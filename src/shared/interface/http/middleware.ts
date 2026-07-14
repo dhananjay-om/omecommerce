@@ -22,7 +22,6 @@ export function notFound(_req: Request, res: Response): void {
 }
 
 /** RFC 9457 problem+json error handler (plan/03 §3). */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   const traceId = res.locals.traceId as string | undefined;
   if (err instanceof DomainError) {
