@@ -2,6 +2,14 @@ import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { Product } from '../domain/product.js';
 import type { ProductRepository, AttributeRepository, AttributeInfo } from '../domain/repositories.js';
 
+/**
+ * Product types that are sold as a single sellable unit with no distinct variant
+ * axes. Inventory (plan/07 §1) keys stock to a variant, so these types get an
+ * implicit ProductVariant (same SKU) created alongside the product. CONFIGURABLE
+ * and BUNDLE products get their variants/components created explicitly later.
+ */
+const IMPLICIT_VARIANT_TYPES = new Set(['SIMPLE', 'DIGITAL', 'VIRTUAL']);
+
 export class PrismaProductRepository implements ProductRepository {
   constructor(private readonly db: Db) {}
 
@@ -12,17 +20,25 @@ export class PrismaProductRepository implements ProductRepository {
 
   async create(product: Product): Promise<Product> {
     const p = product.props;
-    const row = await this.db.product.create({
-      data: {
-        type: p.type,
-        sku: p.sku,
-        attributeSetId: p.attributeSetId,
-        status: p.status,
-        visibility: p.visibility,
-        nameDefault: p.nameDefault,
-        isDigital: p.isDigital,
-        isVirtual: p.isVirtual,
-      },
+    const row = await this.db.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          type: p.type,
+          sku: p.sku,
+          attributeSetId: p.attributeSetId,
+          status: p.status,
+          visibility: p.visibility,
+          nameDefault: p.nameDefault,
+          isDigital: p.isDigital,
+          isVirtual: p.isVirtual,
+        },
+      });
+      if (IMPLICIT_VARIANT_TYPES.has(created.type)) {
+        await tx.productVariant.create({
+          data: { productId: created.id, sku: created.sku, status: 'ACTIVE' },
+        });
+      }
+      return created;
     });
     return Product.fromPersistence({
       id: row.id,

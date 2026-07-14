@@ -79,8 +79,9 @@ model Store {
   updatedBy          BigInt?   @map("updated_by")
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  website    Website     @relation(fields: [websiteId], references: [id])
-  storeViews StoreView[]
+  website        Website          @relation(fields: [websiteId], references: [id])
+  storeViews     StoreView[]
+  warehouseLinks StoreWarehouse[]
 
   @@unique([websiteId, code])
   @@index([deletedAt])

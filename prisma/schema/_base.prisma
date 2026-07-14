@@ -178,3 +178,37 @@ enum MetafieldOwnerType {
   CUSTOMER
   ORDER
 }
+
+// ---------------------------------------------------------------------------
+// Inventory (plan/07-inventory-architecture.md)
+// ---------------------------------------------------------------------------
+
+enum WarehouseType {
+  PHYSICAL
+  VIRTUAL
+  DROPSHIP
+}
+
+/// Reasons a stock_movement row was written. RESERVATION_RELEASE is logged with
+/// delta=0 (audit trail only — releasing a reservation does not change on_hand).
+enum MovementReason {
+  PURCHASE
+  SALE
+  RETURN
+  ADJUSTMENT
+  TRANSFER
+  RESERVATION_RELEASE
+  CORRECTION
+}
+
+enum ReservationRefType {
+  CART
+  ORDER
+}
+
+enum ReservationStatus {
+  ACTIVE
+  COMMITTED
+  RELEASED
+  EXPIRED
+}

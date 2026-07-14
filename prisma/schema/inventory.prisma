@@ -1,0 +1,120 @@
+// =============================================================================
+// inventory.prisma — Warehouses, stock ledger, reservations, store sourcing.
+// See plan/07-inventory-architecture.md. Principle: current stock is a PROJECTION
+// of an immutable, append-only movement ledger. Reservations are race-safe via a
+// guarded UPDATE (see src/modules/inventory/infrastructure/prisma-stock-ledger.ts).
+//
+// NOTE: `stock_item.available` is a GENERATED ALWAYS AS (on_hand - reserved) STORED
+// column, added via raw SQL (prisma/sql/0002_inventory_raw.sql) — same pattern as
+// `scope_rank` in catalog.prisma. It is intentionally NOT declared here (Prisma has
+// no first-class support for STORED generated columns); read it via $queryRaw.
+//
+// NOTE: partitioning stock_movement by created_at (plan/07 §6) is deferred to Stage 6
+// (plan/12 §5) — at dev/early-prod scale a BRIN index on created_at is sufficient and
+// converting a plain table to a partitioned one is a breaking structural change best
+// done as its own migration once volume actually warrants it.
+// =============================================================================
+
+model Warehouse {
+  id        BigInt        @id @default(autoincrement())
+  publicId  String        @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code      String        @unique @db.Citext
+  name      String
+  type      WarehouseType @default(PHYSICAL)
+  /// Free-form until a shared/normalized address table exists (plan/07 §1).
+  address   Json?         @db.JsonB
+  priority  Int           @default(0)
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?       @map("created_by")
+  updatedBy BigInt?       @map("updated_by")
+  deletedAt DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  stockItems StockItem[]
+  storeLinks StoreWarehouse[]
+
+  @@index([deletedAt])
+  @@map("warehouse")
+}
+
+/// One row per (variant, warehouse). on_hand/reserved are projections of the
+/// stock_movement / stock_reservation ledgers; never written directly outside the
+/// guarded-UPDATE ledger methods.
+model StockItem {
+  id           BigInt   @id @default(autoincrement())
+  variantId    BigInt   @map("variant_id")
+  warehouseId  BigInt   @map("warehouse_id")
+  onHand       Int      @default(0) @map("on_hand")
+  reserved     Int      @default(0) @map("reserved")
+  reorderPoint Int?     @map("reorder_point")
+  reorderQty   Int?     @map("reorder_qty")
+  version      Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  variant      ProductVariant     @relation(fields: [variantId], references: [id])
+  warehouse    Warehouse          @relation(fields: [warehouseId], references: [id])
+  movements    StockMovement[]
+  reservations StockReservation[]
+
+  @@unique([variantId, warehouseId])
+  @@index([warehouseId])
+  @@map("stock_item")
+}
+
+/// Append-only. Never updated, never soft-deleted. balance_after is the on_hand
+/// snapshot immediately after this movement, for audit/history queries without
+/// replaying the whole ledger.
+model StockMovement {
+  id           BigInt         @id @default(autoincrement())
+  stockItemId  BigInt         @map("stock_item_id")
+  delta        Int
+  reason       MovementReason
+  refType      String?        @map("ref_type")
+  refId        BigInt?        @map("ref_id")
+  balanceAfter Int            @map("balance_after")
+  note         String?
+  actorId      BigInt?        @map("actor_id")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  stockItem StockItem @relation(fields: [stockItemId], references: [id])
+
+  @@index([stockItemId, createdAt])
+  @@map("stock_movement")
+}
+
+/// Soft hold against a stock_item. ACTIVE reservations increment stock_item.reserved;
+/// commit/release/expire decrement it. Never soft-deleted — status carries the
+/// terminal state (plan/07 §3).
+model StockReservation {
+  id          BigInt             @id @default(autoincrement())
+  publicId    String             @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  stockItemId BigInt             @map("stock_item_id")
+  qty         Int
+  refType     ReservationRefType @map("ref_type")
+  refId       BigInt             @map("ref_id")
+  status      ReservationStatus  @default(ACTIVE)
+  expiresAt   DateTime?          @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  stockItem StockItem @relation(fields: [stockItemId], references: [id])
+
+  @@index([stockItemId])
+  @@map("stock_reservation")
+}
+
+/// Which warehouses serve a store, and in what priority order (plan/07 §4).
+model StoreWarehouse {
+  storeId     BigInt @map("store_id")
+  warehouseId BigInt @map("warehouse_id")
+  priority    Int    @default(0)
+
+  store     Store     @relation(fields: [storeId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@id([storeId, warehouseId])
+  @@index([warehouseId])
+  @@map("store_warehouse")
+}

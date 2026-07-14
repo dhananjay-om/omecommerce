@@ -1,0 +1,118 @@
+import { Router } from 'express';
+import type { Db } from '../../shared/infrastructure/prisma/client.js';
+import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
+import { PrismaWarehouseRepository, PrismaVariantLookup } from './infrastructure/prisma-warehouse.repository.js';
+import { PrismaStockLedger } from './infrastructure/prisma-stock-ledger.js';
+import { CreateWarehouse } from './application/create-warehouse.usecase.js';
+import { AdjustStock } from './application/adjust-stock.usecase.js';
+import { GetStock } from './application/get-stock.usecase.js';
+import { ReserveStock } from './application/reserve-stock.usecase.js';
+import { CommitReservation } from './application/commit-reservation.usecase.js';
+import { ReleaseReservation } from './application/release-reservation.usecase.js';
+import { ReleaseExpiredReservations } from './application/release-expired-reservations.usecase.js';
+import {
+  createWarehouseSchema,
+  adjustStockSchema,
+  getStockQuerySchema,
+  reserveStockSchema,
+} from './interface/http/schemas.js';
+
+export interface InventoryRouters {
+  admin: Router;
+}
+
+/** Composition root for the Inventory module — wires ports to Prisma adapters. */
+export function createInventoryModule(db: Db): InventoryRouters {
+  const warehouses = new PrismaWarehouseRepository(db);
+  const variants = new PrismaVariantLookup(db);
+  const ledger = new PrismaStockLedger(db);
+
+  const createWarehouse = new CreateWarehouse(warehouses);
+  const adjustStock = new AdjustStock(variants, warehouses, ledger);
+  const getStock = new GetStock(variants, warehouses, ledger);
+  const reserveStock = new ReserveStock(variants, warehouses, ledger);
+  const commitReservation = new CommitReservation(ledger);
+  const releaseReservation = new ReleaseReservation(ledger);
+  const releaseExpiredReservations = new ReleaseExpiredReservations(ledger);
+
+  const admin = Router();
+
+  admin.post(
+    '/warehouses',
+    asyncHandler(async (req, res) => {
+      const body = parse(createWarehouseSchema, req.body);
+      const view = await createWarehouse.execute(body);
+      res.status(201).json({ data: view });
+    }),
+  );
+
+  admin.post(
+    '/inventory/adjustments',
+    asyncHandler(async (req, res) => {
+      const body = parse(adjustStockSchema, req.body);
+      const view = await adjustStock.execute({
+        variantPublicId: body.variantId,
+        warehouseCode: body.warehouseCode,
+        delta: body.delta,
+        reason: body.reason,
+        note: body.note,
+      });
+      res.status(201).json({ data: view });
+    }),
+  );
+
+  admin.get(
+    '/inventory/stock',
+    asyncHandler(async (req, res) => {
+      const query = parse(getStockQuerySchema, req.query);
+      const view = await getStock.execute({
+        variantPublicId: query.variantId,
+        warehouseCode: query.warehouseCode,
+      });
+      res.json({ data: view });
+    }),
+  );
+
+  admin.post(
+    '/inventory/reservations',
+    asyncHandler(async (req, res) => {
+      const body = parse(reserveStockSchema, req.body);
+      const view = await reserveStock.execute({
+        variantPublicId: body.variantId,
+        warehouseCode: body.warehouseCode,
+        qty: body.qty,
+        refType: body.refType,
+        refId: body.refId,
+        ttlSeconds: body.ttlSeconds,
+      });
+      res.status(201).json({ data: view });
+    }),
+  );
+
+  admin.post(
+    '/inventory/reservations/:publicId/commit',
+    asyncHandler(async (req, res) => {
+      await commitReservation.execute(req.params.publicId!);
+      res.status(204).send();
+    }),
+  );
+
+  admin.post(
+    '/inventory/reservations/:publicId/release',
+    asyncHandler(async (req, res) => {
+      await releaseReservation.execute(req.params.publicId!);
+      res.status(204).send();
+    }),
+  );
+
+  // Manual trigger for now; scheduled via BullMQ cron in Stage 3 (plan/12 §5).
+  admin.post(
+    '/inventory/reservations/sweep-expired',
+    asyncHandler(async (_req, res) => {
+      const result = await releaseExpiredReservations.execute();
+      res.json({ data: result });
+    }),
+  );
+
+  return { admin };
+}
