@@ -4,6 +4,8 @@ import { logger } from './shared/infrastructure/logger.js';
 import { installBigIntJson } from './shared/interface/http/serialization.js';
 import { requestContext, notFound, errorHandler } from './shared/interface/http/middleware.js';
 import { healthRouter } from './shared/interface/http/health.route.js';
+import { prisma } from './shared/infrastructure/prisma/client.js';
+import { createCatalogModule } from './modules/catalog/catalog.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -20,7 +22,10 @@ export function createApp(): Express {
   // Health / readiness
   app.use(healthRouter);
 
-  // TODO(stage-1+): app.use('/admin/v1', adminRouter); app.use('/store/v1', storeRouter);
+  // Modules
+  const catalog = createCatalogModule(prisma);
+  app.use('/admin/v1', catalog.admin);
+  app.use('/store/v1', catalog.store);
 
   app.use(notFound);
   app.use(errorHandler);
