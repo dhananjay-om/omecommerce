@@ -1,0 +1,423 @@
+// =============================================================================
+// catalog.prisma — Attribute system, Products, Variants, Categories, Media
+// See plan/01-domain-model-and-erd.md §2–§5. The modernized-EAV core.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Attribute system  (attribute_set -> group -> set_attribute -> attribute -> option)
+// ---------------------------------------------------------------------------
+
+model Attribute {
+  id               BigInt             @id @default(autoincrement())
+  code             String             @unique @db.Citext // e.g. "ram", "display_size"
+  label            String
+  dataType         AttributeDataType  @map("data_type")
+  inputType        AttributeInputType @map("input_type")
+  isRequired       Boolean            @default(false) @map("is_required")
+  isSearchable     Boolean            @default(false) @map("is_searchable")
+  isFilterable     Boolean            @default(false) @map("is_filterable")
+  isComparable     Boolean            @default(false) @map("is_comparable")
+  isSortable       Boolean            @default(false) @map("is_sortable")
+  isVisiblePdp     Boolean            @default(true) @map("is_visible_pdp")
+  isVisiblePlp     Boolean            @default(false) @map("is_visible_plp")
+  usedInSearch     Boolean            @default(false) @map("used_in_search")
+  usedInLayeredNav Boolean            @default(false) @map("used_in_layered_nav")
+  isVariantForming Boolean            @default(false) @map("is_variant_forming")
+  scope            AttributeScope     @default(GLOBAL)
+  validationRules  Json               @default("{}") @map("validation_rules") @db.JsonB
+  defaultValue     Json?              @map("default_value") @db.JsonB
+  placeholder      String?
+  tooltip          String?
+  isTranslatable   Boolean            @default(false) @map("is_translatable")
+  referenceType    ReferenceKind?     @map("reference_type")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy        BigInt?            @map("created_by")
+  updatedBy        BigInt?            @map("updated_by")
+  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  options        AttributeOption[]
+  labels         AttributeLabel[]
+  setAssignments AttributeSetAttribute[]
+  productValues  ProductAttributeValue[]
+  variantAxes    VariantAxisValue[]
+
+  @@index([deletedAt])
+  @@index([isFilterable])
+  @@index([isVariantForming])
+  @@map("attribute")
+}
+
+model AttributeOption {
+  id          BigInt    @id @default(autoincrement())
+  attributeId BigInt    @map("attribute_id")
+  value       String
+  label       String
+  swatch      String? // hex color or media reference
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  attribute   Attribute          @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  variantAxes VariantAxisValue[]
+
+  @@unique([attributeId, value])
+  @@index([attributeId, sortOrder])
+  @@map("attribute_option")
+}
+
+model AttributeLabel {
+  id          BigInt @id @default(autoincrement())
+  attributeId BigInt @map("attribute_id")
+  storeViewId BigInt @map("store_view_id")
+  label       String
+
+  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  storeView StoreView @relation(fields: [storeViewId], references: [id], onDelete: Cascade)
+
+  @@unique([attributeId, storeViewId])
+  @@map("attribute_label")
+}
+
+model AttributeSet {
+  id        BigInt    @id @default(autoincrement())
+  code      String    @unique @db.Citext
+  name      String
+  isDefault Boolean   @default(false) @map("is_default")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  groups     AttributeSetGroup[]
+  attributes AttributeSetAttribute[]
+  products   Product[]
+
+  @@index([deletedAt])
+  @@map("attribute_set")
+}
+
+model AttributeSetGroup {
+  id             BigInt @id @default(autoincrement())
+  attributeSetId BigInt @map("attribute_set_id")
+  name           String // "General", "Specifications", "Connectivity"
+  sortOrder      Int    @default(0) @map("sort_order")
+
+  attributeSet AttributeSet            @relation(fields: [attributeSetId], references: [id], onDelete: Cascade)
+  attributes   AttributeSetAttribute[]
+
+  @@unique([attributeSetId, name])
+  @@index([attributeSetId, sortOrder])
+  @@map("attribute_set_group")
+}
+
+/// Junction: which attribute belongs to which group within a set, and in what order.
+model AttributeSetAttribute {
+  id                 BigInt   @id @default(autoincrement())
+  attributeSetId     BigInt   @map("attribute_set_id")
+  groupId            BigInt   @map("group_id")
+  attributeId        BigInt   @map("attribute_id")
+  sortOrder          Int      @default(0) @map("sort_order")
+  isRequiredOverride Boolean? @map("is_required_override")
+
+  attributeSet AttributeSet      @relation(fields: [attributeSetId], references: [id], onDelete: Cascade)
+  group        AttributeSetGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  attribute    Attribute         @relation(fields: [attributeId], references: [id])
+
+  @@unique([attributeSetId, attributeId])
+  @@index([groupId, sortOrder])
+  @@map("attribute_set_attribute")
+}
+
+// ---------------------------------------------------------------------------
+// Products & variants
+// ---------------------------------------------------------------------------
+
+model Product {
+  id             BigInt            @id @default(autoincrement())
+  publicId       String            @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  type           ProductType
+  sku            String            @unique @db.Citext
+  attributeSetId BigInt            @map("attribute_set_id")
+  status         ProductStatus     @default(DRAFT)
+  visibility     ProductVisibility @default(BOTH)
+  taxClassId     BigInt?           @map("tax_class_id") // FK -> tax_class (later phase)
+  weight         Decimal?          @db.Decimal(12, 4)
+  isDigital      Boolean           @default(false) @map("is_digital")
+  isVirtual      Boolean           @default(false) @map("is_virtual")
+  hasVariants    Boolean           @default(false) @map("has_variants")
+  /// Denormalized default name cache for admin lists; authoritative name is a scoped attribute value.
+  nameDefault    String?           @map("name_default")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy      BigInt?           @map("created_by")
+  updatedBy      BigInt?           @map("updated_by")
+  deletedAt      DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  attributeSet    AttributeSet            @relation(fields: [attributeSetId], references: [id])
+  variants        ProductVariant[]
+  attributeValues ProductAttributeValue[]
+  media           ProductMedia[]
+  categories      ProductCategory[]
+  storeViews      ProductStoreView[]
+  linksFrom       ProductLink[]           @relation("LinkSource")
+  linksTo         ProductLink[]           @relation("LinkTarget")
+  bundleItems     ProductBundleItem[]     @relation("BundleParent")
+  componentOf     ProductBundleItem[]     @relation("BundleComponent")
+
+  @@index([status, deletedAt])
+  @@index([attributeSetId])
+  @@index([type])
+  @@map("product")
+}
+
+model ProductVariant {
+  id        BigInt        @id @default(autoincrement())
+  publicId  String        @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  productId BigInt        @map("product_id")
+  sku       String        @unique @db.Citext
+  barcode   String?
+  weight    Decimal?      @db.Decimal(12, 4)
+  position  Int           @default(0)
+  status    VariantStatus @default(ACTIVE)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  product Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  axes    VariantAxisValue[]
+  media   ProductMedia[]
+
+  @@index([productId, deletedAt])
+  @@map("product_variant")
+}
+
+/// Which variant-forming attribute option defines a variant (Color=Red, Size=L, ...).
+model VariantAxisValue {
+  id          BigInt @id @default(autoincrement())
+  variantId   BigInt @map("variant_id")
+  attributeId BigInt @map("attribute_id")
+  optionId    BigInt @map("option_id")
+
+  variant   ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attribute Attribute       @relation(fields: [attributeId], references: [id])
+  option    AttributeOption @relation(fields: [optionId], references: [id])
+
+  @@unique([variantId, attributeId])
+  @@index([attributeId, optionId])
+  @@map("variant_axis_value")
+}
+
+/// Per-store-view visibility / status override for a product (catalog visibility per store).
+model ProductStoreView {
+  id             BigInt         @id @default(autoincrement())
+  productId      BigInt         @map("product_id")
+  storeViewId    BigInt         @map("store_view_id")
+  isVisible      Boolean        @default(true) @map("is_visible")
+  statusOverride ProductStatus? @map("status_override")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // storeViewId FK enforced via raw SQL (keeps StoreView back-relation list clean)
+
+  @@unique([productId, storeViewId])
+  @@index([storeViewId])
+  @@map("product_store_view")
+}
+
+model ProductLink {
+  id              BigInt          @id @default(autoincrement())
+  productId       BigInt          @map("product_id")
+  linkedProductId BigInt          @map("linked_product_id")
+  linkType        ProductLinkType @map("link_type")
+  position        Int             @default(0)
+
+  product       Product @relation("LinkSource", fields: [productId], references: [id], onDelete: Cascade)
+  linkedProduct Product @relation("LinkTarget", fields: [linkedProductId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, linkedProductId, linkType])
+  @@index([productId, linkType])
+  @@map("product_link")
+}
+
+model ProductBundleItem {
+  id                 BigInt          @id @default(autoincrement())
+  bundleProductId    BigInt          @map("bundle_product_id")
+  componentProductId BigInt          @map("component_product_id")
+  groupLabel         String?         @map("group_label")
+  qty                Int             @default(1)
+  isOptional         Boolean         @default(false) @map("is_optional")
+  priceType          BundlePriceType @default(DYNAMIC) @map("price_type")
+  userDefinedQty     Boolean         @default(false) @map("user_defined_qty")
+  sortOrder          Int             @default(0) @map("sort_order")
+
+  bundle    Product @relation("BundleParent", fields: [bundleProductId], references: [id], onDelete: Cascade)
+  component Product @relation("BundleComponent", fields: [componentProductId], references: [id])
+
+  @@index([bundleProductId, sortOrder])
+  @@map("product_bundle_item")
+}
+
+// ---------------------------------------------------------------------------
+// Modernized EAV value table (typed + scoped). See plan 01 §2.2.
+// scope_rank (GENERATED) + CHECK constraints + per-attribute partial indexes
+// are added in prisma/sql/0001_foundation_raw.sql.
+// ---------------------------------------------------------------------------
+
+model ProductAttributeValue {
+  id            BigInt    @id @default(autoincrement())
+  productId     BigInt    @map("product_id")
+  attributeId   BigInt    @map("attribute_id")
+  scope         ScopeType @default(GLOBAL)
+  websiteId     BigInt?   @map("website_id")
+  storeId       BigInt?   @map("store_id")
+  storeViewId   BigInt?   @map("store_view_id")
+  valueText     String?   @map("value_text")
+  valueInt      BigInt?   @map("value_int")
+  valueDecimal  Decimal?  @map("value_decimal") @db.Decimal(18, 4)
+  valueDatetime DateTime? @map("value_datetime") @db.Timestamptz(6)
+  valueJson     Json?     @map("value_json") @db.JsonB
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute Attribute @relation(fields: [attributeId], references: [id])
+
+  @@unique([productId, attributeId, scope, websiteId, storeId, storeViewId], name: "productAttributeScope", map: "uq_pav_scope")
+  @@index([productId])
+  @@map("product_attribute_value")
+}
+
+// ---------------------------------------------------------------------------
+// Categories (unlimited hierarchy: materialized LTREE path + closure table)
+// ---------------------------------------------------------------------------
+
+model Category {
+  id               BigInt                @id @default(autoincrement())
+  publicId         String                @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  parentId         BigInt?               @map("parent_id")
+  /// Materialized path (ltree). Managed via raw SQL / trigger; Unsupported in client.
+  path             Unsupported("ltree")?
+  type             CategoryType          @default(MANUAL)
+  landingPageCmsId BigInt?               @map("landing_page_cms_id")
+  sortMode         CategorySortMode      @default(POSITION) @map("sort_mode")
+  position         Int                   @default(0)
+  nameDefault      String?               @map("name_default")
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy        BigInt?               @map("created_by")
+  updatedBy        BigInt?               @map("updated_by")
+  deletedAt        DateTime?             @map("deleted_at") @db.Timestamptz(6)
+
+  parent      Category?         @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[]        @relation("CategoryTree")
+  products    ProductCategory[]
+  rule        CategoryRule?
+  ancestors   CategoryClosure[] @relation("ClosureDescendant")
+  descendants CategoryClosure[] @relation("ClosureAncestor")
+
+  @@index([parentId])
+  @@index([deletedAt])
+  @@map("category")
+}
+
+/// Transitive-closure table for fast subtree / breadcrumb queries.
+model CategoryClosure {
+  ancestorId   BigInt @map("ancestor_id")
+  descendantId BigInt @map("descendant_id")
+  depth        Int
+
+  ancestor   Category @relation("ClosureAncestor", fields: [ancestorId], references: [id], onDelete: Cascade)
+  descendant Category @relation("ClosureDescendant", fields: [descendantId], references: [id], onDelete: Cascade)
+
+  @@id([ancestorId, descendantId])
+  @@index([descendantId])
+  @@map("category_closure")
+}
+
+model CategoryRule {
+  id         BigInt   @id @default(autoincrement())
+  categoryId BigInt   @unique @map("category_id")
+  rule       Json     @default("{}") @db.JsonB
+  matchType  String   @default("all") @map("match_type") // all | any
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("category_rule")
+}
+
+model ProductCategory {
+  productId  BigInt  @map("product_id")
+  categoryId BigInt  @map("category_id")
+  position   Int     @default(0)
+  isDynamic  Boolean @default(false) @map("is_dynamic")
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId, position])
+  @@map("product_category")
+}
+
+// ---------------------------------------------------------------------------
+// Media (registry; bytes live in MinIO/S3). See plan 01 §5.
+// ---------------------------------------------------------------------------
+
+model MediaAsset {
+  id         BigInt    @id @default(autoincrement())
+  publicId   String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  storageKey String    @unique @map("storage_key")
+  mimeType   String    @map("mime_type")
+  bytes      BigInt
+  width      Int?
+  height     Int?
+  duration   Int? // seconds, for video/audio
+  checksum   String?
+  altDefault String?   @map("alt_default")
+  kind       MediaKind
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  BigInt?   @map("created_by")
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  transforms MediaTransform[]
+  usages     ProductMedia[]
+
+  @@index([kind])
+  @@index([deletedAt])
+  @@map("media_asset")
+}
+
+model MediaTransform {
+  id         BigInt @id @default(autoincrement())
+  assetId    BigInt @map("asset_id")
+  variant    String // "thumb", "medium", "zoom"
+  storageKey String @map("storage_key")
+  width      Int?
+  height     Int?
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, variant])
+  @@map("media_transform")
+}
+
+model ProductMedia {
+  id          BigInt           @id @default(autoincrement())
+  productId   BigInt           @map("product_id")
+  variantId   BigInt?          @map("variant_id")
+  assetId     BigInt           @map("asset_id")
+  role        ProductMediaRole @default(GALLERY)
+  position    Int              @default(0)
+  storeViewId BigInt?          @map("store_view_id") // per-store imagery (FK via raw SQL)
+  altOverride String?          @map("alt_override")
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  asset   MediaAsset      @relation(fields: [assetId], references: [id])
+
+  @@index([productId, position])
+  @@index([variantId])
+  @@index([assetId])
+  @@map("product_media")
+}

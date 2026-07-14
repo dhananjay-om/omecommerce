@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ome
+          POSTGRES_PASSWORD: ome
+          POSTGRES_DB: omecommerce
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ome -d omecommerce"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ome:ome@localhost:5432/omecommerce?schema=public
+      REDIS_URL: redis://localhost:6379
+      INTEGRATION: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate --schema prisma/schema
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Apply migrations (Prisma + raw SQL)
+        run: npm run migrate:deploy
+      - name: Seed
+        run: npm run db:seed
+      - run: npm test

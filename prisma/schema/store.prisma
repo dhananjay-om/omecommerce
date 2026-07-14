@@ -1,0 +1,117 @@
+// =============================================================================
+// store.prisma — Website / Store / Store View + Language / Currency / Theme
+// Scope foundation. See plan/01-domain-model-and-erd.md §1.
+// =============================================================================
+
+model Currency {
+  code       String   @id @db.Char(3) // ISO-4217, e.g. "USD"
+  symbol     String
+  minorUnits Int      @default(2) @map("minor_units")
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  websitesBase Website[]   @relation("WebsiteBaseCurrency")
+  storeViews   StoreView[]
+
+  @@map("currency")
+}
+
+model Language {
+  id         BigInt   @id @default(autoincrement())
+  code       String   @unique // BCP-47, e.g. "en-US"
+  name       String
+  nativeName String   @map("native_name")
+  isRtl      Boolean  @default(false) @map("is_rtl")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  storeViews StoreView[]
+
+  @@map("language")
+}
+
+model Theme {
+  id        BigInt    @id @default(autoincrement())
+  code      String    @unique
+  name      String
+  config    Json      @default("{}") @db.JsonB
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  storeViews StoreView[]
+
+  @@map("theme")
+}
+
+model Website {
+  id             BigInt    @id @default(autoincrement())
+  publicId       String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code           String    @unique @db.Citext // e.g. "us_retail"
+  name           String
+  baseCurrency   String    @map("base_currency") @db.Char(3)
+  defaultStoreId BigInt?   @map("default_store_id") // FK added via raw SQL (deferred cycle)
+  isDefault      Boolean   @default(false) @map("is_default")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy      BigInt?   @map("created_by")
+  updatedBy      BigInt?   @map("updated_by")
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  currency Currency @relation("WebsiteBaseCurrency", fields: [baseCurrency], references: [code])
+  stores   Store[]
+
+  // Exactly one default website enforced by a partial unique index (raw SQL).
+  @@index([deletedAt])
+  @@map("website")
+}
+
+model Store {
+  id                 BigInt    @id @default(autoincrement())
+  publicId           String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId          BigInt    @map("website_id")
+  code               String    @db.Citext
+  name               String
+  rootCategoryId     BigInt?   @map("root_category_id") // FK -> category (raw SQL; avoids cycle)
+  defaultStoreViewId BigInt?   @map("default_store_view_id") // FK -> store_view (raw SQL)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy          BigInt?   @map("created_by")
+  updatedBy          BigInt?   @map("updated_by")
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  website    Website     @relation(fields: [websiteId], references: [id])
+  storeViews StoreView[]
+
+  @@unique([websiteId, code])
+  @@index([deletedAt])
+  @@map("store")
+}
+
+model StoreView {
+  id         BigInt          @id @default(autoincrement())
+  publicId   String          @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  storeId    BigInt          @map("store_id")
+  code       String          @db.Citext
+  languageId BigInt          @map("language_id")
+  currency   String          @db.Char(3)
+  themeId    BigInt?         @map("theme_id")
+  isRtl      Boolean         @default(false) @map("is_rtl")
+  sortOrder  Int             @default(0) @map("sort_order")
+  status     StoreViewStatus @default(ACTIVE)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  BigInt?         @map("created_by")
+  updatedBy  BigInt?         @map("updated_by")
+  deletedAt  DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  store       Store    @relation(fields: [storeId], references: [id])
+  language    Language @relation(fields: [languageId], references: [id])
+  currencyRef Currency @relation(fields: [currency], references: [code])
+  theme       Theme?   @relation(fields: [themeId], references: [id])
+
+  attributeLabels AttributeLabel[]
+
+  @@unique([storeId, code])
+  @@index([deletedAt])
+  @@map("store_view")
+}

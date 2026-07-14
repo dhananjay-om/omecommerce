@@ -1,0 +1,48 @@
+// =============================================================================
+// metafield.prisma — Shopify-style metafields (namespaced, scoped, versioned)
+// See plan/01-domain-model-and-erd.md §2.3.
+// =============================================================================
+
+model MetafieldDefinition {
+  id         BigInt             @id @default(autoincrement())
+  ownerType  MetafieldOwnerType @map("owner_type")
+  namespace  String
+  key        String
+  dataType   AttributeDataType  @map("data_type")
+  validation Json               @default("{}") @db.JsonB
+  scope      AttributeScope     @default(GLOBAL)
+  isVisible  Boolean            @default(true) @map("is_visible")
+  groupName  String?            @map("group_name")
+  sortOrder  Int                @default(0) @map("sort_order")
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  values MetafieldValue[]
+
+  @@unique([ownerType, namespace, key])
+  @@index([ownerType])
+  @@map("metafield_definition")
+}
+
+model MetafieldValue {
+  id           BigInt    @id @default(autoincrement())
+  definitionId BigInt    @map("definition_id")
+  ownerId      BigInt    @map("owner_id")
+  scope        ScopeType @default(GLOBAL)
+  websiteId    BigInt?   @map("website_id")
+  storeId      BigInt?   @map("store_id")
+  storeViewId  BigInt?   @map("store_view_id")
+  languageId   BigInt?   @map("language_id")
+  value        Json      @db.JsonB
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy    BigInt?   @map("created_by")
+
+  definition MetafieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  // Highest version per (definition, owner, scope, store_view, language) is "current".
+  @@unique([definitionId, ownerId, scope, storeViewId, languageId, version], name: "metafieldOwnerScopeVersion", map: "uq_metafield_ver")
+  @@index([definitionId, ownerId])
+  @@map("metafield_value")
+}

@@ -1,0 +1,180 @@
+// =============================================================================
+// OMEcommerce — Prisma schema (Foundation: Store + Catalog core)
+// _base.prisma : datasource, generator, extensions, shared enums
+// -----------------------------------------------------------------------------
+// Multi-file schema (prisma/schema/*.prisma). Requires Prisma >= 5.15.
+// Conventions (see plan/02-prisma-schema-and-migrations.md):
+//   - BigInt identity PKs + external UUIDv7 `publicId`
+//   - snake_case in DB via @map / @@map ; camelCase in TS
+//   - all timestamps @db.Timestamptz ; money Decimal(18,4)
+//   - soft delete via nullable deletedAt (enforced by a client extension)
+//   - Scope FKs (websiteId/storeId/storeViewId) and audit FKs (createdBy/updatedBy)
+//     are kept as PLAIN scalar columns here; their FK constraints, CHECKs, generated
+//     columns, partitioning and specialized indexes live in prisma/sql/*.sql
+//     (hand-appended to the generated migration). This keeps Website/Store/StoreView
+//     free of dozens of noisy back-relations.
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "prismaSchemaFolder"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, ltree, pg_trgm, btree_gin]
+}
+
+// ---------------------------------------------------------------------------
+// Shared enums
+// ---------------------------------------------------------------------------
+
+/// Scope of an overridable value. Resolution order (most specific wins):
+/// STORE_VIEW -> STORE -> WEBSITE -> GLOBAL   (see plan 00 §2, 01 §1)
+enum ScopeType {
+  GLOBAL
+  WEBSITE
+  STORE
+  STORE_VIEW
+}
+
+enum StoreViewStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// The maximum scope granularity an attribute's values may be overridden at.
+enum AttributeScope {
+  GLOBAL
+  WEBSITE
+  STORE_VIEW
+}
+
+enum AttributeDataType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DECIMAL
+  BOOLEAN
+  DATE
+  DATETIME
+  COLOR
+  SELECT
+  MULTISELECT
+  IMAGE
+  FILE
+  URL
+  EMAIL
+  PHONE
+  JSON
+  RICHTEXT
+  REF_PRODUCT
+  REF_CATEGORY
+  REF_BRAND
+  REF_CMS
+  REF_COLLECTION
+  REF_CUSTOMER
+}
+
+enum AttributeInputType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DECIMAL
+  SWITCH
+  DATE
+  DATETIME
+  COLOR_PICKER
+  DROPDOWN
+  MULTISELECT
+  IMAGE_PICKER
+  FILE_UPLOAD
+  RICHTEXT
+  URL
+  EMAIL
+  PHONE
+  JSON_EDITOR
+  REFERENCE
+}
+
+enum ReferenceKind {
+  PRODUCT
+  CATEGORY
+  BRAND
+  CMS
+  COLLECTION
+  CUSTOMER
+}
+
+enum ProductType {
+  SIMPLE
+  CONFIGURABLE
+  BUNDLE
+  DIGITAL
+  VIRTUAL
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProductVisibility {
+  NOT_VISIBLE
+  CATALOG
+  SEARCH
+  BOTH
+}
+
+enum VariantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductLinkType {
+  RELATED
+  CROSS_SELL
+  UP_SELL
+}
+
+enum BundlePriceType {
+  FIXED
+  DYNAMIC
+}
+
+enum CategoryType {
+  MANUAL
+  DYNAMIC
+}
+
+enum CategorySortMode {
+  POSITION
+  NAME
+  PRICE
+  NEWEST
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  MODEL3D
+}
+
+enum ProductMediaRole {
+  GALLERY
+  THUMBNAIL
+  SWATCH
+  VIDEO
+  DOCUMENT
+}
+
+enum MetafieldOwnerType {
+  PRODUCT
+  VARIANT
+  CATEGORY
+  CUSTOMER
+  ORDER
+}

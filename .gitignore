@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+raw_err.log
+coverage/
+.DS_Store
+prisma/.tmp/
