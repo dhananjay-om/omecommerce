@@ -1,6 +1,7 @@
 import { Product } from '../domain/product.js';
 import type { ProductRepository } from '../domain/repositories.js';
 import { ConflictError, ValidationError } from '../../../shared/domain/errors.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { CreateProductCommand, ProductView } from './dto.js';
 
 function parseId(value: string, field: string): bigint {
@@ -11,7 +12,10 @@ function parseId(value: string, field: string): bigint {
 }
 
 export class CreateProduct {
-  constructor(private readonly products: ProductRepository) {}
+  constructor(
+    private readonly products: ProductRepository,
+    private readonly outbox: OutboxWriter,
+  ) {}
 
   async execute(cmd: CreateProductCommand): Promise<ProductView> {
     if (await this.products.existsBySku(cmd.sku.trim())) {
@@ -26,6 +30,17 @@ export class CreateProduct {
       nameDefault: cmd.nameDefault ?? null,
     });
     const saved = await this.products.create(product);
+    // Catalog's first outbox event (Stage 4) — consumed by the search indexer.
+    // Not written in the same transaction as product.create() (that repository
+    // call is a single-statement insert, not a multi-step transaction like
+    // Order's) — an immediate follow-up write, same documented trade-off as
+    // Order's non-OrderPlaced events.
+    await this.outbox.write({
+      aggregateType: 'Product',
+      aggregateId: saved.props.publicId!,
+      eventType: 'ProductCreated',
+      payload: { sku: saved.props.sku },
+    });
     return toView(saved);
   }
 }

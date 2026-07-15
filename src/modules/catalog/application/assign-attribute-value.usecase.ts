@@ -3,6 +3,7 @@ import type { ProductRepository, AttributeRepository, ProductAttributeStore } fr
 import { toColumns } from '../domain/attribute-value.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import type { CacheAside } from '../../../shared/infrastructure/cache/cache-aside.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { pdpCachePrefix } from './get-product-for-store-view.usecase.js';
 import type { AssignAttributeValueCommand } from './dto.js';
 
@@ -45,6 +46,7 @@ export class AssignAttributeValue {
     private readonly attributes: AttributeRepository,
     private readonly store: ProductAttributeStore,
     private readonly cache: CacheAside,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: AssignAttributeValueCommand): Promise<void> {
@@ -70,5 +72,12 @@ export class AssignAttributeValue {
     // handful of Redis keys than to compute exactly which store views a
     // WEBSITE/STORE/STORE_VIEW-scoped change could affect.
     await this.cache.invalidatePrefix(pdpCachePrefix(cmd.productPublicId));
+
+    await this.outbox.write({
+      aggregateType: 'Product',
+      aggregateId: cmd.productPublicId,
+      eventType: 'ProductAttributeChanged',
+      payload: { attributeCode: cmd.attributeCode, scope: cmd.scope },
+    });
   }
 }

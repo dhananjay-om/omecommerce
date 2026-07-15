@@ -11,6 +11,7 @@ import { createInventoryModule } from './modules/inventory/inventory.module.js';
 import { createPricingModule } from './modules/pricing/pricing.module.js';
 import { createOrderModule } from './modules/order/order.module.js';
 import { createAuthModule } from './modules/auth/auth.module.js';
+import { createSearchModule } from './modules/search/search.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -50,6 +51,10 @@ export function createApp(): Express {
   const order = createOrderModule(prisma, auth.authorize);
   app.use('/admin/v1', order.admin);
   app.use('/store/v1', order.store);
+
+  const search = createSearchModule(prisma, auth.authorize);
+  app.use('/admin/v1', search.admin);
+  app.use('/store/v1', search.store);
 
   app.use(notFound);
   app.use(errorHandler);

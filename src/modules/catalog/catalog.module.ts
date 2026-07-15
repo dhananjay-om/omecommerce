@@ -3,6 +3,7 @@ import type { Redis } from 'ioredis';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { PrismaStoreContextResolver } from '../../shared/infrastructure/store-context.repository.js';
 import { CacheAside } from '../../shared/infrastructure/cache/cache-aside.js';
+import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import {
   PrismaProductRepository,
@@ -30,9 +31,10 @@ export function createCatalogModule(db: Db, redis: Redis): CatalogRouters {
   const attrStore = new PrismaProductAttributeStore(db);
   const storeContext = new PrismaStoreContextResolver(db);
   const cache = new CacheAside(redis);
+  const outbox = new OutboxWriter(db);
 
-  const createProduct = new CreateProduct(products);
-  const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache);
+  const createProduct = new CreateProduct(products, outbox);
+  const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
   const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
 
   // --- Admin API ---

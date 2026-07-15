@@ -3,6 +3,7 @@ import { getDomainEventsQueue } from '../shared/infrastructure/queue/queues.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
 import { startOrderConfirmationWorker } from './order-confirmation.worker.js';
 import { startReservationSweepWorker, scheduleReservationSweep } from './reservation-sweep.worker.js';
+import { startSearchIndexerWorker } from './search-indexer.worker.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 export interface WorkerHandles {
@@ -11,8 +12,8 @@ export interface WorkerHandles {
 }
 
 /**
- * Starts background processing (Stage 3 cross-cutting infra): the outbox relay
- * plus its two consumers. Called only from main.ts (the actual running server
+ * Starts background processing (Stage 3/4 cross-cutting infra): the outbox
+ * relay plus its consumers. Called only from main.ts (the actual running server
  * process) — never from createApp()/tests, so the test suite doesn't spin up
  * BullMQ workers or Redis connections it doesn't need.
  */
@@ -23,15 +24,16 @@ export async function startWorkers(): Promise<WorkerHandles> {
 
   const orderConfirmationWorker = startOrderConfirmationWorker();
   const reservationSweepWorker = startReservationSweepWorker();
+  const searchIndexerWorker = startSearchIndexerWorker();
   await scheduleReservationSweep();
 
-  logger.info('background workers started (outbox relay, order confirmation, reservation sweep)');
+  logger.info('background workers started (outbox relay, order confirmation, reservation sweep, search indexer)');
 
   return {
     outboxRelay,
     async stop() {
       outboxRelay.stop();
-      await Promise.allSettled([orderConfirmationWorker.close(), reservationSweepWorker.close()]);
+      await Promise.allSettled([orderConfirmationWorker.close(), reservationSweepWorker.close(), searchIndexerWorker.close()]);
     },
   };
 }
