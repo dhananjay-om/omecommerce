@@ -46,9 +46,12 @@ model Customer {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  addresses       CustomerAddress[]
-  wallets         Wallet[]
-  loyaltyAccounts LoyaltyAccount[]
+  addresses           CustomerAddress[]
+  wallets             Wallet[]
+  loyaltyAccounts     LoyaltyAccount[]
+  referralCodes       ReferralCode[]
+  referralsAsReferrer Referral[]        @relation("ReferralAsReferrer")
+  referralsAsReferee  Referral[]        @relation("ReferralAsReferee")
 
   @@unique([websiteId, email], map: "uq_customer_website_email")
   @@index([deletedAt])

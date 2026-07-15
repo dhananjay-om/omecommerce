@@ -348,6 +348,7 @@ enum WalletSource {
   GIFTCARD_LOAD
   PROMO
   ADMIN_ADJUST
+  REFERRAL
 }
 
 enum GiftCardStatus {
@@ -413,4 +414,53 @@ enum LoyaltySource {
   CUSTOMER
   EXPIRE
   REVERSAL
+  REFERRAL
+}
+
+// ---------------------------------------------------------------------------
+// Referral (plan/11-loyalty-and-referral.md §3) — referrer/referee tracking +
+// rewards. Reuses LoyaltyProgramStatus for ReferralProgram.status (ACTIVE/
+// PAUSED/ENDED) — same concept, same reuse precedent as LoyaltyAccount.status
+// reusing WalletStatus. Reward issuance reuses WalletLedger.credit (source
+// REFERRAL, added above) and LoyaltyLedger.earn (source REFERRAL, added
+// above) directly rather than a new ledger of its own.
+// ---------------------------------------------------------------------------
+
+/// SIGNUP: referrer is rewarded as soon as the referee attaches the code.
+/// FIRST_ORDER: referrer is rewarded when the referee's first qualifying
+/// paid order arrives (optionally gated on ReferralProgram.minOrderAmount).
+enum ReferralQualifyingEvent {
+  SIGNUP
+  FIRST_ORDER
+}
+
+/// Only the two reward types this pass can actually issue through an
+/// existing ledger — no GIFT_CARD (real extra work: HMAC code generation,
+/// see issue-gift-card.usecase.ts) or COUPON (no Promotion/coupon module
+/// exists anywhere in this codebase yet).
+enum ReferralRewardType {
+  STORE_CREDIT
+  POINTS
+}
+
+/// No INVITED state (this pass has no pre-signup click/attribution tracking
+/// — see referral.prisma's header) and no REJECTED state (no admin
+/// fraud-review queue this pass) — a referral is either progressing
+/// normally, EXPIRED (missed its attribution window), or REVERSED (the
+/// qualifying order was refunded after the referrer's reward was granted —
+/// schema-reviewer finding: this status transition, not a mutable
+/// ReferralReward row, is the system of record for "was this clawed back",
+/// keeping ReferralReward a truly immutable one-time-grant row like every
+/// other ledger/grant table in this schema).
+enum ReferralStatus {
+  SIGNED_UP
+  QUALIFIED
+  REWARDED
+  EXPIRED
+  REVERSED
+}
+
+enum ReferralBeneficiary {
+  REFERRER
+  REFEREE
 }

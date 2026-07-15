@@ -1,0 +1,167 @@
+// =============================================================================
+// referral.prisma — Referral program: referrer/referee tracking + rewards
+// (plan/11-loyalty-and-referral.md §3).
+//
+// SCOPE FOR THIS PASS (Stage 5c — completes plan/11, Loyalty was Stage 5b):
+// - ONE program per website (`@@unique([websiteId])`), same simplification as
+//   LoyaltyProgram — no product/category/campaign rules exist to
+//   differentiate multiple programs.
+// - Reward types limited to STORE_CREDIT (wallet) and POINTS (loyalty) — see
+//   ReferralRewardType's doc comment in _base.prisma for why GIFT_CARD/COUPON
+//   are cut.
+// - STORE_CREDIT reward amounts (ReferralProgram.referrer/refereeRewardAmount,
+//   ReferralReward.amount) carry no currency column and always resolve to
+//   the customer's website's base currency at issuance — same simplification
+//   Loyalty's RedeemLoyaltyPoints already makes for its own wallet credit;
+//   a website running multiple wallet currencies per plan/10's design is out
+//   of scope for referral rewards specifically.
+// - NO pre-signup click/attribution tracking (referral_code shared -> click
+//   -> cookie/landing page -> *then* register, per the plan's flow). This is
+//   a backend-only project with no frontend session/cookie infrastructure to
+//   capture that attribution before signup. Simplified to: a logged-in
+//   customer attaches a referral code via one storefront call shortly after
+//   registering. This means a Referral row is only ever created with a KNOWN
+//   refereeCustomerId (never null/pending) — collapses the plan's
+//   invited/signed_up distinction into one state, SIGNED_UP. `createdAt`
+//   doubles as "signed up at" (no separate column — they're always equal by
+//   construction, schema-reviewer finding).
+// - Self-referral: not separately enforced as a device/IP-fingerprint check
+//   (no such infra exists) — the existing @@unique([websiteId, email]) on
+//   Customer already makes literal same-email self-referral impossible;
+//   multi-account fraud (same person, different email) needs fingerprinting
+//   infra that's real future work. No fraud_flags column — nothing would
+//   ever write to it without an admin fraud-review workflow, which this pass
+//   doesn't build either. Same reasoning extends to ReferralCode: no
+//   status/disable mechanism, since nothing this pass would ever set one.
+// - No reward-cap-per-period, no velocity checks — only
+//   maxReferralsPerCustomer (a simple lifetime cap) is kept.
+// - No outbox events emitted (ReferralInvited/Qualified/Rewarded, etc.) —
+//   matches Loyalty's own precedent: this module only *consumes* Order's
+//   events, it doesn't produce its own, since no Notifications/Analytics
+//   consumer exists yet to receive them.
+// - Referral.qualifyingOrderId is a bare Prisma scalar (no Prisma relation,
+//   to avoid an Order -> Referral module dependency) but DOES get a real FK
+//   in raw SQL, ON DELETE SET NULL — same "bare scalar, still FK'd"
+//   convention as Cart.customerGroupId/Order.customerGroupId, not the
+//   genuinely-polymorphic refType/refId convention (LoyaltyTransaction) an
+//   earlier draft wrongly reached for (schema-reviewer finding).
+// =============================================================================
+
+model ReferralProgram {
+  id                      BigInt                  @id @default(autoincrement())
+  publicId                String                  @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId               BigInt                  @map("website_id") // scope scalar; FK added in raw SQL
+  name                    String
+  status                  LoyaltyProgramStatus    @default(ACTIVE)
+  qualifyingEvent         ReferralQualifyingEvent @default(FIRST_ORDER) @map("qualifying_event")
+  /// Only meaningful when qualifyingEvent = FIRST_ORDER.
+  minOrderAmount          Decimal?                @map("min_order_amount") @db.Decimal(18, 4)
+  referrerRewardType      ReferralRewardType      @map("referrer_reward_type")
+  /// Exactly one of referrerRewardAmount/referrerRewardPoints is populated,
+  /// matching referrerRewardType — enforced by a raw-SQL CHECK (schema-reviewer
+  /// finding), same discipline as product_attribute_value's pav_value_present.
+  referrerRewardAmount    Decimal?                @map("referrer_reward_amount") @db.Decimal(18, 4)
+  referrerRewardPoints    BigInt?                 @map("referrer_reward_points")
+  refereeRewardType       ReferralRewardType      @map("referee_reward_type")
+  refereeRewardAmount     Decimal?                @map("referee_reward_amount") @db.Decimal(18, 4)
+  refereeRewardPoints     BigInt?                 @map("referee_reward_points")
+  /// Null = unlimited.
+  maxReferralsPerCustomer Int?                    @map("max_referrals_per_customer")
+  /// Null = unlimited — no deadline on the referee's qualifying order.
+  attributionWindowDays   Int?                    @map("attribution_window_days")
+  createdBy               BigInt?                 @map("created_by")
+  updatedBy               BigInt?                 @map("updated_by")
+  createdAt               DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt               DateTime?               @map("deleted_at") @db.Timestamptz(6)
+
+  codes     ReferralCode[]
+  referrals Referral[]
+
+  @@unique([websiteId], map: "uq_referral_program_website")
+  @@index([deletedAt])
+  @@map("referral_program")
+}
+
+/// A referrer's shareable code, lazy-created on first request (same
+/// get-or-create pattern as Wallet/LoyaltyAccount) — never admin-issued.
+model ReferralCode {
+  id         BigInt   @id @default(autoincrement())
+  publicId   String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  programId  BigInt   @map("program_id")
+  customerId BigInt   @map("customer_id")
+  /// Case-insensitive lookup key, not a bearer-redeemable secret — no HMAC
+  /// needed (unlike gift-card codes).
+  code       String   @unique @db.Citext
+  usesCount  Int      @default(0) @map("uses_count")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program   ReferralProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  customer  Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  referrals Referral[]
+
+  @@unique([programId, customerId], map: "uq_referral_code_program_customer")
+  @@index([customerId])
+  @@map("referral_code")
+}
+
+/// A tracked referral relationship. No deletedAt — a referral is a permanent
+/// historical fact (who referred whom), same reasoning as Order not being
+/// soft-deletable.
+model Referral {
+  id                 BigInt         @id @default(autoincrement())
+  publicId           String         @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  programId          BigInt         @map("program_id")
+  referralCodeId     BigInt         @map("referral_code_id")
+  referrerCustomerId BigInt         @map("referrer_customer_id")
+  refereeCustomerId  BigInt         @map("referee_customer_id")
+  status             ReferralStatus @default(SIGNED_UP)
+  /// Bare scalar (no Prisma relation) but FK'd in raw SQL, ON DELETE SET NULL
+  /// — see header comment.
+  qualifyingOrderId  BigInt?        @map("qualifying_order_id")
+  qualifiedAt        DateTime?      @map("qualified_at") @db.Timestamptz(6)
+  rewardedAt         DateTime?      @map("rewarded_at") @db.Timestamptz(6)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program      ReferralProgram  @relation(fields: [programId], references: [id], onDelete: Restrict)
+  referralCode ReferralCode     @relation(fields: [referralCodeId], references: [id], onDelete: Restrict)
+  referrer     Customer         @relation("ReferralAsReferrer", fields: [referrerCustomerId], references: [id], onDelete: Restrict)
+  referee      Customer         @relation("ReferralAsReferee", fields: [refereeCustomerId], references: [id], onDelete: Restrict)
+  rewards      ReferralReward[]
+
+  /// A customer can be referred at most once per program — this is also what
+  /// makes "the referee's first order after signup qualifies" correct
+  /// without a separate customer-wide order-count query.
+  @@unique([programId, refereeCustomerId], map: "uq_referral_program_referee")
+  @@index([referrerCustomerId])
+  @@index([referralCodeId])
+  @@index([qualifyingOrderId])
+  @@map("referral")
+}
+
+/// One-time reward grants, not a running balance — an "issue" is a guarded
+/// insert relying on @@unique([referralId, beneficiary]) for idempotency, no
+/// ledger/projection needed the way Wallet/Loyalty need one. Truly immutable
+/// (no updatedAt) — unlike an earlier draft, a refund-driven clawback is
+/// recorded as a NEW compensating entry in the WalletTransaction/
+/// LoyaltyTransaction ledger (refType='Referral', refId=referral.id) plus
+/// Referral.status transitioning to REVERSED, never as a mutation on this
+/// row (schema-reviewer finding — keeps this table consistent with every
+/// other append-only grant/ledger table here).
+model ReferralReward {
+  id          BigInt              @id @default(autoincrement())
+  referralId  BigInt              @map("referral_id")
+  beneficiary ReferralBeneficiary
+  rewardType  ReferralRewardType  @map("reward_type")
+  /// Exactly one of amount/points is populated, matching rewardType —
+  /// enforced by a raw-SQL CHECK (schema-reviewer finding).
+  amount      Decimal?            @db.Decimal(18, 4)
+  points      BigInt?
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  referral Referral @relation(fields: [referralId], references: [id], onDelete: Restrict)
+
+  @@unique([referralId, beneficiary], map: "uq_referral_reward_referral_beneficiary")
+  @@map("referral_reward")
+}

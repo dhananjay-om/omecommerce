@@ -8,6 +8,7 @@ import { startReservationSweepWorker, scheduleReservationSweep } from './reserva
 import { createSearchIndexHandler } from './search-indexer.worker.js';
 import { startBulkImportWorker } from './bulk-import.worker.js';
 import { createLoyaltyEarnHandler } from './loyalty-earn.worker.js';
+import { createReferralQualifyHandler } from './referral-qualify.worker.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 export interface WorkerHandles {
@@ -17,17 +18,23 @@ export interface WorkerHandles {
 
 /**
  * DOMAIN_EVENTS_QUEUE has several logical consumers (order confirmation,
- * search indexing, loyalty earn/clawback), but BullMQ delivers each job to
- * exactly ONE Worker attached to a given queue name — separate Worker
- * instances on the same queue COMPETE for jobs rather than each getting a
- * copy. All of them therefore run inside this single Worker, dispatched by
- * job name; each handler independently no-ops for job names it doesn't care
- * about. A handler's failure is logged and does not stop the others from
- * running for the same job (each handler's own idempotency is what makes
- * re-processing that job later, e.g. after a fix, safe).
+ * search indexing, loyalty earn/clawback, referral qualify/clawback), but
+ * BullMQ delivers each job to exactly ONE Worker attached to a given queue
+ * name — separate Worker instances on the same queue COMPETE for jobs rather
+ * than each getting a copy. All of them therefore run inside this single
+ * Worker, dispatched by job name; each handler independently no-ops for job
+ * names it doesn't care about. A handler's failure is logged and does not
+ * stop the others from running for the same job (each handler's own
+ * idempotency is what makes re-processing that job later, e.g. after a fix,
+ * safe).
  */
 function startDomainEventsWorker(): Worker {
-  const handlers: Array<(job: Job) => Promise<void>> = [handleOrderConfirmation, createSearchIndexHandler(), createLoyaltyEarnHandler()];
+  const handlers: Array<(job: Job) => Promise<void>> = [
+    handleOrderConfirmation,
+    createSearchIndexHandler(),
+    createLoyaltyEarnHandler(),
+    createReferralQualifyHandler(),
+  ];
 
   const worker = new Worker(
     DOMAIN_EVENTS_QUEUE,
@@ -61,7 +68,9 @@ export async function startWorkers(): Promise<WorkerHandles> {
   const bulkImportWorker = startBulkImportWorker();
   await scheduleReservationSweep();
 
-  logger.info('background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn], reservation sweep, bulk import)');
+  logger.info(
+    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify], reservation sweep, bulk import)',
+  );
 
   return {
     outboxRelay,

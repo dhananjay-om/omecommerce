@@ -19,6 +19,7 @@ import { createCmsModule } from './modules/cms/cms.module.js';
 import { createWalletModule } from './modules/wallet/wallet.module.js';
 import { createGiftCardModule } from './modules/giftcard/giftcard.module.js';
 import { createLoyaltyModule } from './modules/loyalty/loyalty.module.js';
+import { createReferralModule } from './modules/referral/referral.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -84,6 +85,10 @@ export function createApp(): Express {
   const loyalty = createLoyaltyModule(prisma, auth.authorize, customer.authenticateCustomer);
   app.use('/admin/v1', loyalty.admin);
   app.use('/store/v1', loyalty.store);
+
+  const referral = createReferralModule(prisma, auth.authorize, customer.authenticateCustomer);
+  app.use('/admin/v1', referral.admin);
+  app.use('/store/v1', referral.store);
 
   app.use(notFound);
   app.use(errorHandler);
