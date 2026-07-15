@@ -5,7 +5,8 @@ import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { StockLedger, ReservationHandle } from '../../inventory/domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import { PaymentDeclinedError } from '../domain/errors.js';
-import { addMinor, multiplyByQty, toMinorUnits } from '../../../shared/domain/decimal.js';
+import { addMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { CompleteCheckoutCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
@@ -48,6 +49,7 @@ export class CompleteCheckout {
     private readonly taxCalculator: TaxCalculator,
     private readonly shippingCalculator: ShippingCalculator,
     private readonly paymentGateway: PaymentGateway,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: CompleteCheckoutCommand): Promise<OrderViewDto> {
@@ -215,9 +217,21 @@ export class CompleteCheckout {
       }
       await this.orders.setFinancialStatus(order.id, 'PAID');
       await this.orders.setOrderStatus(order.id, 'PROCESSING');
+      await this.outbox.write({
+        aggregateType: 'Order',
+        aggregateId: order.publicId,
+        eventType: 'OrderPaid',
+        payload: { orderNumber: order.orderNumber, grandTotal: fromMinorUnits(grandTotalMinor) },
+      });
     } else {
       await this.releaseAll(reservations);
       await this.orders.setOrderStatus(order.id, 'CANCELLED');
+      await this.outbox.write({
+        aggregateType: 'Order',
+        aggregateId: order.publicId,
+        eventType: 'OrderPaymentFailed',
+        payload: { orderNumber: order.orderNumber, gatewayRef: payment.gatewayRef },
+      });
       throw new PaymentDeclinedError(order.publicId, payment.gatewayRef);
     }
 

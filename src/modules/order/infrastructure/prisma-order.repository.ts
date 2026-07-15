@@ -2,6 +2,8 @@ import type { PaymentTxnType, PaymentTxnStatus, ShipmentStatus, FinancialStatus,
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import type { OrderRepository, CreateOrderInput, OrderView } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
+import { FulfillmentExceedsQtyError, RefundExceedsQtyError } from '../domain/errors.js';
 
 /**
  * Prisma's Decimal (decimal.js) normalizes trailing zeros on toString()
@@ -13,7 +15,6 @@ import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js'
 function formatDecimal(value: { toString(): string }): string {
   return fromMinorUnits(toMinorUnits(value.toString()));
 }
-import { FulfillmentExceedsQtyError, RefundExceedsQtyError } from '../domain/errors.js';
 
 export class PrismaOrderRepository implements OrderRepository {
   constructor(private readonly db: Db) {}
@@ -72,6 +73,14 @@ export class PrismaOrderRepository implements OrderRepository {
           })),
         });
       }
+      // Same-transaction outbox write (true atomicity) — order creation and its
+      // OrderPlaced event either both commit or both roll back together.
+      await new OutboxWriter(tx).write({
+        aggregateType: 'Order',
+        aggregateId: order.publicId,
+        eventType: 'OrderPlaced',
+        payload: { orderNumber: order.orderNumber.toString(), email: order.email, grandTotal: fromMinorUnits(input.grandTotalMinor) },
+      });
       return { order, lines };
     });
 

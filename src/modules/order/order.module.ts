@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { PrismaStoreContextResolver } from '../../shared/infrastructure/store-context.repository.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
+import { idempotent } from '../../shared/infrastructure/idempotency/idempotency.middleware.js';
 import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-resolver.js';
 import { PrismaStockLedger } from '../inventory/infrastructure/prisma-stock-ledger.js';
 import { PrismaCartRepository } from './infrastructure/prisma-cart.repository.js';
@@ -11,6 +12,7 @@ import { PrismaTaxClassLookup, NativeTaxCalculator } from './infrastructure/nati
 import { NativeShippingCalculator } from './infrastructure/native-shipping-calculator.js';
 import { TestPaymentGateway } from './infrastructure/test-payment-gateway.js';
 import { PrismaTaxClassRepository, PrismaShippingMethodRepository } from './infrastructure/prisma-setup.repository.js';
+import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { CreateCart } from './application/create-cart.usecase.js';
 import { AddCartLine } from './application/add-cart-line.usecase.js';
 import { CompleteCheckout } from './application/complete-checkout.usecase.js';
@@ -39,7 +41,7 @@ export interface OrderRouters {
  * Pricing's PriceResolver directly (see complete-checkout.usecase.ts's header
  * comment for why) rather than duplicating their correctness-critical logic.
  */
-export function createOrderModule(db: Db): OrderRouters {
+export function createOrderModule(db: Db, authorize: (permission: string) => RequestHandler): OrderRouters {
   const storeContext = new PrismaStoreContextResolver(db);
   const priceResolver = new PrismaPriceResolver(db);
   const ledger = new PrismaStockLedger(db);
@@ -55,6 +57,7 @@ export function createOrderModule(db: Db): OrderRouters {
   const paymentGateway = new TestPaymentGateway();
   const taxClasses = new PrismaTaxClassRepository(db);
   const shippingMethods = new PrismaShippingMethodRepository(db);
+  const outbox = new OutboxWriter(db);
 
   const createCart = new CreateCart(carts, storeContext, customerGroups);
   const addCartLine = new AddCartLine(carts, variants);
@@ -69,11 +72,12 @@ export function createOrderModule(db: Db): OrderRouters {
     taxCalculator,
     shippingCalculator,
     paymentGateway,
+    outbox,
   );
   const getOrder = new GetOrder(orders);
   const fulfillOrder = new FulfillOrder(orders, warehouses);
-  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses);
-  const cancelOrder = new CancelOrder(orders, refundOrder);
+  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox);
+  const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
 
@@ -107,6 +111,7 @@ export function createOrderModule(db: Db): OrderRouters {
   );
   admin.post(
     '/orders/:publicId/refunds',
+    authorize('orders:refund'),
     asyncHandler(async (req, res) => {
       const body = parse(refundOrderSchema, req.body);
       res.json({ data: await refundOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
@@ -114,6 +119,7 @@ export function createOrderModule(db: Db): OrderRouters {
   );
   admin.post(
     '/orders/:publicId/cancel',
+    authorize('orders:cancel'),
     asyncHandler(async (req, res) => {
       res.json({ data: await cancelOrder.execute({ orderPublicId: req.params.publicId! }) });
     }),
@@ -136,6 +142,7 @@ export function createOrderModule(db: Db): OrderRouters {
   );
   store.post(
     '/carts/:publicId/checkout',
+    idempotent('POST /store/v1/carts/:publicId/checkout'),
     asyncHandler(async (req, res) => {
       const body = parse(completeCheckoutSchema, req.body);
       res.status(201).json({ data: await completeCheckout.execute({ cartPublicId: req.params.publicId!, ...body }) });

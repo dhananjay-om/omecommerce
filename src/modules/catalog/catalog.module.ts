@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import type { Redis } from 'ioredis';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { PrismaStoreContextResolver } from '../../shared/infrastructure/store-context.repository.js';
+import { CacheAside } from '../../shared/infrastructure/cache/cache-aside.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import {
   PrismaProductRepository,
@@ -22,15 +24,16 @@ export interface CatalogRouters {
 }
 
 /** Composition root for the Catalog module — wires ports to Prisma adapters. */
-export function createCatalogModule(db: Db): CatalogRouters {
+export function createCatalogModule(db: Db, redis: Redis): CatalogRouters {
   const products = new PrismaProductRepository(db);
   const attributes = new PrismaAttributeRepository(db);
   const attrStore = new PrismaProductAttributeStore(db);
   const storeContext = new PrismaStoreContextResolver(db);
+  const cache = new CacheAside(redis);
 
   const createProduct = new CreateProduct(products);
-  const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore);
-  const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext);
+  const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache);
+  const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
 
   // --- Admin API ---
   const admin = Router();

@@ -2,6 +2,8 @@ import { ScopeType } from '@prisma/client';
 import type { ProductRepository, AttributeRepository, ProductAttributeStore } from '../domain/repositories.js';
 import { toColumns } from '../domain/attribute-value.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+import type { CacheAside } from '../../../shared/infrastructure/cache/cache-aside.js';
+import { pdpCachePrefix } from './get-product-for-store-view.usecase.js';
 import type { AssignAttributeValueCommand } from './dto.js';
 
 function parseId(value: string | null | undefined): bigint | null {
@@ -42,6 +44,7 @@ export class AssignAttributeValue {
     private readonly products: ProductRepository,
     private readonly attributes: AttributeRepository,
     private readonly store: ProductAttributeStore,
+    private readonly cache: CacheAside,
   ) {}
 
   async execute(cmd: AssignAttributeValueCommand): Promise<void> {
@@ -61,5 +64,11 @@ export class AssignAttributeValue {
       ...targets,
       columns,
     });
+
+    // Invalidate every store-view's cached PDP for this product — a GLOBAL-scope
+    // change affects all of them, and it's simpler/safer to over-invalidate a
+    // handful of Redis keys than to compute exactly which store views a
+    // WEBSITE/STORE/STORE_VIEW-scoped change could affect.
+    await this.cache.invalidatePrefix(pdpCachePrefix(cmd.productPublicId));
   }
 }

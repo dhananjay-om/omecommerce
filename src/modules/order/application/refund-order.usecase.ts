@@ -2,7 +2,8 @@ import type { OrderRepository, VariantLookup, WarehouseResolver } from '../domai
 import type { StockLedger } from '../../inventory/domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError } from '../domain/errors.js';
-import { addMinor, toMinorUnits } from '../../../shared/domain/decimal.js';
+import { addMinor, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { RefundOrderCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
@@ -14,6 +15,7 @@ export class RefundOrder {
     private readonly ledger: StockLedger,
     private readonly variants: VariantLookup,
     private readonly warehouses: WarehouseResolver,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: RefundOrderCommand): Promise<OrderViewDto> {
@@ -69,6 +71,12 @@ export class RefundOrder {
     const updated = await this.orders.findByPublicId(cmd.orderPublicId);
     const allRefunded = updated!.lines.every((l) => l.refundedQty >= l.qty);
     await this.orders.setFinancialStatus(order.id, allRefunded ? 'REFUNDED' : 'PARTIALLY_REFUNDED');
+    await this.outbox.write({
+      aggregateType: 'Order',
+      aggregateId: order.publicId,
+      eventType: 'OrderRefunded',
+      payload: { orderNumber: order.orderNumber, amount: fromMinorUnits(refundTotalMinor), restocked: restock },
+    });
 
     const final = await this.orders.findByPublicId(cmd.orderPublicId);
     return toOrderDto(final!);

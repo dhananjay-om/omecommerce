@@ -4,8 +4,10 @@
  * Mirrors plan/02-prisma-schema-and-migrations.md §6.5.
  */
 import { PrismaClient, ProductType, ProductStatus } from '@prisma/client';
+import { ScryptPasswordHasher } from '../src/modules/auth/infrastructure/scrypt-password-hasher.js';
 
 const prisma = new PrismaClient();
+const hasher = new ScryptPasswordHasher();
 
 async function main() {
   // --- reference data ---
@@ -79,7 +81,37 @@ async function main() {
     skipDuplicates: true,
   });
 
+  // --- RBAC: permissions, a super-admin role, and a default dev admin user ---
+  const PERMISSIONS = [
+    { code: 'admin:manage', description: 'Create/manage admin users' },
+    { code: 'orders:refund', description: 'Issue order refunds' },
+    { code: 'orders:cancel', description: 'Cancel orders' },
+    { code: 'inventory:adjust', description: 'Adjust warehouse stock levels' },
+  ];
+  for (const p of PERMISSIONS) {
+    await prisma.permission.upsert({ where: { code: p.code }, update: {}, create: p });
+  }
+  const superAdminRole = await prisma.role.upsert({
+    where: { code: 'super-admin' },
+    update: {},
+    create: { code: 'super-admin', name: 'Super Admin' },
+  });
+  const allPermissions = await prisma.permission.findMany({ select: { id: true } });
+  await prisma.rolePermission.createMany({
+    data: allPermissions.map((p) => ({ roleId: superAdminRole.id, permissionId: p.id })),
+    skipDuplicates: true,
+  });
+  const DEV_ADMIN_EMAIL = 'admin@ome.local';
+  const DEV_ADMIN_PASSWORD = 'dev-only-password-change-me'; // dev/demo seed only — never a real credential
+  const existingAdmin = await prisma.adminUser.findFirst({ where: { email: DEV_ADMIN_EMAIL } });
+  if (!existingAdmin) {
+    const passwordHash = await hasher.hash(DEV_ADMIN_PASSWORD);
+    const admin = await prisma.adminUser.create({ data: { email: DEV_ADMIN_EMAIL, passwordHash } });
+    await prisma.adminUserRole.create({ data: { adminUserId: admin.id, roleId: superAdminRole.id } });
+  }
+
   console.log('Seed complete: website=%s store=%s product=%s', website.code, store.code, product.sku);
+  console.log('Dev admin login: %s / %s', DEV_ADMIN_EMAIL, DEV_ADMIN_PASSWORD);
 }
 
 main()

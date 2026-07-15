@@ -1,0 +1,155 @@
+// =============================================================================
+// system.prisma — Cross-cutting Stage 3 infrastructure (plan/12 §5, plan/00 §4.8):
+// idempotency keys, the transactional outbox, and admin auth/RBAC.
+//
+// SCOPE FOR THIS PASS:
+// - Idempotency is scoped per (route, key) — not a bare global unique on key —
+//   since two different endpoints could otherwise collide on a naively-chosen
+//   client key. It is a CLAIM/COMPLETE state machine, not a response cache: the
+//   app INSERTs an IN_PROGRESS row (atomically claiming the key) BEFORE running
+//   the handler, so a concurrent duplicate request hits the unique constraint
+//   immediately and never executes the handler a second time — see `status`.
+// - The outbox is intentionally generic (aggregateType/aggregateId/eventType/
+//   payload), not one table per event — a single relay + queue serves every
+//   producer. OrderPlaced's write happens inside the same DB transaction as
+//   order creation (true atomicity); OrderPaid/Cancelled/Refunded are written as
+//   an immediate follow-up call after their status transition, not nested in the
+//   same transaction — a documented, deliberate relaxation acceptable because (a)
+//   the outbox relay still guarantees at-least-once delivery regardless, and (b)
+//   the consumers built in this stage are themselves idempotent (a duplicate
+//   "send confirmation" log is harmless). Tightening this to full same-transaction
+//   atomicity for every event is a straightforward follow-up, not a redesign.
+//   Like stock_movement/order, it is NOT partitioned yet (deferred to Stage 6,
+//   plan/12 §5); a BRIN index on created_at is the interim mitigation, same
+//   precedent exactly.
+// - Auth/RBAC covers ADMIN users only — full Customer accounts (storefront
+//   login) remain deferred, consistent with every prior Cart/Order decision
+//   (guest checkout only). `role`/`permission`/`role_permission` match plan/04 §1
+//   exactly; `admin_user_role` is the plan's `user_role` renamed to disambiguate
+//   from a future Customer `user`. plan/04 §1 also lists `user_store_scope` (an
+//   admin may be limited to specific websites/stores) — DEFERRED here: it has no
+//   consuming application logic yet (no per-store admin delegation workflow
+//   exists), so it isn't added as an inert table. This stage ships permission-
+//   based RBAC only (an admin either has a permission platform-wide, or doesn't);
+//   store-scoped restriction is a separable follow-up feature.
+// - `Role` has no soft-delete: RolePermission/AdminUserRole reference it with
+//   `onDelete: Cascade`, which only fires on a hard DELETE — a soft-deleted role
+//   would silently keep granting every permission it holds to every admin still
+//   assigned it. Unlike Website/Store/Product (historical/financial references
+//   that must survive their referent's removal), a Role is pure security
+//   configuration with no other table holding a historical FK to it, so hard-
+//   delete + CASCADE is the simpler and CORRECT choice here, not a downgrade.
+// =============================================================================
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+/// Guards a money-moving POST against duplicate submission (retry, double-click,
+/// at-least-once delivery upstream). A claim/complete state machine, not a bare
+/// response cache — see header comment.
+model IdempotencyKey {
+  id             BigInt            @id @default(autoincrement())
+  route          String
+  key            String
+  requestHash    String            @map("request_hash")
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body") @db.JsonB
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz(6)
+
+  @@unique([route, key])
+  @@index([expiresAt])
+  @@map("idempotency_key")
+}
+
+/// The transactional outbox (plan/00 §4.8). A relay polls unpublished rows and
+/// enqueues them to BullMQ; publishedAt is set once enqueued (not once consumed —
+/// consumer-side idempotency handles redelivery, this only guarantees the event
+/// left the outbox at least once).
+model OutboxEvent {
+  id            BigInt    @id @default(autoincrement())
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id")
+  eventType     String    @map("event_type")
+  payload       Json      @db.JsonB
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz(6)
+
+  @@map("outbox_event")
+}
+
+model AdminUser {
+  id           BigInt    @id @default(autoincrement())
+  publicId     String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  email        String    @unique @db.Citext
+  passwordHash String    @map("password_hash")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy    BigInt?   @map("created_by")
+  updatedBy    BigInt?   @map("updated_by")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  roles AdminUserRole[]
+
+  @@index([deletedAt])
+  @@map("admin_user")
+}
+
+/// No soft-delete — see header comment (a Role is security config, not a
+/// historical/financial record; hard-delete + CASCADE is correct here).
+model Role {
+  id        BigInt   @id @default(autoincrement())
+  code      String   @unique @db.Citext
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+
+  permissions RolePermission[]
+  users       AdminUserRole[]
+
+  @@map("role")
+}
+
+model Permission {
+  id          BigInt   @id @default(autoincrement())
+  code        String   @unique @db.Citext // e.g. "orders:refund", "inventory:adjust"
+  description String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  roles RolePermission[]
+
+  @@map("permission")
+}
+
+model RolePermission {
+  roleId       BigInt @map("role_id")
+  permissionId BigInt @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permission")
+}
+
+model AdminUserRole {
+  adminUserId BigInt @map("admin_user_id")
+  roleId      BigInt @map("role_id")
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([adminUserId, roleId])
+  @@index([roleId])
+  @@map("admin_user_role")
+}

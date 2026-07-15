@@ -2,6 +2,7 @@ import type { OrderRepository } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError } from '../domain/errors.js';
 import { RefundOrder } from './refund-order.usecase.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { CancelOrderCommand, OrderViewDto } from './dto.js';
 
 /**
@@ -13,6 +14,7 @@ export class CancelOrder {
   constructor(
     private readonly orders: OrderRepository,
     private readonly refundOrder: RefundOrder,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: CancelOrderCommand): Promise<OrderViewDto> {
@@ -31,6 +33,12 @@ export class CancelOrder {
     });
 
     await this.orders.setOrderStatus(order.id, 'CANCELLED');
+    await this.outbox.write({
+      aggregateType: 'Order',
+      aggregateId: order.publicId,
+      eventType: 'OrderCancelled',
+      payload: { orderNumber: order.orderNumber },
+    });
     return { ...result, status: 'CANCELLED' };
   }
 }

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaWarehouseRepository, PrismaVariantLookup } from './infrastructure/prisma-warehouse.repository.js';
@@ -22,7 +22,7 @@ export interface InventoryRouters {
 }
 
 /** Composition root for the Inventory module — wires ports to Prisma adapters. */
-export function createInventoryModule(db: Db): InventoryRouters {
+export function createInventoryModule(db: Db, authorize: (permission: string) => RequestHandler): InventoryRouters {
   const warehouses = new PrismaWarehouseRepository(db);
   const variants = new PrismaVariantLookup(db);
   const ledger = new PrismaStockLedger(db);
@@ -48,6 +48,7 @@ export function createInventoryModule(db: Db): InventoryRouters {
 
   admin.post(
     '/inventory/adjustments',
+    authorize('inventory:adjust'),
     asyncHandler(async (req, res) => {
       const body = parse(adjustStockSchema, req.body);
       const view = await adjustStock.execute({
@@ -105,7 +106,8 @@ export function createInventoryModule(db: Db): InventoryRouters {
     }),
   );
 
-  // Manual trigger for now; scheduled via BullMQ cron in Stage 3 (plan/12 §5).
+  // Also scheduled as a repeatable BullMQ job (src/workers/reservation-sweep.worker.ts);
+  // this endpoint remains for on-demand/manual runs and tests.
   admin.post(
     '/inventory/reservations/sweep-expired',
     asyncHandler(async (_req, res) => {
