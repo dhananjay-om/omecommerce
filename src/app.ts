@@ -18,6 +18,7 @@ import { createWishlistModule } from './modules/wishlist/wishlist.module.js';
 import { createCmsModule } from './modules/cms/cms.module.js';
 import { createWalletModule } from './modules/wallet/wallet.module.js';
 import { createGiftCardModule } from './modules/giftcard/giftcard.module.js';
+import { createLoyaltyModule } from './modules/loyalty/loyalty.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -79,6 +80,10 @@ export function createApp(): Express {
   const giftcard = createGiftCardModule(prisma, env.GIFT_CARD_HMAC_SECRET, auth.authorize, customer.authenticateCustomer);
   app.use('/admin/v1', giftcard.admin);
   app.use('/store/v1', giftcard.store);
+
+  const loyalty = createLoyaltyModule(prisma, auth.authorize, customer.authenticateCustomer);
+  app.use('/admin/v1', loyalty.admin);
+  app.use('/store/v1', loyalty.store);
 
   app.use(notFound);
   app.use(errorHandler);

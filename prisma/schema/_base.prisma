@@ -381,3 +381,36 @@ enum GiftCardTxnType {
   VOID
   EXPIRE
 }
+
+// ---------------------------------------------------------------------------
+// Loyalty (plan/11-loyalty-and-referral.md) — points ledger. Reuses
+// WalletStatus for LoyaltyAccount.status (ACTIVE/FROZEN) — same concept, no
+// duplicate enum needed.
+// ---------------------------------------------------------------------------
+
+enum LoyaltyProgramStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum LoyaltyTxnType {
+  EARN
+  REDEEM
+  EXPIRE
+  ADJUST
+  REVERSE
+}
+
+/// Simplified from plan/11's many trigger types (order_paid/product_purchase/
+/// signup/review/birthday/referral/newsletter/social/custom) — only
+/// order-paid earning is built this pass. CUSTOMER = self-service redemption
+/// (POST /store/v1/me/loyalty/actions/redeem), distinct from ADMIN
+/// (an admin-initiated grant/correction).
+enum LoyaltySource {
+  ORDER
+  ADMIN
+  CUSTOMER
+  EXPIRE
+  REVERSAL
+}

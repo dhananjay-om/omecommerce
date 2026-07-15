@@ -14,13 +14,30 @@ let domainEventsQueue: Queue | undefined;
 let maintenanceQueue: Queue | undefined;
 let bulkJobsQueue: Queue | undefined;
 
+/**
+ * No consumer ever polls a domain-event job's result by id after the fact
+ * (unlike bulk-jobs, below) — so completed/failed jobs are removed immediately
+ * rather than left to accumulate in Redis forever. This also keeps a job's
+ * `jobId` (`outbox-<row.id>`) reusable once its outbox row's id cycles back
+ * around (e.g. a test DB's `TRUNCATE ... RESTART IDENTITY`) — BullMQ's
+ * `queue.add()` is a silent no-op against an existing (even completed/failed)
+ * jobId, so leaving old jobs in place would make a new event with a reused id
+ * vanish instead of being enqueued.
+ */
 export function getDomainEventsQueue(): Queue {
-  domainEventsQueue ??= new Queue(DOMAIN_EVENTS_QUEUE, { connection: getQueueConnectionOptions() });
+  domainEventsQueue ??= new Queue(DOMAIN_EVENTS_QUEUE, {
+    connection: getQueueConnectionOptions(),
+    defaultJobOptions: { removeOnComplete: true, removeOnFail: true },
+  });
   return domainEventsQueue;
 }
 
+/** Same reasoning as getDomainEventsQueue() above — no consumer polls a maintenance job's result by id. */
 export function getMaintenanceQueue(): Queue {
-  maintenanceQueue ??= new Queue(MAINTENANCE_QUEUE, { connection: getQueueConnectionOptions() });
+  maintenanceQueue ??= new Queue(MAINTENANCE_QUEUE, {
+    connection: getQueueConnectionOptions(),
+    defaultJobOptions: { removeOnComplete: true, removeOnFail: true },
+  });
   return maintenanceQueue;
 }
 

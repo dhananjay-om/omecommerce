@@ -8,6 +8,7 @@ import { PrismaStockLedger } from '../inventory/infrastructure/prisma-stock-ledg
 import { PrismaCartRepository } from './infrastructure/prisma-cart.repository.js';
 import { PrismaOrderRepository } from './infrastructure/prisma-order.repository.js';
 import { PrismaVariantLookup, PrismaWarehouseResolver, PrismaCustomerGroupLookup } from './infrastructure/prisma-lookups.js';
+import { PrismaCustomerLookup } from './infrastructure/prisma-customer-lookup.js';
 import { PrismaTaxClassLookup, NativeTaxCalculator } from './infrastructure/native-tax-calculator.js';
 import { NativeShippingCalculator } from './infrastructure/native-shipping-calculator.js';
 import { TestPaymentGateway } from './infrastructure/test-payment-gateway.js';
@@ -51,6 +52,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const variants = new PrismaVariantLookup(db);
   const warehouses = new PrismaWarehouseResolver(db);
   const customerGroups = new PrismaCustomerGroupLookup(db);
+  const customers = new PrismaCustomerLookup(db);
   const taxClassLookup = new PrismaTaxClassLookup(db);
   const taxCalculator = new NativeTaxCalculator(taxClassLookup);
   const shippingCalculator = new NativeShippingCalculator(db);
@@ -59,7 +61,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const shippingMethods = new PrismaShippingMethodRepository(db);
   const outbox = new OutboxWriter(db);
 
-  const createCart = new CreateCart(carts, storeContext, customerGroups);
+  const createCart = new CreateCart(carts, storeContext, customerGroups, customers);
   const addCartLine = new AddCartLine(carts, variants);
   const completeCheckout = new CompleteCheckout(
     carts,

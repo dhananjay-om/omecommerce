@@ -32,7 +32,8 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
       `TRUNCATE order_return_line, order_return, fulfillment_line, fulfillment, payment_transaction,
        order_tax_line, order_address, order_line, "order", cart_line, cart,
        tax_class, shipping_method, price_tier, product_price, price_list,
-       stock_reservation, stock_movement, stock_item, product RESTART IDENTITY CASCADE`,
+       stock_reservation, stock_movement, stock_item, product,
+       customer_address, customer RESTART IDENTITY CASCADE`,
     );
     const set = await prisma.attributeSet.upsert({
       where: { code: 'order-test-set' },
@@ -139,6 +140,61 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     const fetched = await admin.get(`/admin/v1/orders/${order.publicId}`);
     expect(fetched.status).toBe(200);
     expect(fetched.body.data.orderNumber).toBe(order.orderNumber);
+  });
+
+  it('a cart created for a logged-in customer produces an order carrying that customerId', async () => {
+    const variantId = await createVariant('ORD-SKU-CUST-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+
+    await request(app)
+      .post('/store/v1/customers')
+      .send({ websiteCode: 'us_retail', email: 'order-customer@example.com', password: 'correct-horse-battery' });
+    const login = await request(app)
+      .post('/store/v1/customers/actions/login')
+      .send({ websiteCode: 'us_retail', email: 'order-customer@example.com', password: 'correct-horse-battery' });
+    const customerPublicId = login.body.data.customerPublicId as string;
+
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId, customerPublicId });
+    expect(cart.status).toBe(201);
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'order-customer@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    expect(checkout.status).toBe(201);
+
+    const orderRow = await prisma.order.findFirstOrThrow({ where: { publicId: checkout.body.data.publicId } });
+    const customerRow = await prisma.customer.findFirstOrThrow({ where: { publicId: customerPublicId } });
+    expect(orderRow.customerId).toBe(customerRow.id);
+  });
+
+  it('a guest checkout (no customerPublicId) produces an order with customerId=null', async () => {
+    const variantId = await createVariant('ORD-SKU-GUEST-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'guest@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    expect(checkout.status).toBe(201);
+    const orderRow = await prisma.order.findFirstOrThrow({ where: { publicId: checkout.body.data.publicId } });
+    expect(orderRow.customerId).toBeNull();
   });
 
   it('applies tax when the product has a tax class assigned', async () => {

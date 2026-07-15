@@ -23,6 +23,11 @@ export interface CustomerGroupLookup {
   byCode(code: string): Promise<{ id: bigint } | null>;
 }
 
+/** Resolves a logged-in customer's publicId to their internal id, so a cart (and the order it becomes) can carry it (own trivial copy, per-module convention). */
+export interface CustomerLookup {
+  findIdByPublicId(customerPublicId: string): Promise<bigint | null>;
+}
+
 export interface TaxClassInfo {
   code: string;
   rateMinor: bigint;
@@ -64,6 +69,7 @@ export interface CartView {
   websiteId: bigint;
   storeViewId: bigint;
   currency: string;
+  customerId: bigint | null;
   customerGroupId: bigint | null;
   status: CartStatus;
   lines: CartLineView[];
@@ -73,6 +79,7 @@ export interface CreateCartInput {
   websiteId: bigint;
   storeViewId: bigint;
   currency: string;
+  customerId?: bigint | null;
   customerGroupId?: bigint | null;
 }
 
@@ -122,6 +129,7 @@ export interface CreateOrderInput {
   websiteId: bigint;
   storeId: bigint;
   storeViewId: bigint;
+  customerId: bigint | null;
   customerGroupId: bigint | null;
   email: string;
   currency: string;

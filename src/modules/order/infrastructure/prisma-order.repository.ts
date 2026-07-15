@@ -33,6 +33,7 @@ export class PrismaOrderRepository implements OrderRepository {
           storeId: input.storeId,
           storeViewId: input.storeViewId,
           cartId: input.cartId,
+          customerId: input.customerId,
           customerGroupId: input.customerGroupId,
           email: input.email,
           currency: input.currency,

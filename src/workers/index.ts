@@ -1,15 +1,48 @@
+import { Worker, type Job } from 'bullmq';
 import { OutboxRelay } from '../shared/infrastructure/outbox/outbox-relay.js';
-import { getDomainEventsQueue } from '../shared/infrastructure/queue/queues.js';
+import { DOMAIN_EVENTS_QUEUE, getDomainEventsQueue } from '../shared/infrastructure/queue/queues.js';
+import { getQueueConnectionOptions } from '../shared/infrastructure/queue/connection.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
-import { startOrderConfirmationWorker } from './order-confirmation.worker.js';
+import { handleOrderConfirmation } from './order-confirmation.worker.js';
 import { startReservationSweepWorker, scheduleReservationSweep } from './reservation-sweep.worker.js';
-import { startSearchIndexerWorker } from './search-indexer.worker.js';
+import { createSearchIndexHandler } from './search-indexer.worker.js';
 import { startBulkImportWorker } from './bulk-import.worker.js';
+import { createLoyaltyEarnHandler } from './loyalty-earn.worker.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 export interface WorkerHandles {
   outboxRelay: OutboxRelay;
   stop(): Promise<void>;
+}
+
+/**
+ * DOMAIN_EVENTS_QUEUE has several logical consumers (order confirmation,
+ * search indexing, loyalty earn/clawback), but BullMQ delivers each job to
+ * exactly ONE Worker attached to a given queue name — separate Worker
+ * instances on the same queue COMPETE for jobs rather than each getting a
+ * copy. All of them therefore run inside this single Worker, dispatched by
+ * job name; each handler independently no-ops for job names it doesn't care
+ * about. A handler's failure is logged and does not stop the others from
+ * running for the same job (each handler's own idempotency is what makes
+ * re-processing that job later, e.g. after a fix, safe).
+ */
+function startDomainEventsWorker(): Worker {
+  const handlers: Array<(job: Job) => Promise<void>> = [handleOrderConfirmation, createSearchIndexHandler(), createLoyaltyEarnHandler()];
+
+  const worker = new Worker(
+    DOMAIN_EVENTS_QUEUE,
+    async (job) => {
+      for (const handler of handlers) {
+        try {
+          await handler(job);
+        } catch (err) {
+          logger.error({ err, jobId: job.id, jobName: job.name }, 'domain-events handler failed');
+        }
+      }
+    },
+    { connection: getQueueConnectionOptions() },
+  );
+  return worker;
 }
 
 /**
@@ -23,24 +56,18 @@ export async function startWorkers(): Promise<WorkerHandles> {
   const outboxRelay = new OutboxRelay(prisma, domainEventsQueue);
   outboxRelay.start();
 
-  const orderConfirmationWorker = startOrderConfirmationWorker();
+  const domainEventsWorker = startDomainEventsWorker();
   const reservationSweepWorker = startReservationSweepWorker();
-  const searchIndexerWorker = startSearchIndexerWorker();
   const bulkImportWorker = startBulkImportWorker();
   await scheduleReservationSweep();
 
-  logger.info('background workers started (outbox relay, order confirmation, reservation sweep, search indexer, bulk import)');
+  logger.info('background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn], reservation sweep, bulk import)');
 
   return {
     outboxRelay,
     async stop() {
       outboxRelay.stop();
-      await Promise.allSettled([
-        orderConfirmationWorker.close(),
-        reservationSweepWorker.close(),
-        searchIndexerWorker.close(),
-        bulkImportWorker.close(),
-      ]);
+      await Promise.allSettled([domainEventsWorker.close(), reservationSweepWorker.close(), bulkImportWorker.close()]);
     },
   };
 }

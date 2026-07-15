@@ -1,5 +1,6 @@
 export interface CreateCartCommand {
   storeViewId: string;
+  customerPublicId?: string | null;
   customerGroupCode?: string | null;
 }
 

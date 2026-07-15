@@ -1,0 +1,135 @@
+// =============================================================================
+// loyalty.prisma — Loyalty program: points ledger, tiers
+// (plan/11-loyalty-and-referral.md).
+//
+// SCOPE FOR THIS PASS (Stage 5b — Loyalty only; Referral is its own later pass):
+// - ONE earn rule per program (`pointsPerCurrencyUnit` directly on
+//   LoyaltyProgram), not a separate loyalty_earn_rule table with JSONB
+//   condition trees, campaign windows, or product/category scoping — real
+//   future work, not built here.
+// - ONE program per website (`@@unique([websiteId])`), not the plan's
+//   "multiple programs, one active, versioned" — no product/category/campaign
+//   rules exist yet to differentiate multiple programs.
+// - Lifetime-points tier basis only — no rolling-12-month-spend basis (needs a
+//   scheduled recompute job this pass doesn't build).
+// - No separate loyalty_reward/loyalty_redemption tables — redemption
+//   converts points directly to wallet store credit (one LoyaltyTransaction
+//   REDEEM row + one WalletTransaction CREDIT row together are the complete
+//   audit trail; a reward catalog — free shipping, free product — is real
+//   future work).
+// - Points are NOT currency-typed (BigInt, not Decimal + currency) — no
+//   cross-table currency-consistency trigger needed here (unlike Stage 5a's
+//   wallet/gift-card tables): a point only becomes a currency amount at
+//   redemption time via program.pointValue.
+// - No points-expiry sweep job yet — `expiresAt` exists on LoyaltyTransaction
+//   for future use, same as Wallet's own unswept `expiresAt` today.
+// - LoyaltyAccount.status reuses WalletStatus (ACTIVE/FROZEN) rather than a
+//   duplicate enum — same concept, precedented elsewhere in this schema
+//   (ScopeType/AttributeScope are each shared by two models too). Accepted
+//   coupling risk: a future Wallet-only status value (e.g. around HOLD/RELEASE)
+//   would technically also become a valid-but-meaningless LoyaltyAccount.status;
+//   worth splitting into its own enum if the two domains' status lifecycles
+//   actually diverge later.
+// =============================================================================
+
+model LoyaltyProgram {
+  id                    BigInt               @id @default(autoincrement())
+  publicId              String               @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId             BigInt               @map("website_id") // scope scalar; FK added in raw SQL
+  name                  String
+  status                LoyaltyProgramStatus @default(ACTIVE)
+  pointsPerCurrencyUnit Decimal              @map("points_per_currency_unit") @db.Decimal(18, 4)
+  pointValue            Decimal              @map("point_value") @db.Decimal(18, 4)
+  /// A bounded admin-config threshold, not an accumulator — Int is
+  /// deliberate here even though thresholdPoints/pointsBalance/points below
+  /// are BigInt (no realistic redeem-minimum approaches Int range).
+  redeemMinPoints       Int                  @default(0) @map("redeem_min_points")
+  pointsExpiryMonths    Int?                 @map("points_expiry_months")
+  createdBy             BigInt?              @map("created_by")
+  updatedBy             BigInt?              @map("updated_by")
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?            @map("deleted_at") @db.Timestamptz(6)
+
+  tiers    LoyaltyTier[]
+  accounts LoyaltyAccount[]
+
+  @@unique([websiteId], map: "uq_loyalty_program_website")
+  @@index([deletedAt])
+  @@map("loyalty_program")
+}
+
+model LoyaltyTier {
+  id              BigInt   @id @default(autoincrement())
+  programId       BigInt   @map("program_id")
+  name            String
+  thresholdPoints BigInt   @map("threshold_points")
+  earnMultiplier  Decimal  @default(1) @map("earn_multiplier") @db.Decimal(6, 2)
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdBy       BigInt?  @map("created_by")
+  updatedBy       BigInt?  @map("updated_by")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program  LoyaltyProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  accounts LoyaltyAccount[]
+
+  @@unique([programId, name], map: "uq_loyalty_tier_program_name")
+  @@index([programId, sortOrder])
+  @@map("loyalty_tier")
+}
+
+/// No deletedAt — same reasoning as Wallet: FROZEN is the terminal state;
+/// hiding an account with a nonzero points liability from reads would be
+/// wrong (the global soft-delete extension hides deletedAt-IS-NOT-NULL rows
+/// from ALL reads, including reporting).
+model LoyaltyAccount {
+  id             BigInt       @id @default(autoincrement())
+  publicId       String       @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  customerId     BigInt       @map("customer_id")
+  programId      BigInt       @map("program_id")
+  pointsBalance  BigInt       @default(0) @map("points_balance")
+  lifetimePoints BigInt       @default(0) @map("lifetime_points")
+  tierId         BigInt?      @map("tier_id")
+  status         WalletStatus @default(ACTIVE)
+  /// Declared for schema-level parity with Wallet/GiftCard/stock_item — not
+  /// actively referenced by the guarded-UPDATE queries.
+  version        Int          @default(0)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  program      LoyaltyProgram       @relation(fields: [programId], references: [id], onDelete: Restrict)
+  tier         LoyaltyTier?         @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  transactions LoyaltyTransaction[]
+
+  @@unique([customerId, programId], map: "uq_loyalty_account_customer_program")
+  @@index([programId])
+  @@index([tierId])
+  @@map("loyalty_account")
+}
+
+/// Append-only ledger — pointsBalance is a projection (sum of all points here).
+/// No updatedAt/deletedAt: immutable by design, same as stock_movement/
+/// wallet_transaction/gift_card_transaction.
+model LoyaltyTransaction {
+  id               BigInt         @id @default(autoincrement())
+  loyaltyAccountId BigInt         @map("loyalty_account_id")
+  type             LoyaltyTxnType
+  points           BigInt
+  balanceAfter     BigInt         @map("balance_after")
+  source           LoyaltySource
+  refType          String?        @map("ref_type")
+  refId            BigInt?        @map("ref_id")
+  idempotencyKey   String?        @map("idempotency_key")
+  expiresAt        DateTime?      @map("expires_at") @db.Timestamptz(6)
+  actorId          BigInt?        @map("actor_id")
+  reason           String?
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  loyaltyAccount LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([loyaltyAccountId, idempotencyKey], map: "uq_loyalty_txn_account_idempotency")
+  @@index([loyaltyAccountId, createdAt])
+  @@map("loyalty_transaction")
+}

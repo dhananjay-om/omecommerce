@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const createCartSchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'expected numeric id'),
+  customerPublicId: z.string().uuid().nullish(),
   customerGroupCode: z.string().min(1).nullish(),
 });
 

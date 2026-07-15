@@ -114,7 +114,7 @@ export class CompleteCheckout {
 
   private async priceAndPlace(
     cmd: CompleteCheckoutCommand,
-    cart: { id: bigint; currency: string; customerGroupId: bigint | null },
+    cart: { id: bigint; currency: string; customerId: bigint | null; customerGroupId: bigint | null },
     ctx: StoreViewContext,
     pricedLines: PricedLine[],
     reservations: ReservationHandle[],
@@ -168,6 +168,7 @@ export class CompleteCheckout {
         websiteId: ctx.websiteId,
         storeId: ctx.storeId,
         storeViewId: ctx.storeViewId,
+        customerId: cart.customerId,
         customerGroupId: cart.customerGroupId,
         email: cmd.email,
         currency: cart.currency,

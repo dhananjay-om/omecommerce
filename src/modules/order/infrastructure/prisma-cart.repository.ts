@@ -11,6 +11,7 @@ export class PrismaCartRepository implements CartRepository {
         websiteId: input.websiteId,
         storeViewId: input.storeViewId,
         currency: input.currency,
+        customerId: input.customerId ?? null,
         customerGroupId: input.customerGroupId ?? null,
       },
       include: { lines: true },
@@ -54,6 +55,7 @@ interface CartRow {
   websiteId: bigint;
   storeViewId: bigint;
   currency: string;
+  customerId: bigint | null;
   customerGroupId: bigint | null;
   status: CartView['status'];
   lines: Array<{ id: bigint; variantId: bigint; qty: number }>;
@@ -66,6 +68,7 @@ function toView(row: CartRow): CartView {
     websiteId: row.websiteId,
     storeViewId: row.storeViewId,
     currency: row.currency,
+    customerId: row.customerId,
     customerGroupId: row.customerGroupId,
     status: row.status,
     lines: row.lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })),

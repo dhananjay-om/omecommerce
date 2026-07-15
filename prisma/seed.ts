@@ -90,6 +90,7 @@ async function main() {
     { code: 'catalog:manage', description: 'Manage attribute sets, attributes, and bulk product import' },
     { code: 'cms:manage', description: 'Manage CMS pages and blocks' },
     { code: 'wallet:manage', description: 'Manage customer wallets, store credit, and gift cards' },
+    { code: 'loyalty:manage', description: 'Manage loyalty programs, tiers, and customer point balances' },
   ];
   for (const p of PERMISSIONS) {
     await prisma.permission.upsert({ where: { code: p.code }, update: {}, create: p });

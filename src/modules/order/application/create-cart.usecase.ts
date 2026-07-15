@@ -1,4 +1,4 @@
-import type { CartRepository, CustomerGroupLookup } from '../domain/repositories.js';
+import type { CartRepository, CustomerGroupLookup, CustomerLookup } from '../domain/repositories.js';
 import type { StoreContextResolver } from '../../../shared/application/scope.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import type { CreateCartCommand, CartView } from './dto.js';
@@ -8,6 +8,7 @@ export class CreateCart {
     private readonly carts: CartRepository,
     private readonly storeContext: StoreContextResolver,
     private readonly customerGroups: CustomerGroupLookup,
+    private readonly customers: CustomerLookup,
   ) {}
 
   async execute(cmd: CreateCartCommand): Promise<CartView> {
@@ -24,10 +25,17 @@ export class CreateCart {
       customerGroupId = group.id;
     }
 
+    let customerId: bigint | null = null;
+    if (cmd.customerPublicId) {
+      customerId = await this.customers.findIdByPublicId(cmd.customerPublicId);
+      if (!customerId) throw new NotFoundError('customer', cmd.customerPublicId);
+    }
+
     const cart = await this.carts.create({
       websiteId: ctx.websiteId,
       storeViewId: ctx.storeViewId,
       currency: ctx.currency,
+      customerId,
       customerGroupId,
     });
     return toDto(cart);
