@@ -1,0 +1,69 @@
+// =============================================================================
+// cms.prisma — CMS pages and reusable blocks (plan/05 §2.7).
+//
+// SCOPE FOR THIS PASS:
+// - storeViewId is nullable: NULL = a global row, resolved as the fallback
+//   when no store-view-specific row exists for the same handle/code — the
+//   same GLOBAL-via-NULL convention already used by ProductAttributeValue's
+//   scope columns. `@@unique([storeViewId, handle])` needs NULLS NOT DISTINCT
+//   (raw SQL, PG15+) so at most one GLOBAL page can exist per handle, exactly
+//   like uq_pav_scope in prisma/sql/0001_foundation_raw.sql — Prisma's plain
+//   @@unique treats NULLs as distinct, which would let duplicate global rows
+//   slip through.
+// - storeViewId's FK (raw SQL, prisma/sql/0008_cms_raw.sql) is ON DELETE
+//   CASCADE, NOT SET NULL like ProductMedia.storeViewId — because the unique
+//   index above is NULLS NOT DISTINCT, nulling out storeViewId on a store-view
+//   deletion could collide with an already-existing GLOBAL row for the same
+//   handle/code and fail the delete transaction. Deleting the store view's
+//   own CMS content along with it (CASCADE) avoids that entirely.
+// - Category.landingPageCmsId (catalog.prisma) predates this table (defined
+//   before cms_page existed) and gets its FK -> cms_page(id) ON DELETE SET
+//   NULL added here too, now that the referent exists (same
+//   expand/migrate/contract pattern as Cart/Order.customerId's FK retrofit).
+// - No blocks/widgets sub-content system, no blog — `body` is a single
+//   text/HTML field; a richer content model and blog listing are deferred
+//   (plan/05 §2.7 lists a blog endpoint group; not built in this pass).
+// - No versioning/scheduled-publish (plan/04 §2.3's product_version pattern)
+//   for CMS content yet — publish is an immediate status flip, not a
+//   scheduled pointer swap. A documented, deliberate simplification for this
+//   pass, same spirit as every other "not yet, not silently dropped" note in
+//   this codebase.
+// =============================================================================
+
+model CmsPage {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  storeViewId BigInt?   @map("store_view_id")
+  handle      String    @db.Citext
+  title       String
+  body        String
+  status      CmsStatus @default(DRAFT)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy   BigInt?   @map("created_by")
+  updatedBy   BigInt?   @map("updated_by")
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([storeViewId, handle], map: "uq_cms_page_store_view_handle")
+  @@index([deletedAt])
+  @@map("cms_page")
+}
+
+model CmsBlock {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  storeViewId BigInt?   @map("store_view_id")
+  code        String    @db.Citext
+  body        String
+  status      CmsStatus @default(DRAFT)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy   BigInt?   @map("created_by")
+  updatedBy   BigInt?   @map("updated_by")
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([storeViewId, code], map: "uq_cms_block_store_view_code")
+  @@index([deletedAt])
+  @@map("cms_block")
+}

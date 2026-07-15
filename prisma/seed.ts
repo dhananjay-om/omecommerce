@@ -87,6 +87,8 @@ async function main() {
     { code: 'orders:refund', description: 'Issue order refunds' },
     { code: 'orders:cancel', description: 'Cancel orders' },
     { code: 'inventory:adjust', description: 'Adjust warehouse stock levels' },
+    { code: 'catalog:manage', description: 'Manage attribute sets, attributes, and bulk product import' },
+    { code: 'cms:manage', description: 'Manage CMS pages and blocks' },
   ];
   for (const p of PERMISSIONS) {
     await prisma.permission.upsert({ where: { code: p.code }, update: {}, create: p });

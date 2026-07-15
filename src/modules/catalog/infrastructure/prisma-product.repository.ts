@@ -1,6 +1,15 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { Product } from '../domain/product.js';
-import type { ProductRepository, AttributeRepository, AttributeInfo } from '../domain/repositories.js';
+import type {
+  ProductRepository,
+  AttributeRepository,
+  AttributeInfo,
+  CreateAttributeInput,
+  AttributeSetRepository,
+  AttributeSetInfo,
+  CreateAttributeSetInput,
+  AttributeSetGroupInfo,
+} from '../domain/repositories.js';
 
 /**
  * Product types that are sold as a single sellable unit with no distinct variant
@@ -72,14 +81,101 @@ export class PrismaProductRepository implements ProductRepository {
   }
 }
 
+const ATTRIBUTE_SELECT = { id: true, code: true, label: true, dataType: true, inputType: true } as const;
+
 export class PrismaAttributeRepository implements AttributeRepository {
   constructor(private readonly db: Db) {}
 
   async findByCode(code: string): Promise<AttributeInfo | null> {
-    const row = await this.db.attribute.findFirst({
-      where: { code },
-      select: { id: true, code: true, dataType: true },
+    const row = await this.db.attribute.findFirst({ where: { code }, select: ATTRIBUTE_SELECT });
+    return row;
+  }
+
+  async create(input: CreateAttributeInput): Promise<AttributeInfo> {
+    const row = await this.db.attribute.create({
+      data: {
+        code: input.code,
+        label: input.label,
+        dataType: input.dataType,
+        inputType: input.inputType,
+        isRequired: input.isRequired,
+        isFilterable: input.isFilterable,
+        isSearchable: input.isSearchable,
+        isComparable: input.isComparable,
+        isSortable: input.isSortable,
+        isVisiblePdp: input.isVisiblePdp,
+        isVisiblePlp: input.isVisiblePlp,
+        usedInSearch: input.usedInSearch,
+        usedInLayeredNav: input.usedInLayeredNav,
+        isVariantForming: input.isVariantForming,
+        options: input.options?.length
+          ? {
+              create: input.options.map((o) => ({
+                value: o.value,
+                label: o.label,
+                swatch: o.swatch,
+                sortOrder: o.sortOrder ?? 0,
+              })),
+            }
+          : undefined,
+      },
+      select: ATTRIBUTE_SELECT,
     });
-    return row ? { id: row.id, code: row.code, dataType: row.dataType } : null;
+    return row;
+  }
+}
+
+/** Persistence adapter for the attribute-set builder (plan/04 §2.1). */
+export class PrismaAttributeSetRepository implements AttributeSetRepository {
+  constructor(private readonly db: Db) {}
+
+  async createSet(input: CreateAttributeSetInput): Promise<AttributeSetInfo> {
+    return this.db.attributeSet.create({
+      data: { code: input.code, name: input.name, isDefault: input.isDefault },
+      select: { id: true, code: true, name: true },
+    });
+  }
+
+  async findSetByCode(code: string): Promise<AttributeSetInfo | null> {
+    return this.db.attributeSet.findFirst({ where: { code }, select: { id: true, code: true, name: true } });
+  }
+
+  async findSetById(id: bigint): Promise<AttributeSetInfo | null> {
+    return this.db.attributeSet.findFirst({ where: { id }, select: { id: true, code: true, name: true } });
+  }
+
+  async createGroup(attributeSetId: bigint, name: string, sortOrder: number): Promise<AttributeSetGroupInfo> {
+    return this.db.attributeSetGroup.create({
+      data: { attributeSetId, name, sortOrder },
+      select: { id: true, attributeSetId: true, name: true, sortOrder: true },
+    });
+  }
+
+  async findGroupByName(attributeSetId: bigint, name: string): Promise<AttributeSetGroupInfo | null> {
+    return this.db.attributeSetGroup.findFirst({
+      where: { attributeSetId, name },
+      select: { id: true, attributeSetId: true, name: true, sortOrder: true },
+    });
+  }
+
+  async findGroupById(attributeSetId: bigint, groupId: bigint): Promise<AttributeSetGroupInfo | null> {
+    return this.db.attributeSetGroup.findFirst({
+      where: { id: groupId, attributeSetId },
+      select: { id: true, attributeSetId: true, name: true, sortOrder: true },
+    });
+  }
+
+  async assignAttribute(attributeSetId: bigint, groupId: bigint, attributeId: bigint, sortOrder: number): Promise<void> {
+    await this.db.attributeSetAttribute.create({
+      data: { attributeSetId, groupId, attributeId, sortOrder },
+    });
+  }
+
+  async isAttributeAssigned(attributeSetId: bigint, attributeId: bigint): Promise<boolean> {
+    const found = await this.db.attributeSetAttribute.findFirst({
+      where: { attributeSetId, attributeId },
+      select: { id: true },
+    });
+    return found !== null;
   }
 }

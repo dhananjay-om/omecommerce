@@ -1,0 +1,58 @@
+// =============================================================================
+// wishlist.prisma — Customer wishlists (plan/05 §2.6).
+//
+// SCOPE FOR THIS PASS:
+// - A customer may hold multiple named wishlists (plan/05 §2.6 literally reads
+//   "GET/POST /me/wishlists (+ items)", plural) — a "default" one is not
+//   auto-created; the customer names one on first POST.
+// - `Wishlist.customerId` is a bare Prisma scalar (matching Cart.customerId/
+//   Order.customerId's established treatment of customerId as a scope column,
+//   FK added in raw SQL) — but UNLIKE Cart's nullable customerId, this column
+//   is NOT NULL, so its FK is ON DELETE CASCADE (a wishlist has no independent
+//   value once its owning account is gone), not SET NULL (illegal on a
+//   NOT NULL column) or RESTRICT (would block deleting any customer who ever
+//   created a wishlist — see prisma/sql/0007_wishlist_raw.sql).
+// - `WishlistItem.productId` IS a first-class Prisma relation (unlike
+//   customerId), matching CartLine.variantId/OrderLine.variantId's precedent
+//   for core domain-navigation references. onDelete: Cascade here (vs.
+//   variantId's implicit Restrict) is deliberate: Product is normally
+//   soft-deleted (deletedAt), so this rarely fires — it exists for the rare
+//   hard-delete case, where a dangling wishlist item is pointless to keep.
+// - WishlistItem has no deletedAt — removing an item is a real hard delete,
+//   same as CartLine (an ephemeral join row, not a historical record).
+// - `is_public` (plan/01 §8's wishlist schema) is deferred — no public-
+//   wishlist-sharing endpoint exists in plan/05 §2.6 yet.
+// - Reviews (plan/05 §2.6's other half) are explicitly deferred — a separate
+//   moderation/listing surface, not built in this pass.
+// =============================================================================
+
+model Wishlist {
+  id         BigInt   @id @default(autoincrement())
+  publicId   String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  customerId BigInt   @map("customer_id")
+  name       String   @default("default")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items WishlistItem[]
+
+  @@index([customerId])
+  @@map("wishlist")
+}
+
+model WishlistItem {
+  id         BigInt   @id @default(autoincrement())
+  wishlistId BigInt   @map("wishlist_id")
+  productId  BigInt   @map("product_id")
+  addedAt    DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, productId])
+  // Supports a future "wishlisted-by-N-customers" product-popularity query;
+  // no current caller (the unique index above already covers wishlistId-only
+  // lookups as its leftmost prefix).
+  @@index([productId])
+  @@map("wishlist_item")
+}

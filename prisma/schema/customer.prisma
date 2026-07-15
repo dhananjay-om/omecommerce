@@ -1,0 +1,83 @@
+// =============================================================================
+// customer.prisma — Storefront customer accounts + addresses.
+// See plan/05-storefront-apis.md §2.5.
+//
+// SCOPE FOR THIS PASS:
+// - Registration is website-scoped (plan/05 §2.5: "register (website-scoped)"):
+//   email uniqueness is [websiteId, email], not global, since the same person
+//   may hold separate accounts on two different websites in this single-tenant,
+//   multi-website deployment.
+// - Cart.customerId / Order.customerId gain their FK to customer(id) here (raw
+//   SQL) — the retrofit both order.prisma's header comment and plan/02 §6.2's
+//   expand/migrate/contract note already earmarked ("added once that table
+//   exists"). Cart's FK is ON DELETE SET NULL (Cart is ephemeral/disposable,
+//   same reasoning as its existing cart_customer_group_fk — schema-reviewer
+//   caught an initial draft that wrongly proposed RESTRICT here, which would
+//   have blocked deleting a customer with any abandoned, never-converted
+//   cart). Order's FK is ON DELETE RESTRICT — Order is a permanent financial
+//   record, same reasoning as Order.cartId's existing explicit Restrict.
+// - `customer.website_id` FK is ON DELETE RESTRICT — Customer is closer to
+//   Order in permanence (registered account + order history) than to Cart;
+//   a website deletion must not silently wipe out its customers.
+// - customerGroupId is a bare Prisma scalar (no Prisma-level relation) but
+//   DOES get a real FK in raw SQL (ON DELETE SET NULL) — "bare scalar" means
+//   no Prisma relation to keep CustomerGroup's back-relation list clean, not
+//   "no constraint at all", matching Cart.customerGroupId/Order.customerGroupId
+//   exactly (see prisma/sql/0004_order_raw.sql).
+// - No createdBy/updatedBy — Customer/CustomerAddress are self-service,
+//   customer-authored entities, not admin-authored master data (same as
+//   Cart/Order, which also omit these).
+// - No cart-merge, store-credit, or digital-download support yet — see
+//   src/modules/customer/customer.module.ts's header comment for the full,
+//   deliberate list of deferrals for this pass.
+// =============================================================================
+
+model Customer {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId       BigInt    @map("website_id")
+  email           String    @db.Citext
+  passwordHash    String    @map("password_hash")
+  customerGroupId BigInt?   @map("customer_group_id")
+  firstName       String?   @map("first_name")
+  lastName        String?   @map("last_name")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  addresses CustomerAddress[]
+
+  @@unique([websiteId, email], map: "uq_customer_website_email")
+  @@index([deletedAt])
+  @@index([customerGroupId])
+  @@map("customer")
+}
+
+/// Same address shape as OrderAddress (order.prisma) minus the order-snapshot
+/// framing — this is the live, editable address book a customer manages.
+model CustomerAddress {
+  id                BigInt    @id @default(autoincrement())
+  publicId          String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  customerId        BigInt    @map("customer_id")
+  name              String
+  company           String?
+  line1             String
+  line2             String?
+  city              String
+  region            String?
+  postalCode        String    @map("postal_code")
+  country           String    @db.Char(2)
+  phone             String?
+  isDefaultShipping Boolean   @default(false) @map("is_default_shipping")
+  isDefaultBilling  Boolean   @default(false) @map("is_default_billing")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([deletedAt])
+  @@map("customer_address")
+}

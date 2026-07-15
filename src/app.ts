@@ -12,6 +12,9 @@ import { createPricingModule } from './modules/pricing/pricing.module.js';
 import { createOrderModule } from './modules/order/order.module.js';
 import { createAuthModule } from './modules/auth/auth.module.js';
 import { createSearchModule } from './modules/search/search.module.js';
+import { createCustomerModule } from './modules/customer/customer.module.js';
+import { createWishlistModule } from './modules/wishlist/wishlist.module.js';
+import { createCmsModule } from './modules/cms/cms.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -38,7 +41,7 @@ export function createApp(): Express {
   app.use('/admin/v1', auth.admin);
 
   // Modules
-  const catalog = createCatalogModule(prisma, redis);
+  const catalog = createCatalogModule(prisma, redis, auth.authorize);
   app.use('/admin/v1', catalog.admin);
   app.use('/store/v1', catalog.store);
 
@@ -55,6 +58,16 @@ export function createApp(): Express {
   const search = createSearchModule(prisma, auth.authorize);
   app.use('/admin/v1', search.admin);
   app.use('/store/v1', search.store);
+
+  const customer = createCustomerModule(prisma);
+  app.use('/store/v1', customer.store);
+
+  const wishlist = createWishlistModule(prisma, customer.authenticateCustomer);
+  app.use('/store/v1', wishlist.store);
+
+  const cms = createCmsModule(prisma, auth.authorize);
+  app.use('/admin/v1', cms.admin);
+  app.use('/store/v1', cms.store);
 
   app.use(notFound);
   app.use(errorHandler);

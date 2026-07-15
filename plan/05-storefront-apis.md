@@ -102,6 +102,12 @@ GET /store/v1/content/pages/{handle}                 per-store-view CMS page
 GET /store/v1/content/blocks/{code}                  reusable block
 GET /store/v1/content/blog/{...}                     blog posts
 ```
+- **Implemented (Stage 4 completion pass):** pages + blocks, with per-store-view
+  overrides falling back to a global row (NULL store_view_id). Publish is an
+  immediate status flip (DRAFT/PUBLISHED), NOT the `*_version`-table content
+  versioning §00's decisions log describes for products/CMS/prices — scheduled
+  publish/rollback for CMS is deferred, a deliberate scope cut recorded here so
+  it reads as a decision, not an oversight. Blog is not built.
 
 ---
 

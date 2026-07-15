@@ -163,6 +163,7 @@ model Product {
   linksTo         ProductLink[]           @relation("LinkTarget")
   bundleItems     ProductBundleItem[]     @relation("BundleParent")
   componentOf     ProductBundleItem[]     @relation("BundleComponent")
+  wishlistItems   WishlistItem[]
 
   @@index([status, deletedAt])
   @@index([attributeSetId])

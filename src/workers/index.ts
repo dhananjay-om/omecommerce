@@ -4,6 +4,7 @@ import { prisma } from '../shared/infrastructure/prisma/client.js';
 import { startOrderConfirmationWorker } from './order-confirmation.worker.js';
 import { startReservationSweepWorker, scheduleReservationSweep } from './reservation-sweep.worker.js';
 import { startSearchIndexerWorker } from './search-indexer.worker.js';
+import { startBulkImportWorker } from './bulk-import.worker.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 export interface WorkerHandles {
@@ -25,15 +26,21 @@ export async function startWorkers(): Promise<WorkerHandles> {
   const orderConfirmationWorker = startOrderConfirmationWorker();
   const reservationSweepWorker = startReservationSweepWorker();
   const searchIndexerWorker = startSearchIndexerWorker();
+  const bulkImportWorker = startBulkImportWorker();
   await scheduleReservationSweep();
 
-  logger.info('background workers started (outbox relay, order confirmation, reservation sweep, search indexer)');
+  logger.info('background workers started (outbox relay, order confirmation, reservation sweep, search indexer, bulk import)');
 
   return {
     outboxRelay,
     async stop() {
       outboxRelay.stop();
-      await Promise.allSettled([orderConfirmationWorker.close(), reservationSweepWorker.close(), searchIndexerWorker.close()]);
+      await Promise.allSettled([
+        orderConfirmationWorker.close(),
+        reservationSweepWorker.close(),
+        searchIndexerWorker.close(),
+        bulkImportWorker.close(),
+      ]);
     },
   };
 }

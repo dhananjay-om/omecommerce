@@ -90,7 +90,7 @@ model Cart {
   websiteId       BigInt     @map("website_id")
   storeViewId     BigInt     @map("store_view_id")
   currency        String     @db.Char(3)
-  customerId      BigInt?    @map("customer_id") // no FK yet — Customer context not built
+  customerId      BigInt?    @map("customer_id") // FK -> customer(id) ON DELETE SET NULL, added in prisma/sql/0006_customer_raw.sql; NULL = guest
   customerGroupId BigInt?    @map("customer_group_id")
   status          CartStatus @default(ACTIVE)
   version         Int        @default(0)
@@ -133,7 +133,7 @@ model Order {
   storeId            BigInt            @map("store_id")
   storeViewId        BigInt            @map("store_view_id")
   cartId             BigInt?           @unique @map("cart_id")
-  customerId         BigInt?           @map("customer_id") // no FK yet — Customer context not built; NULL = guest
+  customerId         BigInt?           @map("customer_id") // FK -> customer(id) ON DELETE RESTRICT, added in prisma/sql/0006_customer_raw.sql; NULL = guest
   customerGroupId    BigInt?           @map("customer_group_id")
   email              String
   currency           String            @db.Char(3)
