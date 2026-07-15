@@ -1,0 +1,335 @@
+// =============================================================================
+// order.prisma — Tax classes, shipping methods, cart, order lifecycle, payments,
+// fulfillment, returns. See plan/08-order-management.md.
+//
+// SCOPE FOR THIS PASS (documented deliberate simplifications, not silent gaps):
+// - TaxPort/ShippingPort are minimal NATIVE implementations (tax_class flat rate;
+//   shipping_method flat rate) behind the ports decided in plan/00 §9 ("native +
+//   adapter interface"). A pluggable Avalara/TaxJar-style adapter is future work;
+//   the port boundary (src/modules/order/domain/ports.ts) is where it plugs in.
+// - No order_discount table yet — no Promotion/coupon context exists (deferred to
+//   its own stage). `order.discountTotal` stays present (defaults to 0) so the
+//   shape is forward-compatible.
+// - No separate `invoice` document/numbering table — FinancialStatus +
+//   PaymentTransaction are the substantive financial record; a formatted invoice
+//   is a presentation concern, deferred.
+// - `Cart`/`Order.customerId` are present as bare nullable scalars with NO FK yet —
+//   full Customer context (accounts/auth/addresses) is a later stage; guest
+//   checkout (customerId=NULL) is the only path exercised today. The FK to
+//   `customer(id)` is added once that table exists (expand/migrate/contract,
+//   plan/02 §6.2). `CartLine` does NOT snapshot a price — prices are always
+//   re-resolved live at checkout (plan/05 §2.3: "never trust stale totals").
+// - `order_line` has no `product_id` (only `variant_id`) — derivable via
+//   `variant.product_id`; kept as a single source of truth rather than a
+//   denormalized, sync-requiring second column.
+// - plan/08's separate `shipment` concept is folded into `Fulfillment`
+//   (`trackingNumber`/`carrier`/`shippedAt` live there directly) — one write, one
+//   less join, no loss of information at this scale.
+// - `order_number` is a real per-website atomic sequence (order_number_counter +
+//   a guarded UPDATE via next_order_number(), plan/08 §5), not just the internal id.
+// - No partitioning yet on `order`/`order_line` despite plan/08 §7's 50M-order
+//   target — deferred to Stage 6 (plan/12 §5), same as stock_movement. A BRIN
+//   index on `order.created_at` is the interim mitigation, mirroring
+//   stock_movement's `ix_stock_movement_created_at_brin` precedent exactly.
+// =============================================================================
+
+/// Flat-rate native tax classification (plan/00 §9 decision: native + adapter
+/// interface). `rate` is a FRACTION (0.0825 = 8.25%), not a percentage, so it
+/// composes directly with the scale-4 fixed-point arithmetic in
+/// shared/domain/decimal.ts (see prisma/sql/0004_order_raw.sql for the CHECK).
+model TaxClass {
+  id        BigInt    @id @default(autoincrement())
+  publicId  String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code      String    @unique @db.Citext
+  name      String
+  rate      Decimal   @db.Decimal(7, 4)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([deletedAt])
+  @@map("tax_class")
+}
+
+/// Flat-rate native shipping (plan/01 catalog requirements list "Shipping" as a
+/// module; full carrier/zone/rate-table architecture is future work — see
+/// plan/09's deployment scope. This is the minimal real implementation the
+/// checkout saga needs today.)
+model ShippingMethod {
+  id        BigInt    @id @default(autoincrement())
+  publicId  String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code      String    @unique @db.Citext
+  name      String
+  flatRate  Decimal   @map("flat_rate") @db.Decimal(18, 4)
+  currency  String    @db.Char(3) // scope scalar; FK added in raw SQL
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([deletedAt])
+  @@map("shipping_method")
+}
+
+/// Guarded per-website order-number sequence (plan/08 §5). One row per website;
+/// `nextNumber` is advanced via a race-safe UPDATE...RETURNING (next_order_number()
+/// in raw SQL), same pattern as the inventory/wallet ledgers.
+model OrderNumberCounter {
+  websiteId  BigInt @id @map("website_id")
+  nextNumber BigInt @default(1) @map("next_number")
+
+  @@map("order_number_counter")
+}
+
+/// Cart is a domain aggregate whose totals are ALWAYS recomputed server-side at
+/// checkout — no price is stored on CartLine (plan/05 §2.3).
+model Cart {
+  id              BigInt     @id @default(autoincrement())
+  publicId        String     @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId       BigInt     @map("website_id")
+  storeViewId     BigInt     @map("store_view_id")
+  currency        String     @db.Char(3)
+  customerId      BigInt?    @map("customer_id") // no FK yet — Customer context not built
+  customerGroupId BigInt?    @map("customer_group_id")
+  status          CartStatus @default(ACTIVE)
+  version         Int        @default(0)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  lines CartLine[]
+  order Order?
+
+  @@index([websiteId])
+  @@index([storeViewId])
+  @@index([customerGroupId])
+  @@index([status])
+  @@map("cart")
+}
+
+model CartLine {
+  id        BigInt   @id @default(autoincrement())
+  cartId    BigInt   @map("cart_id")
+  variantId BigInt   @map("variant_id")
+  qty       Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([cartId, variantId])
+  @@map("cart_line")
+}
+
+/// The order aggregate. NEVER soft-deleted (cancel, don't delete — plan/08 §2).
+/// Money/line/address/tax are all SNAPSHOTTED at placement so later catalog/price
+/// changes can never alter a placed order (plan/08 §2, §7).
+model Order {
+  id                 BigInt            @id @default(autoincrement())
+  publicId           String            @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  orderNumber        BigInt            @map("order_number")
+  websiteId          BigInt            @map("website_id")
+  storeId            BigInt            @map("store_id")
+  storeViewId        BigInt            @map("store_view_id")
+  cartId             BigInt?           @unique @map("cart_id")
+  customerId         BigInt?           @map("customer_id") // no FK yet — Customer context not built; NULL = guest
+  customerGroupId    BigInt?           @map("customer_group_id")
+  email              String
+  currency           String            @db.Char(3)
+  status             OrderStatus       @default(PENDING)
+  financialStatus    FinancialStatus   @default(PENDING) @map("financial_status")
+  fulfillmentStatus  FulfillmentStatus @default(UNFULFILLED) @map("fulfillment_status")
+  subtotal           Decimal           @db.Decimal(18, 4)
+  discountTotal      Decimal           @default(0) @map("discount_total") @db.Decimal(18, 4)
+  taxTotal           Decimal           @map("tax_total") @db.Decimal(18, 4)
+  shippingTotal      Decimal           @map("shipping_total") @db.Decimal(18, 4)
+  grandTotal         Decimal           @map("grand_total") @db.Decimal(18, 4)
+  shippingMethodCode String?           @map("shipping_method_code") // snapshot, not FK
+  placedAt           DateTime          @default(now()) @map("placed_at") @db.Timestamptz(6)
+  version            Int               @default(0)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // onDelete: Restrict (explicit, not Prisma's implicit SetNull default for optional
+  // relations) — a completed order must never have its cart_id silently nulled out
+  // by a future cart-purge job (plan/00 §4.6 "cart... partition + drop old"); that
+  // job must affirmatively exclude carts with a completed order instead.
+  cart         Cart?                @relation(fields: [cartId], references: [id], onDelete: Restrict)
+  lines        OrderLine[]
+  addresses    OrderAddress[]
+  taxLines     OrderTaxLine[]
+  payments     PaymentTransaction[]
+  fulfillments Fulfillment[]
+  returns      OrderReturn[]
+
+  @@unique([websiteId, orderNumber])
+  @@index([storeId])
+  @@index([storeViewId])
+  @@index([customerGroupId])
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("order")
+}
+
+/// Line-level snapshot: sku/name/price/tax are frozen at order placement
+/// (plan/08 §2 "an order must never change because a product was later edited").
+/// Mutable AFTER creation (fulfilledQty/refundedQty advance via later fulfillment/
+/// return operations) — unlike payment_transaction/fulfillment_line/etc, so it
+/// gets updatedAt + version (optimistic lock) like stock_item, not append-only
+/// treatment.
+model OrderLine {
+  id             BigInt   @id @default(autoincrement())
+  orderId        BigInt   @map("order_id")
+  variantId      BigInt   @map("variant_id")
+  sku            String
+  name           String
+  qty            Int
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 4)
+  taxAmount      Decimal  @default(0) @map("tax_amount") @db.Decimal(18, 4)
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 4)
+  rowTotal       Decimal  @map("row_total") @db.Decimal(18, 4)
+  taxClassCode   String?  @map("tax_class_code") // snapshot, not FK
+  fulfilledQty   Int      @default(0) @map("fulfilled_qty")
+  refundedQty    Int      @default(0) @map("refunded_qty")
+  version        Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant          ProductVariant    @relation(fields: [variantId], references: [id])
+  fulfillmentLines FulfillmentLine[]
+  returnLines      OrderReturnLine[]
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_line")
+}
+
+/// Immutable address snapshot at time of order (plan/08 §2). At most one row per
+/// (order, type) — enforced below, so application code can safely assume a single
+/// BILLING and a single SHIPPING row per order.
+model OrderAddress {
+  id         BigInt      @id @default(autoincrement())
+  orderId    BigInt      @map("order_id")
+  type       AddressType
+  name       String
+  company    String?
+  line1      String
+  line2      String?
+  city       String
+  region     String?
+  postalCode String      @map("postal_code")
+  country    String      @db.Char(2)
+  phone      String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, type])
+  @@map("order_address")
+}
+
+/// Per-tax-class breakdown snapshot (plan/08 §2 order_tax_line).
+model OrderTaxLine {
+  id           BigInt  @id @default(autoincrement())
+  orderId      BigInt  @map("order_id")
+  taxClassCode String  @map("tax_class_code")
+  rate         Decimal @db.Decimal(7, 4)
+  amount       Decimal @db.Decimal(18, 4)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_tax_line")
+}
+
+/// Append-only payment ledger (plan/08 §2). Never updated/deleted — a refund is a
+/// NEW row with type=REFUND, not an edit to the original CAPTURE row. `raw` keeps
+/// the gateway's full response for reconciliation/dispute investigation once
+/// `gatewayRef` alone isn't enough (plan/08 §2 explicitly lists this column).
+model PaymentTransaction {
+  id         BigInt           @id @default(autoincrement())
+  orderId    BigInt           @map("order_id")
+  method     String
+  gateway    String
+  type       PaymentTxnType
+  amount     Decimal          @db.Decimal(18, 4)
+  currency   String           @db.Char(3) // FK'd + trigger-checked == order.currency, raw SQL
+  status     PaymentTxnStatus
+  gatewayRef String?          @map("gateway_ref")
+  raw        Json?            @db.JsonB
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // No standalone @@index([orderId]): the raw-SQL composite index
+  // ix_payment_transaction_order_type(order_id, type) already covers orderId-only
+  // lookups as its leftmost prefix — an extra single-column index would just be
+  // duplicate write amplification.
+  @@map("payment_transaction")
+}
+
+/// A logistics event (pack + ship). Does NOT deduct stock again — inventory was
+/// already deducted when the order's reservations were committed at payment
+/// success (plan/07 §3 / plan/08 §4); this only tracks the shipping/tracking side.
+model Fulfillment {
+  id             BigInt         @id @default(autoincrement())
+  publicId       String         @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  orderId        BigInt         @map("order_id")
+  warehouseId    BigInt         @map("warehouse_id")
+  status         ShipmentStatus @default(PENDING)
+  trackingNumber String?        @map("tracking_number")
+  carrier        String?
+  shippedAt      DateTime?      @map("shipped_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines FulfillmentLine[]
+
+  @@index([orderId])
+  @@index([warehouseId])
+  @@map("fulfillment")
+}
+
+model FulfillmentLine {
+  fulfillmentId BigInt @map("fulfillment_id")
+  orderLineId   BigInt @map("order_line_id")
+  qty           Int
+
+  fulfillment Fulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+  orderLine   OrderLine   @relation(fields: [orderLineId], references: [id])
+
+  @@id([fulfillmentId, orderLineId])
+  @@map("fulfillment_line")
+}
+
+/// RMA header (plan/08 §2/§4).
+model OrderReturn {
+  id        BigInt       @id @default(autoincrement())
+  publicId  String       @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  orderId   BigInt       @map("order_id")
+  reason    String
+  status    ReturnStatus @default(REQUESTED)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines OrderReturnLine[]
+
+  @@index([orderId])
+  @@map("order_return")
+}
+
+model OrderReturnLine {
+  returnId    BigInt  @map("return_id")
+  orderLineId BigInt  @map("order_line_id")
+  qty         Int
+  restock     Boolean @default(true)
+
+  orderReturn OrderReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  orderLine   OrderLine   @relation(fields: [orderLineId], references: [id])
+
+  @@id([returnId, orderLineId])
+  @@map("order_return_line")
+}

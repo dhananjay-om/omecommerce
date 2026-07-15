@@ -8,6 +8,7 @@ import { prisma } from './shared/infrastructure/prisma/client.js';
 import { createCatalogModule } from './modules/catalog/catalog.module.js';
 import { createInventoryModule } from './modules/inventory/inventory.module.js';
 import { createPricingModule } from './modules/pricing/pricing.module.js';
+import { createOrderModule } from './modules/order/order.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -34,6 +35,10 @@ export function createApp(): Express {
 
   const pricing = createPricingModule(prisma);
   app.use('/admin/v1', pricing.admin);
+
+  const order = createOrderModule(prisma);
+  app.use('/admin/v1', order.admin);
+  app.use('/store/v1', order.store);
 
   app.use(notFound);
   app.use(errorHandler);

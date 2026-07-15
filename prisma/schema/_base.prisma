@@ -225,3 +225,76 @@ enum PriceListType {
   B2B
   SPECIAL
 }
+
+// ---------------------------------------------------------------------------
+// Order management (plan/08-order-management.md)
+// ---------------------------------------------------------------------------
+
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+}
+
+/// Order-level status. Independent of FinancialStatus/FulfillmentStatus, which
+/// track payment and shipping progress separately (plan/08 §1 "two decoupled
+/// state machines" — this third, coarser status is the merchant-facing summary).
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum FinancialStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  VOIDED
+}
+
+/// Order-level fulfillment progress (aggregate across all order_line rows).
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  RETURNED
+}
+
+/// A single fulfillment/shipment record's own lifecycle (distinct from the
+/// order-level FulfillmentStatus aggregate above).
+enum ShipmentStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum AddressType {
+  BILLING
+  SHIPPING
+}
+
+enum PaymentTxnType {
+  AUTHORIZE
+  CAPTURE
+  REFUND
+  VOID
+}
+
+enum PaymentTxnStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  RECEIVED
+  REFUNDED
+  REJECTED
+}

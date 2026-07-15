@@ -189,6 +189,8 @@ model ProductVariant {
   stockItems    StockItem[]
   productPrices ProductPrice[]
   priceTiers    PriceTier[]
+  cartLines     CartLine[]
+  orderLines    OrderLine[]
 
   @@index([productId, deletedAt])
   @@map("product_variant")
