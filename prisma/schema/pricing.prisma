@@ -1,0 +1,113 @@
+// =============================================================================
+// pricing.prisma — Price lists, tiers, customer groups. See plan/01 §7.
+//
+// SIMPLIFICATION vs. the plan doc: `product_price` targets a VARIANT only (not
+// "product_id NULL, variant_id NULL" either/or). This follows the precedent set by
+// Inventory (plan/07): every sellable unit is a variant — SIMPLE/DIGITAL/VIRTUAL
+// products get an implicit variant (Stage 1/2) and CONFIGURABLE variants are priced
+// individually. One targeting column avoids a nullable-either-or CHECK + a
+// NULLS-NOT-DISTINCT uniqueness index for no functional loss.
+//
+// DEFERRED: currency_rate / cross-currency conversion (plan/01 §7 "Currency
+// conversion via currency_rate(base,quote,rate,as_of) when no explicit per-currency
+// price exists"). A price_list already carries an explicit `currency`, so multi-
+// currency support today means creating a price_list per currency; automatic FX
+// conversion is a follow-up once a live-rate source is wired in.
+//
+// `PriceList.currency`/`websiteId` are kept as plain scalars (NOT Prisma relations)
+// per the project-wide scope-FK convention (_base.prisma header comment): their FK
+// constraints, with a deliberate ON DELETE choice, are added in
+// prisma/sql/0003_pricing_raw.sql — same pattern as ProductAttributeValue's
+// website/store/store_view scope FKs. `customerGroupId` stays a real Prisma
+// relation since CustomerGroup is pricing-owned; only relations that would force a
+// back-relation onto Website/Currency (owned by store.prisma) are kept scalar-only.
+// =============================================================================
+
+/// Minimal customer-group model — enough to support group/B2B/wholesale pricing.
+/// Full Customer context (accounts, auth, addresses) is a later stage; this table
+/// is the shared dependency both Pricing and (eventually) Customer/Order need.
+model CustomerGroup {
+  id        BigInt    @id @default(autoincrement())
+  publicId  String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code      String    @unique @db.Citext
+  name      String
+  isDefault Boolean   @default(false) @map("is_default")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?   @map("created_by")
+  updatedBy BigInt?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  priceLists PriceList[]
+
+  @@index([deletedAt])
+  @@map("customer_group")
+}
+
+/// A priced offer: base/wholesale/B2B/special(=scheduled), optionally scoped to a
+/// customer group and/or website, with a priority for resolution (plan/01 §7).
+model PriceList {
+  id              BigInt        @id @default(autoincrement())
+  publicId        String        @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code            String        @unique @db.Citext
+  name            String
+  currency        String        @db.Char(3) // scope scalar; FK added in raw SQL
+  customerGroupId BigInt?       @map("customer_group_id")
+  websiteId       BigInt?       @map("website_id") // scope scalar; FK added in raw SQL
+  type            PriceListType @default(BASE)
+  priority        Int           @default(0)
+  startsAt        DateTime?     @map("starts_at") @db.Timestamptz(6)
+  endsAt          DateTime?     @map("ends_at") @db.Timestamptz(6)
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy       BigInt?       @map("created_by")
+  updatedBy       BigInt?       @map("updated_by")
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  customerGroup CustomerGroup? @relation(fields: [customerGroupId], references: [id])
+  prices        ProductPrice[]
+  tiers         PriceTier[]
+
+  @@index([currency, customerGroupId, websiteId, isActive])
+  @@index([customerGroupId])
+  @@index([websiteId])
+  @@index([deletedAt])
+  @@map("price_list")
+}
+
+/// The base (non-tiered) price for a variant within a price list.
+model ProductPrice {
+  id          BigInt   @id @default(autoincrement())
+  priceListId BigInt   @map("price_list_id")
+  variantId   BigInt   @map("variant_id")
+  price       Decimal  @db.Decimal(18, 4)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  priceList PriceList      @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([priceListId, variantId])
+  @@index([variantId])
+  @@map("product_price")
+}
+
+/// Volume/tier pricing: qty >= minQty within this price list gets `price` instead
+/// of the base ProductPrice (plan/01 §7 "tier & wholesale pricing").
+model PriceTier {
+  id          BigInt   @id @default(autoincrement())
+  priceListId BigInt   @map("price_list_id")
+  variantId   BigInt   @map("variant_id")
+  minQty      Int      @map("min_qty")
+  price       Decimal  @db.Decimal(18, 4)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  priceList PriceList      @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([priceListId, variantId, minQty])
+  @@index([variantId, minQty])
+  @@map("price_tier")
+}

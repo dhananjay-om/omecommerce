@@ -7,6 +7,7 @@ import { healthRouter } from './shared/interface/http/health.route.js';
 import { prisma } from './shared/infrastructure/prisma/client.js';
 import { createCatalogModule } from './modules/catalog/catalog.module.js';
 import { createInventoryModule } from './modules/inventory/inventory.module.js';
+import { createPricingModule } from './modules/pricing/pricing.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -30,6 +31,9 @@ export function createApp(): Express {
 
   const inventory = createInventoryModule(prisma);
   app.use('/admin/v1', inventory.admin);
+
+  const pricing = createPricingModule(prisma);
+  app.use('/admin/v1', pricing.admin);
 
   app.use(notFound);
   app.use(errorHandler);

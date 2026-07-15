@@ -212,3 +212,16 @@ enum ReservationStatus {
   RELEASED
   EXPIRED
 }
+
+// ---------------------------------------------------------------------------
+// Pricing (plan/01-domain-model-and-erd.md §7)
+// ---------------------------------------------------------------------------
+
+/// SPECIAL covers both "special price" and "scheduled price" — one mechanism,
+/// distinguished only by starts_at/ends_at (plan/01 §7).
+enum PriceListType {
+  BASE
+  WHOLESALE
+  B2B
+  SPECIAL
+}
