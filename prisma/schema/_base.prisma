@@ -307,3 +307,77 @@ enum CmsStatus {
   DRAFT
   PUBLISHED
 }
+
+// ---------------------------------------------------------------------------
+// Stored value: gift cards, wallet, store credit (plan/10-gift-cards-wallet-store-credit.md)
+// ---------------------------------------------------------------------------
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+}
+
+/// Store Credit and Wallet are the SAME ledger, differentiated by bucket
+/// (plan/10 §1) — not two separate systems. No separate REFUND bucket: per
+/// plan/10 §4.2, a refund lands in STORE_CREDIT with source=REFUND — adding a
+/// distinct REFUND bucket would create two competing ways to represent the
+/// same fact (schema-reviewer finding).
+enum WalletBucket {
+  STORE_CREDIT
+  PREPAID_TOPUP
+  CASHBACK
+  LOYALTY_CONVERSION
+}
+
+/// HOLD/RELEASE deferred — no checkout tender integration yet (this pass's
+/// documented scope cut), so nothing places a hold on a wallet.
+enum WalletTxnType {
+  CREDIT
+  DEBIT
+  ADJUST
+  EXPIRE
+}
+
+enum WalletSource {
+  REFUND
+  RETURN
+  GOODWILL
+  TOPUP
+  CASHBACK
+  LOYALTY
+  GIFTCARD_LOAD
+  PROMO
+  ADMIN_ADJUST
+}
+
+enum GiftCardStatus {
+  ACTIVE
+  REDEEMED
+  EXPIRED
+  DISABLED
+  PENDING
+}
+
+enum GiftCardKind {
+  DIGITAL
+  PHYSICAL
+}
+
+/// PURCHASED (buying a virtual gift-card product) is deferred — needs an
+/// OrderPaid event consumer this pass doesn't build. REFUND (issuing a new
+/// card as a refund substitute, plan/10 §3.3) is included even though no
+/// use-case emits it yet — trivial to declare, unlike PURCHASED.
+enum GiftCardSource {
+  ADMIN_ISSUED
+  PROMOTIONAL
+  REFUND
+}
+
+enum GiftCardTxnType {
+  ISSUE
+  REDEEM
+  REFUND
+  ADJUST
+  VOID
+  EXPIRE
+}

@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import pinoHttp from 'pino-http';
 import { logger } from './shared/infrastructure/logger.js';
+import { env } from './config/env.js';
 import { installBigIntJson } from './shared/interface/http/serialization.js';
 import { requestContext, notFound, errorHandler } from './shared/interface/http/middleware.js';
 import { healthRouter } from './shared/interface/http/health.route.js';
@@ -15,6 +16,8 @@ import { createSearchModule } from './modules/search/search.module.js';
 import { createCustomerModule } from './modules/customer/customer.module.js';
 import { createWishlistModule } from './modules/wishlist/wishlist.module.js';
 import { createCmsModule } from './modules/cms/cms.module.js';
+import { createWalletModule } from './modules/wallet/wallet.module.js';
+import { createGiftCardModule } from './modules/giftcard/giftcard.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -68,6 +71,14 @@ export function createApp(): Express {
   const cms = createCmsModule(prisma, auth.authorize);
   app.use('/admin/v1', cms.admin);
   app.use('/store/v1', cms.store);
+
+  const wallet = createWalletModule(prisma, auth.authorize, customer.authenticateCustomer);
+  app.use('/admin/v1', wallet.admin);
+  app.use('/store/v1', wallet.store);
+
+  const giftcard = createGiftCardModule(prisma, env.GIFT_CARD_HMAC_SECRET, auth.authorize, customer.authenticateCustomer);
+  app.use('/admin/v1', giftcard.admin);
+  app.use('/store/v1', giftcard.store);
 
   app.use(notFound);
   app.use(errorHandler);

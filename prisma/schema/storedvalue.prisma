@@ -1,0 +1,157 @@
+// =============================================================================
+// storedvalue.prisma — Gift cards + wallet/store credit
+// (plan/10-gift-cards-wallet-store-credit.md).
+//
+// SCOPE FOR THIS PASS (Stage 5a — ledger + admin/storefront APIs only):
+// - Store Credit and Wallet are the SAME ledger (plan/10 §1): one Wallet per
+//   (customer, website, currency), one WalletTransaction append-only ledger
+//   with a `bucket` discriminator. Gift Cards are a separate, code-based,
+//   non-customer-bound instrument — not a bucket.
+// - Every debit uses the same guarded UPDATE as the inventory ledger
+//   (PrismaStockLedger, plan/07 §2): `UPDATE ... SET balance = balance - $amt
+//   WHERE balance >= $amt ...`, inside the same transaction as the ledger
+//   INSERT — never a plain UPDATE followed by a separate check.
+// - Wallet is deliberately NOT soft-deleted (unlike GiftCard) — FROZEN is its
+//   terminal state. The global soft-delete Prisma extension hides
+//   deletedAt-IS-NOT-NULL rows from ALL reads (findMany/count included);
+//   soft-deleting a wallet that still carries a nonzero balance would hide a
+//   real financial liability from reconciliation/reporting. Same reasoning
+//   style as Role's no-soft-delete decision in system.prisma.
+// - Ledger tables use generic refType/refId (not a hardcoded orderId),
+//   matching StockMovement's exact precedent — a store-credit refund needs to
+//   reference a specific OrderReturn, not just an Order, and a
+//   loyalty-conversion credit references neither.
+// - idempotencyKey gets a plain @@unique([<parent>Id, idempotencyKey]) — NOT
+//   NULLS NOT DISTINCT: Postgres's default NULL-is-distinct behavior is
+//   exactly what's wanted here (writes that pass no key shouldn't collide
+//   with each other), unlike the scope-uniqueness case elsewhere in this
+//   schema. This is a separate concern from system.prisma's IdempotencyKey
+//   table (which guards route-level HTTP idempotency, not ledger-row
+//   idempotency) — complementary, not substitutable.
+// - Currency FKs + a cross-table currency-consistency trigger (raw SQL,
+//   prisma/sql/0009_storedvalue_raw.sql) mirror payment_transaction's
+//   check_payment_currency_matches_order() exactly — a wallet/gift-card
+//   ledger row must match its parent's fixed currency (plan/10 §2: "a gift
+//   card / wallet bucket has a fixed currency").
+// - NOT built this pass (documented deferrals, not silently dropped):
+//   * Checkout tender integration (paying an order with gift card/wallet) —
+//     needs complete-checkout.usecase.ts surgery (holds, split tender, refund
+//     routing, plan/10 §6). This is why WalletTxnType has no HOLD/RELEASE and
+//     there's no wallet_hold table yet.
+//   * Gift-card-as-product issuance (buying one as a virtual product) — needs
+//     an OrderPaid consumer; GiftCardSource has no PURCHASED value yet.
+//   * Wallet top-up via PSP — separate payment-gateway wiring, deferred.
+//   * Liability/breakage analytics read model (plan/10 §9) — Stage 6.
+// =============================================================================
+
+model Wallet {
+  id         BigInt       @id @default(autoincrement())
+  publicId   String       @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  customerId BigInt       @map("customer_id")
+  websiteId  BigInt       @map("website_id")
+  currency   String       @db.Char(3)
+  balance    Decimal      @default(0) @db.Decimal(18, 4)
+  status     WalletStatus @default(ACTIVE)
+  /// Declared for schema-level parity with stock_item — not actively
+  /// referenced by the guarded-UPDATE queries, same as stock_item's own
+  /// version field today (the WHERE-guarded balance check is what makes
+  /// concurrent debits race-safe, not this counter).
+  version    Int          @default(0)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer     Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  transactions WalletTransaction[]
+
+  @@unique([customerId, websiteId, currency], map: "uq_wallet_customer_website_currency")
+  @@index([websiteId])
+  @@map("wallet")
+}
+
+/// Append-only ledger — balance is a projection (Wallet.balance = SUM(amount)).
+/// No updatedAt/deletedAt: immutable by design, same as stock_movement.
+model WalletTransaction {
+  id             BigInt        @id @default(autoincrement())
+  walletId       BigInt        @map("wallet_id")
+  bucket         WalletBucket
+  type           WalletTxnType
+  amount         Decimal       @db.Decimal(18, 4)
+  balanceAfter   Decimal       @map("balance_after") @db.Decimal(18, 4)
+  currency       String        @db.Char(3)
+  source         WalletSource
+  /// Generic polymorphic reference (order/return/loyalty/promo/...), matching
+  /// StockMovement.refType/refId exactly — not a hardcoded orderId.
+  refType        String?       @map("ref_type")
+  refId          BigInt?       @map("ref_id")
+  idempotencyKey String?       @map("idempotency_key")
+  expiresAt      DateTime?     @map("expires_at") @db.Timestamptz(6)
+  actorId        BigInt?       @map("actor_id")
+  reason         String?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@unique([walletId, idempotencyKey], map: "uq_wallet_txn_wallet_idempotency")
+  @@index([walletId, createdAt])
+  @@map("wallet_transaction")
+}
+
+/// Bound to a code, not a customer, until redeemed (plan/10 §1) — hence
+/// purchaserCustomerId is a bare nullable scalar, not a first-class relation.
+model GiftCard {
+  id                  BigInt         @id @default(autoincrement())
+  publicId            String         @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId           BigInt         @map("website_id")
+  /// HMAC-SHA256 hex of the redeemable code. The raw code is returned once at
+  /// issuance and never stored — this table can only ever verify a submitted
+  /// code by re-hashing and comparing, never recover it.
+  codeHash            String         @unique @map("code_hash")
+  codeLast4           String         @map("code_last4")
+  initialAmount       Decimal        @map("initial_amount") @db.Decimal(18, 4)
+  balance             Decimal        @default(0) @db.Decimal(18, 4)
+  currency            String         @db.Char(3)
+  status              GiftCardStatus @default(ACTIVE)
+  kind                GiftCardKind   @default(DIGITAL)
+  source              GiftCardSource
+  purchaserCustomerId BigInt?        @map("purchaser_customer_id")
+  recipientEmail      String?        @map("recipient_email")
+  recipientName       String?        @map("recipient_name")
+  message             String?
+  expiresAt           DateTime?      @map("expires_at") @db.Timestamptz(6)
+  version             Int            @default(0)
+  createdBy           BigInt?        @map("created_by")
+  updatedBy           BigInt?        @map("updated_by")
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  transactions GiftCardTransaction[]
+
+  @@index([deletedAt])
+  @@index([websiteId])
+  @@index([purchaserCustomerId])
+  @@index([status])
+  @@map("gift_card")
+}
+
+/// Append-only ledger, same shape/reasoning as WalletTransaction.
+model GiftCardTransaction {
+  id             BigInt          @id @default(autoincrement())
+  giftCardId     BigInt          @map("gift_card_id")
+  type           GiftCardTxnType
+  amount         Decimal         @db.Decimal(18, 4)
+  balanceAfter   Decimal         @map("balance_after") @db.Decimal(18, 4)
+  currency       String          @db.Char(3)
+  refType        String?         @map("ref_type")
+  refId          BigInt?         @map("ref_id")
+  idempotencyKey String?         @map("idempotency_key")
+  actorId        BigInt?         @map("actor_id")
+  reason         String?
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  giftCard GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
+
+  @@unique([giftCardId, idempotencyKey], map: "uq_gift_card_txn_giftcard_idempotency")
+  @@index([giftCardId, createdAt])
+  @@map("gift_card_transaction")
+}

@@ -47,6 +47,7 @@ model Customer {
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   addresses CustomerAddress[]
+  wallets   Wallet[]
 
   @@unique([websiteId, email], map: "uq_customer_website_email")
   @@index([deletedAt])

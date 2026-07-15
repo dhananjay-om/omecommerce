@@ -17,6 +17,12 @@ const EnvSchema = z.object({
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET: z.string().optional(),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  // A dedicated secret, not reused JWT_SECRET — this is a different
+  // cryptographic purpose (deterministic keyed hash for exact-match code
+  // lookup, not signature verification), so a separate key is the cleaner
+  // practice (unlike the customer-token/JWT_SECRET reuse decision, which was
+  // justified by a payload-shape check being the real boundary there).
+  GIFT_CARD_HMAC_SECRET: z.string().min(16, 'GIFT_CARD_HMAC_SECRET must be at least 16 characters'),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
