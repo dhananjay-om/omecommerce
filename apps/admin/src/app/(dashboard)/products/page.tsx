@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { statusBadgeVariant } from '@/lib/status-badge';
 
 const PAGE_SIZE = 20;
 
@@ -72,7 +73,7 @@ export default async function ProductsPage({
                   <TableCell>{p.name ?? '—'}</TableCell>
                   <TableCell>{p.type}</TableCell>
                   <TableCell>
-                    <Badge variant={p.status === 'ACTIVE' ? 'default' : 'secondary'}>{p.status}</Badge>
+                    <Badge variant={statusBadgeVariant(p.status)}>{p.status}</Badge>
                   </TableCell>
                   <TableCell>{new Date(p.createdAt).toLocaleDateString()}</TableCell>
                 </TableRow>

@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
+import { LogOut } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { logout } from '@/app/actions/auth';
 import { DashboardNav } from '@/components/dashboard-nav';
-import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 
 /**
@@ -23,19 +23,32 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="flex w-56 flex-col border-r bg-muted/20 p-4">
-        <div className="mb-6 px-3 text-lg font-semibold">OMEcommerce</div>
-        <DashboardNav />
-        <div className="mt-auto pt-4">
+    <div className="flex min-h-screen bg-muted/30">
+      <aside className="flex w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+          <span className="text-xl leading-none font-bold tracking-tight">
+            <span className="text-primary">orange</span>
+            <span className="text-sidebar-foreground">mantra</span>
+          </span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          <DashboardNav />
+        </div>
+        <div className="border-t border-sidebar-border p-3">
           <form action={logout}>
-            <Button type="submit" variant="outline" className="w-full">
+            <button
+              type="submit"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <LogOut className="size-4" strokeWidth={2} />
               Log out
-            </Button>
+            </button>
           </form>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl p-8">{children}</div>
+      </main>
       <Toaster />
     </div>
   );

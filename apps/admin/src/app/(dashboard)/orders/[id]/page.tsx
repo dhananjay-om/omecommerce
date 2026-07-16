@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { FulfillDialog } from '../fulfill-dialog';
 import { RefundDialog } from '../refund-dialog';
 import { CancelDialog } from '../cancel-dialog';
+import { statusBadgeVariant } from '@/lib/status-badge';
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,9 +22,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">Order #{order.orderNumber}</h1>
-          <Badge variant="secondary">{order.status}</Badge>
-          <Badge variant="secondary">{order.financialStatus}</Badge>
-          <Badge variant="secondary">{order.fulfillmentStatus}</Badge>
+          <Badge variant={statusBadgeVariant(order.status)}>{order.status}</Badge>
+          <Badge variant={statusBadgeVariant(order.financialStatus)}>{order.financialStatus}</Badge>
+          <Badge variant={statusBadgeVariant(order.fulfillmentStatus)}>{order.fulfillmentStatus}</Badge>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{order.email}</p>
       </div>

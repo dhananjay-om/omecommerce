@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { statusBadgeVariant } from '@/lib/status-badge';
 
 const PAGE_SIZE = 20;
 
@@ -74,13 +75,13 @@ export default async function OrdersPage({
                   </TableCell>
                   <TableCell>{o.email}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{o.status}</Badge>
+                    <Badge variant={statusBadgeVariant(o.status)}>{o.status}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{o.financialStatus}</Badge>
+                    <Badge variant={statusBadgeVariant(o.financialStatus)}>{o.financialStatus}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{o.fulfillmentStatus}</Badge>
+                    <Badge variant={statusBadgeVariant(o.fulfillmentStatus)}>{o.fulfillmentStatus}</Badge>
                   </TableCell>
                   <TableCell>
                     {o.currency} {o.grandTotal}

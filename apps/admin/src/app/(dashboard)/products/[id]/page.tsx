@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import { statusBadgeVariant } from '@/lib/status-badge';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,7 +20,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </Link>
         <div className="mt-2 flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{product.name ?? product.sku}</h1>
-          <Badge variant={product.status === 'ACTIVE' ? 'default' : 'secondary'}>{product.status}</Badge>
+          <Badge variant={statusBadgeVariant(product.status)}>{product.status}</Badge>
         </div>
       </div>
 
@@ -68,7 +69,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   <TableRow key={v.publicId}>
                     <TableCell>{v.sku}</TableCell>
                     <TableCell>
-                      <Badge variant={v.status === 'ACTIVE' ? 'default' : 'secondary'}>{v.status}</Badge>
+                      <Badge variant={statusBadgeVariant(v.status)}>{v.status}</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{v.publicId}</TableCell>
                   </TableRow>
