@@ -127,3 +127,10 @@ export interface BulkImportResult {
   failed: number;
   errors: BulkImportRowError[];
 }
+
+export interface VariantView {
+  publicId: string;
+  sku: string;
+  status: string;
+  position: number;
+}

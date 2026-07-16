@@ -12,6 +12,7 @@ import {
   PrismaProductRepository,
   PrismaAttributeRepository,
   PrismaAttributeSetRepository,
+  PrismaProductVariantRepository,
 } from './infrastructure/prisma-product.repository.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
 import { CreateProduct } from './application/create-product.usecase.js';
@@ -21,6 +22,7 @@ import { CreateAttributeSet } from './application/create-attribute-set.usecase.j
 import { CreateAttributeSetGroup } from './application/create-attribute-set-group.usecase.js';
 import { CreateAttribute } from './application/create-attribute.usecase.js';
 import { AssignAttributeToGroup } from './application/assign-attribute-to-group.usecase.js';
+import { ListProductVariants } from './application/list-product-variants.usecase.js';
 import {
   createProductSchema,
   assignAttributeValueSchema,
@@ -43,6 +45,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const attributes = new PrismaAttributeRepository(db);
   const attributeSets = new PrismaAttributeSetRepository(db);
   const attrStore = new PrismaProductAttributeStore(db);
+  const variants = new PrismaProductVariantRepository(db);
   const storeContext = new PrismaStoreContextResolver(db);
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(db);
@@ -54,6 +57,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createAttributeSetGroup = new CreateAttributeSetGroup(attributeSets);
   const createAttribute = new CreateAttribute(attributes);
   const assignAttributeToGroup = new AssignAttributeToGroup(attributeSets, attributes);
+  const listProductVariants = new ListProductVariants(products, variants);
 
   // --- Admin API ---
   const admin = Router();
@@ -71,6 +75,12 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       const body = parse(assignAttributeValueSchema, req.body);
       await assignAttributeValue.execute({ ...body, productPublicId: req.params.publicId! });
       res.status(204).send();
+    }),
+  );
+  admin.get(
+    '/products/:publicId/variants',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listProductVariants.execute(req.params.publicId!) });
     }),
   );
   admin.post(

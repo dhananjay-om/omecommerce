@@ -116,4 +116,20 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
       .send({ attributeCode: 'ram', scope: 'GLOBAL', value: 'not-a-number' });
     expect(bad.status).toBe(422);
   });
+
+  it('lists a SIMPLE product\'s implicitly-created variant (admin browse — was previously undiscoverable via any API)', async () => {
+    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-4', attributeSetId });
+    const publicId = created.body.data.publicId as string;
+
+    const variants = await admin.get(`/admin/v1/products/${publicId}/variants`);
+    expect(variants.status).toBe(200);
+    expect(variants.body.data).toHaveLength(1);
+    expect(variants.body.data[0]).toMatchObject({ sku: 'API-SKU-4', status: 'ACTIVE', position: 0 });
+    expect(variants.body.data[0].publicId).toEqual(expect.any(String));
+  });
+
+  it('404s listing variants for an unknown product', async () => {
+    const res = await admin.get('/admin/v1/products/00000000-0000-7000-8000-000000000000/variants');
+    expect(res.status).toBe(404);
+  });
 });

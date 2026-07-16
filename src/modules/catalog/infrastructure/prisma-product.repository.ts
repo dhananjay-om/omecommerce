@@ -9,6 +9,8 @@ import type {
   AttributeSetInfo,
   CreateAttributeSetInput,
   AttributeSetGroupInfo,
+  ProductVariantRepository,
+  VariantInfo,
 } from '../domain/repositories.js';
 
 /**
@@ -77,6 +79,19 @@ export class PrismaProductRepository implements ProductRepository {
       nameDefault: row.nameDefault,
       isDigital: row.isDigital,
       isVirtual: row.isVirtual,
+    });
+  }
+}
+
+/** Read-only adapter over a product's own variants (admin browse). */
+export class PrismaProductVariantRepository implements ProductVariantRepository {
+  constructor(private readonly db: Db) {}
+
+  async listByProductId(productId: bigint): Promise<VariantInfo[]> {
+    return this.db.productVariant.findMany({
+      where: { productId },
+      select: { publicId: true, sku: true, status: true, position: true },
+      orderBy: { position: 'asc' },
     });
   }
 }

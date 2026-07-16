@@ -9,6 +9,18 @@ export interface ProductRepository {
   findByPublicId(publicId: string): Promise<Product | null>;
 }
 
+export interface VariantInfo {
+  publicId: string;
+  sku: string;
+  status: string;
+  position: number;
+}
+
+/** Read-only port over a product's own variants (admin browse — plan/12 Admin UI). */
+export interface ProductVariantRepository {
+  listByProductId(productId: bigint): Promise<VariantInfo[]>;
+}
+
 export interface AttributeInfo {
   id: bigint;
   code: string;
