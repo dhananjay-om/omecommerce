@@ -53,7 +53,11 @@ export const listProductsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().optional(),
   status: z.nativeEnum(ProductStatus).optional(),
+  type: z.nativeEnum(ProductType).optional(),
+  attributeSetId: z.string().regex(/^\d+$/, 'expected numeric id').optional(),
   search: z.string().min(1).optional(),
+  sortBy: z.enum(['sku', 'nameDefault', 'createdAt', 'status']).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
 });
 
 export const createAttributeSetSchema = z.object({

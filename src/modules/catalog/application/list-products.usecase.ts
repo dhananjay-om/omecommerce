@@ -1,4 +1,5 @@
 import type { ProductRepository } from '../domain/repositories.js';
+import { ValidationError } from '../../../shared/domain/errors.js';
 import type { ListProductsQuery, ProductListView } from './dto.js';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -12,7 +13,24 @@ export class ListProducts {
     const page = query.page && query.page > 0 ? query.page : 1;
     const pageSize = query.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
 
-    const result = await this.products.list({ page, pageSize, status: query.status, search: query.search });
+    let attributeSetId: bigint | undefined;
+    if (query.attributeSetId !== undefined) {
+      if (!/^\d+$/.test(query.attributeSetId)) {
+        throw new ValidationError('invalid attributeSetId', [{ path: 'attributeSetId', message: 'expected numeric id' }]);
+      }
+      attributeSetId = BigInt(query.attributeSetId);
+    }
+
+    const result = await this.products.list({
+      page,
+      pageSize,
+      status: query.status,
+      type: query.type,
+      attributeSetId,
+      search: query.search,
+      sortBy: query.sortBy,
+      sortDir: query.sortDir,
+    });
     return {
       total: result.total,
       page: result.page,
@@ -24,6 +42,8 @@ export class ListProducts {
         type: p.type,
         status: p.status,
         createdAt: p.createdAt.toISOString(),
+        quantity: p.quantity,
+        salableQuantity: p.salableQuantity,
       })),
     };
   }

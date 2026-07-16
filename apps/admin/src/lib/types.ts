@@ -9,6 +9,8 @@ export interface ProductListItem {
   type: ProductType;
   status: ProductStatus;
   createdAt: string;
+  quantity: number;
+  salableQuantity: number;
 }
 
 export interface ProductList {

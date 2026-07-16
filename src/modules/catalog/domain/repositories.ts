@@ -9,14 +9,25 @@ export interface ProductListItem {
   type: ProductType;
   status: ProductStatus;
   createdAt: Date;
+  /** Sum of on-hand stock across all this product's variants and warehouses. */
+  quantity: number;
+  /** Sum of available (on_hand - reserved) stock across all variants/warehouses. */
+  salableQuantity: number;
 }
+
+export type ListProductsSortBy = 'sku' | 'nameDefault' | 'createdAt' | 'status';
+export type SortDirection = 'asc' | 'desc';
 
 export interface ListProductsFilter {
   page: number;
   pageSize: number;
   status?: ProductStatus;
+  type?: ProductType;
+  attributeSetId?: bigint;
   /** Matches sku/name, case-insensitive substring (admin browse — not the storefront search index). */
   search?: string;
+  sortBy?: ListProductsSortBy;
+  sortDir?: SortDirection;
 }
 
 export interface ProductListResult {

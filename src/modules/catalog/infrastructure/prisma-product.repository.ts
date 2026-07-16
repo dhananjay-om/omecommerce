@@ -16,7 +16,8 @@ import type {
   ProductListResult,
   UpdateProductInput,
 } from '../domain/repositories.js';
-import type { Prisma, Product as PrismaProductRow } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { Product as PrismaProductRow } from '@prisma/client';
 
 function toDomainProps(row: PrismaProductRow) {
   return {
@@ -99,6 +100,8 @@ export class PrismaProductRepository implements ProductRepository {
   async list(filter: ListProductsFilter): Promise<ProductListResult> {
     const where: Prisma.ProductWhereInput = {
       status: filter.status,
+      type: filter.type,
+      attributeSetId: filter.attributeSetId,
       ...(filter.search
         ? { OR: [{ sku: { contains: filter.search, mode: 'insensitive' } }, { nameDefault: { contains: filter.search, mode: 'insensitive' } }] }
         : {}),
@@ -108,19 +111,55 @@ export class PrismaProductRepository implements ProductRepository {
       this.db.product.count({ where }),
       this.db.product.findMany({
         where,
-        select: { publicId: true, sku: true, nameDefault: true, type: true, status: true, createdAt: true },
-        orderBy: { createdAt: 'desc' },
+        select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, createdAt: true },
+        orderBy: { [filter.sortBy ?? 'createdAt']: filter.sortDir ?? 'desc' },
         skip: (filter.page - 1) * filter.pageSize,
         take: filter.pageSize,
       }),
     ]);
 
+    const stockByProduct = await this.sumStockByProduct(rows.map((r) => r.id));
+
     return {
       total,
       page: filter.page,
       pageSize: filter.pageSize,
-      products: rows.map((r) => ({ publicId: r.publicId, sku: r.sku, name: r.nameDefault, type: r.type, status: r.status, createdAt: r.createdAt })),
+      products: rows.map((r) => {
+        const stock = stockByProduct.get(r.id.toString()) ?? { onHand: 0, available: 0 };
+        return {
+          publicId: r.publicId,
+          sku: r.sku,
+          name: r.nameDefault,
+          type: r.type,
+          status: r.status,
+          createdAt: r.createdAt,
+          quantity: stock.onHand,
+          salableQuantity: stock.available,
+        };
+      }),
     };
+  }
+
+  /** Sums on-hand/available stock across every variant and warehouse for a page of
+   * products — a LEFT JOIN so a product with zero variants (a CONFIGURABLE with no
+   * variants created yet) or zero stock rows still doesn't drop out of the result. */
+  private async sumStockByProduct(productIds: bigint[]): Promise<Map<string, { onHand: number; available: number }>> {
+    const result = new Map<string, { onHand: number; available: number }>();
+    if (productIds.length === 0) return result;
+
+    const rows = await this.db.$queryRaw<Array<{ product_id: bigint; on_hand_sum: bigint; available_sum: bigint }>>`
+      SELECT pv.product_id AS product_id,
+             COALESCE(SUM(si.on_hand), 0) AS on_hand_sum,
+             COALESCE(SUM(si.available), 0) AS available_sum
+        FROM product_variant pv
+        LEFT JOIN stock_item si ON si.variant_id = pv.id
+       WHERE pv.product_id IN (${Prisma.join(productIds)})
+       GROUP BY pv.product_id`;
+
+    for (const row of rows) {
+      result.set(row.product_id.toString(), { onHand: Number(row.on_hand_sum), available: Number(row.available_sum) });
+    }
+    return result;
   }
 }
 

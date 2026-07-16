@@ -68,7 +68,11 @@ export interface ListProductsQuery {
   page?: number;
   pageSize?: number;
   status?: ProductStatus;
+  type?: ProductType;
+  attributeSetId?: string;
   search?: string;
+  sortBy?: 'sku' | 'nameDefault' | 'createdAt' | 'status';
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface ProductListItemView {
@@ -78,6 +82,8 @@ export interface ProductListItemView {
   type: ProductType;
   status: ProductStatus;
   createdAt: string;
+  quantity: number;
+  salableQuantity: number;
 }
 
 export interface ProductListView {

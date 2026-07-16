@@ -1,27 +1,78 @@
 import Link from 'next/link';
 import { apiGet, buildQuery } from '@/lib/api-client';
-import type { ProductList } from '@/lib/types';
+import type { AttributeSet, ProductList } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { statusBadgeVariant } from '@/lib/status-badge';
+import { ProductsTable, type SortKey } from './products-table';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const PRODUCT_TYPES = ['SIMPLE', 'CONFIGURABLE', 'BUNDLE', 'DIGITAL', 'VIRTUAL'];
+const STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
+
+const nativeSelectClass =
+  'h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string; status?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    status?: string;
+    type?: string;
+    attributeSetId?: string;
+    pageSize?: string;
+    sortBy?: string;
+    sortDir?: string;
+  }>;
 }) {
   const params = await searchParams;
   const page = params.page ? Number(params.page) : 1;
+  const pageSize = params.pageSize ? Number(params.pageSize) : DEFAULT_PAGE_SIZE;
+  const sortBy = (['sku', 'nameDefault', 'createdAt', 'status'].includes(params.sortBy ?? '')
+    ? params.sortBy
+    : 'createdAt') as SortKey;
+  const sortDir = params.sortDir === 'asc' ? 'asc' : 'desc';
 
-  const list = await apiGet<ProductList>(
-    `/admin/v1/products${buildQuery({ page, pageSize: PAGE_SIZE, search: params.search, status: params.status })}`,
-  );
+  const [list, attributeSets] = await Promise.all([
+    apiGet<ProductList>(
+      `/admin/v1/products${buildQuery({
+        page,
+        pageSize,
+        search: params.search,
+        status: params.status,
+        type: params.type,
+        attributeSetId: params.attributeSetId,
+        sortBy,
+        sortDir,
+      })}`,
+    ),
+    apiGet<AttributeSet[]>('/admin/v1/attribute-sets'),
+  ]);
   const totalPages = Math.max(1, Math.ceil(list.total / list.pageSize));
+
+  const baseFilters = {
+    search: params.search,
+    status: params.status,
+    type: params.type,
+    attributeSetId: params.attributeSetId,
+    pageSize,
+  };
+
+  function sortHref(column: SortKey): string {
+    const nextDir = sortBy === column && sortDir === 'asc' ? 'desc' : 'asc';
+    return `/products${buildQuery({ ...baseFilters, page: 1, sortBy: column, sortDir: nextDir })}`;
+  }
+  const sortLinks: Record<SortKey, string> = {
+    sku: sortHref('sku'),
+    nameDefault: sortHref('nameDefault'),
+    createdAt: sortHref('createdAt'),
+    status: sortHref('status'),
+  };
+
+  const hasFilters = Boolean(params.search || params.status || params.type || params.attributeSetId);
 
   return (
     <div>
@@ -32,55 +83,57 @@ export default async function ProductsPage({
         </Link>
       </div>
 
-      <form className="mt-6 flex gap-2" action="/products">
-        <Input name="search" placeholder="Search by SKU or name…" defaultValue={params.search} className="max-w-sm" />
+      <form className="mt-6 flex flex-wrap items-center gap-2" action="/products">
+        <Input
+          key={params.search ?? ''}
+          name="search"
+          placeholder="Search by SKU or name…"
+          defaultValue={params.search}
+          className="max-w-sm"
+        />
+        <select name="status" defaultValue={params.status ?? ''} className={nativeSelectClass}>
+          <option value="">All Statuses</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <select name="type" defaultValue={params.type ?? ''} className={nativeSelectClass}>
+          <option value="">All Types</option>
+          {PRODUCT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select name="attributeSetId" defaultValue={params.attributeSetId ?? ''} className={nativeSelectClass}>
+          <option value="">All Attribute Sets</option>
+          {attributeSets.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <select name="pageSize" defaultValue={String(pageSize)} className={nativeSelectClass}>
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n} / page
+            </option>
+          ))}
+        </select>
         <Button type="submit" variant="outline">
-          Search
+          Apply
         </Button>
-        {params.search ? (
+        {hasFilters ? (
           <Link href="/products" className={cn(buttonVariants({ variant: 'ghost' }))}>
             Clear
           </Link>
         ) : null}
       </form>
 
-      <div className="mt-6 rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>SKU</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.products.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  No products found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              list.products.map((p) => (
-                <TableRow key={p.publicId}>
-                  <TableCell className="font-medium">
-                    <Link href={`/products/${p.publicId}`} className="hover:underline">
-                      {p.sku}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{p.name ?? '—'}</TableCell>
-                  <TableCell>{p.type}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusBadgeVariant(p.status)}>{p.status}</Badge>
-                  </TableCell>
-                  <TableCell>{new Date(p.createdAt).toLocaleDateString()}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="mt-6">
+        <ProductsTable products={list.products} sortLinks={sortLinks} activeSortBy={sortBy} activeSortDir={sortDir} />
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
@@ -94,7 +147,7 @@ export default async function ProductsPage({
             </Button>
           ) : (
             <Link
-              href={`/products${buildQuery({ page: page - 1, search: params.search, status: params.status })}`}
+              href={`/products${buildQuery({ ...baseFilters, page: page - 1, sortBy, sortDir })}`}
               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
             >
               Previous
@@ -106,7 +159,7 @@ export default async function ProductsPage({
             </Button>
           ) : (
             <Link
-              href={`/products${buildQuery({ page: page + 1, search: params.search, status: params.status })}`}
+              href={`/products${buildQuery({ ...baseFilters, page: page + 1, sortBy, sortDir })}`}
               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
             >
               Next

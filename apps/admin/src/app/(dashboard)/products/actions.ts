@@ -115,3 +115,24 @@ export async function updateProduct(
   revalidatePath(`/products/${productPublicId}`);
   redirect(`/products/${productPublicId}`);
 }
+
+export interface BulkUpdateStatusResult {
+  error: string | null;
+}
+
+/** Loops PATCH calls, one per selected product — fine here since status is a single
+ * scalar field (unlike the attribute bulk-write in Phase H, which genuinely needed a
+ * transaction to avoid N outbox events for one form save). */
+export async function bulkUpdateProductStatus(publicIds: string[], status: string): Promise<BulkUpdateStatusResult> {
+  try {
+    await Promise.all(publicIds.map((id) => apiPatch<ProductDetail>(`/admin/v1/products/${id}`, { status })));
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { error: err.message };
+    }
+    throw err;
+  }
+
+  revalidatePath('/products');
+  return { error: null };
+}

@@ -152,6 +152,38 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
     expect(searched.body.data.products[0].sku).toBe('API-SKU-1');
   });
 
+  it('lists products filtered by type/attribute set, sorted, with quantity/salable-quantity columns', async () => {
+    const otherSet = await admin.post('/admin/v1/attribute-sets').send({ code: 'list-filter-set', name: 'List Filter Set' });
+    await admin.post('/admin/v1/products').send({ type: 'DIGITAL', sku: 'API-SKU-LIST-DIGITAL', attributeSetId: otherSet.body.data.id });
+
+    const byType = await admin.get('/admin/v1/products').query({ type: 'DIGITAL' });
+    expect(byType.body.data.products.every((p: { type: string }) => p.type === 'DIGITAL')).toBe(true);
+    expect(byType.body.data.products.some((p: { sku: string }) => p.sku === 'API-SKU-LIST-DIGITAL')).toBe(true);
+
+    const bySet = await admin.get('/admin/v1/products').query({ attributeSetId: otherSet.body.data.id });
+    expect(bySet.body.data.products).toHaveLength(1);
+    expect(bySet.body.data.products[0].sku).toBe('API-SKU-LIST-DIGITAL');
+
+    const sortedAsc = await admin.get('/admin/v1/products').query({ sortBy: 'sku', sortDir: 'asc', pageSize: 100 });
+    const skus = sortedAsc.body.data.products.map((p: { sku: string }) => p.sku);
+    expect(skus).toEqual([...skus].sort());
+
+    // Quantity/salableQuantity: create a warehouse + variant, adjust stock, confirm the grid reflects it.
+    await admin.post('/admin/v1/warehouses').send({ code: 'LIST-WH', name: 'List Warehouse' });
+    const withStock = await admin
+      .post('/admin/v1/products')
+      .send({ type: 'SIMPLE', sku: 'API-SKU-LIST-STOCK', attributeSetId });
+    const variantId = (await admin.get(`/admin/v1/products/${withStock.body.data.publicId}/variants`)).body.data[0].publicId;
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'LIST-WH', delta: 25, reason: 'PURCHASE' });
+
+    const withQty = await admin.get('/admin/v1/products').query({ search: 'API-SKU-LIST-STOCK' });
+    expect(withQty.body.data.products[0]).toMatchObject({ quantity: 25, salableQuantity: 25 });
+
+    // A product with no stock at all still gets quantity 0, not omitted.
+    const zeroQty = await admin.get('/admin/v1/products').query({ search: 'API-SKU-LIST-DIGITAL' });
+    expect(zeroQty.body.data.products[0]).toMatchObject({ quantity: 0, salableQuantity: 0 });
+  });
+
   it('gets a product\'s admin detail: raw fields, variants, and GLOBAL-scope attributes', async () => {
     const created = await admin
       .post('/admin/v1/products')
