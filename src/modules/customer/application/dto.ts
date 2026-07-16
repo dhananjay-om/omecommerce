@@ -54,6 +54,38 @@ export interface CustomerAddressView {
   isDefaultBilling: boolean;
 }
 
+export interface ListCustomersQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+export interface CustomerListItemView {
+  publicId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CustomerListView {
+  total: number;
+  page: number;
+  pageSize: number;
+  customers: CustomerListItemView[];
+}
+
+export interface CustomerDetailView {
+  publicId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+  createdAt: string;
+  addresses: CustomerAddressView[];
+}
+
 export interface CustomerOrderView {
   publicId: string;
   orderNumber: string;

@@ -65,6 +65,7 @@ export function createApp(): Express {
   app.use('/store/v1', search.store);
 
   const customer = createCustomerModule(prisma);
+  app.use('/admin/v1', customer.admin);
   app.use('/store/v1', customer.store);
 
   const wishlist = createWishlistModule(prisma, customer.authenticateCustomer);

@@ -120,3 +120,44 @@ export interface OrderDetail {
   grandTotal: string;
   lines: OrderLine[];
 }
+
+export interface CustomerListItem {
+  publicId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CustomerList {
+  total: number;
+  page: number;
+  pageSize: number;
+  customers: CustomerListItem[];
+}
+
+export interface CustomerAddress {
+  publicId: string;
+  name: string;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+  isDefaultShipping: boolean;
+  isDefaultBilling: boolean;
+}
+
+export interface CustomerDetail {
+  publicId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+  createdAt: string;
+  addresses: CustomerAddress[];
+}

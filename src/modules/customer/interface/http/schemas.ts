@@ -14,6 +14,12 @@ export const loginCustomerSchema = z.object({
   password: z.string().min(1),
 });
 
+export const listCustomersQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  search: z.string().min(1).optional(),
+});
+
 export const addCustomerAddressSchema = z.object({
   name: z.string().min(1).max(255),
   company: z.string().max(255).nullish(),

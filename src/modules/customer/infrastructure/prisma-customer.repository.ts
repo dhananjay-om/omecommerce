@@ -1,5 +1,13 @@
+import type { Prisma } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { CustomerRepository, CustomerRecord, CreateCustomerInput, WebsiteLookup } from '../domain/repositories.js';
+import type {
+  CustomerRepository,
+  CustomerRecord,
+  CreateCustomerInput,
+  WebsiteLookup,
+  ListCustomersFilter,
+  CustomerListResult,
+} from '../domain/repositories.js';
 
 const CUSTOMER_SELECT = {
   id: true,
@@ -10,6 +18,7 @@ const CUSTOMER_SELECT = {
   firstName: true,
   lastName: true,
   isActive: true,
+  createdAt: true,
 } as const;
 
 export class PrismaCustomerRepository implements CustomerRepository {
@@ -34,6 +43,44 @@ export class PrismaCustomerRepository implements CustomerRepository {
       },
       select: CUSTOMER_SELECT,
     });
+  }
+
+  async list(filter: ListCustomersFilter): Promise<CustomerListResult> {
+    const where: Prisma.CustomerWhereInput = {
+      deletedAt: null,
+      ...(filter.search
+        ? {
+            OR: [
+              { email: { contains: filter.search, mode: 'insensitive' } },
+              { firstName: { contains: filter.search, mode: 'insensitive' } },
+              { lastName: { contains: filter.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const [total, rows] = await this.db.$transaction([
+      this.db.customer.count({ where }),
+      this.db.customer.findMany({
+        where,
+        select: CUSTOMER_SELECT,
+        orderBy: { createdAt: 'desc' },
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+      }),
+    ]);
+    return {
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+      customers: rows.map((row) => ({
+        publicId: row.publicId,
+        email: row.email,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        isActive: row.isActive,
+        createdAt: row.createdAt,
+      })),
+    };
   }
 }
 

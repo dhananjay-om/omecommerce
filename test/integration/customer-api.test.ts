@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { prisma } from '../../src/shared/infrastructure/prisma/client.js';
+import { getAdminToken, adminRequest } from '../helpers/auth.js';
 
 /**
  * Storefront Customer accounts over HTTP (live DB) — plan/05 §2.5. Proves
@@ -168,5 +169,30 @@ describe.skipIf(!process.env.INTEGRATION)('customer API (live DB)', () => {
     const res = await request(app).get('/store/v1/me/orders').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
+  });
+
+  it('admin lists customers with pagination and email search, and fetches a detail view with addresses', async () => {
+    const admin = adminRequest(app, await getAdminToken(app));
+
+    const all = await admin.get('/admin/v1/customers');
+    expect(all.status).toBe(200);
+    // jane@example.com and other@example.com were both registered in prior tests
+    expect(all.body.data.total).toBeGreaterThanOrEqual(2);
+
+    const bySearch = await admin.get('/admin/v1/customers').query({ search: 'jane' });
+    expect(bySearch.body.data.customers).toHaveLength(1);
+    expect(bySearch.body.data.customers[0].email).toBe('jane@example.com');
+
+    const janePublicId = bySearch.body.data.customers[0].publicId;
+    const detail = await admin.get(`/admin/v1/customers/${janePublicId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.email).toBe('jane@example.com');
+    // Jane has exactly one remaining address at this point in the file (the
+    // "1 Main St" one was deleted in an earlier test; "2 Work Ave" remains).
+    expect(detail.body.data.addresses).toHaveLength(1);
+    expect(detail.body.data.addresses[0].line1).toBe('2 Work Ave');
+
+    const unknown = await admin.get('/admin/v1/customers/00000000-0000-7000-8000-000000000000');
+    expect(unknown.status).toBe(404);
   });
 });

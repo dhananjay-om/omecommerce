@@ -7,6 +7,7 @@ export interface CustomerRecord {
   firstName: string | null;
   lastName: string | null;
   isActive: boolean;
+  createdAt: Date;
 }
 
 export interface CreateCustomerInput {
@@ -17,10 +18,33 @@ export interface CreateCustomerInput {
   lastName?: string | null;
 }
 
+export interface CustomerListItem {
+  publicId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface ListCustomersFilter {
+  page: number;
+  pageSize: number;
+  search?: string;
+}
+
+export interface CustomerListResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  customers: CustomerListItem[];
+}
+
 export interface CustomerRepository {
   findByWebsiteAndEmail(websiteId: bigint, email: string): Promise<CustomerRecord | null>;
   findByPublicId(publicId: string): Promise<CustomerRecord | null>;
   create(input: CreateCustomerInput): Promise<CustomerRecord>;
+  list(filter: ListCustomersFilter): Promise<CustomerListResult>;
 }
 
 export interface CustomerAddressRecord {

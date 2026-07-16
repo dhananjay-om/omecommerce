@@ -27,7 +27,7 @@ describe.skipIf(!process.env.INTEGRATION)('attribute-set builder API (live DB)',
   it('creates an attribute set', async () => {
     const res = await admin.post('/admin/v1/attribute-sets').send({ code: 'laptops', name: 'Laptops' });
     expect(res.status).toBe(201);
-    expect(res.body.data).toEqual({ id: expect.any(String), code: 'laptops', name: 'Laptops' });
+    expect(res.body.data).toEqual({ id: expect.any(String), code: 'laptops', name: 'Laptops', isDefault: false });
   });
 
   it('rejects a duplicate attribute-set code with 409', async () => {

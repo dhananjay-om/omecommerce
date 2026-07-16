@@ -12,12 +12,21 @@ import { LoginCustomer } from './application/login-customer.usecase.js';
 import { GetCustomerProfile } from './application/get-customer-profile.usecase.js';
 import { AddCustomerAddress, ListCustomerAddresses, DeleteCustomerAddress } from './application/customer-address.usecases.js';
 import { ListCustomerOrders } from './application/list-customer-orders.usecase.js';
+import { ListCustomers } from './application/list-customers.usecase.js';
+import { GetCustomerDetail } from './application/get-customer-detail.usecase.js';
 import { authenticateCustomer } from './interface/http/customer.middleware.js';
-import { registerCustomerSchema, loginCustomerSchema, addCustomerAddressSchema } from './interface/http/schemas.js';
+import {
+  registerCustomerSchema,
+  loginCustomerSchema,
+  addCustomerAddressSchema,
+  listCustomersQuerySchema,
+} from './interface/http/schemas.js';
 
 export interface CustomerModule {
   /** Unauthenticated + authenticated /store/v1 routes owned by this module. */
   store: Router;
+  /** Admin browse routes (list/detail) — first-ever admin surface for this module. */
+  admin: Router;
   /** Exported so other storefront modules (e.g. wishlist) can gate their own routes identically. */
   authenticateCustomer: ReturnType<typeof authenticateCustomer>;
 }
@@ -47,6 +56,8 @@ export function createCustomerModule(db: Db): CustomerModule {
   const listCustomerAddresses = new ListCustomerAddresses(customers, addresses);
   const deleteCustomerAddress = new DeleteCustomerAddress(customers, addresses);
   const listCustomerOrders = new ListCustomerOrders(customers, orders);
+  const listCustomers = new ListCustomers(customers);
+  const getCustomerDetail = new GetCustomerDetail(customers, addresses);
 
   const requireCustomer = authenticateCustomer(tokens);
 
@@ -103,5 +114,20 @@ export function createCustomerModule(db: Db): CustomerModule {
     }),
   );
 
-  return { store, authenticateCustomer: requireCustomer };
+  const admin = Router();
+  admin.get(
+    '/customers',
+    asyncHandler(async (req, res) => {
+      const query = parse(listCustomersQuerySchema, req.query);
+      res.json({ data: await listCustomers.execute(query) });
+    }),
+  );
+  admin.get(
+    '/customers/:publicId',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCustomerDetail.execute(req.params.publicId!) });
+    }),
+  );
+
+  return { store, admin, authenticateCustomer: requireCustomer };
 }
