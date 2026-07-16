@@ -1,6 +1,7 @@
 import type { PaymentTxnType, PaymentTxnStatus, ShipmentStatus, FinancialStatus, OrderStatus, FulfillmentStatus } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { OrderRepository, CreateOrderInput, OrderView } from '../domain/repositories.js';
+import type { Prisma } from '@prisma/client';
+import type { OrderRepository, CreateOrderInput, OrderView, ListOrdersFilter, OrderListResult } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { FulfillmentExceedsQtyError, RefundExceedsQtyError } from '../domain/errors.js';
@@ -91,6 +92,50 @@ export class PrismaOrderRepository implements OrderRepository {
   async findByPublicId(publicId: string): Promise<OrderView | null> {
     const order = await this.db.order.findFirst({ where: { publicId }, include: { lines: true } });
     return order ? toView(order, order.lines) : null;
+  }
+
+  async list(filter: ListOrdersFilter): Promise<OrderListResult> {
+    const where: Prisma.OrderWhereInput = {
+      status: filter.status,
+      financialStatus: filter.financialStatus,
+      ...(filter.email ? { email: { contains: filter.email, mode: 'insensitive' } } : {}),
+    };
+    const [total, rows] = await this.db.$transaction([
+      this.db.order.count({ where }),
+      this.db.order.findMany({
+        where,
+        select: {
+          publicId: true,
+          orderNumber: true,
+          email: true,
+          currency: true,
+          status: true,
+          financialStatus: true,
+          fulfillmentStatus: true,
+          grandTotal: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+      }),
+    ]);
+    return {
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+      orders: rows.map((row) => ({
+        publicId: row.publicId,
+        orderNumber: row.orderNumber.toString(),
+        email: row.email,
+        currency: row.currency,
+        status: row.status,
+        financialStatus: row.financialStatus,
+        fulfillmentStatus: row.fulfillmentStatus,
+        grandTotal: formatDecimal(row.grandTotal),
+        createdAt: row.createdAt,
+      })),
+    };
   }
 
   async setFinancialStatus(orderId: bigint, status: FinancialStatus): Promise<void> {

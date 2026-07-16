@@ -18,6 +18,7 @@ import { CreateCart } from './application/create-cart.usecase.js';
 import { AddCartLine } from './application/add-cart-line.usecase.js';
 import { CompleteCheckout } from './application/complete-checkout.usecase.js';
 import { GetOrder } from './application/get-order.usecase.js';
+import { ListOrders } from './application/list-orders.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
@@ -30,6 +31,7 @@ import {
   refundOrderSchema,
   createTaxClassSchema,
   createShippingMethodSchema,
+  listOrdersQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface OrderRouters {
@@ -77,6 +79,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     outbox,
   );
   const getOrder = new GetOrder(orders);
+  const listOrders = new ListOrders(orders);
   const fulfillOrder = new FulfillOrder(orders, warehouses);
   const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
@@ -96,6 +99,13 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     asyncHandler(async (req, res) => {
       const body = parse(createShippingMethodSchema, req.body);
       res.status(201).json({ data: await createShippingMethod.execute(body) });
+    }),
+  );
+  admin.get(
+    '/orders',
+    asyncHandler(async (req, res) => {
+      const query = parse(listOrdersQuerySchema, req.query);
+      res.json({ data: await listOrders.execute(query) });
     }),
   );
   admin.get(

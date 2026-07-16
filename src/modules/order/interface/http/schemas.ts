@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OrderStatus, FinancialStatus } from '@prisma/client';
 
 export const createCartSchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'expected numeric id'),
@@ -52,4 +53,12 @@ export const createShippingMethodSchema = z.object({
   name: z.string().min(1).max(256),
   flatRate: z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount'),
   currency: z.string().length(3),
+});
+
+export const listOrdersQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  status: z.nativeEnum(OrderStatus).optional(),
+  financialStatus: z.nativeEnum(FinancialStatus).optional(),
+  email: z.string().min(1).optional(),
 });

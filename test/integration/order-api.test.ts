@@ -361,4 +361,23 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     const stock = await admin.get('/admin/v1/inventory/stock').query({ variantId, warehouseCode: 'ORD-WH' });
     expect(stock.body.data.onHand).toBe(10); // fully restocked
   });
+
+  it('lists orders with pagination, status filter, and email filter', async () => {
+    const all = await admin.get('/admin/v1/orders');
+    expect(all.status).toBe(200);
+    expect(all.body.data.total).toBeGreaterThanOrEqual(6); // every prior checkout in this file
+    expect(all.body.data.page).toBe(1);
+
+    const paged = await admin.get('/admin/v1/orders').query({ page: 1, pageSize: 2 });
+    expect(paged.body.data.orders).toHaveLength(2);
+    expect(paged.body.data.pageSize).toBe(2);
+
+    const cancelled = await admin.get('/admin/v1/orders').query({ status: 'CANCELLED' });
+    expect(cancelled.body.data.orders.length).toBeGreaterThanOrEqual(1);
+    expect(cancelled.body.data.orders.every((o: { status: string }) => o.status === 'CANCELLED')).toBe(true);
+
+    const byEmail = await admin.get('/admin/v1/orders').query({ email: 'guest@example.com' });
+    expect(byEmail.body.data.orders).toHaveLength(1);
+    expect(byEmail.body.data.orders[0].email).toBe('guest@example.com');
+  });
 });

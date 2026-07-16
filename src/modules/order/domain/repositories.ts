@@ -175,10 +175,38 @@ export interface OrderView {
   lines: OrderLineView[];
 }
 
+export interface OrderListItem {
+  publicId: string;
+  orderNumber: string;
+  email: string;
+  currency: string;
+  status: string;
+  financialStatus: string;
+  fulfillmentStatus: string;
+  grandTotal: string;
+  createdAt: Date;
+}
+
+export interface ListOrdersFilter {
+  page: number;
+  pageSize: number;
+  status?: OrderStatus;
+  financialStatus?: FinancialStatus;
+  email?: string;
+}
+
+export interface OrderListResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: OrderListItem[];
+}
+
 export interface OrderRepository {
   nextOrderNumber(websiteId: bigint): Promise<bigint>;
   create(input: CreateOrderInput, orderNumber: bigint): Promise<OrderView>;
   findByPublicId(publicId: string): Promise<OrderView | null>;
+  list(filter: ListOrdersFilter): Promise<OrderListResult>;
   setFinancialStatus(orderId: bigint, status: FinancialStatus): Promise<void>;
   setOrderStatus(orderId: bigint, status: OrderStatus): Promise<void>;
   setFulfillmentStatus(orderId: bigint, status: FulfillmentStatus): Promise<void>;

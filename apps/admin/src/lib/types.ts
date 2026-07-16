@@ -71,3 +71,52 @@ export interface PriceList {
   type: PriceListType;
   priority: number;
 }
+
+export type OrderStatus = 'PENDING' | 'PROCESSING' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+export type FinancialStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'VOIDED';
+export type FulfillmentStatus = 'UNFULFILLED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'RETURNED';
+
+export interface OrderListItem {
+  publicId: string;
+  orderNumber: string;
+  email: string;
+  currency: string;
+  status: OrderStatus;
+  financialStatus: FinancialStatus;
+  fulfillmentStatus: FulfillmentStatus;
+  grandTotal: string;
+  createdAt: string;
+}
+
+export interface OrderList {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: OrderListItem[];
+}
+
+export interface OrderLine {
+  sku: string;
+  name: string;
+  qty: number;
+  unitPrice: string;
+  taxAmount: string;
+  rowTotal: string;
+  fulfilledQty: number;
+  refundedQty: number;
+}
+
+export interface OrderDetail {
+  publicId: string;
+  orderNumber: string;
+  email: string;
+  currency: string;
+  status: OrderStatus;
+  financialStatus: FinancialStatus;
+  fulfillmentStatus: FulfillmentStatus;
+  subtotal: string;
+  taxTotal: string;
+  shippingTotal: string;
+  grandTotal: string;
+  lines: OrderLine[];
+}

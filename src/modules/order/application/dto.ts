@@ -1,3 +1,5 @@
+import type { OrderStatus, FinancialStatus } from '@prisma/client';
+
 export interface CreateCartCommand {
   storeViewId: string;
   customerPublicId?: string | null;
@@ -68,6 +70,33 @@ export interface OrderViewDto {
   shippingTotal: string;
   grandTotal: string;
   lines: OrderLineViewDto[];
+}
+
+export interface ListOrdersQuery {
+  page?: number;
+  pageSize?: number;
+  status?: OrderStatus;
+  financialStatus?: FinancialStatus;
+  email?: string;
+}
+
+export interface OrderListItemDto {
+  publicId: string;
+  orderNumber: string;
+  email: string;
+  currency: string;
+  status: string;
+  financialStatus: string;
+  fulfillmentStatus: string;
+  grandTotal: string;
+  createdAt: string;
+}
+
+export interface OrderListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: OrderListItemDto[];
 }
 
 export interface FulfillOrderCommand {
