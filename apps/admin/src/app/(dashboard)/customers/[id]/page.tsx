@@ -17,7 +17,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           ← Back to Customers
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{name || customer.email}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{name || customer.email}</h1>
           <Badge variant={customer.isActive ? 'success' : 'secondary'}>{customer.isActive ? 'Active' : 'Inactive'}</Badge>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{customer.email}</p>

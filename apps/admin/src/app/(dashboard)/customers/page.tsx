@@ -24,7 +24,7 @@ export default async function CustomersPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Customers</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
 
       <form className="mt-6 flex gap-2" action="/customers">
         <Input name="search" placeholder="Search by name or email…" defaultValue={params.search} className="max-w-sm" />

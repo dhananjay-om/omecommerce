@@ -21,7 +21,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           ← Back to Orders
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">Order #{order.orderNumber}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Order #{order.orderNumber}</h1>
           <Badge variant={statusBadgeVariant(order.status)}>{order.status}</Badge>
           <Badge variant={statusBadgeVariant(order.financialStatus)}>{order.financialStatus}</Badge>
           <Badge variant={statusBadgeVariant(order.fulfillmentStatus)}>{order.fulfillmentStatus}</Badge>

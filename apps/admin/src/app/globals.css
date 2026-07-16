@@ -82,13 +82,17 @@
   --chart-4: oklch(0.556 0.02 40);
   --chart-5: oklch(0.371 0.02 40);
   --radius: 0.625rem;
-  --sidebar: oklch(0.99 0.004 40);
-  --sidebar-foreground: oklch(0.18 0.01 40);
+  /* The admin sidebar is always dark (a fixed dark-chrome + light-content
+     hybrid, like most SaaS admin panels) — these don't flip with .dark,
+     since there's no theme toggle in this app; .dark below just keeps them
+     identical for whenever one is added. */
+  --sidebar: oklch(0.17 0.01 40);
+  --sidebar-foreground: oklch(0.92 0.006 40);
   --sidebar-primary: oklch(0.618 0.224 32.05);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.955 0.02 35);
-  --sidebar-accent-foreground: oklch(0.35 0.15 32);
-  --sidebar-border: oklch(0.922 0.006 40);
+  --sidebar-accent: oklch(0.9 0.05 40);
+  --sidebar-accent-foreground: oklch(0.5 0.2 30);
+  --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.618 0.224 32.05 / 55%);
 }
 
@@ -120,13 +124,13 @@
   --chart-3: oklch(0.77 0.165 70.08);
   --chart-4: oklch(0.708 0.02 40);
   --chart-5: oklch(0.556 0.02 40);
-  --sidebar: oklch(0.19 0.012 40);
-  --sidebar-foreground: oklch(0.97 0.004 40);
+  --sidebar: oklch(0.17 0.01 40);
+  --sidebar-foreground: oklch(0.92 0.006 40);
   --sidebar-primary: oklch(0.68 0.2 33);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.3 0.04 33);
-  --sidebar-accent-foreground: oklch(0.93 0.03 33);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: oklch(0.9 0.05 40);
+  --sidebar-accent-foreground: oklch(0.5 0.2 30);
+  --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.68 0.2 33 / 55%);
 }
 

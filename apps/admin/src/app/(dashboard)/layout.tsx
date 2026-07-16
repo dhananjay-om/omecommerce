@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import { getSession } from '@/lib/session';
-import { logout } from '@/app/actions/auth';
 import { DashboardNav } from '@/components/dashboard-nav';
+import { TopHeader } from '@/components/top-header';
 import { Toaster } from '@/components/ui/sonner';
 
 /**
@@ -24,31 +24,31 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      <aside className="flex w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-        <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-          <span className="text-xl leading-none font-bold tracking-tight">
-            <span className="text-primary">orange</span>
-            <span className="text-sidebar-foreground">mantra</span>
+      <aside className="flex w-64 flex-col bg-sidebar text-sidebar-foreground">
+        <div className="flex h-16 items-center gap-2.5 px-5">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+            <ShoppingBag className="size-4.5 text-primary-foreground" strokeWidth={2.25} />
+          </div>
+          <span className="text-lg leading-none font-bold tracking-tight">
+            <span className="text-sidebar-foreground">OME</span>
+            <span className="text-primary">commerce</span>
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="flex-1 overflow-y-auto px-3 py-2">
           <DashboardNav />
         </div>
-        <div className="border-t border-sidebar-border p-3">
-          <form action={logout}>
-            <button
-              type="submit"
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <LogOut className="size-4" strokeWidth={2} />
-              Log out
-            </button>
-          </form>
+        <div className="border-t border-sidebar-border px-5 py-4">
+          <p className="text-[11px] font-medium tracking-wider text-sidebar-foreground/35 uppercase">
+            OrangeMantra · OMEcommerce
+          </p>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl p-8">{children}</div>
-      </main>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <TopHeader />
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-6xl p-8">{children}</div>
+        </main>
+      </div>
       <Toaster />
     </div>
   );

@@ -26,7 +26,7 @@ export default async function ProductsPage({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Products</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Products</h1>
         <Link href="/products/new" className={cn(buttonVariants())}>
           New Product
         </Link>

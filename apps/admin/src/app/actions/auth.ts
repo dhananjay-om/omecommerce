@@ -30,7 +30,7 @@ export async function login(_prevState: LoginFormState, formData: FormData): Pro
   }
 
   await createSession(body.data.token);
-  redirect('/products');
+  redirect('/dashboard');
 }
 
 export async function logout(): Promise<void> {

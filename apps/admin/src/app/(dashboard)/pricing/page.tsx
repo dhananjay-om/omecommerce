@@ -11,7 +11,7 @@ export default async function PricingPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Pricing</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
         <NewPriceListDialog />
       </div>
 

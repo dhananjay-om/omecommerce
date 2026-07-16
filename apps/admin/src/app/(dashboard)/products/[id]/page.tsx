@@ -19,7 +19,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           ← Back to Products
         </Link>
         <div className="mt-2 flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{product.name ?? product.sku}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{product.name ?? product.sku}</h1>
           <Badge variant={statusBadgeVariant(product.status)}>{product.status}</Badge>
         </div>
       </div>

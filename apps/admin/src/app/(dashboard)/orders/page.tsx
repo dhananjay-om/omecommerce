@@ -31,7 +31,7 @@ export default async function OrdersPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Orders</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
 
       <form className="mt-6 flex gap-2" action="/orders">
         <Input name="email" placeholder="Search by email…" defaultValue={params.email} className="max-w-sm" />
