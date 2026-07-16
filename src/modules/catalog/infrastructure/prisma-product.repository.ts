@@ -186,6 +186,10 @@ export class PrismaAttributeRepository implements AttributeRepository {
     return row;
   }
 
+  async list(): Promise<AttributeInfo[]> {
+    return this.db.attribute.findMany({ select: ATTRIBUTE_SELECT, orderBy: { label: 'asc' } });
+  }
+
   async create(input: CreateAttributeInput): Promise<AttributeInfo> {
     const row = await this.db.attribute.create({
       data: {

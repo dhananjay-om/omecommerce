@@ -103,6 +103,8 @@ export interface CreateAttributeInput {
 export interface AttributeRepository {
   findByCode(code: string): Promise<AttributeInfo | null>;
   create(input: CreateAttributeInput): Promise<AttributeInfo>;
+  /** Admin browse (plan/13 Phase L) — the reusable-attribute library + "assign existing attribute" picker. */
+  list(): Promise<AttributeInfo[]>;
 }
 
 export interface AttributeSetInfo {

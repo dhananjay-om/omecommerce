@@ -2,7 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Boxes, Tag, ShoppingCart, Users, type LucideIcon } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Package,
+  Boxes,
+  Tag,
+  ShoppingCart,
+  Users,
+  ListTree,
+  SlidersHorizontal,
+  type LucideIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -19,6 +29,8 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/products', label: 'Products', icon: Package },
       { href: '/inventory', label: 'Inventory', icon: Boxes },
       { href: '/pricing', label: 'Pricing', icon: Tag },
+      { href: '/attribute-sets', label: 'Attribute Sets', icon: ListTree },
+      { href: '/attributes', label: 'Attributes', icon: SlidersHorizontal },
     ],
   },
   {

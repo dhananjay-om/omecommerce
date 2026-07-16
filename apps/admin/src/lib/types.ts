@@ -101,6 +101,35 @@ export interface AttributeSetDetail extends AttributeSet {
   groups: AttributeSetGroupDetail[];
 }
 
+export type AttributeInputType =
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'NUMBER'
+  | 'DECIMAL'
+  | 'SWITCH'
+  | 'DATE'
+  | 'DATETIME'
+  | 'COLOR_PICKER'
+  | 'DROPDOWN'
+  | 'MULTISELECT'
+  | 'IMAGE_PICKER'
+  | 'FILE_UPLOAD'
+  | 'RICHTEXT'
+  | 'URL'
+  | 'EMAIL'
+  | 'PHONE'
+  | 'JSON_EDITOR'
+  | 'REFERENCE';
+
+/** The reusable-attribute library (plan/13 Phase L) — one row per Attribute definition, independent of any set. */
+export interface Attribute {
+  id: string;
+  code: string;
+  label: string;
+  dataType: AttributeDataType;
+  inputType: AttributeInputType;
+}
+
 export type WarehouseType = 'PHYSICAL' | 'VIRTUAL' | 'DROPSHIP';
 
 export interface Warehouse {

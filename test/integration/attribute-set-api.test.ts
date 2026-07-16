@@ -78,6 +78,20 @@ describe.skipIf(!process.env.INTEGRATION)('attribute-set builder API (live DB)',
     expect(options.map((o) => o.value).sort()).toEqual(['13', '15']);
   });
 
+  it('lists all reusable attributes (admin browse — populates the "assign existing attribute" picker)', async () => {
+    const res = await admin.get('/admin/v1/attributes');
+    expect(res.status).toBe(200);
+    expect(
+      res.body.data.find((a: { code: string }) => a.code === 'screen-size'),
+    ).toEqual({
+      id: expect.any(String),
+      code: 'screen-size',
+      label: 'Screen Size',
+      dataType: 'SELECT',
+      inputType: 'DROPDOWN',
+    });
+  });
+
   it('rejects a duplicate attribute code with 409', async () => {
     const res = await admin
       .post('/admin/v1/attributes')

@@ -28,6 +28,7 @@ import { ListProductVariants } from './application/list-product-variants.usecase
 import { ListProducts } from './application/list-products.usecase.js';
 import { GetProductDetail } from './application/get-product-detail.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
+import { ListAttributes } from './application/list-attributes.usecase.js';
 import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
 import {
   createProductSchema,
@@ -73,6 +74,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const getProductDetail = new GetProductDetail(products, variants, attrStore);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
+  const listAttributes = new ListAttributes(attributes);
 
   // --- Admin API ---
   const admin = Router();
@@ -153,6 +155,12 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       const body = parse(createAttributeSetGroupSchema, req.body);
       res.status(201).json({ data: await createAttributeSetGroup.execute({ ...body, attributeSetId: req.params.id! }) });
+    }),
+  );
+  admin.get(
+    '/attributes',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listAttributes.execute() });
     }),
   );
   admin.post(
