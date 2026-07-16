@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -86,12 +86,12 @@
      hybrid, like most SaaS admin panels) — these don't flip with .dark,
      since there's no theme toggle in this app; .dark below just keeps them
      identical for whenever one is added. */
-  --sidebar: oklch(0.17 0.01 40);
-  --sidebar-foreground: oklch(0.92 0.006 40);
+  --sidebar: oklch(0.21 0.032 264.665);
+  --sidebar-foreground: oklch(0.968 0.007 247.896);
   --sidebar-primary: oklch(0.618 0.224 32.05);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.9 0.05 40);
-  --sidebar-accent-foreground: oklch(0.5 0.2 30);
+  --sidebar-accent: oklch(0.98 0.016 73.684);
+  --sidebar-accent-foreground: oklch(0.618 0.224 32.05);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.618 0.224 32.05 / 55%);
 }

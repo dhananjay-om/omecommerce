@@ -38,7 +38,7 @@ export function DashboardNav() {
       {NAV_GROUPS.map((group, i) => (
         <div key={group.label ?? `group-${i}`}>
           {group.label ? (
-            <div className="mb-1 px-3 text-xs font-semibold tracking-wider text-sidebar-foreground/40 uppercase">
+            <div className="mb-1 px-3 text-xs font-medium tracking-wider text-sidebar-foreground/35 uppercase">
               {group.label}
             </div>
           ) : null}
@@ -51,10 +51,10 @@ export function DashboardNav() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
                     active
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                      ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground'
+                      : 'font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground',
                   )}
                 >
                   <Icon className="size-4" strokeWidth={2} />
