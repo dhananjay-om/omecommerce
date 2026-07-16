@@ -7,14 +7,19 @@ import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-write
 import { pdpCachePrefix } from './get-product-for-store-view.usecase.js';
 import type { AssignAttributeValueCommand } from './dto.js';
 
-function parseId(value: string | null | undefined): bigint | null {
+export function parseId(value: string | null | undefined): bigint | null {
   if (value === null || value === undefined) return null;
   if (!/^\d+$/.test(value)) throw new ValidationError('invalid id', [{ path: 'id', message: 'numeric' }]);
   return BigInt(value);
 }
 
-/** Resolve which scope target id must be present and null the others (plan/01 §1). */
-function resolveScopeTargets(cmd: AssignAttributeValueCommand): {
+/** Resolve which scope target id must be present and null the others (plan/01 §1). Reused by AssignAttributeValues (plural). */
+export function resolveScopeTargets(cmd: {
+  scope: ScopeType;
+  websiteId?: string | null;
+  storeId?: string | null;
+  storeViewId?: string | null;
+}): {
   websiteId: bigint | null;
   storeId: bigint | null;
   storeViewId: bigint | null;

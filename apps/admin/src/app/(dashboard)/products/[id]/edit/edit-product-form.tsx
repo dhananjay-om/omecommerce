@@ -1,8 +1,9 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { updateProduct, type UpdateProductFormState } from '../../actions';
-import type { AttributeSet, ProductDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, ProductDetail } from '@/lib/types';
+import { AttributeFieldsSection } from '../../attribute-fields-section';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,9 +14,19 @@ const VISIBILITIES = ['BOTH', 'CATALOG', 'SEARCH', 'NOT_VISIBLE'];
 
 const initialState: UpdateProductFormState = { error: null };
 
-export function EditProductForm({ product, attributeSets }: { product: ProductDetail; attributeSets: AttributeSet[] }) {
+export function EditProductForm({
+  product,
+  attributeSets,
+  attributeSetDetails,
+}: {
+  product: ProductDetail;
+  attributeSets: AttributeSet[];
+  attributeSetDetails: Record<string, AttributeSetDetail>;
+}) {
   const action = updateProduct.bind(null, product.publicId);
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [attributeSetId, setAttributeSetId] = useState(product.attributeSetId);
+  const selectedSetDetail = attributeSetDetails[attributeSetId];
 
   return (
     <form action={formAction} className="max-w-lg space-y-4">
@@ -42,7 +53,7 @@ export function EditProductForm({ product, attributeSets }: { product: ProductDe
 
       <div className="space-y-2">
         <Label htmlFor="attributeSetId">Attribute set</Label>
-        <Select name="attributeSetId" defaultValue={product.attributeSetId}>
+        <Select name="attributeSetId" value={attributeSetId} onValueChange={(value) => setAttributeSetId(String(value))}>
           <SelectTrigger id="attributeSetId" className="w-full">
             <SelectValue placeholder="Select an attribute set">
               {(value: string | null) => attributeSets.find((s) => s.id === value)?.name ?? 'Select an attribute set'}
@@ -89,6 +100,8 @@ export function EditProductForm({ product, attributeSets }: { product: ProductDe
           </SelectContent>
         </Select>
       </div>
+
+      {selectedSetDetail ? <AttributeFieldsSection groups={selectedSetDetail.groups} values={product.attributes} /> : null}
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 

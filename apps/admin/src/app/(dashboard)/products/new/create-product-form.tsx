@@ -1,8 +1,9 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { createProduct, type CreateProductFormState } from '../actions';
-import type { AttributeSet } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail } from '@/lib/types';
+import { AttributeFieldsSection } from '../attribute-fields-section';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +14,17 @@ const STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
 
 const initialState: CreateProductFormState = { error: null };
 
-export function CreateProductForm({ attributeSets }: { attributeSets: AttributeSet[] }) {
+export function CreateProductForm({
+  attributeSets,
+  attributeSetDetails,
+}: {
+  attributeSets: AttributeSet[];
+  attributeSetDetails: Record<string, AttributeSetDetail>;
+}) {
   const [state, formAction, pending] = useActionState(createProduct, initialState);
+  const defaultAttributeSetId = attributeSets.find((s) => s.isDefault)?.id ?? attributeSets[0]?.id ?? '';
+  const [attributeSetId, setAttributeSetId] = useState(defaultAttributeSetId);
+  const selectedSetDetail = attributeSetDetails[attributeSetId];
 
   return (
     <form action={formAction} className="max-w-lg space-y-4">
@@ -51,7 +61,7 @@ export function CreateProductForm({ attributeSets }: { attributeSets: AttributeS
 
       <div className="space-y-2">
         <Label htmlFor="attributeSetId">Attribute set</Label>
-        <Select name="attributeSetId" defaultValue={attributeSets.find((s) => s.isDefault)?.id ?? attributeSets[0]?.id}>
+        <Select name="attributeSetId" value={attributeSetId} onValueChange={(value) => setAttributeSetId(String(value))}>
           <SelectTrigger id="attributeSetId" className="w-full">
             <SelectValue placeholder="Select an attribute set">
               {(value: string | null) => attributeSets.find((s) => s.id === value)?.name ?? 'Select an attribute set'}
@@ -82,6 +92,8 @@ export function CreateProductForm({ attributeSets }: { attributeSets: AttributeS
           </SelectContent>
         </Select>
       </div>
+
+      {selectedSetDetail ? <AttributeFieldsSection groups={selectedSetDetail.groups} values={{}} /> : null}
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 

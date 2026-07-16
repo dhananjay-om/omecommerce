@@ -18,6 +18,7 @@ import { PrismaProductAttributeStore } from './infrastructure/product-attribute.
 import { CreateProduct } from './application/create-product.usecase.js';
 import { UpdateProduct } from './application/update-product.usecase.js';
 import { AssignAttributeValue } from './application/assign-attribute-value.usecase.js';
+import { AssignAttributeValues } from './application/assign-attribute-values.usecase.js';
 import { GetProductForStoreView } from './application/get-product-for-store-view.usecase.js';
 import { CreateAttributeSet } from './application/create-attribute-set.usecase.js';
 import { CreateAttributeSetGroup } from './application/create-attribute-set-group.usecase.js';
@@ -32,6 +33,7 @@ import {
   createProductSchema,
   updateProductSchema,
   assignAttributeValueSchema,
+  assignAttributeValuesSchema,
   storeViewQuerySchema,
   listProductsQuerySchema,
   createAttributeSetSchema,
@@ -60,6 +62,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createProduct = new CreateProduct(products, outbox);
   const updateProduct = new UpdateProduct(products);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
+  const assignAttributeValues = new AssignAttributeValues(products, attributes, attrStore, cache, outbox);
   const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
   const createAttributeSet = new CreateAttributeSet(attributeSets);
   const createAttributeSetGroup = new CreateAttributeSetGroup(attributeSets);
@@ -107,6 +110,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       const body = parse(assignAttributeValueSchema, req.body);
       await assignAttributeValue.execute({ ...body, productPublicId: req.params.publicId! });
+      res.status(204).send();
+    }),
+  );
+  admin.put(
+    '/products/:publicId/attributes/bulk',
+    asyncHandler(async (req, res) => {
+      const body = parse(assignAttributeValuesSchema, req.body);
+      await assignAttributeValues.execute({ productPublicId: req.params.publicId!, values: body.values });
       res.status(204).send();
     }),
   );

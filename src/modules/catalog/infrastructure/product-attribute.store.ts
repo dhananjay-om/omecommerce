@@ -20,12 +20,12 @@ interface RawResolvedRow {
 export class PrismaProductAttributeStore implements ProductAttributeStore {
   constructor(private readonly db: Db) {}
 
-  async upsertScopedValue(input: WriteScopedValueInput): Promise<void> {
+  // Upsert against the NULLS NOT DISTINCT scope-unique index (plan/02 §6). Prisma's
+  // typed upsert can't express a nullable compound key, so we use raw ON CONFLICT.
+  private upsertQuery(input: WriteScopedValueInput) {
     const { columns: c } = input;
     const jsonParam = c.valueJson === null ? null : JSON.stringify(c.valueJson);
-    // Upsert against the NULLS NOT DISTINCT scope-unique index (plan/02 §6). Prisma's
-    // typed upsert can't express a nullable compound key, so we use raw ON CONFLICT.
-    await this.db.$executeRaw`
+    return this.db.$executeRaw`
       INSERT INTO product_attribute_value
         (product_id, attribute_id, scope, website_id, store_id, store_view_id,
          value_text, value_int, value_decimal, value_datetime, value_json)
@@ -41,6 +41,18 @@ export class PrismaProductAttributeStore implements ProductAttributeStore {
         value_datetime = EXCLUDED.value_datetime,
         value_json = EXCLUDED.value_json,
         updated_at = now()`;
+  }
+
+  async upsertScopedValue(input: WriteScopedValueInput): Promise<void> {
+    await this.upsertQuery(input);
+  }
+
+  /** Same upsert, but all inputs commit atomically in one transaction — used by
+   * AssignAttributeValues (plural) so a product-edit form save is one all-or-nothing
+   * write instead of N independent round-trips. */
+  async upsertScopedValues(inputs: WriteScopedValueInput[]): Promise<void> {
+    if (inputs.length === 0) return;
+    await this.db.$transaction(inputs.map((i) => this.upsertQuery(i)));
   }
 
   async resolveForStoreView(

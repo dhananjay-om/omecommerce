@@ -115,6 +115,10 @@ export interface AttributeSetGroupInfo {
 }
 
 export interface AttributeOptionInfo {
+  /** The AttributeOption row's own id — SELECT attribute values are stored as this
+   * id via product_attribute_value.value_int (see attribute-value.ts's REF_TYPES),
+   * not the `value` string below, which is just the option's display key. */
+  id: bigint;
   value: string;
   label: string;
   swatch: string | null;
@@ -185,6 +189,8 @@ export interface ResolvedAttribute {
  */
 export interface ProductAttributeStore {
   upsertScopedValue(input: WriteScopedValueInput): Promise<void>;
+  /** All inputs commit atomically in one transaction (plan/13 Phase H). */
+  upsertScopedValues(inputs: WriteScopedValueInput[]): Promise<void>;
   resolveForStoreView(
     productId: bigint,
     chain: { websiteId: bigint; storeId: bigint; storeViewId: bigint },

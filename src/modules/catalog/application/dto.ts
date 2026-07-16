@@ -39,6 +39,20 @@ export interface AssignAttributeValueCommand {
   value?: unknown;
 }
 
+export interface AssignAttributeValueItem {
+  attributeCode: string;
+  scope?: ScopeType;
+  websiteId?: string | null;
+  storeId?: string | null;
+  storeViewId?: string | null;
+  value?: unknown;
+}
+
+export interface AssignAttributeValuesCommand {
+  productPublicId: string;
+  values: AssignAttributeValueItem[];
+}
+
 export interface ProductForStoreViewQuery {
   productPublicId: string;
   storeViewId: string;
@@ -93,6 +107,7 @@ export interface AttributeSetView {
 }
 
 export interface AttributeOptionView {
+  id: string;
   value: string;
   label: string;
   swatch: string | null;

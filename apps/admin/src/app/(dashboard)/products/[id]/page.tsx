@@ -112,7 +112,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </dl>
           )}
           <p className="mt-4 text-xs text-muted-foreground">
-            Read-only for now — editing attribute values (including per-website/store/store-view overrides) is a follow-up phase.
+            <Link href={`/products/${product.publicId}/edit`} className="underline hover:text-foreground">
+              Edit these values
+            </Link>{' '}
+            — per-website/store/store-view overrides aren&apos;t supported here yet, GLOBAL scope only.
           </p>
         </CardContent>
       </Card>

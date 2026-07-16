@@ -267,13 +267,55 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
       dataType: 'SELECT',
     });
     expect(detail.body.data.groups[0].attributes[0].options).toEqual([
-      { value: 'red', label: 'Red', swatch: null, sortOrder: 0 },
-      { value: 'blue', label: 'Blue', swatch: null, sortOrder: 0 },
+      { id: expect.any(String), value: 'red', label: 'Red', swatch: null, sortOrder: 0 },
+      { id: expect.any(String), value: 'blue', label: 'Blue', swatch: null, sortOrder: 0 },
     ]);
   });
 
   it('404s getting detail for an unknown attribute set', async () => {
     const res = await admin.get('/admin/v1/attribute-sets/999999');
+    expect(res.status).toBe(404);
+  });
+
+  it('bulk-assigns several attribute values in one atomic write (one outbox event, not N)', async () => {
+    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-BULK-1', attributeSetId });
+    const publicId = created.body.data.publicId as string;
+
+    await admin.post('/admin/v1/attributes').send({ code: 'bulk-test-note', label: 'Note', dataType: 'TEXT', inputType: 'TEXT' });
+
+    const bulk = await admin.put(`/admin/v1/products/${publicId}/attributes/bulk`).send({
+      values: [
+        { attributeCode: 'ram', value: 16 },
+        { attributeCode: 'bulk-test-note', value: 'saved together' },
+      ],
+    });
+    expect(bulk.status).toBe(204);
+
+    const detail = await admin.get(`/admin/v1/products/${publicId}`);
+    expect(detail.body.data.attributes.ram).toBe(16);
+    expect(detail.body.data.attributes['bulk-test-note']).toBe('saved together');
+  });
+
+  it('rolls back the whole bulk write if any single value is invalid (atomic, not partial)', async () => {
+    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-BULK-2', attributeSetId });
+    const publicId = created.body.data.publicId as string;
+
+    const bulk = await admin.put(`/admin/v1/products/${publicId}/attributes/bulk`).send({
+      values: [
+        { attributeCode: 'ram', value: 8 },
+        { attributeCode: 'ram', value: 'not-a-number' },
+      ],
+    });
+    expect(bulk.status).toBe(422);
+
+    const detail = await admin.get(`/admin/v1/products/${publicId}`);
+    expect(detail.body.data.attributes.ram).toBeUndefined();
+  });
+
+  it('404s bulk-assigning attributes for an unknown product', async () => {
+    const res = await admin
+      .put('/admin/v1/products/00000000-0000-7000-8000-000000000000/attributes/bulk')
+      .send({ values: [{ attributeCode: 'ram', value: 1 }] });
     expect(res.status).toBe(404);
   });
 });

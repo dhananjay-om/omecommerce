@@ -28,7 +28,13 @@ export class GetAttributeSetDetail {
           inputType: a.inputType,
           isRequired: a.isRequired,
           sortOrder: a.sortOrder,
-          options: a.options,
+          options: a.options.map((o) => ({
+            id: o.id.toString(),
+            value: o.value,
+            label: o.label,
+            swatch: o.swatch,
+            sortOrder: o.sortOrder,
+          })),
         })),
       })),
     };

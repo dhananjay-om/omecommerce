@@ -30,6 +30,21 @@ export const assignAttributeValueSchema = z.object({
   value: z.unknown(),
 });
 
+export const assignAttributeValuesSchema = z.object({
+  values: z
+    .array(
+      z.object({
+        attributeCode: z.string().min(1),
+        scope: z.nativeEnum(ScopeType).optional(),
+        websiteId: z.string().regex(/^\d+$/).nullish(),
+        storeId: z.string().regex(/^\d+$/).nullish(),
+        storeViewId: z.string().regex(/^\d+$/).nullish(),
+        value: z.unknown(),
+      }),
+    )
+    .min(1),
+});
+
 export const storeViewQuerySchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'storeViewId query param required'),
 });

@@ -60,9 +60,19 @@ export type AttributeDataType =
   | 'FILE'
   | 'URL'
   | 'EMAIL'
-  | 'PHONE';
+  | 'PHONE'
+  | 'JSON'
+  | 'RICHTEXT'
+  | 'REF_PRODUCT'
+  | 'REF_CATEGORY'
+  | 'REF_BRAND'
+  | 'REF_CMS'
+  | 'REF_COLLECTION'
+  | 'REF_CUSTOMER';
 
 export interface AttributeOption {
+  /** The AttributeOption row's own id — SELECT attribute values are submitted/read as this id, not `value` below. */
+  id: string;
   value: string;
   label: string;
   swatch: string | null;

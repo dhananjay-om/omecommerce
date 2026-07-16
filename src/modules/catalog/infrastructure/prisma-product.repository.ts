@@ -232,7 +232,7 @@ export class PrismaAttributeSetRepository implements AttributeSetRepository {
                     isRequired: true,
                     options: {
                       orderBy: { sortOrder: 'asc' },
-                      select: { value: true, label: true, swatch: true, sortOrder: true },
+                      select: { id: true, value: true, label: true, swatch: true, sortOrder: true },
                     },
                   },
                 },

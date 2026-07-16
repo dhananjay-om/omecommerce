@@ -2,11 +2,46 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPatch, ApiError } from '@/lib/api-client';
+import { apiPost, apiPatch, apiPut, ApiError } from '@/lib/api-client';
 import type { ProductDetail } from '@/lib/types';
 
 export interface CreateProductFormState {
   error: string | null;
+}
+
+/** Reads back the `attr__<code>` fields the AttributeFieldsSection rendered, using
+ * the `__attrTypes` map it embeds to know how to parse each one (a plain <input>
+ * can't tell you its own semantic type — MULTISELECT needs getAll(), BOOLEAN needs
+ * checkbox-presence, etc). Fields left empty are omitted, not cleared — there's no
+ * "unset this attribute value" endpoint in this pass. */
+function parseAttributeValues(formData: FormData): Array<{ attributeCode: string; value: unknown }> {
+  const rawTypes = formData.get('__attrTypes');
+  if (!rawTypes) return [];
+  const attrTypes = JSON.parse(String(rawTypes)) as Record<string, string>;
+
+  const values: Array<{ attributeCode: string; value: unknown }> = [];
+  for (const [code, dataType] of Object.entries(attrTypes)) {
+    const name = `attr__${code}`;
+    if (dataType === 'MULTISELECT') {
+      const arr = formData.getAll(name).map(String);
+      if (arr.length > 0) values.push({ attributeCode: code, value: arr });
+    } else if (dataType === 'BOOLEAN') {
+      values.push({ attributeCode: code, value: formData.get(name) === 'on' });
+    } else if (dataType === 'NUMBER') {
+      const raw = formData.get(name);
+      if (raw !== null && String(raw).trim() !== '') values.push({ attributeCode: code, value: Number(raw) });
+    } else {
+      const raw = formData.get(name);
+      if (raw !== null && String(raw).trim() !== '') values.push({ attributeCode: code, value: String(raw) });
+    }
+  }
+  return values;
+}
+
+async function saveAttributeValues(productPublicId: string, formData: FormData): Promise<void> {
+  const values = parseAttributeValues(formData);
+  if (values.length === 0) return;
+  await apiPut(`/admin/v1/products/${productPublicId}/attributes/bulk`, { values });
 }
 
 export async function createProduct(_prevState: CreateProductFormState, formData: FormData): Promise<CreateProductFormState> {
@@ -31,6 +66,7 @@ export async function createProduct(_prevState: CreateProductFormState, formData
       nameDefault: nameDefault || undefined,
       weight: weight || undefined,
     });
+    await saveAttributeValues(created.publicId, formData);
   } catch (err) {
     if (err instanceof ApiError) {
       return { error: err.message };
@@ -68,6 +104,7 @@ export async function updateProduct(
       visibility: visibility || undefined,
       weight: weight || null,
     });
+    await saveAttributeValues(productPublicId, formData);
   } catch (err) {
     if (err instanceof ApiError) {
       return { error: err.message };
