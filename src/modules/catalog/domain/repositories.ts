@@ -1,4 +1,4 @@
-import type { AttributeDataType, AttributeInputType, ScopeType, ProductType, ProductStatus } from '@prisma/client';
+import type { AttributeDataType, AttributeInputType, ScopeType, ProductType, ProductStatus, ProductVisibility } from '@prisma/client';
 import type { Product } from './product.js';
 import type { AttributeValueColumns } from './attribute-value.js';
 
@@ -26,11 +26,20 @@ export interface ProductListResult {
   products: ProductListItem[];
 }
 
+export interface UpdateProductInput {
+  nameDefault?: string | null;
+  status?: ProductStatus;
+  visibility?: ProductVisibility;
+  weight?: string | null;
+  attributeSetId?: bigint;
+}
+
 /** Persistence port for the Product aggregate (implemented in infrastructure). */
 export interface ProductRepository {
   existsBySku(sku: string): Promise<boolean>;
   create(product: Product): Promise<Product>;
   findByPublicId(publicId: string): Promise<Product | null>;
+  update(publicId: string, input: UpdateProductInput): Promise<Product>;
   list(filter: ListProductsFilter): Promise<ProductListResult>;
 }
 
@@ -105,6 +114,34 @@ export interface AttributeSetGroupInfo {
   sortOrder: number;
 }
 
+export interface AttributeOptionInfo {
+  value: string;
+  label: string;
+  swatch: string | null;
+  sortOrder: number;
+}
+
+export interface AttributeSetAttributeDetail {
+  code: string;
+  label: string;
+  dataType: AttributeDataType;
+  inputType: AttributeInputType;
+  isRequired: boolean;
+  sortOrder: number;
+  options: AttributeOptionInfo[];
+}
+
+export interface AttributeSetGroupDetail {
+  id: bigint;
+  name: string;
+  sortOrder: number;
+  attributes: AttributeSetAttributeDetail[];
+}
+
+export interface AttributeSetDetail extends AttributeSetInfo {
+  groups: AttributeSetGroupDetail[];
+}
+
 /**
  * Persistence port for the attribute-set builder (plan/04 §2.1): sets, their
  * groups (tabs/sections in the dynamic product editor), and the junction that
@@ -116,6 +153,8 @@ export interface AttributeSetRepository {
   findSetById(id: bigint): Promise<AttributeSetInfo | null>;
   /** Admin browse (plan/12 Admin UI) — populates the attribute-set picker on the create-product form. */
   listSets(): Promise<AttributeSetInfo[]>;
+  /** Admin dynamic-attribute-form support (plan/13 Phase G) — groups + their assigned attributes (with data type/options), for rendering typed inputs on the product create/edit form. */
+  getSetDetail(id: bigint): Promise<AttributeSetDetail | null>;
   createGroup(attributeSetId: bigint, name: string, sortOrder: number): Promise<AttributeSetGroupInfo>;
   findGroupByName(attributeSetId: bigint, name: string): Promise<AttributeSetGroupInfo | null>;
   findGroupById(attributeSetId: bigint, groupId: bigint): Promise<AttributeSetGroupInfo | null>;

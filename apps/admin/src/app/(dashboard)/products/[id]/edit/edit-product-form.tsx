@@ -1,57 +1,48 @@
 'use client';
 
 import { useActionState } from 'react';
-import { createProduct, type CreateProductFormState } from '../actions';
-import type { AttributeSet } from '@/lib/types';
+import { updateProduct, type UpdateProductFormState } from '../../actions';
+import type { AttributeSet, ProductDetail } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const PRODUCT_TYPES = ['SIMPLE', 'CONFIGURABLE', 'BUNDLE', 'DIGITAL', 'VIRTUAL'];
 const STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
+const VISIBILITIES = ['BOTH', 'CATALOG', 'SEARCH', 'NOT_VISIBLE'];
 
-const initialState: CreateProductFormState = { error: null };
+const initialState: UpdateProductFormState = { error: null };
 
-export function CreateProductForm({ attributeSets }: { attributeSets: AttributeSet[] }) {
-  const [state, formAction, pending] = useActionState(createProduct, initialState);
+export function EditProductForm({ product, attributeSets }: { product: ProductDetail; attributeSets: AttributeSet[] }) {
+  const action = updateProduct.bind(null, product.publicId);
+  const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
     <form action={formAction} className="max-w-lg space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="sku">SKU</Label>
-        <Input id="sku" name="sku" required />
+        <Label>SKU</Label>
+        <Input value={product.sku} disabled />
+        <p className="text-xs text-muted-foreground">SKU can&apos;t be changed after creation.</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Type</Label>
+        <Input value={product.type} disabled />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="nameDefault">Name</Label>
-        <Input id="nameDefault" name="nameDefault" />
+        <Input id="nameDefault" name="nameDefault" defaultValue={product.name ?? ''} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="weight">Weight (kg)</Label>
-        <Input id="weight" name="weight" type="number" step="0.0001" min="0" />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="type">Type</Label>
-        <Select name="type" defaultValue="SIMPLE">
-          <SelectTrigger id="type" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRODUCT_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input id="weight" name="weight" type="number" step="0.0001" min="0" defaultValue={product.weight ?? ''} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="attributeSetId">Attribute set</Label>
-        <Select name="attributeSetId" defaultValue={attributeSets.find((s) => s.isDefault)?.id ?? attributeSets[0]?.id}>
+        <Select name="attributeSetId" defaultValue={product.attributeSetId}>
           <SelectTrigger id="attributeSetId" className="w-full">
             <SelectValue placeholder="Select an attribute set">
               {(value: string | null) => attributeSets.find((s) => s.id === value)?.name ?? 'Select an attribute set'}
@@ -69,7 +60,7 @@ export function CreateProductForm({ attributeSets }: { attributeSets: AttributeS
 
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
-        <Select name="status" defaultValue="DRAFT">
+        <Select name="status" defaultValue={product.status}>
           <SelectTrigger id="status" className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -83,10 +74,26 @@ export function CreateProductForm({ attributeSets }: { attributeSets: AttributeS
         </Select>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="visibility">Visibility</Label>
+        <Select name="visibility" defaultValue={product.visibility}>
+          <SelectTrigger id="visibility" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {VISIBILITIES.map((v) => (
+              <SelectItem key={v} value={v}>
+                {v}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
       <Button type="submit" disabled={pending}>
-        {pending ? 'Creating…' : 'Create Product'}
+        {pending ? 'Saving…' : 'Save Changes'}
       </Button>
     </form>
   );

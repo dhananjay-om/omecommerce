@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
 import type { ProductDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { statusBadgeVariant } from '@/lib/status-badge';
+import { cn } from '@/lib/utils';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,9 +20,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <Link href="/products" className="text-sm text-muted-foreground hover:underline">
           ← Back to Products
         </Link>
-        <div className="mt-2 flex items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">{product.name ?? product.sku}</h1>
-          <Badge variant={statusBadgeVariant(product.status)}>{product.status}</Badge>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">{product.name ?? product.sku}</h1>
+            <Badge variant={statusBadgeVariant(product.status)}>{product.status}</Badge>
+          </div>
+          <Link href={`/products/${product.publicId}/edit`} className={cn(buttonVariants())}>
+            Edit
+          </Link>
         </div>
       </div>
 
@@ -44,6 +51,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <div>
             <div className="text-muted-foreground">Attribute Set ID</div>
             <div className="font-medium">{product.attributeSetId}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Weight</div>
+            <div className="font-medium">{product.weight ? `${product.weight} kg` : '—'}</div>
           </div>
         </CardContent>
       </Card>

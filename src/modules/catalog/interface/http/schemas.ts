@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ProductType, ProductStatus, ProductVisibility, ScopeType, AttributeDataType, AttributeInputType } from '@prisma/client';
 
+const decimalString = z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount, e.g. "2.5"');
+
 export const createProductSchema = z.object({
   type: z.nativeEnum(ProductType),
   sku: z.string().min(1).max(128),
@@ -8,6 +10,15 @@ export const createProductSchema = z.object({
   status: z.nativeEnum(ProductStatus).optional(),
   visibility: z.nativeEnum(ProductVisibility).optional(),
   nameDefault: z.string().max(512).nullish(),
+  weight: decimalString.nullish(),
+});
+
+export const updateProductSchema = z.object({
+  nameDefault: z.string().max(512).nullish(),
+  status: z.nativeEnum(ProductStatus).optional(),
+  visibility: z.nativeEnum(ProductVisibility).optional(),
+  weight: decimalString.nullish(),
+  attributeSetId: z.string().regex(/^\d+$/, 'expected numeric id').optional(),
 });
 
 export const assignAttributeValueSchema = z.object({

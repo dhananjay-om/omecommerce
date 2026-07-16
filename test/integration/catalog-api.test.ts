@@ -181,4 +181,99 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
     const electronics = res.body.data.find((s: { code: string }) => s.code === 'electronics');
     expect(electronics).toMatchObject({ code: 'electronics', name: 'Electronics', isDefault: true });
   });
+
+  it('updates a product\'s core fields (name/status/visibility/weight/attribute set)', async () => {
+    const created = await admin
+      .post('/admin/v1/products')
+      .send({ type: 'SIMPLE', sku: 'API-SKU-UPDATE-1', attributeSetId, status: 'DRAFT' });
+    const publicId = created.body.data.publicId as string;
+
+    const otherSet = await admin.post('/admin/v1/attribute-sets').send({ code: 'update-test-set', name: 'Update Test Set' });
+
+    const updated = await admin.patch(`/admin/v1/products/${publicId}`).send({
+      nameDefault: 'Renamed Product',
+      status: 'ACTIVE',
+      visibility: 'CATALOG',
+      weight: '2.5',
+      attributeSetId: otherSet.body.data.id,
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toMatchObject({
+      publicId,
+      name: 'Renamed Product',
+      status: 'ACTIVE',
+      visibility: 'CATALOG',
+      weight: '2.5',
+    });
+
+    const detail = await admin.get(`/admin/v1/products/${publicId}`);
+    expect(detail.body.data).toMatchObject({
+      name: 'Renamed Product',
+      status: 'ACTIVE',
+      attributeSetId: otherSet.body.data.id,
+    });
+
+    // SKU and type were never sent — confirm they're untouched (patch semantics).
+    expect(detail.body.data.sku).toBe('API-SKU-UPDATE-1');
+    expect(detail.body.data.type).toBe('SIMPLE');
+  });
+
+  it('partially updates a product without touching omitted fields', async () => {
+    const created = await admin
+      .post('/admin/v1/products')
+      .send({ type: 'SIMPLE', sku: 'API-SKU-UPDATE-2', attributeSetId, nameDefault: 'Original Name', status: 'DRAFT' });
+    const publicId = created.body.data.publicId as string;
+
+    const updated = await admin.patch(`/admin/v1/products/${publicId}`).send({ status: 'ACTIVE' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.status).toBe('ACTIVE');
+    expect(updated.body.data.name).toBe('Original Name');
+  });
+
+  it('404s updating an unknown product', async () => {
+    const res = await admin.patch('/admin/v1/products/00000000-0000-7000-8000-000000000000').send({ status: 'ACTIVE' });
+    expect(res.status).toBe(404);
+  });
+
+  it('gets an attribute set\'s detail: groups, assigned attributes, and options', async () => {
+    const set = await admin.post('/admin/v1/attribute-sets').send({ code: 'detail-test-set', name: 'Detail Test Set' });
+    const setId = set.body.data.id as string;
+    const group = await admin.post(`/admin/v1/attribute-sets/${setId}/groups`).send({ name: 'Specs', sortOrder: 1 });
+    const groupId = group.body.data.id as string;
+
+    await admin.post('/admin/v1/attributes').send({
+      code: 'color-detail-test',
+      label: 'Color',
+      dataType: 'SELECT',
+      inputType: 'DROPDOWN',
+      options: [
+        { value: 'red', label: 'Red' },
+        { value: 'blue', label: 'Blue' },
+      ],
+    });
+    await admin
+      .post(`/admin/v1/attribute-sets/${setId}/attributes`)
+      .send({ groupId, attributeCode: 'color-detail-test', sortOrder: 1 });
+
+    const detail = await admin.get(`/admin/v1/attribute-sets/${setId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data).toMatchObject({ id: setId, code: 'detail-test-set', name: 'Detail Test Set' });
+    expect(detail.body.data.groups).toHaveLength(1);
+    expect(detail.body.data.groups[0]).toMatchObject({ name: 'Specs', sortOrder: 1 });
+    expect(detail.body.data.groups[0].attributes).toHaveLength(1);
+    expect(detail.body.data.groups[0].attributes[0]).toMatchObject({
+      code: 'color-detail-test',
+      label: 'Color',
+      dataType: 'SELECT',
+    });
+    expect(detail.body.data.groups[0].attributes[0].options).toEqual([
+      { value: 'red', label: 'Red', swatch: null, sortOrder: 0 },
+      { value: 'blue', label: 'Blue', swatch: null, sortOrder: 0 },
+    ]);
+  });
+
+  it('404s getting detail for an unknown attribute set', async () => {
+    const res = await admin.get('/admin/v1/attribute-sets/999999');
+    expect(res.status).toBe(404);
+  });
 });

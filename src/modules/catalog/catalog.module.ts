@@ -16,6 +16,7 @@ import {
 } from './infrastructure/prisma-product.repository.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
 import { CreateProduct } from './application/create-product.usecase.js';
+import { UpdateProduct } from './application/update-product.usecase.js';
 import { AssignAttributeValue } from './application/assign-attribute-value.usecase.js';
 import { GetProductForStoreView } from './application/get-product-for-store-view.usecase.js';
 import { CreateAttributeSet } from './application/create-attribute-set.usecase.js';
@@ -26,8 +27,10 @@ import { ListProductVariants } from './application/list-product-variants.usecase
 import { ListProducts } from './application/list-products.usecase.js';
 import { GetProductDetail } from './application/get-product-detail.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
+import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
 import {
   createProductSchema,
+  updateProductSchema,
   assignAttributeValueSchema,
   storeViewQuerySchema,
   listProductsQuerySchema,
@@ -55,6 +58,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const outbox = new OutboxWriter(db);
 
   const createProduct = new CreateProduct(products, outbox);
+  const updateProduct = new UpdateProduct(products);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
   const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
   const createAttributeSet = new CreateAttributeSet(attributeSets);
@@ -65,6 +69,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const listProducts = new ListProducts(products);
   const getProductDetail = new GetProductDetail(products, variants, attrStore);
   const listAttributeSets = new ListAttributeSets(attributeSets);
+  const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
 
   // --- Admin API ---
   const admin = Router();
@@ -89,6 +94,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       res.json({ data: await getProductDetail.execute(req.params.publicId!) });
     }),
   );
+  admin.patch(
+    '/products/:publicId',
+    asyncHandler(async (req, res) => {
+      const body = parse(updateProductSchema, req.body);
+      const view = await updateProduct.execute({ ...body, publicId: req.params.publicId! });
+      res.json({ data: view });
+    }),
+  );
   admin.put(
     '/products/:publicId/attributes',
     asyncHandler(async (req, res) => {
@@ -107,6 +120,12 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/attribute-sets',
     asyncHandler(async (req, res) => {
       res.json({ data: await listAttributeSets.execute() });
+    }),
+  );
+  admin.get(
+    '/attribute-sets/:id',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getAttributeSetDetail.execute(req.params.id!) });
     }),
   );
   admin.post(

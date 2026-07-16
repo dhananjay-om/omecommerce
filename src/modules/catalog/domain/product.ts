@@ -10,6 +10,7 @@ export interface ProductProps {
   status: ProductStatus;
   visibility: ProductVisibility;
   nameDefault: string | null;
+  weight: string | null;
   isDigital: boolean;
   isVirtual: boolean;
 }
@@ -21,6 +22,7 @@ export interface CreateProductInput {
   status?: ProductStatus;
   visibility?: ProductVisibility;
   nameDefault?: string | null;
+  weight?: string | null;
 }
 
 /**
@@ -49,6 +51,7 @@ export class Product {
       status: input.status ?? ProductStatus.DRAFT,
       visibility: input.visibility ?? ProductVisibility.BOTH,
       nameDefault: input.nameDefault ?? null,
+      weight: input.weight ?? null,
       isDigital: input.type === ProductType.DIGITAL,
       isVirtual: input.type === ProductType.VIRTUAL,
     });

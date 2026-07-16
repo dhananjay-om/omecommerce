@@ -27,6 +27,7 @@ export function adminRequest(app: Express, token: string) {
     get: (url: string) => withAuth(request(app).get(url)),
     post: (url: string) => withAuth(request(app).post(url)),
     put: (url: string) => withAuth(request(app).put(url)),
+    patch: (url: string) => withAuth(request(app).patch(url)),
     delete: (url: string) => withAuth(request(app).delete(url)),
   };
 }

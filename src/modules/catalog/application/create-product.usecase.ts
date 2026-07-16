@@ -28,6 +28,7 @@ export class CreateProduct {
       status: cmd.status,
       visibility: cmd.visibility,
       nameDefault: cmd.nameDefault ?? null,
+      weight: cmd.weight ?? null,
     });
     const saved = await this.products.create(product);
     // Catalog's first outbox event (Stage 4) — consumed by the search indexer.
@@ -54,5 +55,6 @@ export function toView(product: Product): ProductView {
     status: p.status,
     visibility: p.visibility,
     name: p.nameDefault,
+    weight: p.weight,
   };
 }

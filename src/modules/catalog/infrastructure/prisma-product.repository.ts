@@ -7,14 +7,32 @@ import type {
   CreateAttributeInput,
   AttributeSetRepository,
   AttributeSetInfo,
+  AttributeSetDetail,
   CreateAttributeSetInput,
   AttributeSetGroupInfo,
   ProductVariantRepository,
   VariantInfo,
   ListProductsFilter,
   ProductListResult,
+  UpdateProductInput,
 } from '../domain/repositories.js';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, Product as PrismaProductRow } from '@prisma/client';
+
+function toDomainProps(row: PrismaProductRow) {
+  return {
+    id: row.id,
+    publicId: row.publicId,
+    type: row.type,
+    sku: row.sku,
+    attributeSetId: row.attributeSetId,
+    status: row.status,
+    visibility: row.visibility,
+    nameDefault: row.nameDefault,
+    weight: row.weight?.toString() ?? null,
+    isDigital: row.isDigital,
+    isVirtual: row.isVirtual,
+  };
+}
 
 /**
  * Product types that are sold as a single sellable unit with no distinct variant
@@ -43,6 +61,7 @@ export class PrismaProductRepository implements ProductRepository {
           status: p.status,
           visibility: p.visibility,
           nameDefault: p.nameDefault,
+          weight: p.weight,
           isDigital: p.isDigital,
           isVirtual: p.isVirtual,
         },
@@ -54,35 +73,27 @@ export class PrismaProductRepository implements ProductRepository {
       }
       return created;
     });
-    return Product.fromPersistence({
-      id: row.id,
-      publicId: row.publicId,
-      type: row.type,
-      sku: row.sku,
-      attributeSetId: row.attributeSetId,
-      status: row.status,
-      visibility: row.visibility,
-      nameDefault: row.nameDefault,
-      isDigital: row.isDigital,
-      isVirtual: row.isVirtual,
-    });
+    return Product.fromPersistence(toDomainProps(row));
   }
 
   async findByPublicId(publicId: string): Promise<Product | null> {
     const row = await this.db.product.findFirst({ where: { publicId } });
     if (!row) return null;
-    return Product.fromPersistence({
-      id: row.id,
-      publicId: row.publicId,
-      type: row.type,
-      sku: row.sku,
-      attributeSetId: row.attributeSetId,
-      status: row.status,
-      visibility: row.visibility,
-      nameDefault: row.nameDefault,
-      isDigital: row.isDigital,
-      isVirtual: row.isVirtual,
+    return Product.fromPersistence(toDomainProps(row));
+  }
+
+  async update(publicId: string, input: UpdateProductInput): Promise<Product> {
+    const row = await this.db.product.update({
+      where: { publicId },
+      data: {
+        nameDefault: input.nameDefault,
+        status: input.status,
+        visibility: input.visibility,
+        weight: input.weight,
+        attributeSetId: input.attributeSetId,
+      },
     });
+    return Product.fromPersistence(toDomainProps(row));
   }
 
   async list(filter: ListProductsFilter): Promise<ProductListResult> {
@@ -191,6 +202,67 @@ export class PrismaAttributeSetRepository implements AttributeSetRepository {
 
   async listSets(): Promise<AttributeSetInfo[]> {
     return this.db.attributeSet.findMany({ select: { id: true, code: true, name: true, isDefault: true }, orderBy: { name: 'asc' } });
+  }
+
+  async getSetDetail(id: bigint): Promise<AttributeSetDetail | null> {
+    const set = await this.db.attributeSet.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        isDefault: true,
+        groups: {
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            sortOrder: true,
+            attributes: {
+              orderBy: { sortOrder: 'asc' },
+              select: {
+                sortOrder: true,
+                isRequiredOverride: true,
+                attribute: {
+                  select: {
+                    code: true,
+                    label: true,
+                    dataType: true,
+                    inputType: true,
+                    isRequired: true,
+                    options: {
+                      orderBy: { sortOrder: 'asc' },
+                      select: { value: true, label: true, swatch: true, sortOrder: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!set) return null;
+    return {
+      id: set.id,
+      code: set.code,
+      name: set.name,
+      isDefault: set.isDefault,
+      groups: set.groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        sortOrder: g.sortOrder,
+        attributes: g.attributes.map((a) => ({
+          code: a.attribute.code,
+          label: a.attribute.label,
+          dataType: a.attribute.dataType,
+          inputType: a.attribute.inputType,
+          isRequired: a.isRequiredOverride ?? a.attribute.isRequired,
+          sortOrder: a.sortOrder,
+          options: a.attribute.options,
+        })),
+      })),
+    };
   }
 
   async createGroup(attributeSetId: bigint, name: string, sortOrder: number): Promise<AttributeSetGroupInfo> {

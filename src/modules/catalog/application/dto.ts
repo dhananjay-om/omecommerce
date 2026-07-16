@@ -7,6 +7,16 @@ export interface CreateProductCommand {
   status?: ProductStatus;
   visibility?: ProductVisibility;
   nameDefault?: string | null;
+  weight?: string | null;
+}
+
+export interface UpdateProductCommand {
+  publicId: string;
+  nameDefault?: string | null;
+  status?: ProductStatus;
+  visibility?: ProductVisibility;
+  weight?: string | null;
+  attributeSetId?: string;
 }
 
 export interface ProductView {
@@ -16,6 +26,7 @@ export interface ProductView {
   status: ProductStatus;
   visibility: ProductVisibility;
   name: string | null;
+  weight: string | null;
 }
 
 export interface AssignAttributeValueCommand {
@@ -79,6 +90,34 @@ export interface AttributeSetView {
   code: string;
   name: string;
   isDefault: boolean;
+}
+
+export interface AttributeOptionView {
+  value: string;
+  label: string;
+  swatch: string | null;
+  sortOrder: number;
+}
+
+export interface AttributeSetAttributeView {
+  code: string;
+  label: string;
+  dataType: AttributeDataType;
+  inputType: AttributeInputType;
+  isRequired: boolean;
+  sortOrder: number;
+  options: AttributeOptionView[];
+}
+
+export interface AttributeSetGroupDetailView {
+  id: string;
+  name: string;
+  sortOrder: number;
+  attributes: AttributeSetAttributeView[];
+}
+
+export interface AttributeSetDetailView extends AttributeSetView {
+  groups: AttributeSetGroupDetailView[];
 }
 
 export interface CreateAttributeSetGroupCommand {

@@ -1,5 +1,5 @@
 export type ProductType = 'SIMPLE' | 'CONFIGURABLE' | 'BUNDLE' | 'DIGITAL' | 'VIRTUAL';
-export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'ARCHIVED';
+export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 export type ProductVisibility = 'BOTH' | 'CATALOG' | 'SEARCH' | 'NOT_VISIBLE';
 
 export interface ProductListItem {
@@ -32,6 +32,7 @@ export interface ProductDetail {
   status: ProductStatus;
   visibility: ProductVisibility;
   name: string | null;
+  weight: string | null;
   attributeSetId: string;
   variants: Variant[];
   attributes: Record<string, unknown>;
@@ -42,6 +43,50 @@ export interface AttributeSet {
   code: string;
   name: string;
   isDefault: boolean;
+}
+
+export type AttributeDataType =
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'NUMBER'
+  | 'DECIMAL'
+  | 'BOOLEAN'
+  | 'DATE'
+  | 'DATETIME'
+  | 'COLOR'
+  | 'SELECT'
+  | 'MULTISELECT'
+  | 'IMAGE'
+  | 'FILE'
+  | 'URL'
+  | 'EMAIL'
+  | 'PHONE';
+
+export interface AttributeOption {
+  value: string;
+  label: string;
+  swatch: string | null;
+  sortOrder: number;
+}
+
+export interface AttributeSetAttribute {
+  code: string;
+  label: string;
+  dataType: AttributeDataType;
+  isRequired: boolean;
+  sortOrder: number;
+  options: AttributeOption[];
+}
+
+export interface AttributeSetGroupDetail {
+  id: string;
+  name: string;
+  sortOrder: number;
+  attributes: AttributeSetAttribute[];
+}
+
+export interface AttributeSetDetail extends AttributeSet {
+  groups: AttributeSetGroupDetail[];
 }
 
 export type WarehouseType = 'PHYSICAL' | 'VIRTUAL' | 'DROPSHIP';

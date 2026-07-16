@@ -66,6 +66,7 @@ export class GetProductForStoreView {
       status: p.status,
       visibility: p.visibility,
       name: p.nameDefault,
+      weight: p.weight,
       storeViewId: query.storeViewId,
       currency: ctx.currency,
       attributes,
