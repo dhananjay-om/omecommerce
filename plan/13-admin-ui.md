@@ -61,6 +61,12 @@ existed, following the exact per-context recipe every prior stage used (domain p
 | D | `GET /warehouses`, `GET /inventory/warehouses/:code/stock`, `GET /price-lists` | Inventory + Pricing (create warehouse, adjust stock, create price list, set price) |
 | E | `GET /orders` (paginated, filterable) | Orders list/detail + fulfill/refund/cancel dialogs |
 | F | Customer module's first-ever admin router: `GET /customers`, `GET /customers/:publicId` | Customers list/detail |
+| G | `PATCH /products/:publicId` (core-field update), `GET /attribute-sets/:id` (detail: groups + attributes + options) | Real product Edit page (previously create-only); `weight` wired end-to-end |
+| H | `PUT /products/:publicId/attributes/bulk` (atomic, one outbox event) | Dynamic per-data-type attribute-value inputs on create/edit forms |
+| I | `sortBy`/`sortDir`/`type`/`attributeSetId` filters + quantity/salable-quantity columns on `GET /products` | Filters panel, sortable headers, bulk Activate/Deactivate |
+
+Phases G–I were a second round, prompted by the user referencing Magento's admin
+Products grid/edit-form UI as a target — see §7.
 
 Each phase: backend endpoints tested with integration tests against a throwaway
 Postgres (same rigor as every backend stage), frontend typechecked/built/linted, then
@@ -120,8 +126,15 @@ been silently falling back to the browser's default serif font since Phase B.
 - The storefront UI entirely — its own future plan.
 - Admin screens for Loyalty, Referral, Wallet, Gift Cards, CMS, Wishlist, bulk
   product import, search/facet configuration.
-- A full attribute-set *builder* UI (groups, per-type input widgets) — the product
-  detail page shows attributes read-only.
+- A full attribute-set *builder* UI (create sets/groups/attributes, choose data
+  types, define options) — still raw-API-only. What Phase H added is *consuming*
+  an existing attribute set's definition to render/edit values on a product, not
+  authoring the definition itself.
+- Product images (`MediaAsset`/`ProductMedia` schema exists, zero upload code
+  anywhere) and categories (`Category` schema exists — including a Postgres `ltree`
+  path column Prisma can't read/write directly — zero admin endpoints) — both
+  confirmed real gaps, explicitly scoped out of the Phase G–I round after a
+  cost/risk conversation with the user, not attempted.
 - Fine-grained RBAC-aware UI (the backend has real permissions like
   `catalog:manage`/`orders:refund`; this UI doesn't branch on them yet).
 - A shared types package between `apps/admin` and the backend.
@@ -129,3 +142,37 @@ been silently falling back to the browser's default serif font since Phase B.
 - A real `/admin/v1/auth/me` endpoint — the top header's avatar shows a generic
   "Admin" label rather than the logged-in admin's actual email/name, since the JWT
   doesn't carry it and no profile endpoint exists yet.
+- Configurable-product variant-matrix generation (Magento's "Configurations"
+  wizard) — real feature, big scope, not attempted.
+
+## 7. Phases G–I: product edit, dynamic attributes, richer grid
+
+Prompted by the user pointing at Magento's admin Products grid and product-edit
+form as a reference and asking for the gap to be closed. Full detail in the
+Phase G/H/I commit messages; the notable findings:
+
+- **`SELECT`-type attribute values are stored by the `AttributeOption` row's own
+  numeric `id`, not its `value` string** (`toColumns()`'s `REF_TYPES` set writes
+  `value_int`). The attribute-set-detail endpoint didn't expose the option `id` at
+  all until Phase H added it — without it there was no way for a dynamic form to
+  submit a valid SELECT value.
+- **`AttributeDataType` has more members than an earlier audit found**: `JSON`,
+  `RICHTEXT`, and six `REF_*` reference types (`REF_PRODUCT`/`REF_CATEGORY`/
+  `REF_BRAND`/`REF_CMS`/`REF_COLLECTION`/`REF_CUSTOMER`) were missing from the
+  frontend's type union, caught by a real TypeScript error once the dynamic
+  attribute-input component tried to exhaustively branch on data type. `REF_*`/
+  `JSON`/`IMAGE`/`FILE` render nothing in the product form (need a reference-picker
+  or upload UI — real, separate future work), but are at least correctly typed now.
+- **Turning a Server Component into a Client Component (for bulk row-select)
+  surfaced a genuine hydration bug that had been latent the whole time**:
+  `toLocaleDateString()` with no explicit locale formats differently on the Node
+  server than in a browser. As a pure Server Component the date was only ever
+  formatted once (server-side, baked into static HTML); once the same code became
+  part of a hydrating Client Component, the client re-executed it and diverged.
+  Fixed by pinning an explicit locale — worth checking for on any other Server →
+  Client Component conversion in this codebase.
+- The bulk attribute-write endpoint (`AssignAttributeValues`, plural) exists
+  alongside the original single-attribute one specifically because a form save with
+  a dozen+ attributes as N sequential PUTs would mean N outbox events for one
+  logical change; the bulk-import worker still uses the singular per-row version,
+  where that's the correct semantics.
