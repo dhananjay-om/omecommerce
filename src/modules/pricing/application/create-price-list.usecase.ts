@@ -44,6 +44,6 @@ export class CreatePriceList {
       startsAt: cmd.startsAt ? new Date(cmd.startsAt) : null,
       endsAt: cmd.endsAt ? new Date(cmd.endsAt) : null,
     });
-    return { publicId: pl.publicId, code: pl.code, name: pl.name, currency: pl.currency, type: pl.type };
+    return { publicId: pl.publicId, code: pl.code, name: pl.name, currency: pl.currency, type: pl.type, priority: pl.priority };
   }
 }

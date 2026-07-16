@@ -10,6 +10,7 @@ import { PrismaPriceListRepository } from './infrastructure/prisma-price-list.re
 import { PrismaPriceResolver } from './infrastructure/prisma-price-resolver.js';
 import { CreateCustomerGroup } from './application/create-customer-group.usecase.js';
 import { CreatePriceList } from './application/create-price-list.usecase.js';
+import { ListPriceLists } from './application/list-price-lists.usecase.js';
 import { SetProductPrice } from './application/set-product-price.usecase.js';
 import { SetPriceTier } from './application/set-price-tier.usecase.js';
 import { ResolvePrice } from './application/resolve-price.usecase.js';
@@ -35,6 +36,7 @@ export function createPricingModule(db: Db): PricingRouters {
 
   const createCustomerGroup = new CreateCustomerGroup(customerGroups);
   const createPriceList = new CreatePriceList(priceLists, customerGroups, websites);
+  const listPriceLists = new ListPriceLists(priceLists);
   const setProductPrice = new SetProductPrice(priceLists, variants);
   const setPriceTier = new SetPriceTier(priceLists, variants);
   const resolvePrice = new ResolvePrice(resolver, variants, customerGroups, websites);
@@ -56,6 +58,13 @@ export function createPricingModule(db: Db): PricingRouters {
       const body = parse(createPriceListSchema, req.body);
       const view = await createPriceList.execute(body);
       res.status(201).json({ data: view });
+    }),
+  );
+
+  admin.get(
+    '/price-lists',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listPriceLists.execute() });
     }),
   );
 

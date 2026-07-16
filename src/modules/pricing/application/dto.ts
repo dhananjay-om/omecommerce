@@ -30,6 +30,7 @@ export interface PriceListView {
   name: string;
   currency: string;
   type: PriceListType;
+  priority: number;
 }
 
 export interface SetProductPriceCommand {

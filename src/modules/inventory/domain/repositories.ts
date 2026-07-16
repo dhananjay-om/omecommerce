@@ -19,6 +19,7 @@ export interface CreateWarehouseInput {
 export interface WarehouseRepository {
   create(input: CreateWarehouseInput): Promise<WarehouseInfo>;
   findByCode(code: string): Promise<WarehouseInfo | null>;
+  list(): Promise<WarehouseInfo[]>;
 }
 
 /** Resolves a catalog variant's publicId to its internal id (read-only cross-module lookup). */
@@ -30,6 +31,11 @@ export interface StockSnapshot {
   onHand: number;
   reserved: number;
   available: number;
+}
+
+export interface WarehouseStockRow extends StockSnapshot {
+  variantPublicId: string;
+  sku: string;
 }
 
 export interface ReservationHandle {
@@ -83,4 +89,7 @@ export interface StockLedger {
   findReservationByPublicId(publicId: string): Promise<ReservationInfo | null>;
 
   getStock(stockItemId: bigint): Promise<StockSnapshot | null>;
+
+  /** All stock rows for a warehouse (admin browse), joined with the variant's sku/publicId. */
+  listByWarehouse(warehouseId: bigint): Promise<WarehouseStockRow[]>;
 }

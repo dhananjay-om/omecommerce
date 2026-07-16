@@ -36,6 +36,7 @@ export interface PriceListInfo {
   name: string;
   currency: string;
   type: PriceListType;
+  priority: number;
 }
 
 export interface CreatePriceListInput {
@@ -53,6 +54,7 @@ export interface CreatePriceListInput {
 export interface PriceListRepository {
   create(input: CreatePriceListInput): Promise<PriceListInfo>;
   findByCode(code: string): Promise<PriceListInfo | null>;
+  list(): Promise<PriceListInfo[]>;
   setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void>;
   setPriceTier(priceListId: bigint, variantId: bigint, minQty: number, price: string): Promise<void>;
 }

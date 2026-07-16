@@ -5,6 +5,7 @@ import type {
   StockSnapshot,
   ReservationHandle,
   ReservationInfo,
+  WarehouseStockRow,
 } from '../domain/repositories.js';
 import { InsufficientStockError, InvalidReservationStateError } from '../domain/errors.js';
 import { computeExpiry } from '../domain/reservation.js';
@@ -159,6 +160,24 @@ export class PrismaStockLedger implements StockLedger {
     const rows = await this.db.$queryRaw<StockItemRow[]>`
       SELECT on_hand, reserved, available FROM stock_item WHERE id = ${stockItemId}`;
     return rows[0] ? toSnapshot(rows[0]) : null;
+  }
+
+  async listByWarehouse(warehouseId: bigint): Promise<WarehouseStockRow[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{ variant_public_id: string; sku: string; on_hand: number; reserved: number; available: number }>
+    >`
+      SELECT v.public_id AS variant_public_id, v.sku, si.on_hand, si.reserved, si.available
+        FROM stock_item si
+        JOIN product_variant v ON v.id = si.variant_id
+       WHERE si.warehouse_id = ${warehouseId}
+       ORDER BY v.sku`;
+    return rows.map((row) => ({
+      variantPublicId: row.variant_public_id,
+      sku: row.sku,
+      onHand: row.on_hand,
+      reserved: row.reserved,
+      available: row.available,
+    }));
   }
 
   private async releaseByStatus(

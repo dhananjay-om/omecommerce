@@ -22,14 +22,46 @@ export class PrismaPriceListRepository implements PriceListRepository {
         endsAt: input.endsAt ?? null,
       },
     });
-    return { id: row.id, publicId: row.publicId, code: row.code, name: row.name, currency: row.currency, type: row.type };
+    return {
+      id: row.id,
+      publicId: row.publicId,
+      code: row.code,
+      name: row.name,
+      currency: row.currency,
+      type: row.type,
+      priority: row.priority,
+    };
   }
 
   async findByCode(code: string): Promise<PriceListInfo | null> {
     const row = await this.db.priceList.findFirst({ where: { code } });
     return row
-      ? { id: row.id, publicId: row.publicId, code: row.code, name: row.name, currency: row.currency, type: row.type }
+      ? {
+          id: row.id,
+          publicId: row.publicId,
+          code: row.code,
+          name: row.name,
+          currency: row.currency,
+          type: row.type,
+          priority: row.priority,
+        }
       : null;
+  }
+
+  async list(): Promise<PriceListInfo[]> {
+    const rows = await this.db.priceList.findMany({
+      where: { deletedAt: null },
+      orderBy: { priority: 'desc' },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      publicId: row.publicId,
+      code: row.code,
+      name: row.name,
+      currency: row.currency,
+      type: row.type,
+      priority: row.priority,
+    }));
   }
 
   async setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void> {

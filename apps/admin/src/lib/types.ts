@@ -43,3 +43,31 @@ export interface AttributeSet {
   name: string;
   isDefault: boolean;
 }
+
+export type WarehouseType = 'PHYSICAL' | 'VIRTUAL' | 'DROPSHIP';
+
+export interface Warehouse {
+  publicId: string;
+  code: string;
+  name: string;
+  type: WarehouseType;
+}
+
+export interface WarehouseStockItem {
+  variantPublicId: string;
+  sku: string;
+  onHand: number;
+  reserved: number;
+  available: number;
+}
+
+export type PriceListType = 'BASE' | 'WHOLESALE' | 'B2B' | 'SPECIAL';
+
+export interface PriceList {
+  publicId: string;
+  code: string;
+  name: string;
+  currency: string;
+  type: PriceListType;
+  priority: number;
+}

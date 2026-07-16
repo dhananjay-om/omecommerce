@@ -46,3 +46,11 @@ export interface GetStockQuery {
   variantPublicId: string;
   warehouseCode: string;
 }
+
+export interface WarehouseStockItemView {
+  variantPublicId: string;
+  sku: string;
+  onHand: number;
+  reserved: number;
+  available: number;
+}

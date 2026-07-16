@@ -22,6 +22,14 @@ export class PrismaWarehouseRepository implements WarehouseRepository {
       ? { id: row.id, publicId: row.publicId, code: row.code, name: row.name, type: row.type }
       : null;
   }
+
+  async list(): Promise<WarehouseInfo[]> {
+    const rows = await this.db.warehouse.findMany({
+      where: { deletedAt: null },
+      orderBy: { code: 'asc' },
+    });
+    return rows.map((row) => ({ id: row.id, publicId: row.publicId, code: row.code, name: row.name, type: row.type }));
+  }
 }
 
 /** Read-only cross-module lookup: resolves a catalog variant's publicId. */

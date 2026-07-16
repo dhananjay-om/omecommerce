@@ -167,6 +167,25 @@ describe.skipIf(!process.env.INTEGRATION)('inventory API (live DB)', () => {
     expect(stock.body.data).toEqual({ onHand: 5, reserved: 1, available: 4 });
   });
 
+  it('lists warehouses and a warehouse\'s stock', async () => {
+    const variantId = await createVariant('INV-SKU-LIST-1');
+    await admin
+      .post('/admin/v1/inventory/adjustments')
+      .send({ variantId, warehouseCode: 'WH-LIFECYCLE', delta: 7, reason: 'PURCHASE' });
+
+    const warehouses = await admin.get('/admin/v1/warehouses');
+    expect(warehouses.status).toBe(200);
+    expect(warehouses.body.data.map((w: { code: string }) => w.code)).toContain('WH-LIFECYCLE');
+
+    const stock = await admin.get('/admin/v1/inventory/warehouses/WH-LIFECYCLE/stock');
+    expect(stock.status).toBe(200);
+    const row = stock.body.data.find((r: { sku: string }) => r.sku === 'INV-SKU-LIST-1');
+    expect(row).toMatchObject({ onHand: 7, reserved: 0, available: 7 });
+
+    const unknown = await admin.get('/admin/v1/inventory/warehouses/NOPE/stock');
+    expect(unknown.status).toBe(404);
+  });
+
   it('validates input and 404s on unknown warehouse/variant', async () => {
     const variantId = await createVariant('INV-SKU-VALIDATE-1');
 

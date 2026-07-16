@@ -151,4 +151,13 @@ describe.skipIf(!process.env.INTEGRATION)('pricing API (live DB)', () => {
       .send({ variantId, price: 'not-a-number' });
     expect(badPrice.status).toBe(422);
   });
+
+  it('lists price lists ordered by priority', async () => {
+    const res = await admin.get('/admin/v1/price-lists');
+    expect(res.status).toBe(200);
+    const codes = res.body.data.map((pl: { code: string }) => pl.code);
+    expect(codes).toEqual(expect.arrayContaining(['BASE-USD', 'BASE-USD-2', 'WHOLESALE-USD']));
+    const priorities = res.body.data.map((pl: { priority: number }) => pl.priority);
+    expect(priorities).toEqual([...priorities].sort((a: number, b: number) => b - a));
+  });
 });
