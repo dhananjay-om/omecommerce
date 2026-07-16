@@ -39,6 +39,35 @@ export interface ProductForStoreView extends ProductView {
   attributes: Record<string, unknown>;
 }
 
+export interface ListProductsQuery {
+  page?: number;
+  pageSize?: number;
+  status?: ProductStatus;
+  search?: string;
+}
+
+export interface ProductListItemView {
+  publicId: string;
+  sku: string;
+  name: string | null;
+  type: ProductType;
+  status: ProductStatus;
+  createdAt: string;
+}
+
+export interface ProductListView {
+  total: number;
+  page: number;
+  pageSize: number;
+  products: ProductListItemView[];
+}
+
+export interface ProductDetailView extends ProductView {
+  attributeSetId: string;
+  variants: VariantView[];
+  attributes: Record<string, unknown>;
+}
+
 export interface CreateAttributeSetCommand {
   code: string;
   name: string;
@@ -49,6 +78,7 @@ export interface AttributeSetView {
   id: string;
   code: string;
   name: string;
+  isDefault: boolean;
 }
 
 export interface CreateAttributeSetGroupCommand {

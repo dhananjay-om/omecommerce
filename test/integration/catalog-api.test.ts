@@ -132,4 +132,53 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
     const res = await admin.get('/admin/v1/products/00000000-0000-7000-8000-000000000000/variants');
     expect(res.status).toBe(404);
   });
+
+  it('lists products with pagination, status filter, and search (admin browse — was previously undiscoverable via any API)', async () => {
+    const all = await admin.get('/admin/v1/products');
+    expect(all.status).toBe(200);
+    expect(all.body.data.total).toBeGreaterThanOrEqual(4);
+    expect(all.body.data.page).toBe(1);
+    expect(all.body.data.pageSize).toBe(20);
+
+    const firstPage = await admin.get('/admin/v1/products').query({ pageSize: 2, page: 1 });
+    expect(firstPage.body.data.products).toHaveLength(2);
+
+    const active = await admin.get('/admin/v1/products').query({ status: 'ACTIVE' });
+    expect(active.body.data.products.every((p: { status: string }) => p.status === 'ACTIVE')).toBe(true);
+    expect(active.body.data.products.some((p: { sku: string }) => p.sku === 'API-SKU-1')).toBe(true);
+
+    const searched = await admin.get('/admin/v1/products').query({ search: 'Phone A' });
+    expect(searched.body.data.products).toHaveLength(1);
+    expect(searched.body.data.products[0].sku).toBe('API-SKU-1');
+  });
+
+  it('gets a product\'s admin detail: raw fields, variants, and GLOBAL-scope attributes', async () => {
+    const created = await admin
+      .post('/admin/v1/products')
+      .send({ type: 'SIMPLE', sku: 'API-SKU-5', attributeSetId, nameDefault: 'Detail Check', status: 'ACTIVE' });
+    const publicId = created.body.data.publicId as string;
+    await admin.put(`/admin/v1/products/${publicId}/attributes`).send({ attributeCode: 'ram', scope: 'GLOBAL', value: 32 });
+    // A STORE_VIEW override should NOT show up in the admin detail (GLOBAL-only for this pass).
+    await admin.put(`/admin/v1/products/${publicId}/attributes`).send({ attributeCode: 'ram', scope: 'STORE_VIEW', storeViewId, value: 64 });
+
+    const detail = await admin.get(`/admin/v1/products/${publicId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data).toMatchObject({ publicId, sku: 'API-SKU-5', name: 'Detail Check', status: 'ACTIVE', attributeSetId });
+    expect(detail.body.data.variants).toHaveLength(1);
+    expect(detail.body.data.variants[0].sku).toBe('API-SKU-5');
+    expect(detail.body.data.attributes.ram).toBe(32);
+  });
+
+  it('404s getting detail for an unknown product', async () => {
+    const res = await admin.get('/admin/v1/products/00000000-0000-7000-8000-000000000000');
+    expect(res.status).toBe(404);
+  });
+
+  it('lists attribute sets (admin browse — populates the create-product picker)', async () => {
+    const res = await admin.get('/admin/v1/attribute-sets');
+    expect(res.status).toBe(200);
+    expect(res.body.data.some((s: { code: string }) => s.code === 'electronics')).toBe(true);
+    const electronics = res.body.data.find((s: { code: string }) => s.code === 'electronics');
+    expect(electronics).toMatchObject({ code: 'electronics', name: 'Electronics', isDefault: true });
+  });
 });

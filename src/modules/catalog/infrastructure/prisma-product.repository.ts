@@ -11,7 +11,10 @@ import type {
   AttributeSetGroupInfo,
   ProductVariantRepository,
   VariantInfo,
+  ListProductsFilter,
+  ProductListResult,
 } from '../domain/repositories.js';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Product types that are sold as a single sellable unit with no distinct variant
@@ -81,6 +84,33 @@ export class PrismaProductRepository implements ProductRepository {
       isVirtual: row.isVirtual,
     });
   }
+
+  async list(filter: ListProductsFilter): Promise<ProductListResult> {
+    const where: Prisma.ProductWhereInput = {
+      status: filter.status,
+      ...(filter.search
+        ? { OR: [{ sku: { contains: filter.search, mode: 'insensitive' } }, { nameDefault: { contains: filter.search, mode: 'insensitive' } }] }
+        : {}),
+    };
+
+    const [total, rows] = await this.db.$transaction([
+      this.db.product.count({ where }),
+      this.db.product.findMany({
+        where,
+        select: { publicId: true, sku: true, nameDefault: true, type: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+      }),
+    ]);
+
+    return {
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+      products: rows.map((r) => ({ publicId: r.publicId, sku: r.sku, name: r.nameDefault, type: r.type, status: r.status, createdAt: r.createdAt })),
+    };
+  }
 }
 
 /** Read-only adapter over a product's own variants (admin browse). */
@@ -147,16 +177,20 @@ export class PrismaAttributeSetRepository implements AttributeSetRepository {
   async createSet(input: CreateAttributeSetInput): Promise<AttributeSetInfo> {
     return this.db.attributeSet.create({
       data: { code: input.code, name: input.name, isDefault: input.isDefault },
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, isDefault: true },
     });
   }
 
   async findSetByCode(code: string): Promise<AttributeSetInfo | null> {
-    return this.db.attributeSet.findFirst({ where: { code }, select: { id: true, code: true, name: true } });
+    return this.db.attributeSet.findFirst({ where: { code }, select: { id: true, code: true, name: true, isDefault: true } });
   }
 
   async findSetById(id: bigint): Promise<AttributeSetInfo | null> {
-    return this.db.attributeSet.findFirst({ where: { id }, select: { id: true, code: true, name: true } });
+    return this.db.attributeSet.findFirst({ where: { id }, select: { id: true, code: true, name: true, isDefault: true } });
+  }
+
+  async listSets(): Promise<AttributeSetInfo[]> {
+    return this.db.attributeSet.findMany({ select: { id: true, code: true, name: true, isDefault: true }, orderBy: { name: 'asc' } });
   }
 
   async createGroup(attributeSetId: bigint, name: string, sortOrder: number): Promise<AttributeSetGroupInfo> {

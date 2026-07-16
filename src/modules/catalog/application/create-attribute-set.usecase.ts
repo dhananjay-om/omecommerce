@@ -11,6 +11,6 @@ export class CreateAttributeSet {
       throw new ConflictError(`attribute set code already exists: ${code}`);
     }
     const set = await this.attributeSets.createSet({ code, name: cmd.name, isDefault: cmd.isDefault });
-    return { id: set.id.toString(), code: set.code, name: set.name };
+    return { id: set.id.toString(), code: set.code, name: set.name, isDefault: set.isDefault };
   }
 }

@@ -3,7 +3,9 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'prisma/generated/**'] },
+  // apps/* are independent projects (their own package.json, tsconfig, and
+  // eslint config) — apps/admin lints itself via its own `npm run lint`.
+  { ignores: ['dist/**', 'node_modules/**', 'prisma/generated/**', 'apps/**'] },
   js.configs.recommended,
   {
     files: ['**/*.ts'],

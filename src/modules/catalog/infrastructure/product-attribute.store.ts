@@ -81,4 +81,33 @@ export class PrismaProductAttributeStore implements ProductAttributeStore {
       },
     }));
   }
+
+  async resolveGlobalValues(productId: bigint): Promise<ResolvedAttribute[]> {
+    const rows = await this.db.$queryRaw<RawResolvedRow[]>`
+      SELECT
+        v.attribute_id AS attribute_id,
+        a.code AS code,
+        a.data_type::text AS data_type,
+        v.value_text,
+        v.value_int,
+        v.value_decimal::text AS value_decimal,
+        v.value_datetime,
+        v.value_json
+      FROM product_attribute_value v
+      JOIN attribute a ON a.id = v.attribute_id
+      WHERE v.product_id = ${productId} AND v.scope = 'GLOBAL'`;
+
+    return rows.map((r) => ({
+      attributeId: r.attribute_id,
+      code: r.code,
+      dataType: r.data_type as AttributeDataType,
+      columns: {
+        valueText: r.value_text,
+        valueInt: r.value_int,
+        valueDecimal: r.value_decimal,
+        valueDatetime: r.value_datetime,
+        valueJson: r.value_json,
+      },
+    }));
+  }
 }

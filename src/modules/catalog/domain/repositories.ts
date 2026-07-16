@@ -1,12 +1,37 @@
-import type { AttributeDataType, AttributeInputType, ScopeType } from '@prisma/client';
+import type { AttributeDataType, AttributeInputType, ScopeType, ProductType, ProductStatus } from '@prisma/client';
 import type { Product } from './product.js';
 import type { AttributeValueColumns } from './attribute-value.js';
+
+export interface ProductListItem {
+  publicId: string;
+  sku: string;
+  name: string | null;
+  type: ProductType;
+  status: ProductStatus;
+  createdAt: Date;
+}
+
+export interface ListProductsFilter {
+  page: number;
+  pageSize: number;
+  status?: ProductStatus;
+  /** Matches sku/name, case-insensitive substring (admin browse — not the storefront search index). */
+  search?: string;
+}
+
+export interface ProductListResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  products: ProductListItem[];
+}
 
 /** Persistence port for the Product aggregate (implemented in infrastructure). */
 export interface ProductRepository {
   existsBySku(sku: string): Promise<boolean>;
   create(product: Product): Promise<Product>;
   findByPublicId(publicId: string): Promise<Product | null>;
+  list(filter: ListProductsFilter): Promise<ProductListResult>;
 }
 
 export interface VariantInfo {
@@ -64,6 +89,7 @@ export interface AttributeSetInfo {
   id: bigint;
   code: string;
   name: string;
+  isDefault: boolean;
 }
 
 export interface CreateAttributeSetInput {
@@ -88,6 +114,8 @@ export interface AttributeSetRepository {
   createSet(input: CreateAttributeSetInput): Promise<AttributeSetInfo>;
   findSetByCode(code: string): Promise<AttributeSetInfo | null>;
   findSetById(id: bigint): Promise<AttributeSetInfo | null>;
+  /** Admin browse (plan/12 Admin UI) — populates the attribute-set picker on the create-product form. */
+  listSets(): Promise<AttributeSetInfo[]>;
   createGroup(attributeSetId: bigint, name: string, sortOrder: number): Promise<AttributeSetGroupInfo>;
   findGroupByName(attributeSetId: bigint, name: string): Promise<AttributeSetGroupInfo | null>;
   findGroupById(attributeSetId: bigint, groupId: bigint): Promise<AttributeSetGroupInfo | null>;
@@ -122,4 +150,11 @@ export interface ProductAttributeStore {
     productId: bigint,
     chain: { websiteId: bigint; storeId: bigint; storeViewId: bigint },
   ): Promise<ResolvedAttribute[]>;
+  /**
+   * Admin detail view (plan/12 Admin UI) — GLOBAL-scope values only, no store
+   * view chain needed. Read-only for this pass; a full attribute-value
+   * editing UI covering WEBSITE/STORE/STORE_VIEW overrides is real, separate
+   * future work.
+   */
+  resolveGlobalValues(productId: bigint): Promise<ResolvedAttribute[]>;
 }

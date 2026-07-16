@@ -23,6 +23,13 @@ export const storeViewQuerySchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'storeViewId query param required'),
 });
 
+export const listProductsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  status: z.nativeEnum(ProductStatus).optional(),
+  search: z.string().min(1).optional(),
+});
+
 export const createAttributeSetSchema = z.object({
   code: z.string().min(1).max(64),
   name: z.string().min(1).max(255),

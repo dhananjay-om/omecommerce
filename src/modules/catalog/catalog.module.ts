@@ -23,10 +23,14 @@ import { CreateAttributeSetGroup } from './application/create-attribute-set-grou
 import { CreateAttribute } from './application/create-attribute.usecase.js';
 import { AssignAttributeToGroup } from './application/assign-attribute-to-group.usecase.js';
 import { ListProductVariants } from './application/list-product-variants.usecase.js';
+import { ListProducts } from './application/list-products.usecase.js';
+import { GetProductDetail } from './application/get-product-detail.usecase.js';
+import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
 import {
   createProductSchema,
   assignAttributeValueSchema,
   storeViewQuerySchema,
+  listProductsQuerySchema,
   createAttributeSetSchema,
   createAttributeSetGroupSchema,
   createAttributeSchema,
@@ -58,15 +62,31 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createAttribute = new CreateAttribute(attributes);
   const assignAttributeToGroup = new AssignAttributeToGroup(attributeSets, attributes);
   const listProductVariants = new ListProductVariants(products, variants);
+  const listProducts = new ListProducts(products);
+  const getProductDetail = new GetProductDetail(products, variants, attrStore);
+  const listAttributeSets = new ListAttributeSets(attributeSets);
 
   // --- Admin API ---
   const admin = Router();
+  admin.get(
+    '/products',
+    asyncHandler(async (req, res) => {
+      const query = parse(listProductsQuerySchema, req.query);
+      res.json({ data: await listProducts.execute(query) });
+    }),
+  );
   admin.post(
     '/products',
     asyncHandler(async (req, res) => {
       const body = parse(createProductSchema, req.body);
       const view = await createProduct.execute(body);
       res.status(201).json({ data: view });
+    }),
+  );
+  admin.get(
+    '/products/:publicId',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getProductDetail.execute(req.params.publicId!) });
     }),
   );
   admin.put(
@@ -81,6 +101,12 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/products/:publicId/variants',
     asyncHandler(async (req, res) => {
       res.json({ data: await listProductVariants.execute(req.params.publicId!) });
+    }),
+  );
+  admin.get(
+    '/attribute-sets',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listAttributeSets.execute() });
     }),
   );
   admin.post(
