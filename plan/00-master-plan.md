@@ -64,7 +64,8 @@ Medusa, commercetools).
 6. **Soft delete + audit + versioning are cross-cutting**, applied uniformly (§4).
 7. **API-first.** The admin UI and storefront are just clients of the same
    versioned API surface. Read models are denormalized/cached; writes go through
-   the domain.
+   the domain. (The admin UI itself — `apps/admin`, a Next.js app — is built;
+   see Phase 13. The storefront UI is not yet.)
 8. **CQRS only where read and write shapes genuinely diverge** (catalog browse,
    search, analytics). Everywhere else, one model. Don't pay the CQRS tax by default.
 

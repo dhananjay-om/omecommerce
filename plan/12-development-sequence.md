@@ -134,6 +134,15 @@ Context: **Catalog (read + minimal write)**.
   observability (OTel, RED metrics, alerts on drift/DLQ/index lag); backups/PITR;
   CDN; per-client Docker/K8s deploy templates.
 
+### Stage 7 — Admin UI (Phase 13)
+- `apps/admin`, a Next.js app consuming `/admin/v1` — the first real client of the
+  "API-first" principle (§1 point 7). Added the list/browse endpoints the backend
+  never needed until a UI existed to call them (products, warehouses, price lists,
+  orders, and the customer module's first-ever admin routes), then the screens
+  themselves: products, inventory, pricing, orders, customers. Storefront UI and the
+  remaining admin screens (loyalty/referral/wallet/gift-cards/CMS/wishlist/bulk
+  import) are not yet built — see Phase 13 §6 for the full deferred list.
+
 ---
 
 ## 5. Where cross-cutting pieces slot in (don't build them too early)
