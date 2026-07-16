@@ -11,6 +11,7 @@ import {
   Users,
   ListTree,
   SlidersHorizontal,
+  FolderTree,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/products', label: 'Products', icon: Package },
       { href: '/inventory', label: 'Inventory', icon: Boxes },
       { href: '/pricing', label: 'Pricing', icon: Tag },
+      { href: '/categories', label: 'Categories', icon: FolderTree },
       { href: '/attribute-sets', label: 'Attribute Sets', icon: ListTree },
       { href: '/attributes', label: 'Attributes', icon: SlidersHorizontal },
     ],

@@ -38,6 +38,20 @@ export interface ProductDetail {
   attributeSetId: string;
   variants: Variant[];
   attributes: Record<string, unknown>;
+  categoryIds: string[];
+}
+
+export type CategoryType = 'MANUAL' | 'DYNAMIC';
+export type CategorySortMode = 'POSITION' | 'NAME' | 'PRICE' | 'NEWEST';
+
+export interface Category {
+  publicId: string;
+  parentId: string | null;
+  type: CategoryType;
+  sortMode: CategorySortMode;
+  position: number;
+  nameDefault: string | null;
+  createdAt: string;
 }
 
 export interface AttributeSet {

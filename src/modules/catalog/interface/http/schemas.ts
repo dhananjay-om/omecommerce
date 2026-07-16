@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { ProductType, ProductStatus, ProductVisibility, ScopeType, AttributeDataType, AttributeInputType } from '@prisma/client';
+import {
+  ProductType,
+  ProductStatus,
+  ProductVisibility,
+  ScopeType,
+  AttributeDataType,
+  AttributeInputType,
+  CategoryType,
+  CategorySortMode,
+} from '@prisma/client';
 
 const decimalString = z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount, e.g. "2.5"');
 
@@ -114,4 +123,26 @@ const bulkImportRowSchema = z.object({
 
 export const bulkImportProductsSchema = z.object({
   rows: z.array(bulkImportRowSchema).min(1).max(10_000),
+});
+
+export const createCategorySchema = z.object({
+  parentId: z.string().uuid().nullish(),
+  nameDefault: z.string().max(512).nullish(),
+  type: z.nativeEnum(CategoryType).optional(),
+  sortMode: z.nativeEnum(CategorySortMode).optional(),
+  position: z.number().int().optional(),
+});
+
+export const updateCategorySchema = z.object({
+  nameDefault: z.string().max(512).nullish(),
+  sortMode: z.nativeEnum(CategorySortMode).optional(),
+  position: z.number().int().optional(),
+});
+
+export const reparentCategorySchema = z.object({
+  newParentId: z.string().uuid().nullable(),
+});
+
+export const setProductCategoriesSchema = z.object({
+  categoryIds: z.array(z.string().uuid()),
 });

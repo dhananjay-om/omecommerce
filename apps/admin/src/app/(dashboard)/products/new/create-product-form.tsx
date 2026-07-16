@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from 'react';
 import { createProduct, type CreateProductFormState } from '../actions';
-import type { AttributeSet, AttributeSetDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category } from '@/lib/types';
 import { AttributeFieldsSection } from '../attribute-fields-section';
+import { CategoryPicker } from '../category-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,9 +18,11 @@ const initialState: CreateProductFormState = { error: null };
 export function CreateProductForm({
   attributeSets,
   attributeSetDetails,
+  categories,
 }: {
   attributeSets: AttributeSet[];
   attributeSetDetails: Record<string, AttributeSetDetail>;
+  categories: Category[];
 }) {
   const [state, formAction, pending] = useActionState(createProduct, initialState);
   const defaultAttributeSetId = attributeSets.find((s) => s.isDefault)?.id ?? attributeSets[0]?.id ?? '';
@@ -94,6 +97,8 @@ export function CreateProductForm({
       </div>
 
       {selectedSetDetail ? <AttributeFieldsSection groups={selectedSetDetail.groups} values={{}} /> : null}
+
+      <CategoryPicker categories={categories} selectedIds={[]} />
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 

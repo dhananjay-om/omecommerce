@@ -44,6 +44,12 @@ async function saveAttributeValues(productPublicId: string, formData: FormData):
   await apiPut(`/admin/v1/products/${productPublicId}/attributes/bulk`, { values });
 }
 
+/** Always called, even with zero categories — this endpoint replaces the full assigned set, so an empty submission legitimately means "clear all categories". */
+async function saveCategoryIds(productPublicId: string, formData: FormData): Promise<void> {
+  const categoryIds = formData.getAll('categoryIds').map(String);
+  await apiPut(`/admin/v1/products/${productPublicId}/categories`, { categoryIds });
+}
+
 export async function createProduct(_prevState: CreateProductFormState, formData: FormData): Promise<CreateProductFormState> {
   const type = String(formData.get('type') ?? '');
   const sku = String(formData.get('sku') ?? '').trim();
@@ -67,6 +73,7 @@ export async function createProduct(_prevState: CreateProductFormState, formData
       weight: weight || undefined,
     });
     await saveAttributeValues(created.publicId, formData);
+    await saveCategoryIds(created.publicId, formData);
   } catch (err) {
     if (err instanceof ApiError) {
       return { error: err.message };
@@ -105,6 +112,7 @@ export async function updateProduct(
       weight: weight || null,
     });
     await saveAttributeValues(productPublicId, formData);
+    await saveCategoryIds(productPublicId, formData);
   } catch (err) {
     if (err instanceof ApiError) {
       return { error: err.message };

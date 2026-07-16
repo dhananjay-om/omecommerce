@@ -1,9 +1,12 @@
 import { apiGet } from '@/lib/api-client';
-import type { AttributeSet, AttributeSetDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category } from '@/lib/types';
 import { CreateProductForm } from './create-product-form';
 
 export default async function NewProductPage() {
-  const attributeSets = await apiGet<AttributeSet[]>('/admin/v1/attribute-sets');
+  const [attributeSets, categories] = await Promise.all([
+    apiGet<AttributeSet[]>('/admin/v1/attribute-sets'),
+    apiGet<Category[]>('/admin/v1/categories'),
+  ]);
   const details = await Promise.all(
     attributeSets.map((s) => apiGet<AttributeSetDetail>(`/admin/v1/attribute-sets/${s.id}`)),
   );
@@ -14,7 +17,7 @@ export default async function NewProductPage() {
     <div>
       <h1 className="text-3xl font-bold tracking-tight">New Product</h1>
       <div className="mt-6">
-        <CreateProductForm attributeSets={attributeSets} attributeSetDetails={attributeSetDetails} />
+        <CreateProductForm attributeSets={attributeSets} attributeSetDetails={attributeSetDetails} categories={categories} />
       </div>
     </div>
   );

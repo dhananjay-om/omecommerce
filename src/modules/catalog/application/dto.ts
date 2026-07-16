@@ -1,4 +1,13 @@
-import type { ProductType, ProductStatus, ProductVisibility, ScopeType, AttributeDataType, AttributeInputType } from '@prisma/client';
+import type {
+  ProductType,
+  ProductStatus,
+  ProductVisibility,
+  ScopeType,
+  AttributeDataType,
+  AttributeInputType,
+  CategoryType,
+  CategorySortMode,
+} from '@prisma/client';
 
 export interface CreateProductCommand {
   type: ProductType;
@@ -97,6 +106,7 @@ export interface ProductDetailView extends ProductView {
   attributeSetId: string;
   variants: VariantView[];
   attributes: Record<string, unknown>;
+  categoryIds: string[];
 }
 
 export interface CreateAttributeSetCommand {
@@ -223,4 +233,42 @@ export interface VariantView {
   sku: string;
   status: string;
   position: number;
+}
+
+export interface CreateCategoryCommand {
+  /** Parent category's publicId; omit/null for a root category. */
+  parentId?: string | null;
+  nameDefault?: string | null;
+  type?: CategoryType;
+  sortMode?: CategorySortMode;
+  position?: number;
+}
+
+export interface UpdateCategoryCommand {
+  publicId: string;
+  nameDefault?: string | null;
+  sortMode?: CategorySortMode;
+  position?: number;
+}
+
+export interface ReparentCategoryCommand {
+  publicId: string;
+  /** New parent's publicId; null moves the category to root. */
+  newParentId: string | null;
+}
+
+export interface CategoryView {
+  publicId: string;
+  parentId: string | null;
+  type: CategoryType;
+  sortMode: CategorySortMode;
+  position: number;
+  nameDefault: string | null;
+  createdAt: string;
+}
+
+export interface SetProductCategoriesCommand {
+  productPublicId: string;
+  /** Category publicIds — replaces the product's full assigned set. */
+  categoryIds: string[];
 }

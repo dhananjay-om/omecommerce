@@ -14,6 +14,7 @@ import {
   PrismaAttributeSetRepository,
   PrismaProductVariantRepository,
 } from './infrastructure/prisma-product.repository.js';
+import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './infrastructure/prisma-category.repository.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
 import { CreateProduct } from './application/create-product.usecase.js';
 import { UpdateProduct } from './application/update-product.usecase.js';
@@ -30,6 +31,12 @@ import { GetProductDetail } from './application/get-product-detail.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
 import { ListAttributes } from './application/list-attributes.usecase.js';
 import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
+import { CreateCategory } from './application/create-category.usecase.js';
+import { ListCategories } from './application/list-categories.usecase.js';
+import { UpdateCategory } from './application/update-category.usecase.js';
+import { ReparentCategory } from './application/reparent-category.usecase.js';
+import { DeleteCategory } from './application/delete-category.usecase.js';
+import { SetProductCategories } from './application/set-product-categories.usecase.js';
 import {
   createProductSchema,
   updateProductSchema,
@@ -42,6 +49,10 @@ import {
   createAttributeSchema,
   assignAttributeToGroupSchema,
   bulkImportProductsSchema,
+  createCategorySchema,
+  updateCategorySchema,
+  reparentCategorySchema,
+  setProductCategoriesSchema,
 } from './interface/http/schemas.js';
 
 export interface CatalogRouters {
@@ -56,6 +67,8 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const attributeSets = new PrismaAttributeSetRepository(db);
   const attrStore = new PrismaProductAttributeStore(db);
   const variants = new PrismaProductVariantRepository(db);
+  const categories = new PrismaCategoryRepository(db);
+  const productCategories = new PrismaProductCategoryRepository(db);
   const storeContext = new PrismaStoreContextResolver(db);
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(db);
@@ -71,10 +84,16 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const assignAttributeToGroup = new AssignAttributeToGroup(attributeSets, attributes);
   const listProductVariants = new ListProductVariants(products, variants);
   const listProducts = new ListProducts(products);
-  const getProductDetail = new GetProductDetail(products, variants, attrStore);
+  const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
   const listAttributes = new ListAttributes(attributes);
+  const createCategory = new CreateCategory(categories);
+  const listCategories = new ListCategories(categories);
+  const updateCategory = new UpdateCategory(categories);
+  const reparentCategory = new ReparentCategory(categories);
+  const deleteCategory = new DeleteCategory(categories);
+  const setProductCategories = new SetProductCategories(products, categories, productCategories);
 
   // --- Admin API ---
   const admin = Router();
@@ -177,6 +196,53 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       const body = parse(assignAttributeToGroupSchema, req.body);
       await assignAttributeToGroup.execute({ ...body, attributeSetId: req.params.id! });
+      res.status(204).send();
+    }),
+  );
+  admin.get(
+    '/categories',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listCategories.execute() });
+    }),
+  );
+  admin.post(
+    '/categories',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(createCategorySchema, req.body);
+      res.status(201).json({ data: await createCategory.execute(body) });
+    }),
+  );
+  admin.patch(
+    '/categories/:publicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateCategorySchema, req.body);
+      res.json({ data: await updateCategory.execute({ ...body, publicId: req.params.publicId! }) });
+    }),
+  );
+  admin.put(
+    '/categories/:publicId/parent',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(reparentCategorySchema, req.body);
+      res.json({ data: await reparentCategory.execute({ publicId: req.params.publicId!, newParentId: body.newParentId }) });
+    }),
+  );
+  admin.delete(
+    '/categories/:publicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteCategory.execute(req.params.publicId!);
+      res.status(204).send();
+    }),
+  );
+  admin.put(
+    '/products/:publicId/categories',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(setProductCategoriesSchema, req.body);
+      await setProductCategories.execute({ productPublicId: req.params.publicId!, categoryIds: body.categoryIds });
       res.status(204).send();
     }),
   );

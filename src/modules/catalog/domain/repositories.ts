@@ -1,4 +1,13 @@
-import type { AttributeDataType, AttributeInputType, ScopeType, ProductType, ProductStatus, ProductVisibility } from '@prisma/client';
+import type {
+  AttributeDataType,
+  AttributeInputType,
+  ScopeType,
+  ProductType,
+  ProductStatus,
+  ProductVisibility,
+  CategoryType,
+  CategorySortMode,
+} from '@prisma/client';
 import type { Product } from './product.js';
 import type { AttributeValueColumns } from './attribute-value.js';
 
@@ -215,4 +224,61 @@ export interface ProductAttributeStore {
    * future work.
    */
   resolveGlobalValues(productId: bigint): Promise<ResolvedAttribute[]>;
+}
+
+export interface CategoryInfo {
+  id: bigint;
+  publicId: string;
+  parentId: bigint | null;
+  /** The parent's own publicId — external callers address categories by publicId, never the internal bigint. */
+  parentPublicId: string | null;
+  type: CategoryType;
+  sortMode: CategorySortMode;
+  position: number;
+  nameDefault: string | null;
+  createdAt: Date;
+}
+
+export interface CreateCategoryInput {
+  parentId?: bigint | null;
+  nameDefault?: string | null;
+  type?: CategoryType;
+  sortMode?: CategorySortMode;
+  position?: number;
+}
+
+export interface UpdateCategoryInput {
+  nameDefault?: string | null;
+  sortMode?: CategorySortMode;
+  position?: number;
+}
+
+/**
+ * Persistence port for the category tree (plan/13 Phase K). Ordinary CRUD goes
+ * through the typed Prisma client (the `path` ltree column is `Unsupported`,
+ * simply invisible to it — `category_before_insert`/`category_after_insert`
+ * triggers fill it and the closure table automatically on every INSERT).
+ * `reparent` is the one operation that needs raw SQL, calling the existing
+ * `category_reparent(child, new_parent)` stored procedure rather than
+ * reimplementing path/closure-rewrite logic at the application layer.
+ */
+export interface CategoryRepository {
+  create(input: CreateCategoryInput): Promise<CategoryInfo>;
+  findById(id: bigint): Promise<CategoryInfo | null>;
+  findByPublicId(publicId: string): Promise<CategoryInfo | null>;
+  /** Admin browse — the full flat list; the tree is built from `parentId` in application/frontend code (small, admin-scale table). */
+  list(): Promise<CategoryInfo[]>;
+  update(id: bigint, input: UpdateCategoryInput): Promise<CategoryInfo>;
+  reparent(id: bigint, newParentId: bigint | null): Promise<CategoryInfo>;
+  hasChildren(id: bigint): Promise<boolean>;
+  hasProducts(id: bigint): Promise<boolean>;
+  softDelete(id: bigint): Promise<void>;
+}
+
+/** Persistence port for a product's category assignments. */
+export interface ProductCategoryRepository {
+  /** Replaces the full assigned set in one transaction (delete-all-then-insert). */
+  setForProduct(productId: bigint, categoryIds: bigint[]): Promise<void>;
+  /** The assigned categories' own publicIds, in position order — the only shape external callers need. */
+  listCategoryPublicIdsForProduct(productId: bigint): Promise<string[]>;
 }

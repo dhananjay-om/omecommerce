@@ -1,4 +1,9 @@
-import type { ProductRepository, ProductVariantRepository, ProductAttributeStore } from '../domain/repositories.js';
+import type {
+  ProductRepository,
+  ProductVariantRepository,
+  ProductAttributeStore,
+  ProductCategoryRepository,
+} from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { fromRow } from '../domain/attribute-value.js';
 import { toView } from './create-product.usecase.js';
@@ -18,6 +23,7 @@ export class GetProductDetail {
     private readonly products: ProductRepository,
     private readonly variants: ProductVariantRepository,
     private readonly attrStore: ProductAttributeStore,
+    private readonly productCategories: ProductCategoryRepository,
   ) {}
 
   async execute(productPublicId: string): Promise<ProductDetailView> {
@@ -26,9 +32,10 @@ export class GetProductDetail {
       throw new NotFoundError('product', productPublicId);
     }
 
-    const [variantRows, attributeRows] = await Promise.all([
+    const [variantRows, attributeRows, categoryIds] = await Promise.all([
       this.variants.listByProductId(product.props.id),
       this.attrStore.resolveGlobalValues(product.props.id),
+      this.productCategories.listCategoryPublicIdsForProduct(product.props.id),
     ]);
 
     const attributes: Record<string, unknown> = {};
@@ -39,6 +46,7 @@ export class GetProductDetail {
       attributeSetId: product.props.attributeSetId.toString(),
       variants: variantRows,
       attributes,
+      categoryIds,
     };
   }
 }

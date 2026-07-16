@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from 'react';
 import { updateProduct, type UpdateProductFormState } from '../../actions';
-import type { AttributeSet, AttributeSetDetail, ProductDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail } from '@/lib/types';
 import { AttributeFieldsSection } from '../../attribute-fields-section';
+import { CategoryPicker } from '../../category-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,10 +19,12 @@ export function EditProductForm({
   product,
   attributeSets,
   attributeSetDetails,
+  categories,
 }: {
   product: ProductDetail;
   attributeSets: AttributeSet[];
   attributeSetDetails: Record<string, AttributeSetDetail>;
+  categories: Category[];
 }) {
   const action = updateProduct.bind(null, product.publicId);
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -102,6 +105,8 @@ export function EditProductForm({
       </div>
 
       {selectedSetDetail ? <AttributeFieldsSection groups={selectedSetDetail.groups} values={product.attributes} /> : null}
+
+      <CategoryPicker categories={categories} selectedIds={product.categoryIds} />
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 

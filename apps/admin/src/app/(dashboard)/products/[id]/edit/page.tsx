@@ -1,12 +1,13 @@
 import { apiGet } from '@/lib/api-client';
-import type { AttributeSet, AttributeSetDetail, ProductDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail } from '@/lib/types';
 import { EditProductForm } from './edit-product-form';
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, attributeSets] = await Promise.all([
+  const [product, attributeSets, categories] = await Promise.all([
     apiGet<ProductDetail>(`/admin/v1/products/${id}`),
     apiGet<AttributeSet[]>('/admin/v1/attribute-sets'),
+    apiGet<Category[]>('/admin/v1/categories'),
   ]);
   const details = await Promise.all(
     attributeSets.map((s) => apiGet<AttributeSetDetail>(`/admin/v1/attribute-sets/${s.id}`)),
@@ -18,7 +19,12 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     <div>
       <h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
       <div className="mt-6">
-        <EditProductForm product={product} attributeSets={attributeSets} attributeSetDetails={attributeSetDetails} />
+        <EditProductForm
+          product={product}
+          attributeSets={attributeSets}
+          attributeSetDetails={attributeSetDetails}
+          categories={categories}
+        />
       </div>
     </div>
   );
