@@ -64,9 +64,14 @@ existed, following the exact per-context recipe every prior stage used (domain p
 | G | `PATCH /products/:publicId` (core-field update), `GET /attribute-sets/:id` (detail: groups + attributes + options) | Real product Edit page (previously create-only); `weight` wired end-to-end |
 | H | `PUT /products/:publicId/attributes/bulk` (atomic, one outbox event) | Dynamic per-data-type attribute-value inputs on create/edit forms |
 | I | `sortBy`/`sortDir`/`type`/`attributeSetId` filters + quantity/salable-quantity columns on `GET /products` | Filters panel, sortable headers, bulk Activate/Deactivate |
+| L | `GET /attributes` (new; everything else already existed unused) | Attribute Sets + Attributes builder UI: create sets/groups/attributes, assign an attribute to a group |
+| K | `GET/POST/PATCH/DELETE /categories`, `PUT /categories/:id/parent`, `PUT /products/:id/categories` | Category tree page (create/rename/delete), category picker on the product form |
+| J | `POST /media/uploads`, `POST /media`, `POST/DELETE /products/:id/media`, thumbnail batch-lookup on `GET /products` | Direct-to-storage image upload + gallery on product edit, grid thumbnail column |
 
 Phases G–I were a second round, prompted by the user referencing Magento's admin
-Products grid/edit-form UI as a target — see §7.
+Products grid/edit-form UI as a target — see §7. Phases L, K, J were a third round,
+closing the three gaps that round's own retrospective (§6, prior revision) had
+explicitly flagged and deferred — see §8.
 
 Each phase: backend endpoints tested with integration tests against a throwaway
 Postgres (same rigor as every backend stage), frontend typechecked/built/linted, then
@@ -126,15 +131,16 @@ been silently falling back to the browser's default serif font since Phase B.
 - The storefront UI entirely — its own future plan.
 - Admin screens for Loyalty, Referral, Wallet, Gift Cards, CMS, Wishlist, bulk
   product import, search/facet configuration.
-- A full attribute-set *builder* UI (create sets/groups/attributes, choose data
-  types, define options) — still raw-API-only. What Phase H added is *consuming*
-  an existing attribute set's definition to render/edit values on a product, not
-  authoring the definition itself.
-- Product images (`MediaAsset`/`ProductMedia` schema exists, zero upload code
-  anywhere) and categories (`Category` schema exists — including a Postgres `ltree`
-  path column Prisma can't read/write directly — zero admin endpoints) — both
-  confirmed real gaps, explicitly scoped out of the Phase G–I round after a
-  cost/risk conversation with the user, not attempted.
+- Attribute-set builder UI, product images, and categories were all real gaps
+  through the end of Phase I — closed in Phases L, K, J respectively (§8).
+- `MediaTransform` renditions (thumb/medium/zoom) — Phase J serves the original
+  upload at all sizes; real resize/thumbnail generation needs `sharp` plus a
+  background job (matching the existing BullMQ worker pattern), not attempted.
+- `CategoryRule` (Magento's dynamic/rule-based categories) — Phase K's category
+  tree is manual assignment only.
+- Drag-and-drop reordering for either the category tree or the product image
+  gallery — Phase K/J both got simple, non-drag interactions (a parent picker,
+  up/down-free position via insertion order) instead.
 - Fine-grained RBAC-aware UI (the backend has real permissions like
   `catalog:manage`/`orders:refund`; this UI doesn't branch on them yet).
 - A shared types package between `apps/admin` and the backend.
@@ -176,3 +182,62 @@ Phase G/H/I commit messages; the notable findings:
   a dozen+ attributes as N sequential PUTs would mean N outbox events for one
   logical change; the bulk-import worker still uses the singular per-row version,
   where that's the correct semantics.
+
+## 8. Phases L, K, J: attribute builder, categories, product images
+
+Requested together by the user immediately after G–I shipped, closing the three
+gaps that round's retrospective had explicitly flagged and deferred. Built in
+priority order — smallest/lowest-risk first: L (attribute builder — almost pure
+frontend, backend endpoints already existed), then K (categories), then J
+(product images — the only one needing genuinely new infrastructure).
+
+**L** — the entire backend already existed and worked (proven by this project's
+own integration tests) except a list-all-attributes endpoint; the phase was
+overwhelmingly "wire a screen to routes nobody had built a UI for yet." Closes
+the loop with Phase H end-to-end: create an attribute (with inline options),
+create a set, create a group, assign the attribute — it then renders as a typed
+input on the product form.
+
+**K** — re-assessed as meaningfully lower-risk than the original Phase G–I
+retrospective feared. The Postgres `ltree` path column and the transitive
+closure table are **not** hand-maintained by the application layer; existing
+triggers (`category_before_insert`/`category_after_insert`) and a
+`category_reparent(child, new_parent)` stored procedure
+(`prisma/sql/0001_foundation_raw.sql` §11–12, present since Stage 1) already do
+it. Prisma's typed client works normally for ordinary CRUD (it just never
+selects the `Unsupported("ltree")` column); raw SQL is only needed for the one
+call to `category_reparent()`. That procedure doesn't itself guard against
+cycles (moving a category under its own descendant), so the application layer
+added that check — an in-memory walk over the flat category list, which is
+simpler and just as correct as a recursive SQL query at this table's size.
+Delete is guarded (rejects a category with children or assigned products);
+cascading soft-delete is separate future work.
+
+**J** — the only phase needing new infrastructure, and the one carrying the
+most genuinely new risk:
+- **A `minio` service was already defined in `docker-compose.yml` but never
+  part of the actually-running dev stack** (`ome-pg-dev`/`ome-redis-dev`/
+  `ome-os-dev`, all started via standalone `docker run` with nonstandard ports,
+  not `docker compose up`). Starting it revealed **an unrelated project's own
+  `minio` container already occupying the default 9000/9001** on this shared
+  dev machine — had to pick different host ports (59000/59001) for
+  `ome-minio-dev`, matching the existing nonstandard-port convention the other
+  three containers already used for the same underlying reason (this machine
+  runs more than one project's dev stack side by side).
+- Chose a **direct-to-storage upload flow** (browser PUTs bytes straight to
+  MinIO/S3 via a presigned URL) over proxying uploads through the Express
+  server — avoids adding multer/busboy and keeps large file bytes off the API
+  process. `@aws-sdk/client-s3` was used rather than a MinIO-specific SDK,
+  since it works against any S3-compatible endpoint (including real AWS S3 in
+  production) with `forcePathStyle: true` for MinIO compatibility.
+- Presigned GET URLs are generated per-request at read time, not stored — so no
+  bucket ACL or public-read config is needed, and access naturally expires.
+- The products grid's thumbnail column needed a batched lookup (one raw SQL
+  `DISTINCT ON` query per page of results, mirroring the existing
+  `sumStockByProduct` pattern in `prisma-product.repository.ts`) rather than
+  N queries for N rows.
+- A second instance of the established Base-UI "uncontrolled `defaultValue`"
+  class of bug (see §5/§7) was caught and fixed during Phase K verification: the
+  category rename dialog's `Input` needed a `key` tied to the category's name so
+  it remounts instead of silently changing its uncontrolled value after a
+  `router.refresh()`.
