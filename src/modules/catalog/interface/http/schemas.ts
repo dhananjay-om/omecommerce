@@ -8,6 +8,7 @@ import {
   AttributeInputType,
   CategoryType,
   CategorySortMode,
+  ProductMediaRole,
 } from '@prisma/client';
 
 const decimalString = z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount, e.g. "2.5"');
@@ -145,4 +146,22 @@ export const reparentCategorySchema = z.object({
 
 export const setProductCategoriesSchema = z.object({
   categoryIds: z.array(z.string().uuid()),
+});
+
+export const requestMediaUploadSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(128),
+});
+
+export const createMediaAssetSchema = z.object({
+  storageKey: z.string().min(1),
+  mimeType: z.string().min(1).max(128),
+  bytes: z.number().int().nonnegative(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+});
+
+export const attachProductMediaSchema = z.object({
+  mediaPublicId: z.string().uuid(),
+  role: z.nativeEnum(ProductMediaRole).optional(),
 });

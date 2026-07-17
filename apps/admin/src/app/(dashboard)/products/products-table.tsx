@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ImageIcon } from 'lucide-react';
 import type { ProductListItem } from '@/lib/types';
 import { bulkUpdateProductStatus } from './actions';
 import { Badge } from '@/components/ui/badge';
@@ -103,6 +104,7 @@ export function ProductsTable({
               <TableHead className="w-10">
                 <input type="checkbox" className="size-4" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
               </TableHead>
+              <TableHead className="w-14" />
               <SortableHeader label="SKU" sortKey="sku" sortLinks={sortLinks} activeSortBy={activeSortBy} activeSortDir={activeSortDir} />
               <SortableHeader
                 label="Name"
@@ -133,7 +135,7 @@ export function ProductsTable({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -148,6 +150,16 @@ export function ProductsTable({
                       onChange={() => toggleOne(p.publicId)}
                       aria-label={`Select ${p.sku}`}
                     />
+                  </TableCell>
+                  <TableCell>
+                    {p.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
+                      <img src={p.thumbnailUrl} alt="" className="size-9 rounded-md border object-cover" />
+                    ) : (
+                      <div className="flex size-9 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
+                        <ImageIcon className="size-4" />
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="font-medium">
                     <Link href={`/products/${p.publicId}`} className="hover:underline">

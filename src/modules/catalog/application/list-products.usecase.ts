@@ -1,4 +1,4 @@
-import type { ProductRepository } from '../domain/repositories.js';
+import type { ProductRepository, ProductMediaRepository, MediaStorage } from '../domain/repositories.js';
 import { ValidationError } from '../../../shared/domain/errors.js';
 import type { ListProductsQuery, ProductListView } from './dto.js';
 
@@ -7,7 +7,11 @@ const MAX_PAGE_SIZE = 100;
 
 /** Admin browse (plan/12 Admin UI) — a real gap this pass fills: there was no way to list products via the API at all before. */
 export class ListProducts {
-  constructor(private readonly products: ProductRepository) {}
+  constructor(
+    private readonly products: ProductRepository,
+    private readonly productMedia: ProductMediaRepository,
+    private readonly storage: MediaStorage,
+  ) {}
 
   async execute(query: ListProductsQuery): Promise<ProductListView> {
     const page = query.page && query.page > 0 ? query.page : 1;
@@ -31,6 +35,15 @@ export class ListProducts {
       sortBy: query.sortBy,
       sortDir: query.sortDir,
     });
+
+    const thumbnailKeys = await this.productMedia.listThumbnailStorageKeysForProducts(result.products.map((p) => p.id));
+    const thumbnailUrls = new Map<string, string>();
+    await Promise.all(
+      Array.from(thumbnailKeys.entries()).map(async ([productId, storageKey]) => {
+        thumbnailUrls.set(productId, await this.storage.presignGetUrl(storageKey));
+      }),
+    );
+
     return {
       total: result.total,
       page: result.page,
@@ -44,6 +57,7 @@ export class ListProducts {
         createdAt: p.createdAt.toISOString(),
         quantity: p.quantity,
         salableQuantity: p.salableQuantity,
+        thumbnailUrl: thumbnailUrls.get(p.id.toString()) ?? null,
       })),
     };
   }

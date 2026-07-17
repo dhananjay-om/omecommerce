@@ -7,11 +7,15 @@ import type {
   ProductVisibility,
   CategoryType,
   CategorySortMode,
+  MediaKind,
+  ProductMediaRole,
 } from '@prisma/client';
 import type { Product } from './product.js';
 import type { AttributeValueColumns } from './attribute-value.js';
 
 export interface ProductListItem {
+  /** Internal id — used by the use-case layer to batch-lookup thumbnails; never serialized to the API response. */
+  id: bigint;
   publicId: string;
   sku: string;
   name: string | null;
@@ -281,4 +285,62 @@ export interface ProductCategoryRepository {
   setForProduct(productId: bigint, categoryIds: bigint[]): Promise<void>;
   /** The assigned categories' own publicIds, in position order — the only shape external callers need. */
   listCategoryPublicIdsForProduct(productId: bigint): Promise<string[]>;
+}
+
+export interface MediaAssetInfo {
+  id: bigint;
+  publicId: string;
+  storageKey: string;
+  mimeType: string;
+  kind: MediaKind;
+}
+
+export interface CreateMediaAssetInput {
+  storageKey: string;
+  mimeType: string;
+  bytes: bigint;
+  width?: number | null;
+  height?: number | null;
+  kind: MediaKind;
+}
+
+/** Persistence port for the media registry (plan/13 Phase J) — rows here point at bytes that live in MinIO/S3, never in this DB. */
+export interface MediaAssetRepository {
+  create(input: CreateMediaAssetInput): Promise<MediaAssetInfo>;
+  findByPublicId(publicId: string): Promise<MediaAssetInfo | null>;
+}
+
+export interface ProductMediaInfo {
+  /** ProductMedia has no publicId column (plan/01 §5) — addressed by this internal id externally, same precedent as attribute-sets/groups. */
+  id: bigint;
+  productId: bigint;
+  role: ProductMediaRole;
+  position: number;
+  altOverride: string | null;
+  assetStorageKey: string;
+  assetAltDefault: string | null;
+}
+
+export interface AttachProductMediaInput {
+  productId: bigint;
+  assetId: bigint;
+  role?: ProductMediaRole;
+}
+
+/** Persistence port for a product's attached media (plan/13 Phase J). */
+export interface ProductMediaRepository {
+  /** Appends at the end of the product's existing gallery (position = current max + 1). */
+  attach(input: AttachProductMediaInput): Promise<ProductMediaInfo>;
+  listForProduct(productId: bigint): Promise<ProductMediaInfo[]>;
+  findById(id: bigint): Promise<ProductMediaInfo | null>;
+  detach(id: bigint): Promise<void>;
+  /** Admin grid thumbnail (plan/13 Phase J) — the first GALLERY/THUMBNAIL-role image's storage key per product, batched for a page of products. Keyed by `productId.toString()`. */
+  listThumbnailStorageKeysForProducts(productIds: bigint[]): Promise<Map<string, string>>;
+}
+
+/** Port over the MinIO/S3-backed object store (plan/13 Phase J) — lets use-cases stay unit-testable without a real bucket. */
+export interface MediaStorage {
+  presignPutUrl(key: string, contentType: string): Promise<string>;
+  presignGetUrl(key: string): Promise<string>;
+  deleteObject(key: string): Promise<void>;
 }

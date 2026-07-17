@@ -15,6 +15,8 @@ import {
   PrismaProductVariantRepository,
 } from './infrastructure/prisma-product.repository.js';
 import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './infrastructure/prisma-category.repository.js';
+import { PrismaMediaAssetRepository, PrismaProductMediaRepository } from './infrastructure/prisma-media.repository.js';
+import { S3MediaStorage } from './infrastructure/s3-media-storage.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
 import { CreateProduct } from './application/create-product.usecase.js';
 import { UpdateProduct } from './application/update-product.usecase.js';
@@ -37,6 +39,10 @@ import { UpdateCategory } from './application/update-category.usecase.js';
 import { ReparentCategory } from './application/reparent-category.usecase.js';
 import { DeleteCategory } from './application/delete-category.usecase.js';
 import { SetProductCategories } from './application/set-product-categories.usecase.js';
+import { RequestMediaUpload } from './application/request-media-upload.usecase.js';
+import { CreateMediaAsset } from './application/create-media-asset.usecase.js';
+import { AttachProductMedia } from './application/attach-product-media.usecase.js';
+import { DetachProductMedia } from './application/detach-product-media.usecase.js';
 import {
   createProductSchema,
   updateProductSchema,
@@ -53,6 +59,9 @@ import {
   updateCategorySchema,
   reparentCategorySchema,
   setProductCategoriesSchema,
+  requestMediaUploadSchema,
+  createMediaAssetSchema,
+  attachProductMediaSchema,
 } from './interface/http/schemas.js';
 
 export interface CatalogRouters {
@@ -69,6 +78,9 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const variants = new PrismaProductVariantRepository(db);
   const categories = new PrismaCategoryRepository(db);
   const productCategories = new PrismaProductCategoryRepository(db);
+  const mediaAssets = new PrismaMediaAssetRepository(db);
+  const productMedia = new PrismaProductMediaRepository(db);
+  const mediaStorage = new S3MediaStorage();
   const storeContext = new PrismaStoreContextResolver(db);
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(db);
@@ -83,8 +95,8 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createAttribute = new CreateAttribute(attributes);
   const assignAttributeToGroup = new AssignAttributeToGroup(attributeSets, attributes);
   const listProductVariants = new ListProductVariants(products, variants);
-  const listProducts = new ListProducts(products);
-  const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories);
+  const listProducts = new ListProducts(products, productMedia, mediaStorage);
+  const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories, productMedia, mediaStorage);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
   const listAttributes = new ListAttributes(attributes);
@@ -94,6 +106,10 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const reparentCategory = new ReparentCategory(categories);
   const deleteCategory = new DeleteCategory(categories);
   const setProductCategories = new SetProductCategories(products, categories, productCategories);
+  const requestMediaUpload = new RequestMediaUpload(mediaStorage);
+  const createMediaAsset = new CreateMediaAsset(mediaAssets);
+  const attachProductMedia = new AttachProductMedia(products, mediaAssets, productMedia, mediaStorage);
+  const detachProductMedia = new DetachProductMedia(products, productMedia);
 
   // --- Admin API ---
   const admin = Router();
@@ -247,13 +263,46 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     }),
   );
   admin.post(
+    '/media/uploads',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(requestMediaUploadSchema, req.body);
+      res.status(201).json({ data: await requestMediaUpload.execute(body) });
+    }),
+  );
+  admin.post(
+    '/media',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(createMediaAssetSchema, req.body);
+      res.status(201).json({ data: await createMediaAsset.execute(body) });
+    }),
+  );
+  admin.post(
+    '/products/:publicId/media',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(attachProductMediaSchema, req.body);
+      const view = await attachProductMedia.execute({ productPublicId: req.params.publicId!, ...body });
+      res.status(201).json({ data: view });
+    }),
+  );
+  admin.delete(
+    '/products/:publicId/media/:productMediaId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await detachProductMedia.execute({ productPublicId: req.params.publicId!, productMediaId: req.params.productMediaId! });
+      res.status(204).send();
+    }),
+  );
+  admin.post(
     '/products/bulk-import',
     authorize('catalog:manage'),
     asyncHandler(async (req, res) => {
-      // JSON-body rows, not a CSV file upload — no multipart/MinIO presigned-
-      // upload plumbing exists yet (that's plan/04 §2.2's Media Manager,
-      // unbuilt); this is the documented scope cut for this pass. Processed
-      // async by src/workers/bulk-import.worker.ts.
+      // JSON-body rows, not a CSV file upload — bulk-import is still a
+      // separate JSON-array flow from the direct-to-storage image upload
+      // added alongside it (POST /media/uploads); the two aren't related.
+      // Processed async by src/workers/bulk-import.worker.ts.
       const body = parse(bulkImportProductsSchema, req.body);
       const job = await getBulkJobsQueue().add('bulk-import-products', { rows: body.rows });
       res.status(202).json({ data: { jobId: job.id } });

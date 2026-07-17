@@ -7,6 +7,8 @@ import type {
   AttributeInputType,
   CategoryType,
   CategorySortMode,
+  MediaKind,
+  ProductMediaRole,
 } from '@prisma/client';
 
 export interface CreateProductCommand {
@@ -93,6 +95,7 @@ export interface ProductListItemView {
   createdAt: string;
   quantity: number;
   salableQuantity: number;
+  thumbnailUrl: string | null;
 }
 
 export interface ProductListView {
@@ -107,6 +110,7 @@ export interface ProductDetailView extends ProductView {
   variants: VariantView[];
   attributes: Record<string, unknown>;
   categoryIds: string[];
+  media: ProductMediaView[];
 }
 
 export interface CreateAttributeSetCommand {
@@ -271,4 +275,47 @@ export interface SetProductCategoriesCommand {
   productPublicId: string;
   /** Category publicIds — replaces the product's full assigned set. */
   categoryIds: string[];
+}
+
+export interface RequestMediaUploadCommand {
+  filename: string;
+  mimeType: string;
+}
+
+export interface RequestMediaUploadResult {
+  uploadUrl: string;
+  storageKey: string;
+}
+
+export interface CreateMediaAssetCommand {
+  storageKey: string;
+  mimeType: string;
+  bytes: number;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface MediaAssetView {
+  publicId: string;
+  mimeType: string;
+  kind: MediaKind;
+}
+
+export interface AttachProductMediaCommand {
+  productPublicId: string;
+  mediaPublicId: string;
+  role?: ProductMediaRole;
+}
+
+export interface ProductMediaView {
+  productMediaId: string;
+  url: string;
+  role: ProductMediaRole;
+  position: number;
+  altText: string | null;
+}
+
+export interface DetachProductMediaCommand {
+  productPublicId: string;
+  productMediaId: string;
 }

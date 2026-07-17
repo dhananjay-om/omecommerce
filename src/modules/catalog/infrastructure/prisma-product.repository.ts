@@ -127,6 +127,7 @@ export class PrismaProductRepository implements ProductRepository {
       products: rows.map((r) => {
         const stock = stockByProduct.get(r.id.toString()) ?? { onHand: 0, available: 0 };
         return {
+          id: r.id,
           publicId: r.publicId,
           sku: r.sku,
           name: r.nameDefault,

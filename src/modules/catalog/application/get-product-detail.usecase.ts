@@ -3,11 +3,13 @@ import type {
   ProductVariantRepository,
   ProductAttributeStore,
   ProductCategoryRepository,
+  ProductMediaRepository,
+  MediaStorage,
 } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { fromRow } from '../domain/attribute-value.js';
 import { toView } from './create-product.usecase.js';
-import type { ProductDetailView } from './dto.js';
+import type { ProductDetailView, ProductMediaView } from './dto.js';
 
 /**
  * Admin detail (plan/12 Admin UI) — raw fields + variants + GLOBAL-scope
@@ -24,6 +26,8 @@ export class GetProductDetail {
     private readonly variants: ProductVariantRepository,
     private readonly attrStore: ProductAttributeStore,
     private readonly productCategories: ProductCategoryRepository,
+    private readonly productMedia: ProductMediaRepository,
+    private readonly storage: MediaStorage,
   ) {}
 
   async execute(productPublicId: string): Promise<ProductDetailView> {
@@ -32,14 +36,25 @@ export class GetProductDetail {
       throw new NotFoundError('product', productPublicId);
     }
 
-    const [variantRows, attributeRows, categoryIds] = await Promise.all([
+    const [variantRows, attributeRows, categoryIds, mediaRows] = await Promise.all([
       this.variants.listByProductId(product.props.id),
       this.attrStore.resolveGlobalValues(product.props.id),
       this.productCategories.listCategoryPublicIdsForProduct(product.props.id),
+      this.productMedia.listForProduct(product.props.id),
     ]);
 
     const attributes: Record<string, unknown> = {};
     for (const r of attributeRows) attributes[r.code] = fromRow(r.dataType, r.columns);
+
+    const media: ProductMediaView[] = await Promise.all(
+      mediaRows.map(async (m) => ({
+        productMediaId: m.id.toString(),
+        url: await this.storage.presignGetUrl(m.assetStorageKey),
+        role: m.role,
+        position: m.position,
+        altText: m.altOverride ?? m.assetAltDefault,
+      })),
+    );
 
     return {
       ...toView(product),
@@ -47,6 +62,7 @@ export class GetProductDetail {
       variants: variantRows,
       attributes,
       categoryIds,
+      media,
     };
   }
 }

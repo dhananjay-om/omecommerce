@@ -5,6 +5,7 @@ import { updateProduct, type UpdateProductFormState } from '../../actions';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail } from '@/lib/types';
 import { AttributeFieldsSection } from '../../attribute-fields-section';
 import { CategoryPicker } from '../../category-picker';
+import { ImageUploadField } from './image-upload-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -105,6 +106,8 @@ export function EditProductForm({
       </div>
 
       {selectedSetDetail ? <AttributeFieldsSection groups={selectedSetDetail.groups} values={product.attributes} /> : null}
+
+      <ImageUploadField productPublicId={product.publicId} media={product.media} />
 
       <CategoryPicker categories={categories} selectedIds={product.categoryIds} />
 

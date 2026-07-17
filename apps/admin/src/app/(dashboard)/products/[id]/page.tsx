@@ -61,6 +61,30 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       <Card>
         <CardHeader>
+          <CardTitle>Images</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {product.media.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No images yet.{' '}
+              <Link href={`/products/${product.publicId}/edit`} className="underline hover:text-foreground">
+                Add some
+              </Link>
+              .
+            </p>
+          ) : (
+            <div className="grid grid-cols-6 gap-3">
+              {product.media.map((m) => (
+                // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
+                <img key={m.productMediaId} src={m.url} alt={m.altText ?? ''} className="aspect-square w-full rounded-md border object-cover" />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Variants</CardTitle>
         </CardHeader>
         <CardContent>

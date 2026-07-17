@@ -11,6 +11,7 @@ export interface ProductListItem {
   createdAt: string;
   quantity: number;
   salableQuantity: number;
+  thumbnailUrl: string | null;
 }
 
 export interface ProductList {
@@ -27,6 +28,16 @@ export interface Variant {
   position: number;
 }
 
+export type ProductMediaRole = 'GALLERY' | 'THUMBNAIL' | 'SWATCH' | 'VIDEO' | 'DOCUMENT';
+
+export interface ProductMedia {
+  productMediaId: string;
+  url: string;
+  role: ProductMediaRole;
+  position: number;
+  altText: string | null;
+}
+
 export interface ProductDetail {
   publicId: string;
   sku: string;
@@ -39,6 +50,7 @@ export interface ProductDetail {
   variants: Variant[];
   attributes: Record<string, unknown>;
   categoryIds: string[];
+  media: ProductMedia[];
 }
 
 export type CategoryType = 'MANUAL' | 'DYNAMIC';
