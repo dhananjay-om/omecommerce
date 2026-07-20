@@ -7,13 +7,20 @@ import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-reso
 import { PrismaStockLedger } from '../inventory/infrastructure/prisma-stock-ledger.js';
 import { PrismaCartRepository } from './infrastructure/prisma-cart.repository.js';
 import { PrismaOrderRepository } from './infrastructure/prisma-order.repository.js';
-import { PrismaVariantLookup, PrismaWarehouseResolver, PrismaCustomerGroupLookup } from './infrastructure/prisma-lookups.js';
+import {
+  PrismaVariantLookup,
+  PrismaWarehouseResolver,
+  PrismaCustomerGroupLookup,
+  PrismaCartProductMediaLookup,
+} from './infrastructure/prisma-lookups.js';
 import { PrismaCustomerLookup } from './infrastructure/prisma-customer-lookup.js';
 import { PrismaTaxClassLookup, NativeTaxCalculator } from './infrastructure/native-tax-calculator.js';
 import { NativeShippingCalculator } from './infrastructure/native-shipping-calculator.js';
 import { TestPaymentGateway } from './infrastructure/test-payment-gateway.js';
 import { PrismaTaxClassRepository, PrismaShippingMethodRepository } from './infrastructure/prisma-setup.repository.js';
+import { S3MediaUrlResolver } from './infrastructure/s3-media-url-resolver.js';
 import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
+import { EnrichCartView } from './application/enrich-cart-view.js';
 import { CreateCart } from './application/create-cart.usecase.js';
 import { AddCartLine } from './application/add-cart-line.usecase.js';
 import { GetCart } from './application/get-cart.usecase.js';
@@ -64,11 +71,14 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const taxClasses = new PrismaTaxClassRepository(db);
   const shippingMethods = new PrismaShippingMethodRepository(db);
   const outbox = new OutboxWriter(db);
+  const cartProductMedia = new PrismaCartProductMediaLookup(db);
+  const mediaUrlResolver = new S3MediaUrlResolver();
+  const enrichCartView = new EnrichCartView(variants, priceResolver, cartProductMedia, mediaUrlResolver);
 
-  const createCart = new CreateCart(carts, storeContext, customerGroups, customers);
-  const addCartLine = new AddCartLine(carts, variants);
-  const getCart = new GetCart(carts);
-  const removeCartLine = new RemoveCartLine(carts, variants);
+  const createCart = new CreateCart(carts, storeContext, customerGroups, customers, enrichCartView);
+  const addCartLine = new AddCartLine(carts, variants, enrichCartView);
+  const getCart = new GetCart(carts, enrichCartView);
+  const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
   const completeCheckout = new CompleteCheckout(
     carts,
     orders,

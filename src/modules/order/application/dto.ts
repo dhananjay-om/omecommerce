@@ -10,6 +10,16 @@ export interface CartLineDto {
   id: string;
   variantId: string;
   qty: number;
+  /** Denormalized display fields (plan/14 Phase 5a) — resolved fresh on every
+   * read, never stored on the cart line itself, same reasoning as PDP's
+   * price/stock (see GetStoreProductDetail's doc comment): they change on a
+   * different cadence than the cart line's own {id, variantId, qty}. */
+  sku: string;
+  name: string;
+  price: string | null;
+  imageUrl: string | null;
+  /** `price * qty`, or null when price is null (no price configured for this variant). */
+  lineTotal: string | null;
 }
 
 export interface CartView {
@@ -17,6 +27,8 @@ export interface CartView {
   currency: string;
   status: string;
   lines: CartLineDto[];
+  /** Sum of every line's `lineTotal` that resolved to a real price; null if the cart has no priced lines yet. */
+  subtotal: string | null;
 }
 
 export interface AddCartLineCommand {

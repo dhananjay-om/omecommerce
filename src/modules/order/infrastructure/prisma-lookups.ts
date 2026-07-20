@@ -1,23 +1,39 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { VariantLookup, WarehouseResolver, CustomerGroupLookup } from '../domain/repositories.js';
+import type { VariantLookup, WarehouseResolver, CustomerGroupLookup, CartProductMediaLookup } from '../domain/repositories.js';
 
 export class PrismaVariantLookup implements VariantLookup {
   constructor(private readonly db: Db) {}
 
-  async byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null } | null> {
+  async byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null> {
     const row = await this.db.productVariant.findFirst({
       where: { publicId },
-      select: { id: true, sku: true, product: { select: { nameDefault: true } } },
+      select: { id: true, sku: true, productId: true, product: { select: { nameDefault: true } } },
     });
-    return row ? { id: row.id, sku: row.sku, nameDefault: row.product.nameDefault } : null;
+    return row ? { id: row.id, sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId } : null;
   }
 
-  async byId(id: bigint): Promise<{ sku: string; nameDefault: string | null } | null> {
+  async byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint } | null> {
     const row = await this.db.productVariant.findFirst({
       where: { id },
-      select: { sku: true, product: { select: { nameDefault: true } } },
+      select: { sku: true, productId: true, product: { select: { nameDefault: true } } },
     });
-    return row ? { sku: row.sku, nameDefault: row.product.nameDefault } : null;
+    return row ? { sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId } : null;
+  }
+}
+
+/** Own copy of search's identical PrismaProductMediaLookup (per-module lookup convention). */
+export class PrismaCartProductMediaLookup implements CartProductMediaLookup {
+  constructor(private readonly db: Db) {}
+
+  async primaryImageKey(productId: bigint): Promise<string | null> {
+    const rows = await this.db.$queryRaw<Array<{ storage_key: string }>>`
+      SELECT ma.storage_key
+      FROM product_media pm
+      JOIN media_asset ma ON ma.id = pm.asset_id
+      WHERE pm.product_id = ${productId}
+      ORDER BY pm.position ASC
+      LIMIT 1`;
+    return rows[0]?.storage_key ?? null;
   }
 }
 

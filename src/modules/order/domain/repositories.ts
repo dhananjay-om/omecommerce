@@ -12,8 +12,13 @@ import type {
 // --- Cross-module read-only lookups (each module resolves its own dependencies) ---
 
 export interface VariantLookup {
-  byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null } | null>;
-  byId(id: bigint): Promise<{ sku: string; nameDefault: string | null } | null>;
+  byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null>;
+  byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint } | null>;
+}
+
+/** The lowest-position media asset's storage KEY for a product (plan/14 Phase 5a) — own copy of the same lookup search's IndexProduct uses; not a URL, see MediaUrlResolver's doc comment for why. */
+export interface CartProductMediaLookup {
+  primaryImageKey(productId: bigint): Promise<string | null>;
 }
 
 /** Order owns its own copy of this lookup, same as every other module (Pricing,

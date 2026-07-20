@@ -2,6 +2,7 @@ import type { CartRepository, CustomerGroupLookup, CustomerLookup } from '../dom
 import type { StoreContextResolver } from '../../../shared/application/scope.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import type { CreateCartCommand, CartView } from './dto.js';
+import type { EnrichCartView } from './enrich-cart-view.js';
 
 export class CreateCart {
   constructor(
@@ -9,6 +10,7 @@ export class CreateCart {
     private readonly storeContext: StoreContextResolver,
     private readonly customerGroups: CustomerGroupLookup,
     private readonly customers: CustomerLookup,
+    private readonly enrichCartView: EnrichCartView,
   ) {}
 
   async execute(cmd: CreateCartCommand): Promise<CartView> {
@@ -38,20 +40,6 @@ export class CreateCart {
       customerId,
       customerGroupId,
     });
-    return toDto(cart);
+    return this.enrichCartView.execute(cart);
   }
-}
-
-export function toDto(cart: {
-  publicId: string;
-  currency: string;
-  status: string;
-  lines: Array<{ id: bigint; variantPublicId: string; qty: number }>;
-}): CartView {
-  return {
-    publicId: cart.publicId,
-    currency: cart.currency,
-    status: cart.status,
-    lines: cart.lines.map((l) => ({ id: l.id.toString(), variantId: l.variantPublicId, qty: l.qty })),
-  };
 }

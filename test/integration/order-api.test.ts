@@ -6,9 +6,11 @@ import { getAdminToken, adminRequest } from '../helpers/auth.js';
 
 /**
  * The full Order vertical slice over HTTP (live DB): checkout saga (happy path +
- * payment-decline compensation), fulfillment, refund, cancel. Gated on INTEGRATION=1.
- * Cart/checkout routes are unauthenticated storefront APIs (plain `request(app)`);
- * everything else is `/admin/v1` and goes through `admin` (bearer-token-carrying).
+ * payment-decline compensation), fulfillment, refund, cancel, and cart-line
+ * enrichment (sku/name/price/imageUrl/lineTotal + cart subtotal, plan/14 Phase
+ * 5a). Gated on INTEGRATION=1. Cart/checkout routes are unauthenticated
+ * storefront APIs (plain `request(app)`); everything else is `/admin/v1` and
+ * goes through `admin` (bearer-token-carrying).
  */
 describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
   const app = createApp();
@@ -147,25 +149,36 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
 
     const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
     const cartId = cart.body.data.publicId;
+    expect(cart.body.data.subtotal).toBeNull();
 
     const added = await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
     expect(added.status).toBe(200);
-    expect(added.body.data.lines).toEqual([{ id: expect.any(String), variantId, qty: 1 }]);
+    expect(added.body.data.lines).toEqual([
+      { id: expect.any(String), variantId, qty: 1, sku: 'ORD-SKU-CART', name: 'ORD-SKU-CART', price: expect.any(String), imageUrl: null, lineTotal: expect.any(String) },
+    ]);
+    expect(Number(added.body.data.lines[0].price)).toBe(10);
+    expect(Number(added.body.data.lines[0].lineTotal)).toBe(10);
+    expect(Number(added.body.data.subtotal)).toBe(10);
 
     // GET reflects the same state without a re-POST — cart state can now survive a page reload.
     const read = await request(app).get(`/store/v1/carts/${cartId}`);
     expect(read.status).toBe(200);
-    expect(read.body.data.lines).toEqual([{ id: expect.any(String), variantId, qty: 1 }]);
+    expect(read.body.data.lines).toHaveLength(1);
+    expect(Number(read.body.data.lines[0].lineTotal)).toBe(10);
 
     // Re-POST with a new qty overwrites (upsert), not a second line.
     const updated = await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 5 });
     expect(updated.status).toBe(200);
-    expect(updated.body.data.lines).toEqual([{ id: expect.any(String), variantId, qty: 5 }]);
+    expect(updated.body.data.lines).toHaveLength(1);
+    expect(updated.body.data.lines[0].qty).toBe(5);
+    expect(Number(updated.body.data.lines[0].lineTotal)).toBe(50);
+    expect(Number(updated.body.data.subtotal)).toBe(50);
 
     // DELETE removes the line entirely.
     const removed = await request(app).delete(`/store/v1/carts/${cartId}/lines/${variantId}`);
     expect(removed.status).toBe(200);
     expect(removed.body.data.lines).toEqual([]);
+    expect(removed.body.data.subtotal).toBeNull();
 
     const readAfterRemove = await request(app).get(`/store/v1/carts/${cartId}`);
     expect(readAfterRemove.body.data.lines).toEqual([]);

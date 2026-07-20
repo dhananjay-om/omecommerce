@@ -59,3 +59,8 @@ export interface PaymentGateway {
   capture(input: CaptureInput): Promise<PaymentResult>;
   refund(input: RefundInput): Promise<PaymentResult>;
 }
+
+/** Resolves a stored media key to a fresh, short-lived GET URL (plan/14 Phase 5a) — own copy of search's identical port; presigned S3/MinIO URLs expire in 15 minutes (shared/infrastructure/storage/s3-client.ts), so this is called per-request, never cached. */
+export interface MediaUrlResolver {
+  presignGetUrl(key: string): Promise<string>;
+}
