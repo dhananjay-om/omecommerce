@@ -3,6 +3,8 @@ import { PRODUCT_INDEX, PRODUCT_INDEX_MAPPING } from '../../../shared/infrastruc
 import type { SearchIndex, ProductDocument, SearchQuery, SearchResult, FacetBucket } from '../domain/ports.js';
 
 const FACET_SIZE = 50;
+/** Dev/demo scale — plenty for a single-index catalog at this project's current size; a real per-store-view-index architecture (index-mapping.ts's documented future scale path) would replace this aggregation entirely. */
+const MAX_PRODUCT_IDS = 10_000;
 
 export class OpenSearchIndex implements SearchIndex {
   constructor(private readonly client: Client) {}
@@ -29,6 +31,20 @@ export class OpenSearchIndex implements SearchIndex {
       body: { query: { term: { productId } } },
       refresh: true,
     });
+  }
+
+  async listAllProductIds(): Promise<string[]> {
+    const exists = await this.client.indices.exists({ index: PRODUCT_INDEX });
+    if (!exists.body) return [];
+    const response = await this.client.search({
+      index: PRODUCT_INDEX,
+      body: {
+        size: 0,
+        aggs: { ids: { terms: { field: 'productId', size: MAX_PRODUCT_IDS } } },
+      },
+    });
+    const body = response.body as { aggregations?: { ids: { buckets: Array<{ key: string }> } } };
+    return (body.aggregations?.ids.buckets ?? []).map((b) => b.key);
   }
 
   async search(query: SearchQuery): Promise<SearchResult> {

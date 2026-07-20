@@ -204,6 +204,44 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     expect(res.body.data.hits).toHaveLength(0);
   });
 
+  it('a full reindex removes orphaned documents for products no longer in Postgres', async () => {
+    // Simulates the real-world drift this caught: a product removed outside
+    // the normal flow (e.g. a test's raw TRUNCATE) bypasses IndexProduct's
+    // delete-on-missing-product path, leaving the OpenSearch document behind
+    // forever if a "full" reindex only upserts current products. Inserting
+    // the orphan directly (rather than via a real delete, which would need
+    // to fight FK constraints) isolates exactly that mechanism.
+    await getOpenSearchClient().index({
+      index: PRODUCT_INDEX,
+      id: `orphan-doc_${storeViewId}`,
+      body: {
+        productId: '019f0000-0000-7000-8000-000000000000',
+        storeViewId,
+        sku: 'ORPHAN-SKU-GHOST',
+        name: 'Ghost Orphan Widget',
+        type: 'SIMPLE',
+        status: 'ACTIVE',
+        visibility: 'BOTH',
+        isInStock: true,
+        price: 1,
+        priceDisplay: '1.0000',
+        currency: 'USD',
+        imageKey: null,
+        facets: [],
+        updatedAt: new Date().toISOString(),
+      },
+      refresh: true,
+    });
+
+    const beforeReindex = await request(app).get('/store/v1/search').query({ storeViewId, q: 'Ghost' });
+    expect(beforeReindex.body.data.hits.map((h: { sku: string }) => h.sku)).toContain('ORPHAN-SKU-GHOST');
+
+    await admin.post('/admin/v1/search/reindex');
+
+    const afterReindex = await request(app).get('/store/v1/search').query({ storeViewId, q: 'Ghost' });
+    expect(afterReindex.body.data.hits).toHaveLength(0);
+  });
+
   it('rejects an invalid sort value with 422', async () => {
     const res = await request(app).get('/store/v1/search').query({ storeViewId, sort: 'not-a-real-sort' });
     expect(res.status).toBe(422);

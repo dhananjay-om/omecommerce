@@ -67,6 +67,17 @@ export interface SearchIndex {
   ensureIndex(): Promise<void>;
   upsert(doc: ProductDocument): Promise<void>;
   deleteByProductId(productId: string): Promise<void>;
+  /**
+   * Every distinct productId currently indexed, across all store views
+   * (plan/14 — lets ReindexAll diff against Postgres and delete only true
+   * orphans, e.g. a product removed outside the normal flow like a test's
+   * raw TRUNCATE, which bypasses IndexProduct's delete-on-missing-product
+   * path). Deliberately NOT a "clear everything then rebuild": emptying the
+   * index and repopulating it is a window where concurrent searches see
+   * nothing (or, with a dropped index, an outright 500) — surgical diff-and-
+   * delete never has that window.
+   */
+  listAllProductIds(): Promise<string[]>;
   search(query: SearchQuery): Promise<SearchResult>;
 }
 

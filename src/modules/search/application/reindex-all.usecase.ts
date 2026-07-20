@@ -14,12 +14,28 @@ export class ReindexAll {
     private readonly indexProduct: IndexProduct,
   ) {}
 
-  async execute(): Promise<{ indexed: number }> {
+  async execute(): Promise<{ indexed: number; removed: number }> {
     await this.index.ensureIndex();
-    const products = await this.products.allActive();
+
+    const [products, indexedProductIds] = await Promise.all([this.products.allActive(), this.index.listAllProductIds()]);
+
+    // A full reindex must actually be full — a product removed outside the
+    // normal flow (e.g. a test's raw TRUNCATE, which bypasses IndexProduct's
+    // delete-on-missing-product path entirely) otherwise leaves an orphaned
+    // document forever, since upsert-only re-indexing never removes what's
+    // no longer in Postgres. Diff-and-delete only the true orphans, rather
+    // than clearing the whole index and repopulating it — that has a real
+    // window where concurrent searches would see nothing (or a dropped index,
+    // an outright error), which a surgical diff never does.
+    const activeProductIds = new Set(products.map((p) => p.publicId));
+    const orphanIds = indexedProductIds.filter((id) => !activeProductIds.has(id));
+    for (const id of orphanIds) {
+      await this.index.deleteByProductId(id);
+    }
+
     for (const p of products) {
       await this.indexProduct.execute(p.publicId);
     }
-    return { indexed: products.length };
+    return { indexed: products.length, removed: orphanIds.length };
   }
 }
