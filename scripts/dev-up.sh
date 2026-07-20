@@ -32,7 +32,6 @@ done
 export DATABASE_URL="postgresql://ome:ome@localhost:55433/ome?schema=public"
 export REDIS_URL="redis://localhost:56379"
 export OPENSEARCH_URL="http://localhost:9200"
-export PORT=4100
 export JWT_SECRET="dev-only-jwt-secret-change-me-please-32ch"
 export GIFT_CARD_HMAC_SECRET="dev-only-giftcard-hmac-secret-change-me"
 export S3_ENDPOINT="http://localhost:59000"
@@ -49,7 +48,11 @@ else
     echo "    building backend first..."
     npm run build >"$LOG_DIR/backend-build.log" 2>&1
   fi
-  nohup node dist/src/main.js >"$LOG_DIR/backend.log" 2>&1 &
+  # PORT is scoped to just this command, not exported globally — an earlier
+  # version exported it for the whole script, which leaked into admin's
+  # `next dev` below (no -p flag) and made it try to bind :4100 too,
+  # crashing with EADDRINUSE instead of ever reaching port 3000.
+  PORT=4100 nohup node dist/src/main.js >"$LOG_DIR/backend.log" 2>&1 &
   disown
   for i in $(seq 1 15); do
     curl -s -o /dev/null http://localhost:4100/health --max-time 2 && break
