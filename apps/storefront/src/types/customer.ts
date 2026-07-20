@@ -35,3 +35,16 @@ export interface SessionInfo {
   isLoggedIn: boolean;
   firstName?: string | null;
 }
+
+export interface WishlistItem {
+  productId: string;
+  sku: string;
+  name: string | null;
+  addedAt: string;
+}
+
+export interface Wishlist {
+  publicId: string;
+  name: string;
+  items: WishlistItem[];
+}
