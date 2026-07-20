@@ -17,6 +17,7 @@ export function searchProducts(params: SearchParams = {}): Promise<SearchResult>
     pageSize: params.pageSize,
     minPrice: params.minPrice,
     maxPrice: params.maxPrice,
+    inStock: params.inStock,
   });
   for (const [field, value] of Object.entries(params.filter ?? {})) {
     qs += `${qs ? '&' : '?'}filter[${encodeURIComponent(field)}]=${encodeURIComponent(value)}`;

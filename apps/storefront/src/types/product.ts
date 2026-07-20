@@ -61,6 +61,7 @@ export interface SearchParams {
   filter?: Record<string, string>;
   minPrice?: number;
   maxPrice?: number;
+  inStock?: boolean;
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name_asc';
   page?: number;
   pageSize?: number;

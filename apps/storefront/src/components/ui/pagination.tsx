@@ -51,12 +51,11 @@ function PaginationLink({
       className={cn(className)}
       nativeButton={false}
       render={
-        <a
-          aria-current={isActive ? "page" : undefined}
-          data-slot="pagination-link"
-          data-active={isActive}
-          {...props}
-        />
+        // no data-slot here — Button's own "button" data-slot already applies to
+        // the rendered <a>, and a second, conflicting data-slot on this element
+        // caused a client/server hydration mismatch (base-ui's `render`-prop merge
+        // order differs between the SSR and hydration passes for duplicate attrs).
+        <a aria-current={isActive ? "page" : undefined} data-active={isActive} {...props} />
       }
     />
   )
