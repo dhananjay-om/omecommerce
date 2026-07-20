@@ -68,3 +68,9 @@ export async function setCartId(cartPublicId: string): Promise<void> {
     maxAge: CART_MAX_AGE_SECONDS,
   });
 }
+
+/** Called after a successful checkout (plan/14 Phase 7) — the cart is now CONVERTED, so reusing its id would keep pointing at a dead cart; ensureCart() creates a fresh one on the next visit. */
+export async function clearCartId(): Promise<void> {
+  const store = await cookies();
+  store.delete(CART_COOKIE);
+}

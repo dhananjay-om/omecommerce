@@ -29,10 +29,12 @@ export function buildQuery(params: Record<string, string | number | boolean | un
 interface RequestOpts {
   /** Attach the customer's bearer token if a session exists — most storefront reads are public and omit this (unlike admin, where every fetch requires it). */
   auth?: boolean;
+  /** Extra headers, e.g. `Idempotency-Key` on checkout (plan/14 Phase 7). */
+  headers?: Record<string, string>;
 }
 
 async function request<T>(path: string, init: RequestInit, opts?: RequestOpts): Promise<T> {
-  const headers: Record<string, string> = init.body ? { 'Content-Type': 'application/json' } : {};
+  const headers: Record<string, string> = { ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...opts?.headers };
   if (opts?.auth) {
     const token = await getSession();
     if (token) headers.Authorization = `Bearer ${token}`;

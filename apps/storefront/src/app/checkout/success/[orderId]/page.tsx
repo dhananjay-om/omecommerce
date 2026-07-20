@@ -1,0 +1,80 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
+import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { getOrder } from '@/services/order.service';
+import { ApiError } from '@/lib/api-client';
+import { Button } from '@/components/ui/button';
+
+export const metadata: Metadata = { title: 'Order Confirmed' };
+
+interface Props {
+  params: Promise<{ orderId: string }>;
+}
+
+export default async function CheckoutSuccessPage({ params }: Props) {
+  const { orderId } = await params;
+
+  let order;
+  try {
+    order = await getOrder(orderId);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) notFound();
+    throw err;
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      <CheckCircleIcon className="mx-auto size-16 text-success" />
+      <h1 className="mt-4 text-2xl font-bold">Thank you for your order!</h1>
+      <p className="mt-1 text-muted-foreground">
+        Order #{order.orderNumber} has been placed. A confirmation has been sent to {order.email}.
+      </p>
+
+      <div className="mt-8 rounded-lg border p-6 text-left">
+        <div className="flex flex-col gap-1">
+          {order.lines.map((line) => (
+            <div key={line.sku} className="flex justify-between text-sm">
+              <span>
+                {line.name} &times; {line.qty}
+              </span>
+              <span>
+                {order.currency} {Number(line.rowTotal).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-col gap-1 border-t pt-4 text-sm">
+          <div className="flex justify-between text-muted-foreground">
+            <span>Subtotal</span>
+            <span>
+              {order.currency} {Number(order.subtotal).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between text-muted-foreground">
+            <span>Shipping</span>
+            <span>
+              {order.currency} {Number(order.shippingTotal).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between text-muted-foreground">
+            <span>Tax</span>
+            <span>
+              {order.currency} {Number(order.taxTotal).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between text-base font-bold">
+            <span>Total</span>
+            <span>
+              {order.currency} {Number(order.grandTotal).toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <Button variant="cta" size="lg" className="mt-8" render={<Link href="/products" />} nativeButton={false}>
+        Continue Shopping
+      </Button>
+    </div>
+  );
+}

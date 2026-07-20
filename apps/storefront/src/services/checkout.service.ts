@@ -1,4 +1,5 @@
 import { api } from '@/lib/axios';
+import type { OrderView } from '@/types/order';
 
 export interface CheckoutAddress {
   name: string;
@@ -18,10 +19,20 @@ export interface CheckoutInput {
   shippingAddress: CheckoutAddress;
   shippingMethodCode: string;
   paymentMethod: string;
+  /** Test-only seam mirroring TestPaymentGateway's own (plan/14 Phase 7 — no real payment processor exists). */
+  testScenario?: 'approve' | 'decline';
 }
 
-/** Client Component mutations only — via the same-origin /api/checkout Route Handler. Full UI arrives in Phase 7. */
-export async function completeCheckout(input: CheckoutInput): Promise<unknown> {
-  const res = await api.post('/checkout', input);
+/**
+ * Client Component mutations only — via the same-origin /api/checkout Route
+ * Handler. A fresh Idempotency-Key per checkout ATTEMPT (not per component
+ * mount) protects against a double-click or network retry submitting the
+ * same order twice; the backend's idempotency middleware replays the first
+ * response for a repeat of the same key (plan/03 §6).
+ */
+export async function completeCheckout(input: CheckoutInput): Promise<OrderView> {
+  const res = await api.post<OrderView>('/checkout', input, {
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+  });
   return res.data;
 }
