@@ -13,17 +13,20 @@ import {
   PrismaAttributeRepository,
   PrismaAttributeSetRepository,
   PrismaProductVariantRepository,
+  PrismaVariantStockLookup,
 } from './infrastructure/prisma-product.repository.js';
 import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './infrastructure/prisma-category.repository.js';
 import { PrismaBrandRepository } from './infrastructure/prisma-brand.repository.js';
 import { PrismaMediaAssetRepository, PrismaProductMediaRepository } from './infrastructure/prisma-media.repository.js';
 import { S3MediaStorage } from './infrastructure/s3-media-storage.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
+import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-resolver.js';
 import { CreateProduct } from './application/create-product.usecase.js';
 import { UpdateProduct } from './application/update-product.usecase.js';
 import { AssignAttributeValue } from './application/assign-attribute-value.usecase.js';
 import { AssignAttributeValues } from './application/assign-attribute-values.usecase.js';
 import { GetProductForStoreView } from './application/get-product-for-store-view.usecase.js';
+import { GetStoreProductDetail } from './application/get-store-product-detail.usecase.js';
 import { CreateAttributeSet } from './application/create-attribute-set.usecase.js';
 import { CreateAttributeSetGroup } from './application/create-attribute-set-group.usecase.js';
 import { CreateAttribute } from './application/create-attribute.usecase.js';
@@ -94,12 +97,25 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const storeContext = new PrismaStoreContextResolver(db);
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(db);
+  const variantStock = new PrismaVariantStockLookup(db);
+  const priceResolver = new PrismaPriceResolver(db);
 
   const createProduct = new CreateProduct(products, outbox);
   const updateProduct = new UpdateProduct(products, brands);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
   const assignAttributeValues = new AssignAttributeValues(products, attributes, attrStore, cache, outbox);
   const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
+  const getStoreProductDetail = new GetStoreProductDetail(
+    products,
+    variants,
+    productCategories,
+    productMedia,
+    mediaStorage,
+    priceResolver,
+    variantStock,
+    storeContext,
+    getProductForStoreView,
+  );
   const createAttributeSet = new CreateAttributeSet(attributeSets);
   const createAttributeSetGroup = new CreateAttributeSetGroup(attributeSets);
   const createAttribute = new CreateAttribute(attributes);
@@ -382,7 +398,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/products/:publicId',
     asyncHandler(async (req, res) => {
       const query = parse(storeViewQuerySchema, req.query);
-      const view = await getProductForStoreView.execute({
+      const view = await getStoreProductDetail.execute({
         productPublicId: req.params.publicId!,
         storeViewId: query.storeViewId,
       });

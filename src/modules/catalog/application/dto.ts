@@ -77,6 +77,31 @@ export interface ProductForStoreView extends ProductView {
   attributes: Record<string, unknown>;
 }
 
+export interface StoreProductVariantView {
+  publicId: string;
+  sku: string;
+  status: string;
+  position: number;
+  price: string | null;
+  inStock: boolean;
+}
+
+/**
+ * The full storefront PDP response (plan/14 Phase 0c) — composes
+ * ProductForStoreView (cached attributes) with price/stock/media/variants/
+ * categories/brand, none of which share that cache's 300s TTL since they
+ * change on a different cadence.
+ */
+export interface StoreProductDetailView extends ProductForStoreView {
+  /** The first-by-position variant's price — a representative default for multi-variant products, not a price range. */
+  price: string | null;
+  inStock: boolean;
+  media: ProductMediaView[];
+  variants: StoreProductVariantView[];
+  categoryIds: string[];
+  brandSlug: string | null;
+}
+
 export interface ListProductsQuery {
   page?: number;
   pageSize?: number;

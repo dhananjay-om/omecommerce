@@ -15,6 +15,7 @@ import type {
   ListProductsFilter,
   ProductListResult,
   UpdateProductInput,
+  VariantStockLookup,
 } from '../domain/repositories.js';
 import { Prisma } from '@prisma/client';
 import type { Product as PrismaProductRow } from '@prisma/client';
@@ -163,6 +164,11 @@ export class PrismaProductRepository implements ProductRepository {
     }
     return result;
   }
+
+  async findBrandSlug(productId: bigint): Promise<string | null> {
+    const row = await this.db.product.findFirst({ where: { id: productId }, select: { brand: { select: { slug: true } } } });
+    return row?.brand?.slug ?? null;
+  }
 }
 
 /** Read-only adapter over a product's own variants (admin browse). */
@@ -172,9 +178,20 @@ export class PrismaProductVariantRepository implements ProductVariantRepository 
   async listByProductId(productId: bigint): Promise<VariantInfo[]> {
     return this.db.productVariant.findMany({
       where: { productId },
-      select: { publicId: true, sku: true, status: true, position: true },
+      select: { id: true, publicId: true, sku: true, status: true, position: true },
       orderBy: { position: 'asc' },
     });
+  }
+}
+
+/** Read-only per-variant stock check for the storefront PDP (plan/14 Phase 0c). */
+export class PrismaVariantStockLookup implements VariantStockLookup {
+  constructor(private readonly db: Db) {}
+
+  async isInStock(variantId: bigint): Promise<boolean> {
+    const rows = await this.db.$queryRaw<Array<{ in_stock: boolean }>>`
+      SELECT EXISTS (SELECT 1 FROM stock_item WHERE variant_id = ${variantId} AND available > 0) AS in_stock`;
+    return rows[0]?.in_stock ?? false;
   }
 }
 

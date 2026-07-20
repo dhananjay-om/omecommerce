@@ -67,9 +67,13 @@ export interface ProductRepository {
   findByPublicId(publicId: string): Promise<Product | null>;
   update(publicId: string, input: UpdateProductInput): Promise<Product>;
   list(filter: ListProductsFilter): Promise<ProductListResult>;
+  /** Storefront PDP (plan/14 Phase 0c) — the assigned brand's slug, if any. A small cross-aggregate convenience read, same precedent as sumStockByProduct's raw joins. */
+  findBrandSlug(productId: bigint): Promise<string | null>;
 }
 
 export interface VariantInfo {
+  /** Internal id — needed to resolve price/stock for a specific variant (plan/14 Phase 0c); never serialized directly. */
+  id: bigint;
   publicId: string;
   sku: string;
   status: string;
@@ -373,6 +377,11 @@ export interface CreateBrandInput {
 export interface UpdateBrandInput {
   name?: string;
   description?: string | null;
+}
+
+/** Per-variant stock check for the storefront PDP (plan/14 Phase 0c) — catalog's own copy of the same read search/domain/repositories.ts's StockAvailabilityLookup does, per the established per-module lookup pattern, just keyed by variant instead of product (no join needed, the PDP already has the variant id in hand). */
+export interface VariantStockLookup {
+  isInStock(variantId: bigint): Promise<boolean>;
 }
 
 /** Persistence port for the storefront brand entity (plan/14 Phase 0b) — same shape/discipline as CategoryRepository, minus the tree (brands are flat). */
