@@ -8,6 +8,7 @@ import type {
   FacetableAttribute,
   StockAvailabilityLookup,
   CategoryMembershipLookup,
+  BrandLookup,
 } from '../domain/repositories.js';
 
 export class PrismaProductLookup implements ProductLookup {
@@ -108,5 +109,14 @@ export class PrismaCategoryMembershipLookup implements CategoryMembershipLookup 
       select: { category: { select: { publicId: true } } },
     });
     return rows.map((r) => r.category.publicId);
+  }
+}
+
+export class PrismaBrandLookup implements BrandLookup {
+  constructor(private readonly db: Db) {}
+
+  async brandPublicId(productId: bigint): Promise<string | null> {
+    const row = await this.db.product.findFirst({ where: { id: productId }, select: { brand: { select: { publicId: true } } } });
+    return row?.brand?.publicId ?? null;
   }
 }

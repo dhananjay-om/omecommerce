@@ -92,6 +92,7 @@ export class PrismaProductRepository implements ProductRepository {
         visibility: input.visibility,
         weight: input.weight,
         attributeSetId: input.attributeSetId,
+        brandId: input.brandId,
       },
     });
     return Product.fromPersistence(toDomainProps(row));

@@ -1,7 +1,7 @@
 import type { CategoryRepository } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { toCategoryView } from './category-view.js';
-import { uniqueCategorySlug } from './slugify.js';
+import { uniqueSlug } from './slugify.js';
 import type { CreateCategoryCommand, CategoryView } from './dto.js';
 
 export class CreateCategory {
@@ -14,7 +14,7 @@ export class CreateCategory {
       if (!parent) throw new NotFoundError('category', cmd.parentId);
       parentId = parent.id;
     }
-    const slug = await uniqueCategorySlug(this.categories, cmd.nameDefault);
+    const slug = await uniqueSlug((s) => this.categories.findBySlug(s), cmd.nameDefault, 'category');
     const created = await this.categories.create({
       parentId,
       nameDefault: cmd.nameDefault,

@@ -29,6 +29,7 @@ export const updateProductSchema = z.object({
   visibility: z.nativeEnum(ProductVisibility).optional(),
   weight: decimalString.nullish(),
   attributeSetId: z.string().regex(/^\d+$/, 'expected numeric id').optional(),
+  brandId: z.string().uuid().nullish(),
 });
 
 export const assignAttributeValueSchema = z.object({
@@ -146,6 +147,16 @@ export const reparentCategorySchema = z.object({
 
 export const setProductCategoriesSchema = z.object({
   categoryIds: z.array(z.string().uuid()),
+});
+
+export const createBrandSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000).nullish(),
+});
+
+export const updateBrandSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).nullish(),
 });
 
 export const requestMediaUploadSchema = z.object({

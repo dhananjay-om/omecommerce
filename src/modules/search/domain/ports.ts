@@ -6,6 +6,9 @@ export interface FacetPair {
 /** Reserved facet code for category membership (plan/14 Phase 0a) — a product can carry several of these, one per assigned category's publicId. Not a real attribute, just reuses the existing generic facet-filter mechanism. */
 export const CATEGORY_FACET_CODE = '__category';
 
+/** Reserved facet code for brand (plan/14 Phase 0b) — at most one per product (Product.brandId is a single nullable FK, unlike categories). */
+export const BRAND_FACET_CODE = '__brand';
+
 export interface ProductDocument {
   productId: string;
   storeViewId: string;

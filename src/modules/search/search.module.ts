@@ -11,6 +11,7 @@ import {
   PrismaAttributeFlagsLookup,
   PrismaStockAvailabilityLookup,
   PrismaCategoryMembershipLookup,
+  PrismaBrandLookup,
 } from './infrastructure/prisma-lookups.js';
 import { IndexProduct } from './application/index-product.usecase.js';
 import { SearchProducts } from './application/search-products.usecase.js';
@@ -35,6 +36,7 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
   const priceResolver = new PrismaPriceResolver(db);
   const stockAvailability = new PrismaStockAvailabilityLookup(db);
   const categoryMembership = new PrismaCategoryMembershipLookup(db);
+  const brandLookup = new PrismaBrandLookup(db);
 
   const indexProduct = new IndexProduct(
     products,
@@ -44,6 +46,7 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
     priceResolver,
     stockAvailability,
     categoryMembership,
+    brandLookup,
     index,
   );
   const searchProducts = new SearchProducts(index);

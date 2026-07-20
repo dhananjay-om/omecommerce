@@ -15,6 +15,7 @@ import {
   PrismaProductVariantRepository,
 } from './infrastructure/prisma-product.repository.js';
 import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './infrastructure/prisma-category.repository.js';
+import { PrismaBrandRepository } from './infrastructure/prisma-brand.repository.js';
 import { PrismaMediaAssetRepository, PrismaProductMediaRepository } from './infrastructure/prisma-media.repository.js';
 import { S3MediaStorage } from './infrastructure/s3-media-storage.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
@@ -40,6 +41,11 @@ import { ReparentCategory } from './application/reparent-category.usecase.js';
 import { DeleteCategory } from './application/delete-category.usecase.js';
 import { SetProductCategories } from './application/set-product-categories.usecase.js';
 import { GetCategoryBySlug } from './application/get-category-by-slug.usecase.js';
+import { CreateBrand } from './application/create-brand.usecase.js';
+import { ListBrands } from './application/list-brands.usecase.js';
+import { UpdateBrand } from './application/update-brand.usecase.js';
+import { DeleteBrand } from './application/delete-brand.usecase.js';
+import { GetBrandBySlug } from './application/get-brand-by-slug.usecase.js';
 import { RequestMediaUpload } from './application/request-media-upload.usecase.js';
 import { CreateMediaAsset } from './application/create-media-asset.usecase.js';
 import { AttachProductMedia } from './application/attach-product-media.usecase.js';
@@ -60,6 +66,8 @@ import {
   updateCategorySchema,
   reparentCategorySchema,
   setProductCategoriesSchema,
+  createBrandSchema,
+  updateBrandSchema,
   requestMediaUploadSchema,
   createMediaAssetSchema,
   attachProductMediaSchema,
@@ -79,6 +87,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const variants = new PrismaProductVariantRepository(db);
   const categories = new PrismaCategoryRepository(db);
   const productCategories = new PrismaProductCategoryRepository(db);
+  const brands = new PrismaBrandRepository(db);
   const mediaAssets = new PrismaMediaAssetRepository(db);
   const productMedia = new PrismaProductMediaRepository(db);
   const mediaStorage = new S3MediaStorage();
@@ -87,7 +96,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const outbox = new OutboxWriter(db);
 
   const createProduct = new CreateProduct(products, outbox);
-  const updateProduct = new UpdateProduct(products);
+  const updateProduct = new UpdateProduct(products, brands);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
   const assignAttributeValues = new AssignAttributeValues(products, attributes, attrStore, cache, outbox);
   const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
@@ -108,6 +117,11 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const deleteCategory = new DeleteCategory(categories);
   const getCategoryBySlug = new GetCategoryBySlug(categories);
   const setProductCategories = new SetProductCategories(products, categories, productCategories);
+  const createBrand = new CreateBrand(brands);
+  const listBrands = new ListBrands(brands);
+  const updateBrand = new UpdateBrand(brands);
+  const deleteBrand = new DeleteBrand(brands);
+  const getBrandBySlug = new GetBrandBySlug(brands);
   const requestMediaUpload = new RequestMediaUpload(mediaStorage);
   const createMediaAsset = new CreateMediaAsset(mediaAssets);
   const attachProductMedia = new AttachProductMedia(products, mediaAssets, productMedia, mediaStorage);
@@ -264,6 +278,36 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       res.status(204).send();
     }),
   );
+  admin.get(
+    '/brands',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listBrands.execute() });
+    }),
+  );
+  admin.post(
+    '/brands',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(createBrandSchema, req.body);
+      res.status(201).json({ data: await createBrand.execute(body) });
+    }),
+  );
+  admin.patch(
+    '/brands/:publicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateBrandSchema, req.body);
+      res.json({ data: await updateBrand.execute({ ...body, publicId: req.params.publicId! }) });
+    }),
+  );
+  admin.delete(
+    '/brands/:publicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteBrand.execute(req.params.publicId!);
+      res.status(204).send();
+    }),
+  );
   admin.post(
     '/media/uploads',
     authorize('catalog:manage'),
@@ -355,6 +399,18 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/categories/:slug',
     asyncHandler(async (req, res) => {
       res.json({ data: await getCategoryBySlug.execute(req.params.slug!) });
+    }),
+  );
+  store.get(
+    '/brands',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listBrands.execute() });
+    }),
+  );
+  store.get(
+    '/brands/:slug',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getBrandBySlug.execute(req.params.slug!) });
     }),
   );
 

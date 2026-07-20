@@ -112,6 +112,18 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     expect(res.body.data.hits.map((h: { sku: string }) => h.sku)).toEqual(['SEARCH-SKU-CAT']);
   });
 
+  it('filters by brand via the reserved __brand facet', async () => {
+    const brand = await admin.post('/admin/v1/brands').send({ name: 'Search Test Brand' });
+    const brandPublicId = brand.body.data.publicId as string;
+    const publicId = await createProduct('SEARCH-SKU-BRAND', 'Branded Widget', 'Acme', 16, '22.00');
+    await admin.patch(`/admin/v1/products/${publicId}`).send({ brandId: brandPublicId });
+    await admin.post('/admin/v1/search/reindex');
+
+    const res = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&filter[__brand]=${brandPublicId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.hits.map((h: { sku: string }) => h.sku)).toEqual(['SEARCH-SKU-BRAND']);
+  });
+
   it('filters by a price range (minPrice/maxPrice)', async () => {
     const res = await request(app).get('/store/v1/search').query({ storeViewId, minPrice: 15, maxPrice: 25 });
     expect(res.status).toBe(200);

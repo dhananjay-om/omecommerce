@@ -28,6 +28,8 @@ export interface UpdateProductCommand {
   visibility?: ProductVisibility;
   weight?: string | null;
   attributeSetId?: string;
+  /** Brand's publicId; `null` clears it (plan/14 Phase 0b). */
+  brandId?: string | null;
 }
 
 export interface ProductView {
@@ -324,4 +326,23 @@ export interface ProductMediaView {
 export interface DetachProductMediaCommand {
   productPublicId: string;
   productMediaId: string;
+}
+
+export interface CreateBrandCommand {
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdateBrandCommand {
+  publicId: string;
+  name?: string;
+  description?: string | null;
+}
+
+export interface BrandView {
+  publicId: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
 }

@@ -57,3 +57,8 @@ export interface StockAvailabilityLookup {
 export interface CategoryMembershipLookup {
   categoryPublicIds(productId: bigint): Promise<string[]>;
 }
+
+/** Brand assignment, projected into the index as a reserved facet (plan/14 Phase 0b) — same mechanism as category, but at most one value per product. */
+export interface BrandLookup {
+  brandPublicId(productId: bigint): Promise<string | null>;
+}

@@ -56,6 +56,8 @@ export interface UpdateProductInput {
   visibility?: ProductVisibility;
   weight?: string | null;
   attributeSetId?: bigint;
+  /** `undefined` leaves it untouched; `null` clears it (plan/14 Phase 0b). */
+  brandId?: bigint | null;
 }
 
 /** Persistence port for the Product aggregate (implemented in infrastructure). */
@@ -351,4 +353,36 @@ export interface MediaStorage {
   presignPutUrl(key: string, contentType: string): Promise<string>;
   presignGetUrl(key: string): Promise<string>;
   deleteObject(key: string): Promise<void>;
+}
+
+export interface BrandInfo {
+  id: bigint;
+  publicId: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  createdAt: Date;
+}
+
+export interface CreateBrandInput {
+  slug: string;
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdateBrandInput {
+  name?: string;
+  description?: string | null;
+}
+
+/** Persistence port for the storefront brand entity (plan/14 Phase 0b) — same shape/discipline as CategoryRepository, minus the tree (brands are flat). */
+export interface BrandRepository {
+  create(input: CreateBrandInput): Promise<BrandInfo>;
+  findById(id: bigint): Promise<BrandInfo | null>;
+  findByPublicId(publicId: string): Promise<BrandInfo | null>;
+  findBySlug(slug: string): Promise<BrandInfo | null>;
+  list(): Promise<BrandInfo[]>;
+  update(id: bigint, input: UpdateBrandInput): Promise<BrandInfo>;
+  hasProducts(id: bigint): Promise<boolean>;
+  softDelete(id: bigint): Promise<void>;
 }
