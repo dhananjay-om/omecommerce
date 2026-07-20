@@ -10,3 +10,5 @@ import 'server-only';
  */
 export const WEBSITE_CODE = process.env.WEBSITE_CODE ?? 'us_retail';
 export const STORE_VIEW_ID = process.env.STORE_VIEW_ID ?? '1';
+/** Absolute origin for sitemap/robots/canonical URLs and OpenGraph tags (plan/14 Phase 8) — set SITE_URL in production; defaults to the local dev port. */
+export const SITE_URL = process.env.SITE_URL ?? 'http://localhost:3001';

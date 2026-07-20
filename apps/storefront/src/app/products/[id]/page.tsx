@@ -6,6 +6,7 @@ import { getProduct, searchProducts } from '@/services/products.service';
 import { listCategories } from '@/services/category.service';
 import { ApiError } from '@/lib/api-client';
 import { CATEGORY_FACET_CODE } from '@/lib/facet-codes';
+import { SITE_URL } from '@/lib/config';
 import { ProductGallery } from '@/components/pdp/product-gallery';
 import { ProductActions } from '@/components/pdp/product-actions';
 import { ProductTabs } from '@/components/pdp/product-tabs';
@@ -20,7 +21,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   try {
     const product = await getProduct(id);
-    return { title: product.name ?? product.sku };
+    const title = product.name ?? product.sku;
+    const description = `${title} — ${product.price ? `${product.currency} ${Number(product.price).toFixed(2)}` : 'shop now'} at OMEShop.`;
+    const image = product.media[0]?.url;
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: 'website',
+        images: image ? [{ url: image }] : undefined,
+      },
+      twitter: {
+        card: image ? 'summary_large_image' : 'summary',
+        title,
+        description,
+        images: image ? [image] : undefined,
+      },
+    };
   } catch {
     return {};
   }
@@ -50,8 +69,25 @@ export default async function ProductDetailPage({ params }: Props) {
   const representativeVariant = product.variants[0];
   const priceNumber = product.price ? Number(product.price) : null;
 
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name ?? product.sku,
+    sku: product.sku,
+    image: product.media.map((m) => m.url),
+    brand: product.brandSlug ? { '@type': 'Brand', name: product.brandSlug } : undefined,
+    offers: {
+      '@type': 'Offer',
+      url: `${SITE_URL}/products/${product.publicId}`,
+      priceCurrency: product.currency,
+      price: priceNumber ?? undefined,
+      availability: product.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    },
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
       <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground hover:underline">
           Home

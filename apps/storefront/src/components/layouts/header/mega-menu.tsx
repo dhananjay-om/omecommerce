@@ -30,7 +30,11 @@ export function MegaMenu({ tree }: { tree: CategoryNode[] }) {
             {node.category.nameDefault ?? node.category.slug}
           </Link>
           {node.children.length > 0 ? (
-            <div className="invisible absolute top-full left-0 z-40 min-w-48 rounded-lg border bg-popover p-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100">
+            // group-focus-within (not just group-hover): visibility:hidden removes an
+            // element from the tab order entirely, so a keyboard user tabbing to the
+            // parent link — the only always-focusable trigger here — needs :focus-within
+            // on the group to reveal the children before Tab can ever reach them.
+            <div className="invisible absolute top-full left-0 z-40 min-w-48 rounded-lg border bg-popover p-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
               {node.children.map((child) => (
                 <Link
                   key={child.category.publicId}

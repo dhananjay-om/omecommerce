@@ -7,12 +7,15 @@ import type { SearchHit } from '@/types/product';
  * consistent. Plain `<img>`, not `next/image` — the backend's presigned
  * MinIO/S3 URLs are per-request and don't fit `next/image`'s remote-pattern
  * allowlist (same constraint documented for the admin app's product grid).
+ * Hover lift is pure CSS, not Framer Motion — this renders dozens of times
+ * per PLP grid, and a JS-driven animation on every card would cost far more
+ * than the visual payoff over a transform/shadow transition.
  */
 export function ProductCard({ hit }: { hit: SearchHit }) {
   return (
     <Link
       href={`/products/${hit.productId}`}
-      className="group flex flex-col overflow-hidden rounded-lg border bg-background transition-shadow hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-lg border bg-background transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
     >
       <div className="aspect-square overflow-hidden bg-muted">
         {hit.imageUrl ? (
