@@ -11,7 +11,7 @@ interface CartState {
   removeLine: (variantId: string) => Promise<void>;
 }
 
-function countItems(cart: Cart | null): number {
+export function countItems(cart: Cart | null): number {
   return cart ? cart.lines.reduce((sum, l) => sum + l.qty, 0) : 0;
 }
 

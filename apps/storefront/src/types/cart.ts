@@ -2,6 +2,11 @@ export interface CartLine {
   id: string;
   variantId: string;
   qty: number;
+  sku: string;
+  name: string;
+  price: string | null;
+  imageUrl: string | null;
+  lineTotal: string | null;
 }
 
 export interface Cart {
@@ -9,4 +14,5 @@ export interface Cart {
   currency: string;
   status: string;
   lines: CartLine[];
+  subtotal: string | null;
 }
