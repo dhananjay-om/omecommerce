@@ -40,6 +40,7 @@ export interface SearchHit {
   name: string;
   priceDisplay: string | null;
   currency: string | null;
+  imageUrl: string | null;
 }
 
 export interface FacetBucket {
