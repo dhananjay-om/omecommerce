@@ -30,4 +30,13 @@ export class PrismaShippingMethodRepository implements ShippingMethodRepository 
   async findByCode(code: string): Promise<{ id: bigint; code: string } | null> {
     return this.db.shippingMethod.findFirst({ where: { code }, select: { id: true, code: true } });
   }
+
+  async list(currency: string): Promise<Array<{ code: string; name: string; flatRate: string; currency: string }>> {
+    const rows = await this.db.shippingMethod.findMany({
+      where: { currency },
+      select: { code: true, name: true, flatRate: true, currency: true },
+      orderBy: { flatRate: 'asc' },
+    });
+    return rows.map((r) => ({ code: r.code, name: r.name, flatRate: r.flatRate.toString(), currency: r.currency }));
+  }
 }

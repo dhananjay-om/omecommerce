@@ -9,6 +9,7 @@
 //   node scripts/seed-demo-data.mjs
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,7 +50,28 @@ const priceList = await ensure(
   (p) => p.code === 'PL-DEMO-USD',
   () => A('POST', '/admin/v1/price-lists', { code: 'PL-DEMO-USD', name: 'Demo USD', currency: 'USD', priority: 0 }),
 );
-console.log('warehouse + price list ok:', warehouse.code, priceList.code);
+const shippingMethod = await ensure(
+  () => A('GET', '/store/v1/shipping-methods?currency=USD'),
+  (m) => m.code === 'STANDARD',
+  () => A('POST', '/admin/v1/shipping-methods', { code: 'STANDARD', name: 'Standard Shipping (3-5 days)', flatRate: '5.00', currency: 'USD' }),
+);
+console.log('warehouse + price list + shipping method ok:', warehouse.code, priceList.code, shippingMethod.code);
+
+// No admin endpoint exists for store<->warehouse mapping (order-api.test.ts
+// hits this same gap and works around it with a direct Prisma write) — without
+// one, checkout's WarehouseResolver falls back to "first active warehouse by
+// id", which silently picks a leftover test warehouse with zero stock for our
+// demo products whenever the backend test suite has run in this DB. Pin the
+// mapping explicitly so checkout is deterministic regardless of what other
+// warehouses exist.
+execSync(
+  `docker exec ome-pg-dev psql -U ome -d ome -c "` +
+    `INSERT INTO store_warehouse (store_id, warehouse_id, priority) ` +
+    `SELECT s.id, w.id, 0 FROM store s, warehouse w WHERE s.code = 'main' AND w.code = 'WH-MAIN' ` +
+    `ON CONFLICT (store_id, warehouse_id) DO UPDATE SET priority = 0"`,
+  { stdio: 'inherit' },
+);
+console.log('store-warehouse mapping ok');
 
 async function ensureCategory(name, parentId) {
   return ensure(

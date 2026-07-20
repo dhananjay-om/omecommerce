@@ -32,6 +32,7 @@ import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
 import { CreateTaxClass, CreateShippingMethod } from './application/setup.usecases.js';
+import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
 import {
   createCartSchema,
   addCartLineSchema,
@@ -94,6 +95,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   );
   const getOrder = new GetOrder(orders);
   const listOrders = new ListOrders(orders);
+  const listShippingMethods = new ListShippingMethods(shippingMethods);
   const fulfillOrder = new FulfillOrder(orders, warehouses);
   const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
@@ -184,6 +186,13 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     asyncHandler(async (req, res) => {
       const body = parse(completeCheckoutSchema, req.body);
       res.status(201).json({ data: await completeCheckout.execute({ cartPublicId: req.params.publicId!, ...body }) });
+    }),
+  );
+  store.get(
+    '/shipping-methods',
+    asyncHandler(async (req, res) => {
+      const currency = typeof req.query.currency === 'string' ? req.query.currency : 'USD';
+      res.json({ data: await listShippingMethods.execute(currency) });
     }),
   );
   store.get(

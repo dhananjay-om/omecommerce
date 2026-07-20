@@ -184,6 +184,14 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     expect(readAfterRemove.body.data.lines).toEqual([]);
   });
 
+  it('lists shipping methods for a currency (plan/14 Phase 7a — checkout needs real options, not a blind code)', async () => {
+    const res = await request(app).get('/store/v1/shipping-methods').query({ currency: 'USD' });
+    expect(res.status).toBe(200);
+    const standard = res.body.data.find((m: { code: string }) => m.code === 'STANDARD');
+    expect(standard).toMatchObject({ name: 'Standard Shipping', currency: 'USD' });
+    expect(Number(standard.flatRate)).toBe(5);
+  });
+
   it('404s reading a non-existent cart', async () => {
     const res = await request(app).get('/store/v1/carts/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b');
     expect(res.status).toBe(404);

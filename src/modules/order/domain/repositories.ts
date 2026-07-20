@@ -55,9 +55,18 @@ export interface TaxClassRepository {
   findByCode(code: string): Promise<{ id: bigint; code: string } | null>;
 }
 
+export interface ShippingMethodInfo {
+  code: string;
+  name: string;
+  flatRate: string;
+  currency: string;
+}
+
 export interface ShippingMethodRepository {
   create(input: { code: string; name: string; flatRate: string; currency: string }): Promise<{ publicId: string; code: string }>;
   findByCode(code: string): Promise<{ id: bigint; code: string } | null>;
+  /** Storefront checkout needs to show real options, not a blind code (plan/14 Phase 7a). */
+  list(currency: string): Promise<ShippingMethodInfo[]>;
 }
 
 // --- Cart ---

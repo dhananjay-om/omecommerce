@@ -133,3 +133,10 @@ export interface RefundOrderCommand {
 export interface CancelOrderCommand {
   orderPublicId: string;
 }
+
+export interface ShippingMethodViewDto {
+  code: string;
+  name: string;
+  flatRate: string;
+  currency: string;
+}
