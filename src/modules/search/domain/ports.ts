@@ -3,7 +3,7 @@ export interface FacetPair {
   value: string;
 }
 
-/** Reserved facet code for category membership (plan/14 Phase 0a) — a product can carry several of these, one per assigned category's publicId. Not a real attribute, just reuses the existing generic facet-filter mechanism. */
+/** Reserved facet code for category membership (plan/14 Phase 0a) — a product carries one of these per DIRECTLY assigned category's publicId AND every one of that category's ancestors (plan/14 Phase 3a: browsing "Electronics" must also surface a product only assigned to "Laptops"), via CategoryMembershipLookup. Not a real attribute, just reuses the existing generic facet-filter mechanism. */
 export const CATEGORY_FACET_CODE = '__category';
 
 /** Reserved facet code for brand (plan/14 Phase 0b) — at most one per product (Product.brandId is a single nullable FK, unlike categories). */
@@ -39,6 +39,8 @@ export interface SearchQuery {
   /** Inclusive numeric range on the top-level `price` field — not a facet, since price isn't a discrete filterable attribute. */
   priceMin?: number;
   priceMax?: number;
+  /** Exact match on the top-level `isInStock` field — same reasoning as price: a real boolean field, not a discrete facet value. */
+  inStock?: boolean;
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name_asc';
   page: number;
   pageSize: number;

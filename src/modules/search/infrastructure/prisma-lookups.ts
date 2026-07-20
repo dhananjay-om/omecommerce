@@ -104,12 +104,22 @@ export class PrismaStockAvailabilityLookup implements StockAvailabilityLookup {
 export class PrismaCategoryMembershipLookup implements CategoryMembershipLookup {
   constructor(private readonly db: Db) {}
 
+  /**
+   * Directly-assigned categories PLUS every one of their ancestors, via
+   * `category_closure` — so filtering a PLP by a root category (e.g.
+   * "Electronics") also surfaces products only assigned to a descendant
+   * (e.g. "Laptops"), the way category browsing is expected to behave.
+   * `category_closure` includes a depth-0 self row per category, so a
+   * directly-assigned leaf category is covered by the same JOIN.
+   */
   async categoryPublicIds(productId: bigint): Promise<string[]> {
-    const rows = await this.db.productCategory.findMany({
-      where: { productId },
-      select: { category: { select: { publicId: true } } },
-    });
-    return rows.map((r) => r.category.publicId);
+    const rows = await this.db.$queryRaw<Array<{ public_id: string }>>`
+      SELECT DISTINCT c.public_id
+      FROM product_category pc
+      JOIN category_closure cc ON cc.descendant_id = pc.category_id
+      JOIN category c ON c.id = cc.ancestor_id
+      WHERE pc.product_id = ${productId}`;
+    return rows.map((r) => r.public_id);
   }
 }
 

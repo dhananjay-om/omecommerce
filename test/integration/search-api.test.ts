@@ -8,8 +8,9 @@ import { getAdminToken, adminRequest } from '../helpers/auth.js';
 
 /**
  * Search over HTTP (live DB + OpenSearch). Proves: full-text search, exact-match
- * faceting (brand/ram), facet counts, price sort, store-view scoping, and
- * primary-image URL resolution. Reindexing is triggered synchronously via
+ * faceting (brand/ram), facet counts, price sort, store-view scoping,
+ * availability filtering, and primary-image URL resolution. Reindexing is
+ * triggered synchronously via
  * POST /admin/v1/search/reindex rather than waiting on the BullMQ outbox relay
  * (no workers run in the test process — see src/workers/index.ts's doc
  * comment). Gated on INTEGRATION=1; the image-resolution test also requires
@@ -115,6 +116,20 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     expect(res.body.data.hits.map((h: { sku: string }) => h.sku)).toEqual(['SEARCH-SKU-CAT']);
   });
 
+  it('filtering by a parent category also surfaces products assigned only to a child category', async () => {
+    const parent = await admin.post('/admin/v1/categories').send({ nameDefault: 'Search Test Parent' });
+    const parentPublicId = parent.body.data.publicId as string;
+    const child = await admin.post('/admin/v1/categories').send({ nameDefault: 'Search Test Child', parentId: parentPublicId });
+    const childPublicId = child.body.data.publicId as string;
+    const publicId = await createProduct('SEARCH-SKU-CHILDCAT', 'Child Categorized Widget', 'Acme', 16, '25.00');
+    await admin.put(`/admin/v1/products/${publicId}/categories`).send({ categoryIds: [childPublicId] });
+    await admin.post('/admin/v1/search/reindex');
+
+    const res = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&filter[__category]=${parentPublicId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.hits.map((h: { sku: string }) => h.sku)).toEqual(['SEARCH-SKU-CHILDCAT']);
+  });
+
   it('filters by brand via the reserved __brand facet', async () => {
     const brand = await admin.post('/admin/v1/brands').send({ name: 'Search Test Brand' });
     const brandPublicId = brand.body.data.publicId as string;
@@ -141,6 +156,25 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     expect(res.body.data.hits).toHaveLength(1);
     expect(res.body.data.hits[0].imageUrl).toContain('http');
     expect(res.body.data.hits[0].imageUrl).toContain(upload.body.data.storageKey);
+  });
+
+  it('filters by availability (inStock)', async () => {
+    await createProduct('SEARCH-SKU-OOS', 'Out Of Stock Widget', 'Acme', 16, '15.00');
+    await createProduct('SEARCH-SKU-INSTOCK', 'In Stock Widget', 'Acme', 16, '15.00');
+    await admin.post('/admin/v1/warehouses').send({ code: 'SEARCH-WH', name: 'Search Test Warehouse' });
+    const variant = await prisma.productVariant.findFirstOrThrow({ where: { sku: 'SEARCH-SKU-INSTOCK' } });
+    await admin.post('/admin/v1/inventory/adjustments').send({
+      variantId: variant.publicId,
+      warehouseCode: 'SEARCH-WH',
+      delta: 10,
+      reason: 'PURCHASE',
+    });
+    await admin.post('/admin/v1/search/reindex');
+
+    const res = await request(app).get('/store/v1/search').query({ storeViewId, inStock: 'true', q: 'Widget' });
+    const skus = res.body.data.hits.map((h: { sku: string }) => h.sku);
+    expect(skus).toContain('SEARCH-SKU-INSTOCK');
+    expect(skus).not.toContain('SEARCH-SKU-OOS');
   });
 
   it('filters by a price range (minPrice/maxPrice)', async () => {

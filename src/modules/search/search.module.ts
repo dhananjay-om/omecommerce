@@ -79,6 +79,7 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
           filters,
           priceMin: query.minPrice,
           priceMax: query.maxPrice,
+          inStock: query.inStock,
           sort: query.sort,
           page: query.page,
           pageSize: query.pageSize,

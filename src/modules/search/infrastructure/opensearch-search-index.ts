@@ -55,6 +55,9 @@ export class OpenSearchIndex implements SearchIndex {
         },
       });
     }
+    if (query.inStock !== undefined) {
+      filter.push({ term: { isInStock: query.inStock } });
+    }
 
     const must = query.q ? [{ multi_match: { query: query.q, fields: ['name^3', 'sku^2'] } }] : [{ match_all: {} }];
 

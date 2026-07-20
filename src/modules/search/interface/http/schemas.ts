@@ -8,4 +8,5 @@ export const searchQuerySchema = z.object({
   pageSize: z.coerce.number().int().positive().max(100).optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
+  inStock: z.coerce.boolean().optional(),
 });
