@@ -7,6 +7,7 @@ export interface CreateCartCommand {
 }
 
 export interface CartLineDto {
+  id: string;
   variantId: string;
   qty: number;
 }
@@ -22,6 +23,11 @@ export interface AddCartLineCommand {
   cartPublicId: string;
   variantId: string;
   qty: number;
+}
+
+export interface RemoveCartLineCommand {
+  cartPublicId: string;
+  variantId: string;
 }
 
 export interface AddressInput {

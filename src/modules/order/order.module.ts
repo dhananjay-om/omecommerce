@@ -16,6 +16,8 @@ import { PrismaTaxClassRepository, PrismaShippingMethodRepository } from './infr
 import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { CreateCart } from './application/create-cart.usecase.js';
 import { AddCartLine } from './application/add-cart-line.usecase.js';
+import { GetCart } from './application/get-cart.usecase.js';
+import { RemoveCartLine } from './application/remove-cart-line.usecase.js';
 import { CompleteCheckout } from './application/complete-checkout.usecase.js';
 import { GetOrder } from './application/get-order.usecase.js';
 import { ListOrders } from './application/list-orders.usecase.js';
@@ -65,6 +67,8 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
 
   const createCart = new CreateCart(carts, storeContext, customerGroups, customers);
   const addCartLine = new AddCartLine(carts, variants);
+  const getCart = new GetCart(carts);
+  const removeCartLine = new RemoveCartLine(carts, variants);
   const completeCheckout = new CompleteCheckout(
     carts,
     orders,
@@ -145,11 +149,23 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
       res.status(201).json({ data: await createCart.execute(body) });
     }),
   );
+  store.get(
+    '/carts/:publicId',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCart.execute(req.params.publicId!) });
+    }),
+  );
   store.post(
     '/carts/:publicId/lines',
     asyncHandler(async (req, res) => {
       const body = parse(addCartLineSchema, req.body);
       res.json({ data: await addCartLine.execute({ cartPublicId: req.params.publicId!, ...body }) });
+    }),
+  );
+  store.delete(
+    '/carts/:publicId/lines/:variantId',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await removeCartLine.execute({ cartPublicId: req.params.publicId!, variantId: req.params.variantId! }) });
     }),
   );
   store.post(

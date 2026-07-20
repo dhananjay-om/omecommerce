@@ -142,6 +142,52 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     expect(fetched.body.data.orderNumber).toBe(order.orderNumber);
   });
 
+  it('reads a cart, updates a line qty via re-POST (upsert), and removes a line via DELETE', async () => {
+    const variantId = await createVariant('ORD-SKU-CART', '10.00');
+
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+
+    const added = await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    expect(added.status).toBe(200);
+    expect(added.body.data.lines).toEqual([{ id: expect.any(String), variantId, qty: 1 }]);
+
+    // GET reflects the same state without a re-POST — cart state can now survive a page reload.
+    const read = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(read.status).toBe(200);
+    expect(read.body.data.lines).toEqual([{ id: expect.any(String), variantId, qty: 1 }]);
+
+    // Re-POST with a new qty overwrites (upsert), not a second line.
+    const updated = await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 5 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.lines).toEqual([{ id: expect.any(String), variantId, qty: 5 }]);
+
+    // DELETE removes the line entirely.
+    const removed = await request(app).delete(`/store/v1/carts/${cartId}/lines/${variantId}`);
+    expect(removed.status).toBe(200);
+    expect(removed.body.data.lines).toEqual([]);
+
+    const readAfterRemove = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(readAfterRemove.body.data.lines).toEqual([]);
+  });
+
+  it('404s reading a non-existent cart', async () => {
+    const res = await request(app).get('/store/v1/carts/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b');
+    expect(res.status).toBe(404);
+  });
+
+  it('404s removing a line from a non-existent cart', async () => {
+    const variantId = await createVariant('ORD-SKU-CART-404', '10.00');
+    const res = await request(app).delete(`/store/v1/carts/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/lines/${variantId}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('404s removing a non-existent variant from a real cart', async () => {
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const res = await request(app).delete(`/store/v1/carts/${cart.body.data.publicId}/lines/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b`);
+    expect(res.status).toBe(404);
+  });
+
   it('a cart created for a logged-in customer produces an order carrying that customerId', async () => {
     const variantId = await createVariant('ORD-SKU-CUST-1', '10.00');
     await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });

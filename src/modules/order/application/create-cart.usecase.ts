@@ -42,11 +42,16 @@ export class CreateCart {
   }
 }
 
-export function toDto(cart: { publicId: string; currency: string; status: string; lines: Array<{ variantId: bigint; qty: number }> }): CartView {
+export function toDto(cart: {
+  publicId: string;
+  currency: string;
+  status: string;
+  lines: Array<{ id: bigint; variantPublicId: string; qty: number }>;
+}): CartView {
   return {
     publicId: cart.publicId,
     currency: cart.currency,
     status: cart.status,
-    lines: cart.lines.map((l) => ({ variantId: l.variantId.toString(), qty: l.qty })),
+    lines: cart.lines.map((l) => ({ id: l.id.toString(), variantId: l.variantPublicId, qty: l.qty })),
   };
 }

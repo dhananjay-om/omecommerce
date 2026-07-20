@@ -14,13 +14,13 @@ export class PrismaCartRepository implements CartRepository {
         customerId: input.customerId ?? null,
         customerGroupId: input.customerGroupId ?? null,
       },
-      include: { lines: true },
+      include: LINES_INCLUDE,
     });
     return toView(row);
   }
 
   async findByPublicId(publicId: string): Promise<CartView | null> {
-    const row = await this.db.cart.findFirst({ where: { publicId }, include: { lines: true } });
+    const row = await this.db.cart.findFirst({ where: { publicId }, include: LINES_INCLUDE });
     return row ? toView(row) : null;
   }
 
@@ -49,6 +49,9 @@ export class PrismaCartRepository implements CartRepository {
   }
 }
 
+/** Joins the variant's publicId alongside the internal FK — checkout needs the internal id, the storefront cart response needs the public one (plan/14 Phase 0d). */
+const LINES_INCLUDE = { lines: { include: { variant: { select: { publicId: true } } } } } as const;
+
 interface CartRow {
   id: bigint;
   publicId: string;
@@ -58,7 +61,7 @@ interface CartRow {
   customerId: bigint | null;
   customerGroupId: bigint | null;
   status: CartView['status'];
-  lines: Array<{ id: bigint; variantId: bigint; qty: number }>;
+  lines: Array<{ id: bigint; variantId: bigint; qty: number; variant: { publicId: string } }>;
 }
 
 function toView(row: CartRow): CartView {
@@ -71,6 +74,6 @@ function toView(row: CartRow): CartView {
     customerId: row.customerId,
     customerGroupId: row.customerGroupId,
     status: row.status,
-    lines: row.lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })),
+    lines: row.lines.map((l) => ({ id: l.id, variantId: l.variantId, variantPublicId: l.variant.publicId, qty: l.qty })),
   };
 }

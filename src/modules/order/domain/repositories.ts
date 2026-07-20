@@ -59,7 +59,10 @@ export interface ShippingMethodRepository {
 
 export interface CartLineView {
   id: bigint;
+  /** Internal id — used throughout checkout (price/tax/stock resolution all key off this). Never serialized directly; see `variantPublicId` for the external-facing id. */
   variantId: bigint;
+  /** The variant's own publicId (plan/14 Phase 0d) — what a storefront cart response actually needs, since a client addresses variants/products by publicId everywhere else. */
+  variantPublicId: string;
   qty: number;
 }
 
