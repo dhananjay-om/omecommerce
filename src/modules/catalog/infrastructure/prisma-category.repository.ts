@@ -11,6 +11,7 @@ const CATEGORY_SELECT = {
   id: true,
   publicId: true,
   parentId: true,
+  slug: true,
   type: true,
   sortMode: true,
   position: true,
@@ -23,6 +24,7 @@ type CategoryRow = {
   id: bigint;
   publicId: string;
   parentId: bigint | null;
+  slug: string;
   type: CategoryInfo['type'];
   sortMode: CategoryInfo['sortMode'];
   position: number;
@@ -37,6 +39,7 @@ function mapRow(row: CategoryRow): CategoryInfo {
     publicId: row.publicId,
     parentId: row.parentId,
     parentPublicId: row.parent?.publicId ?? null,
+    slug: row.slug,
     type: row.type,
     sortMode: row.sortMode,
     position: row.position,
@@ -54,6 +57,7 @@ export class PrismaCategoryRepository implements CategoryRepository {
       data: {
         parentId: input.parentId ?? null,
         nameDefault: input.nameDefault,
+        slug: input.slug,
         type: input.type,
         sortMode: input.sortMode,
         position: input.position,
@@ -73,6 +77,11 @@ export class PrismaCategoryRepository implements CategoryRepository {
     return row ? mapRow(row) : null;
   }
 
+  async findBySlug(slug: string): Promise<CategoryInfo | null> {
+    const row = await this.db.category.findFirst({ where: { slug, deletedAt: null }, select: CATEGORY_SELECT });
+    return row ? mapRow(row) : null;
+  }
+
   async list(): Promise<CategoryInfo[]> {
     const rows = await this.db.category.findMany({
       where: { deletedAt: null },
@@ -80,6 +89,19 @@ export class PrismaCategoryRepository implements CategoryRepository {
       orderBy: [{ parentId: 'asc' }, { position: 'asc' }],
     });
     return rows.map(mapRow);
+  }
+
+  async getAncestors(id: bigint): Promise<CategoryInfo[]> {
+    const links = await this.db.$queryRaw<Array<{ ancestor_id: bigint }>>`
+      SELECT ancestor_id FROM category_closure
+       WHERE descendant_id = ${id} AND depth > 0
+       ORDER BY depth DESC`;
+    if (links.length === 0) return [];
+
+    const ids = links.map((l) => l.ancestor_id);
+    const rows = await this.db.category.findMany({ where: { id: { in: ids }, deletedAt: null }, select: CATEGORY_SELECT });
+    const byId = new Map(rows.map((r) => [r.id.toString(), mapRow(r)]));
+    return ids.map((i) => byId.get(i.toString())).filter((c): c is CategoryInfo => c !== undefined);
   }
 
   async update(id: bigint, input: UpdateCategoryInput): Promise<CategoryInfo> {

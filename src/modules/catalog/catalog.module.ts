@@ -39,6 +39,7 @@ import { UpdateCategory } from './application/update-category.usecase.js';
 import { ReparentCategory } from './application/reparent-category.usecase.js';
 import { DeleteCategory } from './application/delete-category.usecase.js';
 import { SetProductCategories } from './application/set-product-categories.usecase.js';
+import { GetCategoryBySlug } from './application/get-category-by-slug.usecase.js';
 import { RequestMediaUpload } from './application/request-media-upload.usecase.js';
 import { CreateMediaAsset } from './application/create-media-asset.usecase.js';
 import { AttachProductMedia } from './application/attach-product-media.usecase.js';
@@ -105,6 +106,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const updateCategory = new UpdateCategory(categories);
   const reparentCategory = new ReparentCategory(categories);
   const deleteCategory = new DeleteCategory(categories);
+  const getCategoryBySlug = new GetCategoryBySlug(categories);
   const setProductCategories = new SetProductCategories(products, categories, productCategories);
   const requestMediaUpload = new RequestMediaUpload(mediaStorage);
   const createMediaAsset = new CreateMediaAsset(mediaAssets);
@@ -341,6 +343,18 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
         storeViewId: query.storeViewId,
       });
       res.json({ data: view });
+    }),
+  );
+  store.get(
+    '/categories',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listCategories.execute() });
+    }),
+  );
+  store.get(
+    '/categories/:slug',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCategoryBySlug.execute(req.params.slug!) });
     }),
   );
 

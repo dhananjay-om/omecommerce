@@ -34,18 +34,25 @@ describe.skipIf(!process.env.INTEGRATION)('category API (live DB)', () => {
     await prisma.$disconnect();
   });
 
-  it('creates a root category', async () => {
+  it('creates a root category with an auto-generated slug', async () => {
     const res = await admin.post('/admin/v1/categories').send({ nameDefault: 'Electronics' });
     expect(res.status).toBe(201);
     expect(res.body.data).toEqual({
       publicId: expect.any(String),
       parentId: null,
+      slug: 'electronics',
       type: 'MANUAL',
       sortMode: 'POSITION',
       position: 0,
       nameDefault: 'Electronics',
       createdAt: expect.any(String),
     });
+  });
+
+  it('disambiguates a slug collision with a numeric suffix', async () => {
+    const res = await admin.post('/admin/v1/categories').send({ nameDefault: 'Electronics' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.slug).toBe('electronics-2');
   });
 
   it('creates a child category and lists the flat tree', async () => {
@@ -131,5 +138,31 @@ describe.skipIf(!process.env.INTEGRATION)('category API (live DB)', () => {
     const cat = await admin.post('/admin/v1/categories').send({ nameDefault: 'Deletable' });
     const res = await admin.delete(`/admin/v1/categories/${cat.body.data.publicId}`);
     expect(res.status).toBe(204);
+  });
+
+  it('store: lists categories without auth', async () => {
+    const res = await admin.get('/store/v1/categories');
+    expect(res.status).toBe(200);
+    expect(res.body.data.some((c: { slug: string }) => c.slug === 'electronics')).toBe(true);
+  });
+
+  it('store: gets a category by slug with a root-first breadcrumb', async () => {
+    const grandparent = await admin.post('/admin/v1/categories').send({ nameDefault: 'Store Root' });
+    const parent = await admin
+      .post('/admin/v1/categories')
+      .send({ nameDefault: 'Store Mid', parentId: grandparent.body.data.publicId });
+    const child = await admin
+      .post('/admin/v1/categories')
+      .send({ nameDefault: 'Store Leaf', parentId: parent.body.data.publicId });
+
+    const res = await admin.get(`/store/v1/categories/${child.body.data.slug}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.category.slug).toBe(child.body.data.slug);
+    expect(res.body.data.breadcrumb.map((c: { slug: string }) => c.slug)).toEqual(['store-root', 'store-mid']);
+  });
+
+  it('store: 404s getting a category by an unknown slug', async () => {
+    const res = await admin.get('/store/v1/categories/does-not-exist');
+    expect(res.status).toBe(404);
   });
 });

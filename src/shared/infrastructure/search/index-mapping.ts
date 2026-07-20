@@ -12,7 +12,11 @@
  * `facets.code` then `facets.value` gives per-attribute facet counts, and query
  * filters use a `nested` filter with both `code`/`value` terms. Every filterable
  * attribute value (including numbers) is indexed as its string form — exact-value
- * faceting only; numeric range facets are a documented follow-up.
+ * faceting only. Category membership reuses this same mechanism under the
+ * reserved `__category` code (plan/14 Phase 0a, see search/domain/ports.ts's
+ * `CATEGORY_FACET_CODE`) rather than a dedicated field. `price` is a genuine
+ * numeric field, so it supports a real `range` query (min/max) — see
+ * `OpenSearchIndex.search()` — unlike the string-only facets.
  */
 export const PRODUCT_INDEX = 'product_search';
 

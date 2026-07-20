@@ -5,6 +5,8 @@ export interface SearchProductsQuery {
   storeViewId: string;
   q?: string;
   filters?: Record<string, string>;
+  priceMin?: number;
+  priceMax?: number;
   sort?: string;
   page?: number;
   pageSize?: number;
@@ -24,6 +26,8 @@ export class SearchProducts {
       storeViewId: query.storeViewId,
       q: query.q,
       filters,
+      priceMin: query.priceMin,
+      priceMax: query.priceMax,
       sort: (query.sort as SearchQuery['sort']) ?? 'relevance',
       page: Math.max(1, query.page ?? 1),
       pageSize: Math.min(100, Math.max(1, query.pageSize ?? 20)),

@@ -5,6 +5,7 @@ export function toCategoryView(c: CategoryInfo): CategoryView {
   return {
     publicId: c.publicId,
     parentId: c.parentPublicId,
+    slug: c.slug,
     type: c.type,
     sortMode: c.sortMode,
     position: c.position,

@@ -52,3 +52,8 @@ export interface AttributeFlagsLookup {
 export interface StockAvailabilityLookup {
   isInStock(productId: bigint): Promise<boolean>;
 }
+
+/** Category assignment, projected into the index as a reserved facet (plan/14 Phase 0a) — lets `GET /store/v1/search?filter[__category]=<publicId>` power the PLP without a dedicated category-scoped endpoint. */
+export interface CategoryMembershipLookup {
+  categoryPublicIds(productId: bigint): Promise<string[]>;
+}

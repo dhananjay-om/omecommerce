@@ -38,9 +38,9 @@ INSERT INTO product_attribute_value(product_id,attribute_id,scope) VALUES (1,1,'
 INSERT INTO website(code,name,base_currency,is_default) VALUES ('eu','EU','USD',true);
 
 \echo '--- T8: category LTREE path + closure maintained by triggers ---'
-INSERT INTO category(type,position) VALUES ('MANUAL',0);            -- id 1 root
-INSERT INTO category(parent_id,type,position) VALUES (1,'MANUAL',0); -- id 2
-INSERT INTO category(parent_id,type,position) VALUES (2,'MANUAL',0); -- id 3
+INSERT INTO category(type,position,slug) VALUES ('MANUAL',0,'root-cat');                    -- id 1 root
+INSERT INTO category(parent_id,type,position,slug) VALUES (1,'MANUAL',0,'child-cat');       -- id 2
+INSERT INTO category(parent_id,type,position,slug) VALUES (2,'MANUAL',0,'grandchild-cat');  -- id 3
 SELECT id, parent_id, path::text FROM category ORDER BY id;
 \echo '   closure (ancestor,descendant,depth) — expect self-links + 1>2,1>3,2>3 :'
 SELECT ancestor_id, descendant_id, depth FROM category_closure ORDER BY ancestor_id, descendant_id;

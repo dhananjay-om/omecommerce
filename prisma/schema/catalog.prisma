@@ -164,11 +164,31 @@ model Product {
   bundleItems     ProductBundleItem[]     @relation("BundleParent")
   componentOf     ProductBundleItem[]     @relation("BundleComponent")
   wishlistItems   WishlistItem[]
+  brandId         BigInt?                 @map("brand_id")
+  brand           Brand?                  @relation(fields: [brandId], references: [id])
 
   @@index([status, deletedAt])
   @@index([attributeSetId])
   @@index([type])
+  @@index([brandId])
   @@map("product")
+}
+
+/// Storefront brand entity (plan/14 Phase 0b) — same shape/discipline as Category.
+model Brand {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  slug        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  products Product[]
+
+  @@index([deletedAt])
+  @@map("brand")
 }
 
 model ProductVariant {
@@ -307,6 +327,8 @@ model Category {
   sortMode         CategorySortMode      @default(POSITION) @map("sort_mode")
   position         Int                   @default(0)
   nameDefault      String?               @map("name_default")
+  /// URL-safe identifier for storefront routes (/collections/:slug). Backfilled from nameDefault for pre-existing rows.
+  slug             String                @unique
   createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        BigInt?               @map("created_by")

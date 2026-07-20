@@ -45,6 +45,16 @@ export class OpenSearchIndex implements SearchIndex {
         },
       });
     }
+    if (query.priceMin !== undefined || query.priceMax !== undefined) {
+      filter.push({
+        range: {
+          price: {
+            ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
+            ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
+          },
+        },
+      });
+    }
 
     const must = query.q ? [{ multi_match: { query: query.q, fields: ['name^3', 'sku^2'] } }] : [{ match_all: {} }];
 

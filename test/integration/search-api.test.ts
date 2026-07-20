@@ -100,6 +100,26 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     expect(res.body.data.hits[0].sku).toBe('SEARCH-SKU-A');
   });
 
+  it('filters by category membership via the reserved __category facet', async () => {
+    const category = await admin.post('/admin/v1/categories').send({ nameDefault: 'Search Test Category' });
+    const categoryPublicId = category.body.data.publicId as string;
+    const publicId = await createProduct('SEARCH-SKU-CAT', 'Categorized Widget', 'Acme', 16, '25.00');
+    await admin.put(`/admin/v1/products/${publicId}/categories`).send({ categoryIds: [categoryPublicId] });
+    await admin.post('/admin/v1/search/reindex');
+
+    const res = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&filter[__category]=${categoryPublicId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.hits.map((h: { sku: string }) => h.sku)).toEqual(['SEARCH-SKU-CAT']);
+  });
+
+  it('filters by a price range (minPrice/maxPrice)', async () => {
+    const res = await request(app).get('/store/v1/search').query({ storeViewId, minPrice: 15, maxPrice: 25 });
+    expect(res.status).toBe(200);
+    const prices = res.body.data.hits.map((h: { priceDisplay: string }) => Number(h.priceDisplay));
+    expect(prices.every((p: number) => p >= 15 && p <= 25)).toBe(true);
+    expect(prices.length).toBeGreaterThan(0);
+  });
+
   it('sorts by price ascending and descending', async () => {
     const asc = await request(app).get('/store/v1/search').query({ storeViewId, sort: 'price_asc' });
     const ascPrices = asc.body.data.hits.map((h: { priceDisplay: string }) => Number(h.priceDisplay));

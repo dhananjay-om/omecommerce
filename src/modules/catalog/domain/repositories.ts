@@ -236,6 +236,8 @@ export interface CategoryInfo {
   parentId: bigint | null;
   /** The parent's own publicId — external callers address categories by publicId, never the internal bigint. */
   parentPublicId: string | null;
+  /** URL-safe storefront identifier (plan/14 Phase 0a) — unique, always present. */
+  slug: string;
   type: CategoryType;
   sortMode: CategorySortMode;
   position: number;
@@ -246,6 +248,8 @@ export interface CategoryInfo {
 export interface CreateCategoryInput {
   parentId?: bigint | null;
   nameDefault?: string | null;
+  /** Caller-supplied or use-case-generated (slugified nameDefault, disambiguated on collision) — the repository never invents one. */
+  slug: string;
   type?: CategoryType;
   sortMode?: CategorySortMode;
   position?: number;
@@ -270,8 +274,12 @@ export interface CategoryRepository {
   create(input: CreateCategoryInput): Promise<CategoryInfo>;
   findById(id: bigint): Promise<CategoryInfo | null>;
   findByPublicId(publicId: string): Promise<CategoryInfo | null>;
+  /** Storefront lookup (plan/14 Phase 0a) — categories are addressed by slug in URLs, not publicId. */
+  findBySlug(slug: string): Promise<CategoryInfo | null>;
   /** Admin browse — the full flat list; the tree is built from `parentId` in application/frontend code (small, admin-scale table). */
   list(): Promise<CategoryInfo[]>;
+  /** Storefront breadcrumb (plan/14 Phase 0a) — root-first ancestor chain, read from the existing `category_closure` transitive-closure table (excludes the category itself). */
+  getAncestors(id: bigint): Promise<CategoryInfo[]>;
   update(id: bigint, input: UpdateCategoryInput): Promise<CategoryInfo>;
   reparent(id: bigint, newParentId: bigint | null): Promise<CategoryInfo>;
   hasChildren(id: bigint): Promise<boolean>;

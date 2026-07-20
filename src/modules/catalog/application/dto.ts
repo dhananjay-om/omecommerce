@@ -264,11 +264,17 @@ export interface ReparentCategoryCommand {
 export interface CategoryView {
   publicId: string;
   parentId: string | null;
+  slug: string;
   type: CategoryType;
   sortMode: CategorySortMode;
   position: number;
   nameDefault: string | null;
   createdAt: string;
+}
+
+export interface CategoryBreadcrumbView {
+  category: CategoryView;
+  breadcrumb: CategoryView[];
 }
 
 export interface SetProductCategoriesCommand {

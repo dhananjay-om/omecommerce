@@ -3,6 +3,9 @@ export interface FacetPair {
   value: string;
 }
 
+/** Reserved facet code for category membership (plan/14 Phase 0a) — a product can carry several of these, one per assigned category's publicId. Not a real attribute, just reuses the existing generic facet-filter mechanism. */
+export const CATEGORY_FACET_CODE = '__category';
+
 export interface ProductDocument {
   productId: string;
   storeViewId: string;
@@ -28,6 +31,9 @@ export interface SearchQuery {
   storeViewId: string;
   q?: string;
   filters: SearchFilter[];
+  /** Inclusive numeric range on the top-level `price` field — not a facet, since price isn't a discrete filterable attribute. */
+  priceMin?: number;
+  priceMax?: number;
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name_asc';
   page: number;
   pageSize: number;

@@ -7,6 +7,7 @@ import type {
   AttributeFlagsLookup,
   FacetableAttribute,
   StockAvailabilityLookup,
+  CategoryMembershipLookup,
 } from '../domain/repositories.js';
 
 export class PrismaProductLookup implements ProductLookup {
@@ -95,5 +96,17 @@ export class PrismaStockAvailabilityLookup implements StockAvailabilityLookup {
         WHERE pv.product_id = ${productId} AND si.available > 0
       ) AS in_stock`;
     return rows[0]?.in_stock ?? false;
+  }
+}
+
+export class PrismaCategoryMembershipLookup implements CategoryMembershipLookup {
+  constructor(private readonly db: Db) {}
+
+  async categoryPublicIds(productId: bigint): Promise<string[]> {
+    const rows = await this.db.productCategory.findMany({
+      where: { productId },
+      select: { category: { select: { publicId: true } } },
+    });
+    return rows.map((r) => r.category.publicId);
   }
 }
