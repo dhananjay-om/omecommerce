@@ -9,6 +9,7 @@ import type {
   StockAvailabilityLookup,
   CategoryMembershipLookup,
   BrandLookup,
+  ProductMediaLookup,
 } from '../domain/repositories.js';
 
 export class PrismaProductLookup implements ProductLookup {
@@ -118,5 +119,20 @@ export class PrismaBrandLookup implements BrandLookup {
   async brandPublicId(productId: bigint): Promise<string | null> {
     const row = await this.db.product.findFirst({ where: { id: productId }, select: { brand: { select: { publicId: true } } } });
     return row?.brand?.publicId ?? null;
+  }
+}
+
+export class PrismaProductMediaLookup implements ProductMediaLookup {
+  constructor(private readonly db: Db) {}
+
+  async primaryImageKey(productId: bigint): Promise<string | null> {
+    const rows = await this.db.$queryRaw<Array<{ storage_key: string }>>`
+      SELECT ma.storage_key
+      FROM product_media pm
+      JOIN media_asset ma ON ma.id = pm.asset_id
+      WHERE pm.product_id = ${productId}
+      ORDER BY pm.position ASC
+      LIMIT 1`;
+    return rows[0]?.storage_key ?? null;
   }
 }

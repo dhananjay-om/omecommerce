@@ -88,6 +88,7 @@ export class OpenSearchIndex implements SearchIndex {
       name: h._source.name,
       priceDisplay: h._source.priceDisplay,
       currency: h._source.currency,
+      imageKey: h._source.imageKey,
     }));
 
     const facets: Record<string, FacetBucket[]> = {};

@@ -5,6 +5,7 @@ import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaProductAttributeStore } from '../catalog/infrastructure/product-attribute.store.js';
 import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-resolver.js';
 import { OpenSearchIndex } from './infrastructure/opensearch-search-index.js';
+import { S3MediaUrlResolver } from './infrastructure/s3-media-url-resolver.js';
 import {
   PrismaProductLookup,
   PrismaStoreViewLookup,
@@ -12,6 +13,7 @@ import {
   PrismaStockAvailabilityLookup,
   PrismaCategoryMembershipLookup,
   PrismaBrandLookup,
+  PrismaProductMediaLookup,
 } from './infrastructure/prisma-lookups.js';
 import { IndexProduct } from './application/index-product.usecase.js';
 import { SearchProducts } from './application/search-products.usecase.js';
@@ -37,6 +39,8 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
   const stockAvailability = new PrismaStockAvailabilityLookup(db);
   const categoryMembership = new PrismaCategoryMembershipLookup(db);
   const brandLookup = new PrismaBrandLookup(db);
+  const productMedia = new PrismaProductMediaLookup(db);
+  const mediaUrlResolver = new S3MediaUrlResolver();
 
   const indexProduct = new IndexProduct(
     products,
@@ -47,9 +51,10 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
     stockAvailability,
     categoryMembership,
     brandLookup,
+    productMedia,
     index,
   );
-  const searchProducts = new SearchProducts(index);
+  const searchProducts = new SearchProducts(index, mediaUrlResolver);
   const reindexAll = new ReindexAll(products, index, indexProduct);
 
   const admin = Router();

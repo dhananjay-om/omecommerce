@@ -8,10 +8,13 @@ import { getAdminToken, adminRequest } from '../helpers/auth.js';
 
 /**
  * Search over HTTP (live DB + OpenSearch). Proves: full-text search, exact-match
- * faceting (brand/ram), facet counts, price sort, and store-view scoping.
- * Reindexing is triggered synchronously via POST /admin/v1/search/reindex rather
- * than waiting on the BullMQ outbox relay (no workers run in the test process —
- * see src/workers/index.ts's doc comment). Gated on INTEGRATION=1.
+ * faceting (brand/ram), facet counts, price sort, store-view scoping, and
+ * primary-image URL resolution. Reindexing is triggered synchronously via
+ * POST /admin/v1/search/reindex rather than waiting on the BullMQ outbox relay
+ * (no workers run in the test process — see src/workers/index.ts's doc
+ * comment). Gated on INTEGRATION=1; the image-resolution test also requires
+ * S3_ENDPOINT/S3_ACCESS_KEY/S3_SECRET_KEY/S3_BUCKET (a real MinIO, e.g. the
+ * `ome-minio-dev` dev container), same as media-api.test.ts.
  */
 describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', () => {
   const app = createApp();
@@ -122,6 +125,22 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     const res = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&filter[__brand]=${brandPublicId}`);
     expect(res.status).toBe(200);
     expect(res.body.data.hits.map((h: { sku: string }) => h.sku)).toEqual(['SEARCH-SKU-BRAND']);
+  });
+
+  it('resolves the primary image to a fresh presigned URL, and null when no media is attached', async () => {
+    const withoutMedia = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&filter[search-ram]=16`);
+    expect(withoutMedia.body.data.hits[0].imageUrl).toBeNull();
+
+    const publicId = await createProduct('SEARCH-SKU-IMG', 'Photographed Widget', 'Acme', 8, '30.00');
+    const upload = await admin.post('/admin/v1/media/uploads').send({ filename: 'widget.jpg', mimeType: 'image/jpeg' });
+    const asset = await admin.post('/admin/v1/media').send({ storageKey: upload.body.data.storageKey, mimeType: 'image/jpeg', bytes: 1024 });
+    await admin.post(`/admin/v1/products/${publicId}/media`).send({ mediaPublicId: asset.body.data.publicId });
+    await admin.post('/admin/v1/search/reindex');
+
+    const res = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&q=Photographed`);
+    expect(res.body.data.hits).toHaveLength(1);
+    expect(res.body.data.hits[0].imageUrl).toContain('http');
+    expect(res.body.data.hits[0].imageUrl).toContain(upload.body.data.storageKey);
   });
 
   it('filters by a price range (minPrice/maxPrice)', async () => {

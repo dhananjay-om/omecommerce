@@ -9,6 +9,7 @@ import {
   PrismaStockAvailabilityLookup,
   PrismaCategoryMembershipLookup,
   PrismaBrandLookup,
+  PrismaProductMediaLookup,
 } from '../modules/search/infrastructure/prisma-lookups.js';
 import { PrismaProductAttributeStore } from '../modules/catalog/infrastructure/product-attribute.store.js';
 import { PrismaPriceResolver } from '../modules/pricing/infrastructure/prisma-price-resolver.js';
@@ -40,6 +41,7 @@ export function createSearchIndexHandler(): (job: Job) => Promise<void> {
   const stockAvailability = new PrismaStockAvailabilityLookup(prisma);
   const categoryMembership = new PrismaCategoryMembershipLookup(prisma);
   const brandLookup = new PrismaBrandLookup(prisma);
+  const productMedia = new PrismaProductMediaLookup(prisma);
   const indexProduct = new IndexProduct(
     products,
     storeViews,
@@ -49,6 +51,7 @@ export function createSearchIndexHandler(): (job: Job) => Promise<void> {
     stockAvailability,
     categoryMembership,
     brandLookup,
+    productMedia,
     index,
   );
 

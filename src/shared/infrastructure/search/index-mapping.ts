@@ -38,6 +38,7 @@ export const PRODUCT_INDEX_MAPPING = {
       price: { type: 'double' },
       priceDisplay: { type: 'keyword' },
       currency: { type: 'keyword' },
+      imageKey: { type: 'keyword' },
       facets: {
         type: 'nested',
         properties: {

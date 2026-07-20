@@ -21,6 +21,8 @@ export interface ProductDocument {
   price: number | null;
   priceDisplay: string | null;
   currency: string | null;
+  /** Storage key of the lowest-position media asset, not a URL — see ProductMediaLookup's doc comment. */
+  imageKey: string | null;
   facets: FacetPair[];
   updatedAt: string;
 }
@@ -51,7 +53,7 @@ export interface SearchResult {
   total: number;
   page: number;
   pageSize: number;
-  hits: Array<{ productId: string; sku: string; name: string; priceDisplay: string | null; currency: string | null }>;
+  hits: Array<{ productId: string; sku: string; name: string; priceDisplay: string | null; currency: string | null; imageKey: string | null }>;
   facets: Record<string, FacetBucket[]>;
 }
 
@@ -64,4 +66,9 @@ export interface SearchIndex {
   upsert(doc: ProductDocument): Promise<void>;
   deleteByProductId(productId: string): Promise<void>;
   search(query: SearchQuery): Promise<SearchResult>;
+}
+
+/** Resolves a stored media key to a fresh, short-lived GET URL (plan/14 Phase 2a) — a narrower port than catalog's `MediaStorage` since search only ever reads. */
+export interface MediaUrlResolver {
+  presignGetUrl(key: string): Promise<string>;
 }

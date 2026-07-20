@@ -8,6 +8,7 @@ import type {
   StockAvailabilityLookup,
   CategoryMembershipLookup,
   BrandLookup,
+  ProductMediaLookup,
 } from '../domain/repositories.js';
 import type { SearchIndex, ProductDocument, FacetPair } from '../domain/ports.js';
 import { CATEGORY_FACET_CODE, BRAND_FACET_CODE } from '../domain/ports.js';
@@ -29,6 +30,7 @@ export class IndexProduct {
     private readonly stockAvailability: StockAvailabilityLookup,
     private readonly categoryMembership: CategoryMembershipLookup,
     private readonly brandLookup: BrandLookup,
+    private readonly productMedia: ProductMediaLookup,
     private readonly index: SearchIndex,
   ) {}
 
@@ -40,12 +42,13 @@ export class IndexProduct {
     }
 
     const variantId = await this.products.firstVariantId(product.id);
-    const [storeViews, facetable, isInStock, categoryIds, brandPublicId] = await Promise.all([
+    const [storeViews, facetable, isInStock, categoryIds, brandPublicId, imageKey] = await Promise.all([
       this.storeViews.allActive(),
       this.facetableAttributes.facetable(),
       this.stockAvailability.isInStock(product.id),
       this.categoryMembership.categoryPublicIds(product.id),
       this.brandLookup.brandPublicId(product.id),
+      this.productMedia.primaryImageKey(product.id),
     ]);
     const facetableCodes = new Set(facetable.map((a) => a.code));
 
@@ -98,6 +101,7 @@ export class IndexProduct {
         price,
         priceDisplay,
         currency: priceDisplay ? sv.currency : null,
+        imageKey,
         facets,
         updatedAt: new Date().toISOString(),
       };

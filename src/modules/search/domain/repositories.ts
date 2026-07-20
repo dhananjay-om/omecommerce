@@ -62,3 +62,14 @@ export interface CategoryMembershipLookup {
 export interface BrandLookup {
   brandPublicId(productId: bigint): Promise<string | null>;
 }
+
+/**
+ * The lowest-position media asset's storage KEY (plan/14 Phase 2a) — not a
+ * URL. Presigned GET URLs expire in 15 minutes (see s3-client.ts), so baking
+ * one into the index would go stale between reindexes (media changes don't
+ * trigger reindex, same documented limitation as price/stock/category).
+ * SearchProducts resolves the key to a fresh URL on every read instead.
+ */
+export interface ProductMediaLookup {
+  primaryImageKey(productId: bigint): Promise<string | null>;
+}

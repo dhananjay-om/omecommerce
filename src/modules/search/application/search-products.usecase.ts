@@ -1,4 +1,4 @@
-import type { SearchIndex, SearchQuery, SearchResult } from '../domain/ports.js';
+import type { SearchIndex, SearchQuery, MediaUrlResolver } from '../domain/ports.js';
 import { ValidationError } from '../../../shared/domain/errors.js';
 
 export interface SearchProductsQuery {
@@ -12,12 +12,32 @@ export interface SearchProductsQuery {
   pageSize?: number;
 }
 
+export interface SearchProductHit {
+  productId: string;
+  sku: string;
+  name: string;
+  priceDisplay: string | null;
+  currency: string | null;
+  imageUrl: string | null;
+}
+
+export interface SearchProductsResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  hits: SearchProductHit[];
+  facets: Record<string, Array<{ value: string; count: number }>>;
+}
+
 const VALID_SORTS = new Set(['relevance', 'price_asc', 'price_desc', 'name_asc']);
 
 export class SearchProducts {
-  constructor(private readonly index: SearchIndex) {}
+  constructor(
+    private readonly index: SearchIndex,
+    private readonly mediaUrls: MediaUrlResolver,
+  ) {}
 
-  async execute(query: SearchProductsQuery): Promise<SearchResult> {
+  async execute(query: SearchProductsQuery): Promise<SearchProductsResult> {
     if (query.sort && !VALID_SORTS.has(query.sort)) {
       throw new ValidationError('invalid sort', [{ path: 'sort', message: `must be one of ${[...VALID_SORTS].join(', ')}` }]);
     }
@@ -32,6 +52,17 @@ export class SearchProducts {
       page: Math.max(1, query.page ?? 1),
       pageSize: Math.min(100, Math.max(1, query.pageSize ?? 20)),
     };
-    return this.index.search(searchQuery);
+    const result = await this.index.search(searchQuery);
+
+    // Presigned GET URLs expire in 15 minutes, so they're resolved fresh here
+    // rather than stored in the index (see ProductMediaLookup's doc comment).
+    const hits = await Promise.all(
+      result.hits.map(async ({ imageKey, ...hit }) => ({
+        ...hit,
+        imageUrl: imageKey ? await this.mediaUrls.presignGetUrl(imageKey) : null,
+      })),
+    );
+
+    return { ...result, hits };
   }
 }
