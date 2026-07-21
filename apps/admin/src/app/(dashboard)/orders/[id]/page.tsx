@@ -8,6 +8,8 @@ import { FulfillDialog } from '../fulfill-dialog';
 import { RefundDialog } from '../refund-dialog';
 import { CancelDialog } from '../cancel-dialog';
 import { AddNoteForm } from '../add-note-form';
+import { CreateInvoiceDialog } from '../create-invoice-dialog';
+import { InvoicesCard } from '../invoices-card';
 import { statusBadgeVariant } from '@/lib/status-badge';
 
 function sum(values: string[]): number {
@@ -55,6 +57,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       <div className="flex gap-2">
         <FulfillDialog orderPublicId={order.publicId} lines={order.lines} />
         <RefundDialog orderPublicId={order.publicId} lines={order.lines} />
+        <CreateInvoiceDialog orderPublicId={order.publicId} lines={order.lines} invoices={order.invoices} />
         {cancellable ? <CancelDialog orderPublicId={order.publicId} /> : null}
       </div>
 
@@ -136,20 +139,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
       <Card>
         <CardHeader>
+          <CardTitle>Invoices</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InvoicesCard orderPublicId={order.publicId} invoices={order.invoices} currency={order.currency} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Attachments</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {order.invoices.length === 0 && order.fulfillments.every((f) => !f.hasPackingSlip) ? (
-            <p className="text-muted-foreground">No attachments yet.</p>
+          {order.fulfillments.every((f) => !f.hasPackingSlip) ? (
+            <p className="text-muted-foreground">No packing slips yet.</p>
           ) : (
             <ul className="space-y-1">
-              {order.invoices.map((inv) => (
-                <li key={inv.publicId}>
-                  <a href={`/api/orders/${order.publicId}/invoice/${inv.publicId}/pdf`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                    Invoice #{inv.invoiceNumber} (PDF)
-                  </a>
-                </li>
-              ))}
               {order.fulfillments
                 .filter((f) => f.hasPackingSlip)
                 .map((f) => (
