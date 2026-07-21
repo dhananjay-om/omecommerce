@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiPost, ApiError } from '@/lib/api-client';
-import type { OrderDetail, OrderNote } from '@/lib/types';
+import type { OrderDetail, OrderNote, OrderEmailLogEntry } from '@/lib/types';
 
 export interface ActionState {
   error: string | null;
@@ -121,6 +121,27 @@ export async function createInvoice(orderPublicId: string, _prevState: ActionSta
 export async function regenerateInvoice(orderPublicId: string, invoicePublicId: string, _prevState: ActionState): Promise<ActionState> {
   try {
     await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/invoice/${invoicePublicId}/regenerate`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath(`/orders/${orderPublicId}`);
+  return { error: null, success: true };
+}
+
+export async function sendOrderEmail(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const type = formData.get('type');
+  const subject = formData.get('subject');
+  const body = formData.get('body');
+  if (typeof type !== 'string') return { error: 'Select an email type.', success: false };
+
+  try {
+    await apiPost<OrderEmailLogEntry>(`/admin/v1/orders/${orderPublicId}/send-email`, {
+      type,
+      subject: typeof subject === 'string' && subject ? subject : undefined,
+      body: typeof body === 'string' && body ? body : undefined,
+    });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

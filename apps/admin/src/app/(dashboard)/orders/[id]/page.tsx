@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
-import type { OrderDetail, OrderHistoryEntry } from '@/lib/types';
+import type { OrderDetail, OrderHistoryEntry, OrderEmailLogEntry } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,6 +12,8 @@ import { CreateInvoiceDialog } from '../create-invoice-dialog';
 import { InvoicesCard } from '../invoices-card';
 import { ShipmentsCard } from '../shipments-card';
 import { CloseOrderDialog } from '../close-order-dialog';
+import { SendEmailDialog } from '../send-email-dialog';
+import { EmailLogCard } from '../email-log-card';
 import { statusBadgeVariant } from '@/lib/status-badge';
 
 function sum(values: string[]): number {
@@ -24,9 +26,10 @@ function invoicedQty(order: OrderDetail, sku: string): number {
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [order, history] = await Promise.all([
+  const [order, history, emailLog] = await Promise.all([
     apiGet<OrderDetail>(`/admin/v1/orders/${id}`),
     apiGet<OrderHistoryEntry[]>(`/admin/v1/orders/${id}/history`),
+    apiGet<OrderEmailLogEntry[]>(`/admin/v1/orders/${id}/email-log`),
   ]);
   const cancellable = !['CANCELLED', 'COMPLETED', 'CLOSED'].includes(order.status);
   const billing = order.addresses.find((a) => a.type === 'BILLING');
@@ -60,6 +63,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <FulfillDialog orderPublicId={order.publicId} lines={order.lines} />
         <RefundDialog orderPublicId={order.publicId} lines={order.lines} />
         <CreateInvoiceDialog orderPublicId={order.publicId} lines={order.lines} invoices={order.invoices} />
+        <SendEmailDialog orderPublicId={order.publicId} />
         <CloseOrderDialog order={order} />
         {cancellable ? <CancelDialog orderPublicId={order.publicId} /> : null}
       </div>
@@ -204,6 +208,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </ul>
           )}
           <AddNoteForm orderPublicId={order.publicId} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Email History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmailLogCard log={emailLog} />
         </CardContent>
       </Card>
     </div>
