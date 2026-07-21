@@ -948,4 +948,112 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     expect(noMatch.status).toBe(200);
     expect(noMatch.text.split('\n').filter((l: string) => l.trim()).length).toBe(1); // header only
   });
+
+  async function createCustomerOrder(sku: string, email: string): Promise<{ orderPublicId: string; customerPublicId: string; customerToken: string }> {
+    const variantId = await createVariant(sku, '12.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+
+    await request(app).post('/store/v1/customers').send({ websiteCode: 'us_retail', email, password: 'correct-horse-battery' });
+    const login = await request(app).post('/store/v1/customers/actions/login').send({ websiteCode: 'us_retail', email, password: 'correct-horse-battery' });
+    const customerPublicId = login.body.data.customerPublicId as string;
+    const customerToken = login.body.data.token as string;
+
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId, customerPublicId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({ email, billingAddress: address, shippingAddress: address, shippingMethodCode: 'STANDARD', paymentMethod: 'test_card' });
+    expect(checkout.status).toBe(201);
+
+    return { orderPublicId: checkout.body.data.publicId, customerPublicId, customerToken };
+  }
+
+  it('lists a customer\'s own orders with search/pagination/itemsCount, and GET /me/orders/:id returns full detail scoped to that customer', async () => {
+    const { orderPublicId, customerToken } = await createCustomerOrder('ORD-SKU-ME-1', 'me-orders-customer@example.com');
+
+    const list = await request(app).get('/store/v1/me/orders').set('Authorization', `Bearer ${customerToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.data.total).toBeGreaterThanOrEqual(1);
+    expect(list.body.data.orders[0]).toHaveProperty('itemsCount');
+    const own = list.body.data.orders.find((o: { publicId: string }) => o.publicId === orderPublicId);
+    expect(own.itemsCount).toBe(1);
+
+    const detail = await request(app).get(`/store/v1/me/orders/${orderPublicId}`).set('Authorization', `Bearer ${customerToken}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.publicId).toBe(orderPublicId);
+    expect(detail.body.data.lines).toHaveLength(1);
+  });
+
+  it('rejects GET /me/orders/:id for an order belonging to a different customer', async () => {
+    const { orderPublicId } = await createCustomerOrder('ORD-SKU-ME-OTHER-1', 'me-orders-owner@example.com');
+
+    await request(app).post('/store/v1/customers').send({ websiteCode: 'us_retail', email: 'me-orders-intruder@example.com', password: 'correct-horse-battery' });
+    const intruderLogin = await request(app)
+      .post('/store/v1/customers/actions/login')
+      .send({ websiteCode: 'us_retail', email: 'me-orders-intruder@example.com', password: 'correct-horse-battery' });
+    const intruderToken = intruderLogin.body.data.token as string;
+
+    const res = await request(app).get(`/store/v1/me/orders/${orderPublicId}`).set('Authorization', `Bearer ${intruderToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /me/orders/:id strips INTERNAL notes but keeps CUSTOMER notes', async () => {
+    const { orderPublicId, customerToken } = await createCustomerOrder('ORD-SKU-ME-NOTES-1', 'me-orders-notes@example.com');
+
+    await admin.post(`/admin/v1/orders/${orderPublicId}/notes`).send({ type: 'INTERNAL', body: 'internal only' });
+    await admin.post(`/admin/v1/orders/${orderPublicId}/notes`).send({ type: 'CUSTOMER', body: 'visible to customer' });
+
+    const detail = await request(app).get(`/store/v1/me/orders/${orderPublicId}`).set('Authorization', `Bearer ${customerToken}`);
+    expect(detail.body.data.notes).toHaveLength(1);
+    expect(detail.body.data.notes[0].body).toBe('visible to customer');
+  });
+
+  it('GET /me/orders/:id/tracking returns fulfillment + shipment history without leaking admin actor identity', async () => {
+    const { orderPublicId, customerToken } = await createCustomerOrder('ORD-SKU-ME-TRACKING-1', 'me-orders-tracking@example.com');
+    await admin.post(`/admin/v1/orders/${orderPublicId}/fulfillments`).send({
+      lines: [{ sku: 'ORD-SKU-ME-TRACKING-1', qty: 1 }],
+      trackingNumber: 'TRACK-ME-1',
+      carrier: 'DHL',
+    });
+
+    const tracking = await request(app).get(`/store/v1/me/orders/${orderPublicId}/tracking`).set('Authorization', `Bearer ${customerToken}`);
+    expect(tracking.status).toBe(200);
+    expect(tracking.body.data.fulfillments).toHaveLength(1);
+    expect(tracking.body.data.fulfillments[0].trackingNumber).toBe('TRACK-ME-1');
+    expect(tracking.body.data.history.length).toBeGreaterThanOrEqual(1);
+    expect(tracking.body.data.history[0].eventType).toBe('SHIPMENT_CREATED');
+    expect(tracking.body.data.history[0].actorName).toBeNull(); // admin actor identity never leaks to the customer
+  });
+
+  it('GET /me/orders/:id/invoice redirects to the latest invoice PDF, and 404s when no invoice exists', async () => {
+    const { orderPublicId, customerToken } = await createCustomerOrder('ORD-SKU-ME-INVOICE-1', 'me-orders-invoice@example.com');
+
+    const before = await request(app).get(`/store/v1/me/orders/${orderPublicId}/invoice`).set('Authorization', `Bearer ${customerToken}`).redirects(0);
+    expect(before.status).toBe(404);
+
+    await admin.post(`/admin/v1/orders/${orderPublicId}/invoice`).send({});
+    const after = await request(app).get(`/store/v1/me/orders/${orderPublicId}/invoice`).set('Authorization', `Bearer ${customerToken}`).redirects(0);
+    expect(after.status).toBe(302);
+    expect(after.headers.location).toContain('.pdf');
+  });
+
+  it('POST /me/orders/:id/reorder creates a fresh cart with the same lines, and reports skipped inactive variants', async () => {
+    const { orderPublicId, customerToken } = await createCustomerOrder('ORD-SKU-ME-REORDER-1', 'me-orders-reorder@example.com');
+
+    const reorder = await request(app).post(`/store/v1/me/orders/${orderPublicId}/reorder`).set('Authorization', `Bearer ${customerToken}`);
+    expect(reorder.status).toBe(200);
+    expect(reorder.body.data.cartPublicId).toBeTruthy();
+    expect(reorder.body.data.skipped).toEqual([]);
+
+    const cart = await request(app).get(`/store/v1/carts/${reorder.body.data.cartPublicId}`);
+    expect(cart.body.data.lines).toHaveLength(1);
+    expect(cart.body.data.lines[0].sku).toBe('ORD-SKU-ME-REORDER-1');
+
+    // Deactivate the variant, then reorder again — should skip it and still return a valid (empty) cart.
+    await prisma.productVariant.updateMany({ where: { sku: 'ORD-SKU-ME-REORDER-1' }, data: { status: 'INACTIVE' } });
+    const reorderAfterDeactivate = await request(app).post(`/store/v1/me/orders/${orderPublicId}/reorder`).set('Authorization', `Bearer ${customerToken}`);
+    expect(reorderAfterDeactivate.status).toBe(200);
+    expect(reorderAfterDeactivate.body.data.skipped).toEqual([{ sku: 'ORD-SKU-ME-REORDER-1', name: 'ORD-SKU-ME-REORDER-1', reason: 'no longer available' }]);
+  });
 });

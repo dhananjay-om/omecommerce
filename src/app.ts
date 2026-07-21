@@ -56,17 +56,21 @@ export function createApp(): Express {
   const pricing = createPricingModule(prisma);
   app.use('/admin/v1', pricing.admin);
 
-  const order = createOrderModule(prisma, auth.authorize);
+  const customer = createCustomerModule(prisma);
+  app.use('/admin/v1', customer.admin);
+  app.use('/store/v1', customer.store);
+
+  // plan/15 Phase 11 — Order needs customer.authenticateCustomer to gate its
+  // new /me/orders/:id, /invoice, /tracking, /reorder routes (same
+  // cross-module auth-middleware-sharing pattern wishlist/wallet/giftcard/
+  // loyalty/referral already use below), so Customer must be constructed first.
+  const order = createOrderModule(prisma, auth.authorize, customer.authenticateCustomer);
   app.use('/admin/v1', order.admin);
   app.use('/store/v1', order.store);
 
   const search = createSearchModule(prisma, auth.authorize);
   app.use('/admin/v1', search.admin);
   app.use('/store/v1', search.store);
-
-  const customer = createCustomerModule(prisma);
-  app.use('/admin/v1', customer.admin);
-  app.use('/store/v1', customer.store);
 
   const wishlist = createWishlistModule(prisma, customer.authenticateCustomer);
   app.use('/store/v1', wishlist.store);

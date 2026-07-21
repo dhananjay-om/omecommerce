@@ -11,9 +11,72 @@ export interface OrderLineView {
   qty: number;
   unitPrice: string;
   taxAmount: string;
+  discountAmount: string;
   rowTotal: string;
   fulfilledQty: number;
   refundedQty: number;
+}
+
+export interface OrderAddress {
+  type: 'BILLING' | 'SHIPPING';
+  name: string;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+}
+
+export interface OrderPayment {
+  method: string;
+  gateway: string;
+  type: string;
+  amount: string;
+  currency: string;
+  status: string;
+  gatewayRef: string | null;
+  createdAt: string;
+}
+
+export interface OrderFulfillmentLine {
+  sku: string;
+  qty: number;
+}
+
+export interface OrderFulfillment {
+  publicId: string;
+  status: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: string | null;
+  currentStatus: string | null;
+  shippingNotes: string | null;
+  hasPackingSlip: boolean;
+  shippedAt: string | null;
+  createdAt: string;
+  lines: OrderFulfillmentLine[];
+}
+
+export interface OrderNote {
+  id: string;
+  type: 'INTERNAL' | 'CUSTOMER';
+  body: string;
+  createdAt: string;
+}
+
+export interface OrderInvoice {
+  publicId: string;
+  invoiceNumber: string;
+  status: string;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  grandTotal: string;
+  createdAt: string;
 }
 
 export interface OrderView {
@@ -25,8 +88,32 @@ export interface OrderView {
   financialStatus: string;
   fulfillmentStatus: string;
   subtotal: string;
+  discountTotal: string;
   taxTotal: string;
   shippingTotal: string;
   grandTotal: string;
+  placedAt: string;
+  closedAt: string | null;
   lines: OrderLineView[];
+  addresses: OrderAddress[];
+  payments: OrderPayment[];
+  fulfillments: OrderFulfillment[];
+  notes: OrderNote[];
+  invoices: OrderInvoice[];
+}
+
+export interface OrderTrackingHistoryEntry {
+  id: string;
+  eventType: string;
+  fromValue: string | null;
+  toValue: string | null;
+  message: string | null;
+  actorType: string;
+  actorName: string | null;
+  createdAt: string;
+}
+
+export interface OrderTracking {
+  fulfillments: OrderFulfillment[];
+  history: OrderTrackingHistoryEntry[];
 }

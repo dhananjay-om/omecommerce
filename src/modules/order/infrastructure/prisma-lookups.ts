@@ -12,12 +12,12 @@ export class PrismaVariantLookup implements VariantLookup {
     return row ? { id: row.id, sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId } : null;
   }
 
-  async byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint } | null> {
+  async byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint; status: 'ACTIVE' | 'INACTIVE' } | null> {
     const row = await this.db.productVariant.findFirst({
       where: { id },
-      select: { sku: true, productId: true, product: { select: { nameDefault: true } } },
+      select: { sku: true, productId: true, status: true, product: { select: { nameDefault: true } } },
     });
-    return row ? { sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId } : null;
+    return row ? { sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId, status: row.status } : null;
   }
 }
 

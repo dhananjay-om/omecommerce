@@ -20,6 +20,7 @@ import {
   loginCustomerSchema,
   addCustomerAddressSchema,
   listCustomersQuerySchema,
+  listCustomerOrdersQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface CustomerModule {
@@ -87,7 +88,8 @@ export function createCustomerModule(db: Db): CustomerModule {
     '/me/orders',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await listCustomerOrders.execute(req.customer!.customerPublicId) });
+      const query = parse(listCustomerOrdersQuerySchema, req.query);
+      res.json({ data: await listCustomerOrders.execute(req.customer!.customerPublicId, query) });
     }),
   );
   store.get(

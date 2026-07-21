@@ -18,7 +18,8 @@ import type {
 
 export interface VariantLookup {
   byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null>;
-  byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint } | null>;
+  /** `status` added for plan/15 Phase 11 (Reorder) — must skip variants that no longer exist or are INACTIVE; every existing caller ignores the extra field. */
+  byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint; status: 'ACTIVE' | 'INACTIVE' } | null>;
 }
 
 /** The lowest-position media asset's storage KEY for a product (plan/14 Phase 5a) — own copy of the same lookup search's IndexProduct uses; not a URL, see MediaUrlResolver's doc comment for why. */
@@ -347,6 +348,8 @@ export interface OrderView {
   orderNumber: string;
   websiteId: bigint;
   storeId: bigint;
+  /** plan/15 Phase 11 — Reorder needs the original store view to create the new cart in the same scope. */
+  storeViewId: bigint;
   customerId: bigint | null;
   email: string;
   currency: string;

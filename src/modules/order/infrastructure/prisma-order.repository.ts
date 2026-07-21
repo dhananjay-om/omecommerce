@@ -421,6 +421,7 @@ function toView(order: OrderDetailRow): OrderView {
     orderNumber: order.orderNumber.toString(),
     websiteId: order.websiteId,
     storeId: order.storeId,
+    storeViewId: order.storeViewId,
     customerId: order.customerId,
     email: order.email,
     currency: order.currency,

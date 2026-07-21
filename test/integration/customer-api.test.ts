@@ -168,7 +168,8 @@ describe.skipIf(!process.env.INTEGRATION)('customer API (live DB)', () => {
     const token = login.body.data.token as string;
     const res = await request(app).get('/store/v1/me/orders').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([]);
+    expect(res.body.data.orders).toEqual([]);
+    expect(res.body.data.total).toBe(0);
   });
 
   it('admin lists customers with pagination and email search, and fetches a detail view with addresses', async () => {

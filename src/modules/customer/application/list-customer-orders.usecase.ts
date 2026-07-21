@@ -1,6 +1,9 @@
 import type { CustomerRepository, CustomerOrderLookup } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
-import type { CustomerOrderView } from './dto.js';
+import type { CustomerOrderListDto, ListCustomerOrdersQuery } from './dto.js';
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 
 export class ListCustomerOrders {
   constructor(
@@ -8,12 +11,20 @@ export class ListCustomerOrders {
     private readonly orders: CustomerOrderLookup,
   ) {}
 
-  async execute(customerPublicId: string): Promise<CustomerOrderView[]> {
+  async execute(customerPublicId: string, query: ListCustomerOrdersQuery = {}): Promise<CustomerOrderListDto> {
     const customer = await this.customers.findByPublicId(customerPublicId);
     if (!customer) {
       throw new NotFoundError('customer', customerPublicId);
     }
-    const rows = await this.orders.listByCustomerId(customer.id);
-    return rows.map((o) => ({ ...o, placedAt: o.placedAt.toISOString() }));
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const pageSize = query.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
+
+    const result = await this.orders.list(customer.id, { page, pageSize, search: query.search });
+    return {
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      orders: result.orders.map((o) => ({ ...o, placedAt: o.placedAt.toISOString() })),
+    };
   }
 }

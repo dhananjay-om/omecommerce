@@ -95,4 +95,19 @@ export interface CustomerOrderView {
   grandTotal: string;
   currency: string;
   placedAt: string;
+  /** plan/15 Phase 11 — total line quantity, for the My Orders "Items" column. */
+  itemsCount: number;
+}
+
+export interface ListCustomerOrdersQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+export interface CustomerOrderListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: CustomerOrderView[];
 }

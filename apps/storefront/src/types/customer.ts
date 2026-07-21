@@ -29,6 +29,14 @@ export interface CustomerOrderListItem {
   grandTotal: string;
   currency: string;
   placedAt: string;
+  itemsCount: number;
+}
+
+export interface CustomerOrderList {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: CustomerOrderListItem[];
 }
 
 export interface SessionInfo {

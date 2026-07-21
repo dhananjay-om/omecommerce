@@ -269,6 +269,22 @@ export interface OrderHistoryDto {
   createdAt: string;
 }
 
+export interface OrderTrackingDto {
+  fulfillments: FulfillmentDto[];
+  history: OrderHistoryDto[];
+}
+
+export interface ReorderSkippedLineDto {
+  sku: string;
+  name: string;
+  reason: string;
+}
+
+export interface ReorderResultDto {
+  cartPublicId: string;
+  skipped: ReorderSkippedLineDto[];
+}
+
 export interface AddOrderNoteCommand {
   orderPublicId: string;
   type: 'INTERNAL' | 'CUSTOMER';

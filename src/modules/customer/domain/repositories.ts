@@ -98,9 +98,24 @@ export interface CustomerOrderSummary {
   grandTotal: string;
   currency: string;
   placedAt: Date;
+  itemsCount: number;
+}
+
+export interface ListCustomerOrdersFilter {
+  page: number;
+  pageSize: number;
+  /** Matches order_number (exact or text-prefix) — plan/15 Phase 11. */
+  search?: string;
+}
+
+export interface CustomerOrderListResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: CustomerOrderSummary[];
 }
 
 /** Read-only cross-module lookup: a customer's own order history (trivial read, not the full Order module repository). */
 export interface CustomerOrderLookup {
-  listByCustomerId(customerId: bigint): Promise<CustomerOrderSummary[]>;
+  list(customerId: bigint, filter: ListCustomerOrdersFilter): Promise<CustomerOrderListResult>;
 }

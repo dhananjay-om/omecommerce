@@ -20,6 +20,13 @@ export const listCustomersQuerySchema = z.object({
   search: z.string().min(1).optional(),
 });
 
+/** plan/15 Phase 11 — My Orders search/pagination. `search` matches the order number (exact or prefix). */
+export const listCustomerOrdersQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  search: z.string().min(1).optional(),
+});
+
 export const addCustomerAddressSchema = z.object({
   name: z.string().min(1).max(255),
   company: z.string().max(255).nullish(),

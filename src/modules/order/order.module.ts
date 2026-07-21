@@ -47,6 +47,10 @@ import { GetEmailLog } from './application/get-email-log.usecase.js';
 import { SimulatedEmailSender } from './infrastructure/simulated-email-sender.js';
 import { CloseOrder } from './application/close-order.usecase.js';
 import { ExportOrders } from './application/export-orders.usecase.js';
+import { GetCustomerOrder } from './application/get-customer-order.usecase.js';
+import { GetCustomerOrderInvoicePdfUrl } from './application/get-customer-order-invoice-pdf-url.usecase.js';
+import { GetCustomerOrderTracking } from './application/get-customer-order-tracking.usecase.js';
+import { Reorder } from './application/reorder.usecase.js';
 import { PuppeteerPdfRenderer } from './infrastructure/puppeteer-pdf-renderer.js';
 import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
@@ -78,7 +82,7 @@ export interface OrderRouters {
  * Pricing's PriceResolver directly (see complete-checkout.usecase.ts's header
  * comment for why) rather than duplicating their correctness-critical logic.
  */
-export function createOrderModule(db: Db, authorize: (permission: string) => RequestHandler): OrderRouters {
+export function createOrderModule(db: Db, authorize: (permission: string) => RequestHandler, requireCustomer: RequestHandler): OrderRouters {
   const storeContext = new PrismaStoreContextResolver(db);
   const priceResolver = new PrismaPriceResolver(db);
   const ledger = new PrismaStockLedger(db);
@@ -151,6 +155,10 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const getEmailLog = new GetEmailLog(orders);
   const closeOrder = new CloseOrder(orders, outbox);
   const exportOrders = new ExportOrders(orders);
+  const getCustomerOrder = new GetCustomerOrder(orders, customers);
+  const getCustomerOrderInvoicePdfUrl = new GetCustomerOrderInvoicePdfUrl(orders, customers, mediaUrlResolver);
+  const getCustomerOrderTracking = new GetCustomerOrderTracking(orders, customers);
+  const reorder = new Reorder(orders, customers, variants, carts);
 
   const admin = Router();
   admin.post(
@@ -347,6 +355,35 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     '/orders/:publicId',
     asyncHandler(async (req, res) => {
       res.json({ data: await getOrder.execute(req.params.publicId!) });
+    }),
+  );
+  store.get(
+    '/me/orders/:publicId',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCustomerOrder.execute(req.customer!.customerPublicId, req.params.publicId!) });
+    }),
+  );
+  store.get(
+    '/me/orders/:publicId/invoice',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      const url = await getCustomerOrderInvoicePdfUrl.execute(req.customer!.customerPublicId, req.params.publicId!);
+      res.redirect(302, url);
+    }),
+  );
+  store.get(
+    '/me/orders/:publicId/tracking',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCustomerOrderTracking.execute(req.customer!.customerPublicId, req.params.publicId!) });
+    }),
+  );
+  store.post(
+    '/me/orders/:publicId/reorder',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await reorder.execute(req.customer!.customerPublicId, req.params.publicId!) });
     }),
   );
 
