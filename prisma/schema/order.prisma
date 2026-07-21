@@ -10,9 +10,15 @@
 // - No order_discount table yet — no Promotion/coupon context exists (deferred to
 //   its own stage). `order.discountTotal` stays present (defaults to 0) so the
 //   shape is forward-compatible.
-// - No separate `invoice` document/numbering table — FinancialStatus +
-//   PaymentTransaction are the substantive financial record; a formatted invoice
-//   is a presentation concern, deferred.
+// - `OrderInvoice`/`OrderInvoiceLine` (plan/15 Phase 1) added a real invoice
+//   document + per-website numbering (invoice_number_counter, same
+//   next_order_number()-style guarded sequence). Supports partial invoicing
+//   (multiple invoices per order) the same way Fulfillment supports partial
+//   shipment. `qtyInvoiced` per order_line stays derivable (SUM over
+//   order_invoice_line), not a denormalized column — same reasoning as
+//   fulfilledQty/refundedQty being the only counters that DO get a column,
+//   because those are guarded by a CAS UPDATE on a hot path; invoice qty
+//   never needs that.
 // - `Cart`/`Order.customerId` are present as bare nullable scalars with NO FK yet —
 //   full Customer context (accounts/auth/addresses) is a later stage; guest
 //   checkout (customerId=NULL) is the only path exercised today. The FK to
@@ -80,6 +86,15 @@ model OrderNumberCounter {
   nextNumber BigInt @default(1) @map("next_number")
 
   @@map("order_number_counter")
+}
+
+/// Guarded per-website invoice-number sequence (plan/15 Phase 1) — identical
+/// pattern to OrderNumberCounter above (next_invoice_number() in raw SQL).
+model InvoiceNumberCounter {
+  websiteId  BigInt @id @map("website_id")
+  nextNumber BigInt @default(1) @map("next_number")
+
+  @@map("invoice_number_counter")
 }
 
 /// Cart is a domain aggregate whose totals are ALWAYS recomputed server-side at
@@ -166,6 +181,7 @@ model Order {
   returns      OrderReturn[]
   history      OrderStatusHistory[]
   notes        OrderNote[]
+  invoices     OrderInvoice[]
 
   @@unique([websiteId, orderNumber])
   @@index([storeId])
@@ -201,10 +217,11 @@ model OrderLine {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variant          ProductVariant    @relation(fields: [variantId], references: [id])
+  order            Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant          ProductVariant     @relation(fields: [variantId], references: [id])
   fulfillmentLines FulfillmentLine[]
   returnLines      OrderReturnLine[]
+  invoiceLines     OrderInvoiceLine[]
 
   @@index([orderId])
   @@index([variantId])
@@ -377,4 +394,53 @@ model OrderNote {
 
   @@index([orderId, type])
   @@map("order_note")
+}
+
+/// A formatted invoice document (plan/15 Phase 1). Money columns are a snapshot
+/// taken at creation time — like OrderLine, an invoice must never change value
+/// because the order was later refunded/adjusted; refunds are reflected via
+/// PaymentTransaction/FinancialStatus, not by mutating a past invoice.
+/// `invoiceNumber` is a per-website atomic sequence (invoice_number_counter +
+/// next_invoice_number(), identical mechanics to order_number). Multiple
+/// invoices per order are supported (partial invoicing, same shape as
+/// Fulfillment supporting partial shipment).
+model OrderInvoice {
+  id            BigInt        @id @default(autoincrement())
+  publicId      String        @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  orderId       BigInt        @map("order_id")
+  invoiceNumber BigInt        @map("invoice_number")
+  status        InvoiceStatus @default(ISSUED)
+  subtotal      Decimal       @db.Decimal(18, 4)
+  discountTotal Decimal       @default(0) @map("discount_total") @db.Decimal(18, 4)
+  taxTotal      Decimal       @map("tax_total") @db.Decimal(18, 4)
+  grandTotal    Decimal       @map("grand_total") @db.Decimal(18, 4)
+  pdfStorageKey String?       @map("pdf_storage_key") // S3/MinIO object key of the rendered PDF (shared/infrastructure/storage/s3-client.ts)
+  createdBy     BigInt?       @map("created_by") // admin_user.id; NULL if ever system-issued in a later phase
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines OrderInvoiceLine[]
+
+  @@unique([orderId, invoiceNumber])
+  @@index([orderId])
+  @@map("order_invoice")
+}
+
+/// The invoiced subset of order_line — supports partial invoicing exactly like
+/// FulfillmentLine supports partial shipment. Money columns are snapshotted from
+/// OrderLine at invoice-creation time (a later refund must not retroactively
+/// change what an already-issued invoice says).
+model OrderInvoiceLine {
+  invoiceId   BigInt  @map("invoice_id")
+  orderLineId BigInt  @map("order_line_id")
+  qty         Int
+  unitPrice   Decimal @map("unit_price") @db.Decimal(18, 4)
+  taxAmount   Decimal @default(0) @map("tax_amount") @db.Decimal(18, 4)
+  rowTotal    Decimal @map("row_total") @db.Decimal(18, 4)
+
+  invoice   OrderInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  orderLine OrderLine    @relation(fields: [orderLineId], references: [id])
+
+  @@id([invoiceId, orderLineId])
+  @@map("order_invoice_line")
 }

@@ -9,6 +9,7 @@ import type {
   FulfillmentStatus,
   OrderHistoryActorType,
   OrderNoteType,
+  InvoiceStatus,
 } from '@prisma/client';
 
 // --- Cross-module read-only lookups (each module resolves its own dependencies) ---
@@ -276,6 +277,40 @@ export interface AddOrderNoteInput {
   createdBy?: bigint | null;
 }
 
+/** plan/15 Phase 1 — the invoiced subset of an order_line, snapshotted at invoice-creation time. */
+export interface OrderInvoiceLineView {
+  orderLineId: bigint;
+  qty: number;
+  unitPrice: string;
+  taxAmount: string;
+  rowTotal: string;
+}
+
+export interface OrderInvoiceView {
+  id: bigint;
+  publicId: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  grandTotal: string;
+  pdfStorageKey: string | null;
+  createdAt: Date;
+  lines: OrderInvoiceLineView[];
+}
+
+export interface CreateInvoiceInput {
+  orderId: bigint;
+  invoiceNumber: bigint;
+  subtotalMinor: bigint;
+  discountTotalMinor: bigint;
+  taxTotalMinor: bigint;
+  grandTotalMinor: bigint;
+  createdBy?: bigint | null;
+  lines: Array<{ orderLineId: bigint; qty: number; unitPriceMinor: bigint; taxAmountMinor: bigint; rowTotalMinor: bigint }>;
+}
+
 export interface OrderView {
   id: bigint;
   publicId: string;
@@ -303,6 +338,7 @@ export interface OrderView {
   fulfillments: FulfillmentView[];
   returns: OrderReturnView[];
   notes: OrderNoteView[];
+  invoices: OrderInvoiceView[];
 }
 
 export interface OrderListItem {
@@ -381,4 +417,8 @@ export interface OrderRepository {
   recordHistory(input: RecordOrderHistoryInput): Promise<void>;
   listHistory(orderId: bigint): Promise<OrderHistoryView[]>;
   addNote(input: AddOrderNoteInput): Promise<OrderNoteView>;
+  /** plan/15 Phase 1 — race-safe per-website invoice-number sequence (next_invoice_number()), identical mechanics to nextOrderNumber. */
+  nextInvoiceNumber(websiteId: bigint): Promise<bigint>;
+  createInvoice(input: CreateInvoiceInput): Promise<OrderInvoiceView>;
+  setInvoicePdfKey(invoiceId: bigint, key: string): Promise<void>;
 }

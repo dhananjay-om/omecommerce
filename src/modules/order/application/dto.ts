@@ -138,6 +138,26 @@ export interface OrderNoteDto {
   createdAt: string;
 }
 
+export interface OrderInvoiceLineDto {
+  sku: string;
+  qty: number;
+  unitPrice: string;
+  taxAmount: string;
+  rowTotal: string;
+}
+
+export interface OrderInvoiceDto {
+  publicId: string;
+  invoiceNumber: string;
+  status: string;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  grandTotal: string;
+  createdAt: string;
+  lines: OrderInvoiceLineDto[];
+}
+
 export interface OrderViewDto {
   publicId: string;
   orderNumber: string;
@@ -161,6 +181,7 @@ export interface OrderViewDto {
   fulfillments: FulfillmentDto[];
   returns: OrderReturnDto[];
   notes: OrderNoteDto[];
+  invoices: OrderInvoiceDto[];
 }
 
 export interface ListOrdersQuery {
@@ -242,5 +263,12 @@ export interface AddOrderNoteCommand {
   orderPublicId: string;
   type: 'INTERNAL' | 'CUSTOMER';
   body: string;
+  createdBy?: string | null;
+}
+
+export interface CreateInvoiceCommand {
+  orderPublicId: string;
+  /** Omit to invoice every line's full remaining (not-yet-invoiced) qty — supports partial invoicing across multiple calls, same shape as FulfillOrderCommand's `lines`. */
+  lines?: Array<{ sku: string; qty: number }>;
   createdBy?: string | null;
 }

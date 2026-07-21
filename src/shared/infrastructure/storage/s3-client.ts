@@ -63,3 +63,14 @@ export async function deleteObject(key: string): Promise<void> {
   const { client, bucket } = getClient();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
+
+/**
+ * Server-side direct write — distinct from presignPutUrl (a URL the browser
+ * PUTs to directly). Used for content the backend itself generates (e.g. a
+ * Puppeteer-rendered invoice PDF, plan/15 Phase 1), which never touches the
+ * client before it's stored.
+ */
+export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  const { client, bucket } = getClient();
+  await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }));
+}

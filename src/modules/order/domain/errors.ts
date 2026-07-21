@@ -29,3 +29,9 @@ export class RefundExceedsQtyError extends DomainError {
     super(`refund quantity would exceed order line ${orderLineId}'s remaining quantity`, 'https://errors.ome/refund-exceeds-qty', 409);
   }
 }
+
+export class InvoiceExceedsQtyError extends DomainError {
+  constructor(sku: string) {
+    super(`invoice quantity for ${sku} would exceed the order line's remaining (not-yet-invoiced) quantity`, 'https://errors.ome/invoice-exceeds-qty', 409);
+  }
+}

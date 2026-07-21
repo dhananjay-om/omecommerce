@@ -64,3 +64,18 @@ export interface PaymentGateway {
 export interface MediaUrlResolver {
   presignGetUrl(key: string): Promise<string>;
 }
+
+/**
+ * Renders an HTML string to a PDF buffer (plan/15 Phase 1 decision: Puppeteer
+ * HTML->PDF, not a programmatic PDF library — see plan/15-order-management-
+ * enhancement.md §1.4). A port so usecases stay unit-testable against a fake,
+ * same seam pattern as PaymentGateway/TaxCalculator above.
+ */
+export interface PdfRenderer {
+  render(html: string): Promise<Buffer>;
+}
+
+/** Server-side object storage for backend-generated files (invoice/packing-slip PDFs) — distinct from MediaUrlResolver's read-only presign, this actually writes bytes. */
+export interface PdfStorage {
+  store(key: string, body: Buffer): Promise<void>;
+}

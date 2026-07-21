@@ -58,6 +58,11 @@ export const addOrderNoteSchema = z.object({
   body: z.string().min(1).max(4000),
 });
 
+/** Omitting `lines` entirely invoices every line's full remaining qty (plan/15 Phase 1). */
+export const createInvoiceSchema = z.object({
+  lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive() })).min(1).optional(),
+});
+
 export const createTaxClassSchema = z.object({
   code: z.string().min(1).max(64),
   name: z.string().min(1).max(256),

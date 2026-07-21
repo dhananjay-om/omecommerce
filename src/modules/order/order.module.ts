@@ -36,6 +36,13 @@ import { CreateTaxClass, CreateShippingMethod } from './application/setup.usecas
 import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
 import { GetOrderHistory } from './application/get-order-history.usecase.js';
 import { AddOrderNote } from './application/add-order-note.usecase.js';
+import { CreateInvoice } from './application/create-invoice.usecase.js';
+import { ListInvoices } from './application/list-invoices.usecase.js';
+import { GetInvoice } from './application/get-invoice.usecase.js';
+import { GetInvoicePdfUrl } from './application/get-invoice-pdf-url.usecase.js';
+import { RegenerateInvoice } from './application/regenerate-invoice.usecase.js';
+import { PuppeteerPdfRenderer } from './infrastructure/puppeteer-pdf-renderer.js';
+import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
 import { PrismaCustomerContextLookup } from '../wallet/infrastructure/prisma-customer-context-lookup.js';
 import { CreditWallet } from '../wallet/application/credit-wallet.usecase.js';
@@ -47,6 +54,7 @@ import {
   refundOrderSchema,
   cancelOrderSchema,
   addOrderNoteSchema,
+  createInvoiceSchema,
   createTaxClassSchema,
   createShippingMethodSchema,
   listOrdersQuerySchema,
@@ -122,6 +130,13 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
   const getOrderHistory = new GetOrderHistory(orders);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
+  const pdfRenderer = new PuppeteerPdfRenderer();
+  const pdfStorage = new S3PdfStorage();
+  const createInvoice = new CreateInvoice(orders, adminUsers, pdfRenderer, pdfStorage);
+  const listInvoices = new ListInvoices(orders);
+  const getInvoice = new GetInvoice(orders);
+  const getInvoicePdfUrl = new GetInvoicePdfUrl(orders, mediaUrlResolver);
+  const regenerateInvoice = new RegenerateInvoice(orders, pdfRenderer, pdfStorage);
 
   const admin = Router();
   admin.post(
@@ -190,6 +205,43 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     asyncHandler(async (req, res) => {
       const body = parse(cancelOrderSchema, req.body);
       res.json({ data: await cancelOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/invoice',
+    authorize('orders:invoice'),
+    asyncHandler(async (req, res) => {
+      const body = parse(createInvoiceSchema, req.body);
+      res.status(201).json({ data: await createInvoice.execute({ orderPublicId: req.params.publicId!, createdBy: req.adminUser?.adminUserPublicId, ...body }) });
+    }),
+  );
+  admin.get(
+    '/orders/:publicId/invoices',
+    authorize('orders:invoice'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listInvoices.execute(req.params.publicId!) });
+    }),
+  );
+  admin.get(
+    '/orders/:publicId/invoice/:invoiceId',
+    authorize('orders:invoice'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getInvoice.execute(req.params.publicId!, req.params.invoiceId!) });
+    }),
+  );
+  admin.get(
+    '/orders/:publicId/invoice/:invoiceId/pdf',
+    authorize('orders:invoice'),
+    asyncHandler(async (req, res) => {
+      const url = await getInvoicePdfUrl.execute(req.params.publicId!, req.params.invoiceId!);
+      res.redirect(302, url);
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/invoice/:invoiceId/regenerate',
+    authorize('orders:invoice'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await regenerateInvoice.execute(req.params.publicId!, req.params.invoiceId!) });
     }),
   );
 

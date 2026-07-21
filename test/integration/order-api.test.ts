@@ -639,4 +639,123 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     const fulfill = await request(app).post('/admin/v1/orders/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/fulfillments').send({ lines: [] });
     expect(fulfill.status).toBe(401);
   });
+
+  it('creates an invoice for a paid order (all lines, default), renders a real PDF, and records history', async () => {
+    const variantId = await createVariant('ORD-SKU-INVOICE-1', '22.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 3 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    expect(checkout.status).toBe(201);
+    const orderPublicId = checkout.body.data.publicId;
+
+    const invoice = await admin.post(`/admin/v1/orders/${orderPublicId}/invoice`).send({});
+    expect(invoice.status).toBe(201);
+    expect(invoice.body.data.invoices).toHaveLength(1);
+    const inv = invoice.body.data.invoices[0];
+    expect(inv.invoiceNumber).toBeTruthy();
+    expect(inv.status).toBe('ISSUED');
+    expect(inv.subtotal).toBe('66.0000'); // 22.00 * 3
+    expect(inv.grandTotal).toBe('66.0000'); // no tax class assigned
+    expect(inv.lines).toEqual([
+      expect.objectContaining({ sku: 'ORD-SKU-INVOICE-1', qty: 3, rowTotal: '66.0000' }),
+    ]);
+
+    const history = await admin.get(`/admin/v1/orders/${orderPublicId}/history`);
+    expect(history.body.data.map((h: { eventType: string }) => h.eventType)).toContain('INVOICE_CREATED');
+
+    const list = await admin.get(`/admin/v1/orders/${orderPublicId}/invoices`);
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(1);
+    expect(list.body.data[0].publicId).toBe(inv.publicId);
+
+    const detail = await admin.get(`/admin/v1/orders/${orderPublicId}/invoice/${inv.publicId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.invoiceNumber).toBe(inv.invoiceNumber);
+
+    // PDF was actually rendered and stored — follow the redirect and confirm real PDF bytes.
+    const pdfRedirect = await admin.get(`/admin/v1/orders/${orderPublicId}/invoice/${inv.publicId}/pdf`).redirects(0);
+    expect(pdfRedirect.status).toBe(302);
+    const pdfUrl = pdfRedirect.headers.location as string;
+    expect(pdfUrl).toContain('.pdf');
+    const pdfBytes = await fetch(pdfUrl).then((r) => r.arrayBuffer());
+    expect(pdfBytes.byteLength).toBeGreaterThan(100);
+    expect(Buffer.from(pdfBytes.slice(0, 5)).toString('utf8')).toBe('%PDF-');
+
+    const regenerate = await admin.post(`/admin/v1/orders/${orderPublicId}/invoice/${inv.publicId}/regenerate`);
+    expect(regenerate.status).toBe(200);
+    expect(regenerate.body.data.invoices).toHaveLength(1);
+  });
+
+  it('supports partial invoicing across two calls, then rejects over-invoicing the remainder', async () => {
+    const variantId = await createVariant('ORD-SKU-INVOICE-PARTIAL-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 10, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 5 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const first = await admin
+      .post(`/admin/v1/orders/${orderPublicId}/invoice`)
+      .send({ lines: [{ sku: 'ORD-SKU-INVOICE-PARTIAL-1', qty: 2 }] });
+    expect(first.status).toBe(201);
+    expect(first.body.data.invoices).toHaveLength(1);
+    expect(first.body.data.invoices[0].lines[0].qty).toBe(2);
+
+    const overInvoice = await admin
+      .post(`/admin/v1/orders/${orderPublicId}/invoice`)
+      .send({ lines: [{ sku: 'ORD-SKU-INVOICE-PARTIAL-1', qty: 4 }] }); // only 3 remain
+    expect(overInvoice.status).toBe(409);
+
+    const second = await admin
+      .post(`/admin/v1/orders/${orderPublicId}/invoice`)
+      .send({ lines: [{ sku: 'ORD-SKU-INVOICE-PARTIAL-1', qty: 3 }] });
+    expect(second.status).toBe(201);
+    expect(second.body.data.invoices).toHaveLength(2);
+
+    const fullyInvoiced = await admin.post(`/admin/v1/orders/${orderPublicId}/invoice`).send({});
+    expect(fullyInvoiced.status).toBe(409); // nothing left to default-invoice
+  });
+
+  it('rejects invoicing an order that was never paid', async () => {
+    const variantId = await createVariant('ORD-SKU-INVOICE-UNPAID-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+        testScenario: 'decline',
+      });
+    expect(checkout.status).toBe(402);
+    const orderRow = await prisma.order.findFirstOrThrow({ where: { lines: { some: { sku: 'ORD-SKU-INVOICE-UNPAID-1' } } } });
+    const orderPublicId = orderRow.publicId;
+
+    const invoice = await admin.post(`/admin/v1/orders/${orderPublicId}/invoice`).send({});
+    expect(invoice.status).toBe(409);
+  });
 });

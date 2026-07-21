@@ -1,6 +1,23 @@
-import type { OrderRepository, OrderView } from '../domain/repositories.js';
+import type { OrderRepository, OrderView, OrderInvoiceView } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
-import type { OrderViewDto } from './dto.js';
+import type { OrderViewDto, OrderInvoiceDto } from './dto.js';
+
+export function toInvoiceDto(order: OrderView, invoice: OrderInvoiceView): OrderInvoiceDto {
+  return {
+    publicId: invoice.publicId,
+    invoiceNumber: invoice.invoiceNumber,
+    status: invoice.status,
+    subtotal: invoice.subtotal,
+    discountTotal: invoice.discountTotal,
+    taxTotal: invoice.taxTotal,
+    grandTotal: invoice.grandTotal,
+    createdAt: invoice.createdAt.toISOString(),
+    lines: invoice.lines.map((l) => {
+      const orderLine = order.lines.find((ol) => ol.id === l.orderLineId);
+      return { sku: orderLine?.sku ?? l.orderLineId.toString(), qty: l.qty, unitPrice: l.unitPrice, taxAmount: l.taxAmount, rowTotal: l.rowTotal };
+    }),
+  };
+}
 
 export function toOrderDto(order: OrderView): OrderViewDto {
   return {
@@ -76,6 +93,7 @@ export function toOrderDto(order: OrderView): OrderViewDto {
       }),
     })),
     notes: order.notes.map((n) => ({ id: n.id.toString(), type: n.type, body: n.body, createdAt: n.createdAt.toISOString() })),
+    invoices: order.invoices.map((inv) => toInvoiceDto(order, inv)),
   };
 }
 

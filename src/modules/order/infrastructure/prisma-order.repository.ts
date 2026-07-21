@@ -12,6 +12,8 @@ import type {
   OrderHistoryView,
   AddOrderNoteInput,
   OrderNoteView,
+  CreateInvoiceInput,
+  OrderInvoiceView,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -36,6 +38,7 @@ const ORDER_DETAIL_INCLUDE = {
   fulfillments: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
   returns: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
   notes: { orderBy: { createdAt: 'desc' as const } },
+  invoices: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.OrderInclude;
 
 type OrderDetailRow = Prisma.OrderGetPayload<{ include: typeof ORDER_DETAIL_INCLUDE }>;
@@ -317,6 +320,42 @@ export class PrismaOrderRepository implements OrderRepository {
     });
     return { id: row.id, type: row.type, body: row.body, createdAt: row.createdAt };
   }
+
+  async nextInvoiceNumber(websiteId: bigint): Promise<bigint> {
+    const rows = await this.db.$queryRaw<Array<{ n: bigint }>>`SELECT next_invoice_number(${websiteId}) AS n`;
+    return rows[0]!.n;
+  }
+
+  async createInvoice(input: CreateInvoiceInput): Promise<OrderInvoiceView> {
+    const invoice = await this.db.orderInvoice.create({
+      data: {
+        orderId: input.orderId,
+        invoiceNumber: input.invoiceNumber,
+        subtotal: fromMinorUnits(input.subtotalMinor),
+        discountTotal: fromMinorUnits(input.discountTotalMinor),
+        taxTotal: fromMinorUnits(input.taxTotalMinor),
+        grandTotal: fromMinorUnits(input.grandTotalMinor),
+        createdBy: input.createdBy ?? null,
+        lines: {
+          createMany: {
+            data: input.lines.map((l) => ({
+              orderLineId: l.orderLineId,
+              qty: l.qty,
+              unitPrice: fromMinorUnits(l.unitPriceMinor),
+              taxAmount: fromMinorUnits(l.taxAmountMinor),
+              rowTotal: fromMinorUnits(l.rowTotalMinor),
+            })),
+          },
+        },
+      },
+      include: { lines: true },
+    });
+    return toInvoiceView(invoice);
+  }
+
+  async setInvoicePdfKey(invoiceId: bigint, key: string): Promise<void> {
+    await this.db.orderInvoice.update({ where: { id: invoiceId }, data: { pdfStorageKey: key } });
+  }
 }
 
 function toAddressView(a: { type: string; name: string; company: string | null; line1: string; line2: string | null; city: string; region: string | null; postalCode: string; country: string; phone: string | null }): OrderAddressView {
@@ -399,5 +438,30 @@ function toView(order: OrderDetailRow): OrderView {
       lines: r.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty, restock: l.restock })),
     })),
     notes: order.notes.map((n) => ({ id: n.id, type: n.type, body: n.body, createdAt: n.createdAt })),
+    invoices: order.invoices.map(toInvoiceView),
+  };
+}
+
+type InvoiceDetailRow = Prisma.OrderInvoiceGetPayload<{ include: { lines: true } }>;
+
+function toInvoiceView(invoice: InvoiceDetailRow): OrderInvoiceView {
+  return {
+    id: invoice.id,
+    publicId: invoice.publicId,
+    invoiceNumber: invoice.invoiceNumber.toString(),
+    status: invoice.status,
+    subtotal: formatDecimal(invoice.subtotal),
+    discountTotal: formatDecimal(invoice.discountTotal),
+    taxTotal: formatDecimal(invoice.taxTotal),
+    grandTotal: formatDecimal(invoice.grandTotal),
+    pdfStorageKey: invoice.pdfStorageKey,
+    createdAt: invoice.createdAt,
+    lines: invoice.lines.map((l) => ({
+      orderLineId: l.orderLineId,
+      qty: l.qty,
+      unitPrice: formatDecimal(l.unitPrice),
+      taxAmount: formatDecimal(l.taxAmount),
+      rowTotal: formatDecimal(l.rowTotal),
+    })),
   };
 }
