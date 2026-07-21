@@ -28,8 +28,21 @@ export async function fulfillOrder(orderPublicId: string, _prevState: ActionStat
     return { error: 'Enter a quantity to fulfill for at least one line.', success: false };
   }
 
+  const trackingNumber = formData.get('trackingNumber');
+  const carrier = formData.get('carrier');
+  const carrierTrackingUrl = formData.get('carrierTrackingUrl');
+  const estimatedDeliveryAt = formData.get('estimatedDeliveryAt');
+  const shippingNotes = formData.get('shippingNotes');
+
   try {
-    await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/fulfillments`, { lines });
+    await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/fulfillments`, {
+      lines,
+      trackingNumber: typeof trackingNumber === 'string' && trackingNumber ? trackingNumber : undefined,
+      carrier: typeof carrier === 'string' && carrier ? carrier : undefined,
+      carrierTrackingUrl: typeof carrierTrackingUrl === 'string' && carrierTrackingUrl ? carrierTrackingUrl : undefined,
+      estimatedDeliveryAt: typeof estimatedDeliveryAt === 'string' && estimatedDeliveryAt ? estimatedDeliveryAt : undefined,
+      shippingNotes: typeof shippingNotes === 'string' && shippingNotes ? shippingNotes : undefined,
+    });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

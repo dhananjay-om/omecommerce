@@ -6,6 +6,8 @@ import type { OrderLine } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 
 const initialState: ActionState = { error: null, success: false };
@@ -52,6 +54,29 @@ export function FulfillDialog({ orderPublicId, lines }: { orderPublicId: string;
               </div>
             );
           })}
+          <Separator />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="fulfill-carrier">Carrier</Label>
+              <Input id="fulfill-carrier" name="carrier" placeholder="e.g. FedEx" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fulfill-tracking-number">Tracking Number</Label>
+              <Input id="fulfill-tracking-number" name="trackingNumber" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fulfill-tracking-url">Carrier Tracking URL</Label>
+            <Input id="fulfill-tracking-url" name="carrierTrackingUrl" type="url" placeholder="https://…" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fulfill-eta">Estimated Delivery</Label>
+            <Input id="fulfill-eta" name="estimatedDeliveryAt" type="date" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fulfill-notes">Shipping Notes</Label>
+            <Textarea id="fulfill-notes" name="shippingNotes" rows={2} />
+          </div>
           {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
           <DialogFooter>
             <Button type="submit" disabled={pending}>

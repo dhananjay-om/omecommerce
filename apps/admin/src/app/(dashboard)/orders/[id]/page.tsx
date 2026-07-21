@@ -10,6 +10,7 @@ import { CancelDialog } from '../cancel-dialog';
 import { AddNoteForm } from '../add-note-form';
 import { CreateInvoiceDialog } from '../create-invoice-dialog';
 import { InvoicesCard } from '../invoices-card';
+import { ShipmentsCard } from '../shipments-card';
 import { statusBadgeVariant } from '@/lib/status-badge';
 
 function sum(values: string[]): number {
@@ -148,29 +149,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
       <Card>
         <CardHeader>
-          <CardTitle>Attachments</CardTitle>
+          <CardTitle>Shipments</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {order.fulfillments.every((f) => !f.hasPackingSlip) ? (
-            <p className="text-muted-foreground">No packing slips yet.</p>
-          ) : (
-            <ul className="space-y-1">
-              {order.fulfillments
-                .filter((f) => f.hasPackingSlip)
-                .map((f) => (
-                  <li key={f.publicId}>
-                    <a
-                      href={`/api/orders/${order.publicId}/shipment/${f.publicId}/packing-slip`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Packing Slip — Shipment {f.publicId.slice(0, 8)} (PDF)
-                    </a>
-                  </li>
-                ))}
-            </ul>
-          )}
+        <CardContent>
+          <ShipmentsCard orderPublicId={order.publicId} fulfillments={order.fulfillments} />
         </CardContent>
       </Card>
 
