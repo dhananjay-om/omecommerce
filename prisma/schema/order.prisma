@@ -305,12 +305,38 @@ model Fulfillment {
   shippedAt      DateTime?      @map("shipped_at") @db.Timestamptz(6)
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  lines FulfillmentLine[]
+  order    Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines    FulfillmentLine[]
+  tracking ShipmentTracking?
 
   @@index([orderId])
   @@index([warehouseId])
   @@map("fulfillment")
+}
+
+/// Promotes tracking to a first-class, queryable concept (plan/15 Phase 2)
+/// without breaking Fulfillment's existing role as the shipment record itself
+/// (trackingNumber/carrier/shippedAt stay there — see order.prisma's header).
+/// This adds what's missing: a carrier deep-link, an ETA, the carrier's own
+/// free-text status (independent of ShipmentStatus, which is OUR lifecycle,
+/// not the carrier's), shipping notes, and the packing-slip PDF. One row per
+/// Fulfillment (1:1, not append-only) — unlike OrderInvoice, a shipment's
+/// tracking info is a single mutable record that gets updated in place as the
+/// carrier's status changes, not a new document per update.
+model ShipmentTracking {
+  id                    BigInt    @id @default(autoincrement())
+  fulfillmentId         BigInt    @unique @map("fulfillment_id")
+  carrier               String?
+  carrierTrackingUrl    String?   @map("carrier_tracking_url")
+  estimatedDeliveryAt   DateTime? @map("estimated_delivery_at") @db.Timestamptz(6)
+  currentStatus         String?   @map("current_status")
+  shippingNotes         String?   @map("shipping_notes")
+  packingSlipStorageKey String?   @map("packing_slip_storage_key")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  fulfillment Fulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+
+  @@map("shipment_tracking")
 }
 
 model FulfillmentLine {

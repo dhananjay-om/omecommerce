@@ -35,7 +35,7 @@ const ORDER_DETAIL_INCLUDE = {
   lines: true,
   addresses: true,
   payments: { orderBy: { createdAt: 'asc' as const } },
-  fulfillments: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
+  fulfillments: { include: { lines: true, tracking: true }, orderBy: { createdAt: 'asc' as const } },
   returns: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
   notes: { orderBy: { createdAt: 'desc' as const } },
   invoices: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
@@ -265,6 +265,9 @@ export class PrismaOrderRepository implements OrderRepository {
     status: ShipmentStatus;
     trackingNumber?: string | null;
     carrier?: string | null;
+    carrierTrackingUrl?: string | null;
+    estimatedDeliveryAt?: Date | null;
+    shippingNotes?: string | null;
     lines: Array<{ orderLineId: bigint; qty: number }>;
   }): Promise<{ id: bigint; publicId: string }> {
     return this.db.$transaction(async (tx) => {
@@ -276,6 +279,18 @@ export class PrismaOrderRepository implements OrderRepository {
           trackingNumber: input.trackingNumber ?? null,
           carrier: input.carrier ?? null,
           shippedAt: input.status === 'SHIPPED' ? new Date() : null,
+          // Every fulfillment gets exactly one shipment_tracking row (plan/15
+          // Phase 2 — always present, not conditionally created), even when
+          // every field is null; simpler than branching on "was any tracking
+          // field given" and the row is cheap.
+          tracking: {
+            create: {
+              carrier: input.carrier ?? null,
+              carrierTrackingUrl: input.carrierTrackingUrl ?? null,
+              estimatedDeliveryAt: input.estimatedDeliveryAt ?? null,
+              shippingNotes: input.shippingNotes ?? null,
+            },
+          },
         },
       });
       await tx.fulfillmentLine.createMany({
@@ -283,6 +298,10 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       return { id: fulfillment.id, publicId: fulfillment.publicId };
     });
+  }
+
+  async setPackingSlipKey(fulfillmentId: bigint, key: string): Promise<void> {
+    await this.db.shipmentTracking.update({ where: { fulfillmentId }, data: { packingSlipStorageKey: key } });
   }
 
   async recordHistory(input: RecordOrderHistoryInput): Promise<void> {
@@ -426,6 +445,11 @@ function toView(order: OrderDetailRow): OrderView {
       status: f.status,
       trackingNumber: f.trackingNumber,
       carrier: f.carrier,
+      carrierTrackingUrl: f.tracking?.carrierTrackingUrl ?? null,
+      estimatedDeliveryAt: f.tracking?.estimatedDeliveryAt ?? null,
+      currentStatus: f.tracking?.currentStatus ?? null,
+      shippingNotes: f.tracking?.shippingNotes ?? null,
+      packingSlipStorageKey: f.tracking?.packingSlipStorageKey ?? null,
       shippedAt: f.shippedAt,
       createdAt: f.createdAt,
       lines: f.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty })),

@@ -75,6 +75,11 @@ export function toOrderDto(order: OrderView): OrderViewDto {
       status: f.status,
       trackingNumber: f.trackingNumber,
       carrier: f.carrier,
+      carrierTrackingUrl: f.carrierTrackingUrl,
+      estimatedDeliveryAt: f.estimatedDeliveryAt ? f.estimatedDeliveryAt.toISOString() : null,
+      currentStatus: f.currentStatus,
+      shippingNotes: f.shippingNotes,
+      hasPackingSlip: f.packingSlipStorageKey !== null,
       shippedAt: f.shippedAt ? f.shippedAt.toISOString() : null,
       createdAt: f.createdAt.toISOString(),
       lines: f.lines.map((l) => {

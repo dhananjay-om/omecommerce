@@ -1,7 +1,9 @@
 import type { OrderRepository, WarehouseResolver } from '../domain/repositories.js';
+import type { PdfRenderer, PdfStorage } from '../domain/ports.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError } from '../domain/errors.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
+import { buildPackingSlipHtml } from '../infrastructure/packing-slip-template.js';
 import type { FulfillOrderCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
@@ -10,6 +12,8 @@ export class FulfillOrder {
     private readonly orders: OrderRepository,
     private readonly warehouses: WarehouseResolver,
     private readonly outbox: OutboxWriter,
+    private readonly pdfRenderer: PdfRenderer,
+    private readonly pdfStorage: PdfStorage,
   ) {}
 
   async execute(cmd: FulfillOrderCommand): Promise<OrderViewDto> {
@@ -36,6 +40,9 @@ export class FulfillOrder {
       status: 'SHIPPED',
       trackingNumber: cmd.trackingNumber ?? null,
       carrier: cmd.carrier ?? null,
+      carrierTrackingUrl: cmd.carrierTrackingUrl ?? null,
+      estimatedDeliveryAt: cmd.estimatedDeliveryAt ? new Date(cmd.estimatedDeliveryAt) : null,
+      shippingNotes: cmd.shippingNotes ?? null,
       lines: fulfillmentLines,
     });
 
@@ -44,6 +51,13 @@ export class FulfillOrder {
     const anyFulfilled = updated!.lines.some((l) => l.fulfilledQty > 0);
     const newFulfillmentStatus = allFulfilled ? 'FULFILLED' : anyFulfilled ? 'PARTIALLY_FULFILLED' : 'UNFULFILLED';
     await this.orders.setFulfillmentStatus(order.id, newFulfillmentStatus);
+
+    const createdFulfillment = updated!.fulfillments.find((f) => f.publicId === fulfillment.publicId)!;
+    const packingSlipHtml = buildPackingSlipHtml(updated!, createdFulfillment);
+    const packingSlipPdf = await this.pdfRenderer.render(packingSlipHtml);
+    const packingSlipKey = `packing-slips/${order.publicId}/${fulfillment.publicId}.pdf`;
+    await this.pdfStorage.store(packingSlipKey, packingSlipPdf);
+    await this.orders.setPackingSlipKey(fulfillment.id, packingSlipKey);
 
     await this.outbox.write({
       aggregateType: 'Order',

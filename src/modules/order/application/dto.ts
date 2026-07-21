@@ -112,6 +112,12 @@ export interface FulfillmentDto {
   status: string;
   trackingNumber: string | null;
   carrier: string | null;
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: string | null;
+  currentStatus: string | null;
+  shippingNotes: string | null;
+  /** Whether a packing slip PDF has been rendered — the raw storage key never leaves the backend (see MediaUrlResolver's presign-not-proxy convention). */
+  hasPackingSlip: boolean;
   shippedAt: string | null;
   createdAt: string;
   lines: FulfillmentLineDto[];
@@ -225,6 +231,10 @@ export interface FulfillOrderCommand {
   lines: Array<{ sku: string; qty: number }>;
   trackingNumber?: string;
   carrier?: string;
+  /** plan/15 Phase 2 additions — a carrier deep-link, ETA, and free-text shipping notes, stored on the fulfillment's 1:1 shipment_tracking row. */
+  carrierTrackingUrl?: string;
+  estimatedDeliveryAt?: string;
+  shippingNotes?: string;
 }
 
 export interface RefundOrderCommand {

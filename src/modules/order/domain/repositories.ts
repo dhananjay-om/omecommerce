@@ -221,6 +221,13 @@ export interface FulfillmentView {
   status: ShipmentStatus;
   trackingNumber: string | null;
   carrier: string | null;
+  /** plan/15 Phase 2 — from the 1:1 shipment_tracking record, always present once the fulfillment exists. */
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: Date | null;
+  currentStatus: string | null;
+  shippingNotes: string | null;
+  /** Internal-only (never serialized raw — see MediaUrlResolver's presign-not-proxy convention); the DTO layer exposes a boolean instead. */
+  packingSlipStorageKey: string | null;
   shippedAt: Date | null;
   createdAt: Date;
   lines: FulfillmentLineView[];
@@ -411,8 +418,13 @@ export interface OrderRepository {
     status: ShipmentStatus;
     trackingNumber?: string | null;
     carrier?: string | null;
+    carrierTrackingUrl?: string | null;
+    estimatedDeliveryAt?: Date | null;
+    shippingNotes?: string | null;
     lines: Array<{ orderLineId: bigint; qty: number }>;
   }): Promise<{ id: bigint; publicId: string }>;
+  /** plan/15 Phase 2 — stores the rendered packing-slip PDF's key on the fulfillment's 1:1 shipment_tracking row. */
+  setPackingSlipKey(fulfillmentId: bigint, key: string): Promise<void>;
   /** plan/15 Phase 0b — appends one timeline row; called alongside (not instead of) the existing outbox.write() calls in every mutating usecase. */
   recordHistory(input: RecordOrderHistoryInput): Promise<void>;
   listHistory(orderId: bigint): Promise<OrderHistoryView[]>;

@@ -37,6 +37,10 @@ export const fulfillOrderSchema = z.object({
   lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive() })).min(1),
   trackingNumber: z.string().max(128).optional(),
   carrier: z.string().max(128).optional(),
+  /** plan/15 Phase 2 additions. */
+  carrierTrackingUrl: z.string().url().max(2048).optional(),
+  estimatedDeliveryAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+  shippingNotes: z.string().max(2000).optional(),
 });
 
 const refundToSchema = z.enum(['ORIGINAL_PAYMENT_METHOD', 'WALLET']);

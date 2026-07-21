@@ -41,6 +41,7 @@ import { ListInvoices } from './application/list-invoices.usecase.js';
 import { GetInvoice } from './application/get-invoice.usecase.js';
 import { GetInvoicePdfUrl } from './application/get-invoice-pdf-url.usecase.js';
 import { RegenerateInvoice } from './application/regenerate-invoice.usecase.js';
+import { GetPackingSlipPdfUrl } from './application/get-packing-slip-pdf-url.usecase.js';
 import { PuppeteerPdfRenderer } from './infrastructure/puppeteer-pdf-renderer.js';
 import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
@@ -123,20 +124,21 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const walletCustomerContext = new PrismaCustomerContextLookup(db);
   const creditWallet = new CreditWallet(walletLedger, walletCustomerContext);
 
-  const fulfillOrder = new FulfillOrder(orders, warehouses, outbox);
+  const pdfRenderer = new PuppeteerPdfRenderer();
+  const pdfStorage = new S3PdfStorage();
+  const fulfillOrder = new FulfillOrder(orders, warehouses, outbox, pdfRenderer, pdfStorage);
   const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
   const getOrderHistory = new GetOrderHistory(orders);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
-  const pdfRenderer = new PuppeteerPdfRenderer();
-  const pdfStorage = new S3PdfStorage();
   const createInvoice = new CreateInvoice(orders, adminUsers, pdfRenderer, pdfStorage);
   const listInvoices = new ListInvoices(orders);
   const getInvoice = new GetInvoice(orders);
   const getInvoicePdfUrl = new GetInvoicePdfUrl(orders, mediaUrlResolver);
   const regenerateInvoice = new RegenerateInvoice(orders, pdfRenderer, pdfStorage);
+  const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
 
   const admin = Router();
   admin.post(
@@ -189,6 +191,14 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     asyncHandler(async (req, res) => {
       const body = parse(fulfillOrderSchema, req.body);
       res.json({ data: await fulfillOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
+    }),
+  );
+  admin.get(
+    '/orders/:publicId/shipment/:fulfillmentId/packing-slip',
+    authorize('orders:fulfill'),
+    asyncHandler(async (req, res) => {
+      const url = await getPackingSlipPdfUrl.execute(req.params.publicId!, req.params.fulfillmentId!);
+      res.redirect(302, url);
     }),
   );
   admin.post(

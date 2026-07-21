@@ -758,4 +758,75 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     const invoice = await admin.post(`/admin/v1/orders/${orderPublicId}/invoice`).send({});
     expect(invoice.status).toBe(409);
   });
+
+  it('fulfills with carrier tracking details, generates a packing slip PDF, and exposes both via GET', async () => {
+    const variantId = await createVariant('ORD-SKU-TRACKING-1', '14.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 2 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const fulfill = await admin.post(`/admin/v1/orders/${orderPublicId}/fulfillments`).send({
+      lines: [{ sku: 'ORD-SKU-TRACKING-1', qty: 2 }],
+      trackingNumber: 'TRACK-999',
+      carrier: 'FedEx',
+      carrierTrackingUrl: 'https://fedex.example.com/track/TRACK-999',
+      estimatedDeliveryAt: '2026-08-01',
+      shippingNotes: 'Leave at front desk',
+    });
+    expect(fulfill.status).toBe(200);
+    const f = fulfill.body.data.fulfillments[0];
+    expect(f.carrierTrackingUrl).toBe('https://fedex.example.com/track/TRACK-999');
+    expect(f.estimatedDeliveryAt).toContain('2026-08-01');
+    expect(f.shippingNotes).toBe('Leave at front desk');
+    expect(f.hasPackingSlip).toBe(true);
+
+    const detail = await admin.get(`/admin/v1/orders/${orderPublicId}`);
+    expect(detail.body.data.fulfillments[0].hasPackingSlip).toBe(true);
+
+    const packingSlipRedirect = await admin
+      .get(`/admin/v1/orders/${orderPublicId}/shipment/${f.publicId}/packing-slip`)
+      .redirects(0);
+    expect(packingSlipRedirect.status).toBe(302);
+    const pdfUrl = packingSlipRedirect.headers.location as string;
+    const pdfBytes = await fetch(pdfUrl).then((r) => r.arrayBuffer());
+    expect(pdfBytes.byteLength).toBeGreaterThan(100);
+    expect(Buffer.from(pdfBytes.slice(0, 5)).toString('utf8')).toBe('%PDF-');
+  });
+
+  it('fulfilling without tracking details still creates a (mostly-null) shipment_tracking row and a packing slip', async () => {
+    const variantId = await createVariant('ORD-SKU-TRACKING-BARE-1', '9.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const fulfill = await admin.post(`/admin/v1/orders/${orderPublicId}/fulfillments`).send({ lines: [{ sku: 'ORD-SKU-TRACKING-BARE-1', qty: 1 }] });
+    expect(fulfill.status).toBe(200);
+    const f = fulfill.body.data.fulfillments[0];
+    expect(f.carrierTrackingUrl).toBeNull();
+    expect(f.estimatedDeliveryAt).toBeNull();
+    expect(f.shippingNotes).toBeNull();
+    expect(f.hasPackingSlip).toBe(true);
+  });
 });
