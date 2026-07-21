@@ -1,7 +1,18 @@
+import { Prisma } from '@prisma/client';
 import type { PaymentTxnType, PaymentTxnStatus, ShipmentStatus, FinancialStatus, OrderStatus, FulfillmentStatus } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { Prisma } from '@prisma/client';
-import type { OrderRepository, CreateOrderInput, OrderView, ListOrdersFilter, OrderListResult } from '../domain/repositories.js';
+import type {
+  OrderRepository,
+  CreateOrderInput,
+  OrderView,
+  ListOrdersFilter,
+  OrderListResult,
+  OrderAddressView,
+  RecordOrderHistoryInput,
+  OrderHistoryView,
+  AddOrderNoteInput,
+  OrderNoteView,
+} from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { FulfillmentExceedsQtyError, RefundExceedsQtyError } from '../domain/errors.js';
@@ -17,6 +28,18 @@ function formatDecimal(value: { toString(): string }): string {
   return fromMinorUnits(toMinorUnits(value.toString()));
 }
 
+/** include clause shared by every full-detail order read (findByPublicId, and create()'s post-write re-fetch). */
+const ORDER_DETAIL_INCLUDE = {
+  lines: true,
+  addresses: true,
+  payments: { orderBy: { createdAt: 'asc' as const } },
+  fulfillments: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
+  returns: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
+  notes: { orderBy: { createdAt: 'desc' as const } },
+} satisfies Prisma.OrderInclude;
+
+type OrderDetailRow = Prisma.OrderGetPayload<{ include: typeof ORDER_DETAIL_INCLUDE }>;
+
 export class PrismaOrderRepository implements OrderRepository {
   constructor(private readonly db: Db) {}
 
@@ -26,7 +49,7 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   async create(input: CreateOrderInput, orderNumber: bigint): Promise<OrderView> {
-    const row = await this.db.$transaction(async (tx) => {
+    const orderId = await this.db.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -38,6 +61,7 @@ export class PrismaOrderRepository implements OrderRepository {
           customerGroupId: input.customerGroupId,
           email: input.email,
           currency: input.currency,
+          customerIp: input.customerIp ?? null,
           subtotal: fromMinorUnits(input.subtotalMinor),
           taxTotal: fromMinorUnits(input.taxTotalMinor),
           shippingTotal: fromMinorUnits(input.shippingTotalMinor),
@@ -45,7 +69,7 @@ export class PrismaOrderRepository implements OrderRepository {
           shippingMethodCode: input.shippingMethodCode,
         },
       });
-      const lines = await Promise.all(
+      await Promise.all(
         input.lines.map((l) =>
           tx.orderLine.create({
             data: {
@@ -83,57 +107,92 @@ export class PrismaOrderRepository implements OrderRepository {
         eventType: 'OrderPlaced',
         payload: { orderNumber: order.orderNumber.toString(), email: order.email, grandTotal: fromMinorUnits(input.grandTotalMinor) },
       });
-      return { order, lines };
+      await tx.orderStatusHistory.create({
+        data: { orderId: order.id, eventType: 'ORDER_CREATED', message: 'Order placed', actorType: 'SYSTEM' },
+      });
+      return order.id;
     });
 
-    return toView(row.order, row.lines);
+    const detail = await this.db.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_DETAIL_INCLUDE });
+    return toView(detail);
   }
 
   async findByPublicId(publicId: string): Promise<OrderView | null> {
-    const order = await this.db.order.findFirst({ where: { publicId }, include: { lines: true } });
-    return order ? toView(order, order.lines) : null;
+    const order = await this.db.order.findFirst({ where: { publicId }, include: ORDER_DETAIL_INCLUDE });
+    return order ? toView(order) : null;
   }
 
   async list(filter: ListOrdersFilter): Promise<OrderListResult> {
-    const where: Prisma.OrderWhereInput = {
-      status: filter.status,
-      financialStatus: filter.financialStatus,
-      ...(filter.email ? { email: { contains: filter.email, mode: 'insensitive' } } : {}),
-    };
-    const [total, rows] = await this.db.$transaction([
-      this.db.order.count({ where }),
-      this.db.order.findMany({
-        where,
-        select: {
-          publicId: true,
-          orderNumber: true,
-          email: true,
-          currency: true,
-          status: true,
-          financialStatus: true,
-          fulfillmentStatus: true,
-          grandTotal: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (filter.page - 1) * filter.pageSize,
-        take: filter.pageSize,
-      }),
+    const conditions: Prisma.Sql[] = [];
+    if (filter.status) conditions.push(Prisma.sql`o.status = ${filter.status}::"OrderStatus"`);
+    if (filter.financialStatus) conditions.push(Prisma.sql`o.financial_status = ${filter.financialStatus}::"FinancialStatus"`);
+    if (filter.fulfillmentStatus) conditions.push(Prisma.sql`o.fulfillment_status = ${filter.fulfillmentStatus}::"FulfillmentStatus"`);
+    if (filter.email) conditions.push(Prisma.sql`o.email ILIKE ${`%${filter.email}%`}`);
+    if (filter.customerName) conditions.push(Prisma.sql`ba.name ILIKE ${`%${filter.customerName}%`}`);
+    if (filter.dateFrom) conditions.push(Prisma.sql`o.created_at >= ${filter.dateFrom}`);
+    if (filter.dateTo) conditions.push(Prisma.sql`o.created_at <= ${filter.dateTo}`);
+    if (filter.orderId) {
+      const asNumber = /^\d+$/.test(filter.orderId) ? BigInt(filter.orderId) : null;
+      conditions.push(
+        asNumber !== null
+          ? Prisma.sql`(o.public_id::text = ${filter.orderId} OR o.order_number = ${asNumber})`
+          : Prisma.sql`o.public_id::text = ${filter.orderId}`,
+      );
+    }
+    const where = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
+
+    const sortColumn =
+      filter.sortBy === 'grandTotal' ? Prisma.sql`o.grand_total` : filter.sortBy === 'customerName' ? Prisma.sql`ba.name` : Prisma.sql`o.created_at`;
+    const sortDir = filter.sortDir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+    const fromJoin = Prisma.sql`
+      FROM "order" o
+      LEFT JOIN order_address ba ON ba.order_id = o.id AND ba.type = 'BILLING'
+      LEFT JOIN LATERAL (
+        SELECT method FROM payment_transaction p WHERE p.order_id = o.id ORDER BY p.created_at ASC LIMIT 1
+      ) pt ON true
+      ${where}`;
+
+    const [countRows, rows] = await Promise.all([
+      this.db.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS n ${fromJoin}`),
+      this.db.$queryRaw<
+        Array<{
+          public_id: string;
+          order_number: bigint;
+          email: string;
+          customer_name: string | null;
+          payment_method: string | null;
+          currency: string;
+          status: string;
+          financial_status: string;
+          fulfillment_status: string;
+          grand_total: string;
+          created_at: Date;
+        }>
+      >(Prisma.sql`
+        SELECT o.public_id, o.order_number, o.email, COALESCE(ba.name, o.email) AS customer_name, pt.method AS payment_method,
+               o.currency, o.status, o.financial_status, o.fulfillment_status, o.grand_total::text AS grand_total, o.created_at
+        ${fromJoin}
+        ORDER BY ${sortColumn} ${sortDir}
+        LIMIT ${filter.pageSize} OFFSET ${(filter.page - 1) * filter.pageSize}`),
     ]);
+
     return {
-      total,
+      total: Number(countRows[0]?.n ?? 0n),
       page: filter.page,
       pageSize: filter.pageSize,
       orders: rows.map((row) => ({
-        publicId: row.publicId,
-        orderNumber: row.orderNumber.toString(),
+        publicId: row.public_id,
+        orderNumber: row.order_number.toString(),
         email: row.email,
+        customerName: row.customer_name ?? row.email,
+        paymentMethod: row.payment_method,
         currency: row.currency,
         status: row.status,
-        financialStatus: row.financialStatus,
-        fulfillmentStatus: row.fulfillmentStatus,
-        grandTotal: formatDecimal(row.grandTotal),
-        createdAt: row.createdAt,
+        financialStatus: row.financial_status,
+        fulfillmentStatus: row.fulfillment_status,
+        grandTotal: formatDecimal(row.grand_total),
+        createdAt: row.created_at,
       })),
     };
   }
@@ -148,6 +207,10 @@ export class PrismaOrderRepository implements OrderRepository {
 
   async setFulfillmentStatus(orderId: bigint, status: FulfillmentStatus): Promise<void> {
     await this.db.order.update({ where: { id: orderId }, data: { fulfillmentStatus: status } });
+  }
+
+  async setClosedAt(orderId: bigint, closedAt: Date): Promise<void> {
+    await this.db.order.update({ where: { id: orderId }, data: { closedAt, status: 'CLOSED' } });
   }
 
   async recordPayment(input: {
@@ -197,6 +260,8 @@ export class PrismaOrderRepository implements OrderRepository {
     orderId: bigint;
     warehouseId: bigint;
     status: ShipmentStatus;
+    trackingNumber?: string | null;
+    carrier?: string | null;
     lines: Array<{ orderLineId: bigint; qty: number }>;
   }): Promise<{ id: bigint; publicId: string }> {
     return this.db.$transaction(async (tx) => {
@@ -205,6 +270,8 @@ export class PrismaOrderRepository implements OrderRepository {
           orderId: input.orderId,
           warehouseId: input.warehouseId,
           status: input.status,
+          trackingNumber: input.trackingNumber ?? null,
+          carrier: input.carrier ?? null,
           shippedAt: input.status === 'SHIPPED' ? new Date() : null,
         },
       });
@@ -214,56 +281,82 @@ export class PrismaOrderRepository implements OrderRepository {
       return { id: fulfillment.id, publicId: fulfillment.publicId };
     });
   }
+
+  async recordHistory(input: RecordOrderHistoryInput): Promise<void> {
+    await this.db.orderStatusHistory.create({
+      data: {
+        orderId: input.orderId,
+        eventType: input.eventType,
+        fromValue: input.fromValue ?? null,
+        toValue: input.toValue ?? null,
+        message: input.message ?? null,
+        actorType: input.actorType,
+        actorId: input.actorId ?? null,
+        actorName: input.actorName ?? null,
+      },
+    });
+  }
+
+  async listHistory(orderId: bigint): Promise<OrderHistoryView[]> {
+    const rows = await this.db.orderStatusHistory.findMany({ where: { orderId }, orderBy: { createdAt: 'asc' } });
+    return rows.map((r) => ({
+      id: r.id,
+      eventType: r.eventType,
+      fromValue: r.fromValue,
+      toValue: r.toValue,
+      message: r.message,
+      actorType: r.actorType,
+      actorName: r.actorName,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  async addNote(input: AddOrderNoteInput): Promise<OrderNoteView> {
+    const row = await this.db.orderNote.create({
+      data: { orderId: input.orderId, type: input.type, body: input.body, createdBy: input.createdBy ?? null },
+    });
+    return { id: row.id, type: row.type, body: row.body, createdAt: row.createdAt };
+  }
 }
 
-interface OrderRow {
-  id: bigint;
-  publicId: string;
-  orderNumber: bigint;
-  websiteId: bigint;
-  storeId: bigint;
-  email: string;
-  currency: string;
-  status: string;
-  financialStatus: string;
-  fulfillmentStatus: string;
-  subtotal: { toString(): string };
-  taxTotal: { toString(): string };
-  shippingTotal: { toString(): string };
-  grandTotal: { toString(): string };
+function toAddressView(a: { type: string; name: string; company: string | null; line1: string; line2: string | null; city: string; region: string | null; postalCode: string; country: string; phone: string | null }): OrderAddressView {
+  return {
+    type: a.type as OrderAddressView['type'],
+    name: a.name,
+    company: a.company,
+    line1: a.line1,
+    line2: a.line2,
+    city: a.city,
+    region: a.region,
+    postalCode: a.postalCode,
+    country: a.country,
+    phone: a.phone,
+  };
 }
 
-interface OrderLineRow {
-  id: bigint;
-  variantId: bigint;
-  sku: string;
-  name: string;
-  qty: number;
-  unitPrice: { toString(): string };
-  taxAmount: { toString(): string };
-  rowTotal: { toString(): string };
-  fulfilledQty: number;
-  refundedQty: number;
-  version: number;
-}
-
-function toView(order: OrderRow, lines: OrderLineRow[]): OrderView {
+function toView(order: OrderDetailRow): OrderView {
   return {
     id: order.id,
     publicId: order.publicId,
     orderNumber: order.orderNumber.toString(),
     websiteId: order.websiteId,
     storeId: order.storeId,
+    customerId: order.customerId,
     email: order.email,
     currency: order.currency,
     status: order.status,
     financialStatus: order.financialStatus,
     fulfillmentStatus: order.fulfillmentStatus,
     subtotal: formatDecimal(order.subtotal),
+    discountTotal: formatDecimal(order.discountTotal),
     taxTotal: formatDecimal(order.taxTotal),
     shippingTotal: formatDecimal(order.shippingTotal),
     grandTotal: formatDecimal(order.grandTotal),
-    lines: lines.map((l) => ({
+    shippingMethodCode: order.shippingMethodCode,
+    customerIp: order.customerIp,
+    placedAt: order.placedAt,
+    closedAt: order.closedAt,
+    lines: order.lines.map((l) => ({
       id: l.id,
       variantId: l.variantId,
       sku: l.sku,
@@ -271,10 +364,40 @@ function toView(order: OrderRow, lines: OrderLineRow[]): OrderView {
       qty: l.qty,
       unitPrice: formatDecimal(l.unitPrice),
       taxAmount: formatDecimal(l.taxAmount),
+      discountAmount: formatDecimal(l.discountAmount),
       rowTotal: formatDecimal(l.rowTotal),
       fulfilledQty: l.fulfilledQty,
       refundedQty: l.refundedQty,
       version: l.version,
     })),
+    addresses: order.addresses.map(toAddressView),
+    payments: order.payments.map((p) => ({
+      id: p.id,
+      method: p.method,
+      gateway: p.gateway,
+      type: p.type,
+      amount: formatDecimal(p.amount),
+      currency: p.currency,
+      status: p.status,
+      gatewayRef: p.gatewayRef,
+      createdAt: p.createdAt,
+    })),
+    fulfillments: order.fulfillments.map((f) => ({
+      publicId: f.publicId,
+      status: f.status,
+      trackingNumber: f.trackingNumber,
+      carrier: f.carrier,
+      shippedAt: f.shippedAt,
+      createdAt: f.createdAt,
+      lines: f.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty })),
+    })),
+    returns: order.returns.map((r) => ({
+      publicId: r.publicId,
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.createdAt,
+      lines: r.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty, restock: l.restock })),
+    })),
+    notes: order.notes.map((n) => ({ id: n.id, type: n.type, body: n.body, createdAt: n.createdAt })),
   };
 }

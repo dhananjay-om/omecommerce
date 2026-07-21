@@ -172,6 +172,7 @@ export class CompleteCheckout {
         customerGroupId: cart.customerGroupId,
         email: cmd.email,
         currency: cart.currency,
+        customerIp: cmd.customerIp,
         subtotalMinor,
         taxTotalMinor,
         shippingTotalMinor: shipping.amountMinor,
@@ -224,14 +225,34 @@ export class CompleteCheckout {
         eventType: 'OrderPaid',
         payload: { orderNumber: order.orderNumber, grandTotal: fromMinorUnits(grandTotalMinor) },
       });
+      await this.orders.recordHistory({
+        orderId: order.id,
+        eventType: 'PAYMENT_RECEIVED',
+        fromValue: 'PENDING',
+        toValue: 'PAID',
+        message: `Payment captured via ${cmd.paymentMethod}`,
+        actorType: 'SYSTEM',
+      });
     } else {
       await this.releaseAll(reservations);
       await this.orders.setOrderStatus(order.id, 'CANCELLED');
+      // FAILED (plan/15 Phase 0a) over leaving financialStatus at its PENDING
+      // default — a payment-declined order previously looked indistinguishable
+      // from "checkout never even attempted payment yet."
+      await this.orders.setFinancialStatus(order.id, 'FAILED');
       await this.outbox.write({
         aggregateType: 'Order',
         aggregateId: order.publicId,
         eventType: 'OrderPaymentFailed',
         payload: { orderNumber: order.orderNumber, gatewayRef: payment.gatewayRef },
+      });
+      await this.orders.recordHistory({
+        orderId: order.id,
+        eventType: 'PAYMENT_FAILED',
+        fromValue: 'PENDING',
+        toValue: 'FAILED',
+        message: `Payment declined (gateway ref ${payment.gatewayRef})`,
+        actorType: 'SYSTEM',
       });
       throw new PaymentDeclinedError(order.publicId, payment.gatewayRef);
     }

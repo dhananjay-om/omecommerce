@@ -7,6 +7,8 @@ import type {
   FinancialStatus,
   OrderStatus,
   FulfillmentStatus,
+  OrderHistoryActorType,
+  OrderNoteType,
 } from '@prisma/client';
 
 // --- Cross-module read-only lookups (each module resolves its own dependencies) ---
@@ -31,6 +33,13 @@ export interface CustomerGroupLookup {
 /** Resolves a logged-in customer's publicId to their internal id, so a cart (and the order it becomes) can carry it (own trivial copy, per-module convention). */
 export interface CustomerLookup {
   findIdByPublicId(customerPublicId: string): Promise<bigint | null>;
+  /** Reverse direction — plan/15 Phase 0e needs it to credit a wallet (keyed by publicId) from an order's internal customerId. */
+  findPublicIdById(customerId: bigint): Promise<string | null>;
+}
+
+/** plan/15 Phase 0b — resolves the acting admin (from the JWT's adminUserPublicId claim) to an id + display name for order_status_history/order_note's actor columns. Own copy, per-module convention — AdminUser has no `name` column, so email is the display name. */
+export interface AdminUserLookup {
+  findByPublicId(publicId: string): Promise<{ id: bigint; email: string } | null>;
 }
 
 export interface TaxClassInfo {
@@ -150,6 +159,7 @@ export interface CreateOrderInput {
   customerGroupId: bigint | null;
   email: string;
   currency: string;
+  customerIp?: string | null;
   subtotalMinor: bigint;
   taxTotalMinor: bigint;
   shippingTotalMinor: bigint;
@@ -168,10 +178,102 @@ export interface OrderLineView {
   qty: number;
   unitPrice: string;
   taxAmount: string;
+  discountAmount: string;
   rowTotal: string;
   fulfilledQty: number;
   refundedQty: number;
   version: number;
+}
+
+export interface OrderAddressView {
+  type: AddressType;
+  name: string;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+}
+
+export interface PaymentTransactionView {
+  id: bigint;
+  method: string;
+  gateway: string;
+  type: PaymentTxnType;
+  amount: string;
+  currency: string;
+  status: PaymentTxnStatus;
+  gatewayRef: string | null;
+  createdAt: Date;
+}
+
+export interface FulfillmentLineView {
+  orderLineId: bigint;
+  qty: number;
+}
+
+export interface FulfillmentView {
+  publicId: string;
+  status: ShipmentStatus;
+  trackingNumber: string | null;
+  carrier: string | null;
+  shippedAt: Date | null;
+  createdAt: Date;
+  lines: FulfillmentLineView[];
+}
+
+export interface OrderReturnLineView {
+  orderLineId: bigint;
+  qty: number;
+  restock: boolean;
+}
+
+export interface OrderReturnView {
+  publicId: string;
+  reason: string;
+  status: string;
+  createdAt: Date;
+  lines: OrderReturnLineView[];
+}
+
+export interface OrderNoteView {
+  id: bigint;
+  type: OrderNoteType;
+  body: string;
+  createdAt: Date;
+}
+
+/** plan/15 Phase 0b — one row of the order timeline. */
+export interface OrderHistoryView {
+  id: bigint;
+  eventType: string;
+  fromValue: string | null;
+  toValue: string | null;
+  message: string | null;
+  actorType: OrderHistoryActorType;
+  actorName: string | null;
+  createdAt: Date;
+}
+
+export interface RecordOrderHistoryInput {
+  orderId: bigint;
+  eventType: string;
+  fromValue?: string | null;
+  toValue?: string | null;
+  message?: string | null;
+  actorType: OrderHistoryActorType;
+  actorId?: bigint | null;
+  actorName?: string | null;
+}
+
+export interface AddOrderNoteInput {
+  orderId: bigint;
+  type: OrderNoteType;
+  body: string;
+  createdBy?: bigint | null;
 }
 
 export interface OrderView {
@@ -180,22 +282,37 @@ export interface OrderView {
   orderNumber: string;
   websiteId: bigint;
   storeId: bigint;
+  customerId: bigint | null;
   email: string;
   currency: string;
   status: string;
   financialStatus: string;
   fulfillmentStatus: string;
   subtotal: string;
+  discountTotal: string;
   taxTotal: string;
   shippingTotal: string;
   grandTotal: string;
+  shippingMethodCode: string | null;
+  customerIp: string | null;
+  placedAt: Date;
+  closedAt: Date | null;
   lines: OrderLineView[];
+  addresses: OrderAddressView[];
+  payments: PaymentTransactionView[];
+  fulfillments: FulfillmentView[];
+  returns: OrderReturnView[];
+  notes: OrderNoteView[];
 }
 
 export interface OrderListItem {
   publicId: string;
   orderNumber: string;
   email: string;
+  /** Billing address's snapshotted name — an order has no separate "customer name" column; this is the point-in-time name at purchase, same snapshot philosophy as every other order field (plan/15 Phase 0c). Falls back to email if, unexpectedly, no billing address exists. */
+  customerName: string;
+  /** Most recent payment transaction's method (e.g. "test_card"), or null if none recorded yet. */
+  paymentMethod: string | null;
   currency: string;
   status: string;
   financialStatus: string;
@@ -207,9 +324,18 @@ export interface OrderListItem {
 export interface ListOrdersFilter {
   page: number;
   pageSize: number;
+  sortBy?: 'createdAt' | 'grandTotal' | 'customerName';
+  sortDir?: 'asc' | 'desc';
   status?: OrderStatus;
   financialStatus?: FinancialStatus;
+  fulfillmentStatus?: FulfillmentStatus;
   email?: string;
+  /** Matches order_number (exact) or the publicId (exact/prefix) — accepts whatever an admin pastes from the grid or a support ticket. */
+  orderId?: string;
+  /** ILIKE against the billing address name (see OrderListItem.customerName). */
+  customerName?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
 export interface OrderListResult {
@@ -227,6 +353,7 @@ export interface OrderRepository {
   setFinancialStatus(orderId: bigint, status: FinancialStatus): Promise<void>;
   setOrderStatus(orderId: bigint, status: OrderStatus): Promise<void>;
   setFulfillmentStatus(orderId: bigint, status: FulfillmentStatus): Promise<void>;
+  setClosedAt(orderId: bigint, closedAt: Date): Promise<void>;
   recordPayment(input: {
     orderId: bigint;
     method: string;
@@ -246,6 +373,12 @@ export interface OrderRepository {
     orderId: bigint;
     warehouseId: bigint;
     status: ShipmentStatus;
+    trackingNumber?: string | null;
+    carrier?: string | null;
     lines: Array<{ orderLineId: bigint; qty: number }>;
   }): Promise<{ id: bigint; publicId: string }>;
+  /** plan/15 Phase 0b — appends one timeline row; called alongside (not instead of) the existing outbox.write() calls in every mutating usecase. */
+  recordHistory(input: RecordOrderHistoryInput): Promise<void>;
+  listHistory(orderId: bigint): Promise<OrderHistoryView[]>;
+  addNote(input: AddOrderNoteInput): Promise<OrderNoteView>;
 }

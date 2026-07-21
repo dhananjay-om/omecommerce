@@ -12,6 +12,7 @@ import {
   PrismaWarehouseResolver,
   PrismaCustomerGroupLookup,
   PrismaCartProductMediaLookup,
+  PrismaAdminUserLookup,
 } from './infrastructure/prisma-lookups.js';
 import { PrismaCustomerLookup } from './infrastructure/prisma-customer-lookup.js';
 import { PrismaTaxClassLookup, NativeTaxCalculator } from './infrastructure/native-tax-calculator.js';
@@ -33,12 +34,19 @@ import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
 import { CreateTaxClass, CreateShippingMethod } from './application/setup.usecases.js';
 import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
+import { GetOrderHistory } from './application/get-order-history.usecase.js';
+import { AddOrderNote } from './application/add-order-note.usecase.js';
+import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
+import { PrismaCustomerContextLookup } from '../wallet/infrastructure/prisma-customer-context-lookup.js';
+import { CreditWallet } from '../wallet/application/credit-wallet.usecase.js';
 import {
   createCartSchema,
   addCartLineSchema,
   completeCheckoutSchema,
   fulfillOrderSchema,
   refundOrderSchema,
+  cancelOrderSchema,
+  addOrderNoteSchema,
   createTaxClassSchema,
   createShippingMethodSchema,
   listOrdersQuerySchema,
@@ -65,6 +73,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const warehouses = new PrismaWarehouseResolver(db);
   const customerGroups = new PrismaCustomerGroupLookup(db);
   const customers = new PrismaCustomerLookup(db);
+  const adminUsers = new PrismaAdminUserLookup(db);
   const taxClassLookup = new PrismaTaxClassLookup(db);
   const taxCalculator = new NativeTaxCalculator(taxClassLookup);
   const shippingCalculator = new NativeShippingCalculator(db);
@@ -96,11 +105,23 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const getOrder = new GetOrder(orders);
   const listOrders = new ListOrders(orders);
   const listShippingMethods = new ListShippingMethods(shippingMethods);
-  const fulfillOrder = new FulfillOrder(orders, warehouses);
-  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox);
+  // Own instances of the wallet ledger/customer-context lookup — CreditWallet
+  // is reused directly (money-moving ledger write, the correctness-critical
+  // carve-out), not re-implemented, but Order still composes its own copy of
+  // the module here rather than importing wallet.module.ts's factory (that
+  // factory also wires wallet's HTTP routes, which Order has no business
+  // constructing).
+  const walletLedger = new PrismaWalletLedger(db);
+  const walletCustomerContext = new PrismaCustomerContextLookup(db);
+  const creditWallet = new CreditWallet(walletLedger, walletCustomerContext);
+
+  const fulfillOrder = new FulfillOrder(orders, warehouses, outbox);
+  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
+  const getOrderHistory = new GetOrderHistory(orders);
+  const addOrderNote = new AddOrderNote(orders, adminUsers);
 
   const admin = Router();
   admin.post(
@@ -119,6 +140,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   );
   admin.get(
     '/orders',
+    authorize('orders:view'),
     asyncHandler(async (req, res) => {
       const query = parse(listOrdersQuerySchema, req.query);
       res.json({ data: await listOrders.execute(query) });
@@ -126,12 +148,29 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   );
   admin.get(
     '/orders/:publicId',
+    authorize('orders:view'),
     asyncHandler(async (req, res) => {
       res.json({ data: await getOrder.execute(req.params.publicId!) });
     }),
   );
+  admin.get(
+    '/orders/:publicId/history',
+    authorize('orders:view'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getOrderHistory.execute(req.params.publicId!) });
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/notes',
+    authorize('orders:view'),
+    asyncHandler(async (req, res) => {
+      const body = parse(addOrderNoteSchema, req.body);
+      res.status(201).json({ data: await addOrderNote.execute({ orderPublicId: req.params.publicId!, createdBy: req.adminUser?.adminUserPublicId, ...body }) });
+    }),
+  );
   admin.post(
     '/orders/:publicId/fulfillments',
+    authorize('orders:fulfill'),
     asyncHandler(async (req, res) => {
       const body = parse(fulfillOrderSchema, req.body);
       res.json({ data: await fulfillOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
@@ -149,7 +188,8 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     '/orders/:publicId/cancel',
     authorize('orders:cancel'),
     asyncHandler(async (req, res) => {
-      res.json({ data: await cancelOrder.execute({ orderPublicId: req.params.publicId! }) });
+      const body = parse(cancelOrderSchema, req.body);
+      res.json({ data: await cancelOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
     }),
   );
 
@@ -185,7 +225,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     idempotent('POST /store/v1/carts/:publicId/checkout'),
     asyncHandler(async (req, res) => {
       const body = parse(completeCheckoutSchema, req.body);
-      res.status(201).json({ data: await completeCheckout.execute({ cartPublicId: req.params.publicId!, ...body }) });
+      res.status(201).json({ data: await completeCheckout.execute({ cartPublicId: req.params.publicId!, customerIp: req.ip, ...body }) });
     }),
   );
   store.get(

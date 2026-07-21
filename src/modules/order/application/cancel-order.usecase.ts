@@ -30,6 +30,7 @@ export class CancelOrder {
       orderPublicId: cmd.orderPublicId,
       lines: order.lines.map((l) => ({ sku: l.sku, qty: l.qty - l.refundedQty })).filter((l) => l.qty > 0),
       restock: true,
+      refundTo: cmd.refundTo,
     });
 
     await this.orders.setOrderStatus(order.id, 'CANCELLED');
@@ -37,7 +38,15 @@ export class CancelOrder {
       aggregateType: 'Order',
       aggregateId: order.publicId,
       eventType: 'OrderCancelled',
-      payload: { orderNumber: order.orderNumber },
+      payload: { orderNumber: order.orderNumber, reason: cmd.reason ?? null },
+    });
+    await this.orders.recordHistory({
+      orderId: order.id,
+      eventType: 'CANCELLED',
+      fromValue: order.status,
+      toValue: 'CANCELLED',
+      message: cmd.reason ? `Order cancelled: ${cmd.reason}` : 'Order cancelled',
+      actorType: 'ADMIN',
     });
     return { ...result, status: 'CANCELLED' };
   }

@@ -146,7 +146,9 @@ model Order {
   shippingTotal      Decimal           @map("shipping_total") @db.Decimal(18, 4)
   grandTotal         Decimal           @map("grand_total") @db.Decimal(18, 4)
   shippingMethodCode String?           @map("shipping_method_code") // snapshot, not FK
+  customerIp         String?           @map("customer_ip") // plan/15 Phase 0a — req.ip captured at checkout, admin detail page's "Order Information" section
   placedAt           DateTime          @default(now()) @map("placed_at") @db.Timestamptz(6)
+  closedAt           DateTime?         @map("closed_at") @db.Timestamptz(6) // plan/15 Phase 4 — set by CloseOrder
   version            Int               @default(0)
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -162,6 +164,8 @@ model Order {
   payments     PaymentTransaction[]
   fulfillments Fulfillment[]
   returns      OrderReturn[]
+  history      OrderStatusHistory[]
+  notes        OrderNote[]
 
   @@unique([websiteId, orderNumber])
   @@index([storeId])
@@ -332,4 +336,45 @@ model OrderReturnLine {
 
   @@id([returnId, orderLineId])
   @@map("order_return_line")
+}
+
+/// Append-only order activity timeline (plan/15 Phase 0b) — deliberately separate
+/// from `outbox_event`: the outbox is transient delivery infrastructure (polled,
+/// marked published, not indexed for per-order reads); this table is a permanent,
+/// order-scoped read model for the admin/storefront "Timeline" UI. `eventType` is
+/// a free-form String (not an enum), matching `OutboxEvent.eventType`'s own
+/// precedent — new event kinds get added across plan/15's later phases without a
+/// schema migration each time.
+model OrderStatusHistory {
+  id        BigInt                @id @default(autoincrement())
+  orderId   BigInt                @map("order_id")
+  eventType String                @map("event_type") // 'STATUS_CHANGED' | 'PAYMENT_RECEIVED' | 'INVOICE_CREATED' | 'SHIPMENT_CREATED' | 'TRACKING_ADDED' | 'EMAIL_SENT' | 'NOTE_ADDED' | 'CANCELLED' | 'REFUNDED' | 'CLOSED' | ...
+  fromValue String?               @map("from_value")
+  toValue   String?               @map("to_value")
+  message   String? // human-readable timeline line, e.g. "Order confirmed by admin"
+  actorType OrderHistoryActorType @map("actor_type")
+  actorId   BigInt?               @map("actor_id") // admin_user.id when actorType=ADMIN; NULL for SYSTEM/CUSTOMER
+  actorName String?               @map("actor_name") // display-name snapshot — an admin's name may change later, this line shouldn't
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+/// plan/15 Phase 0b. Append-only (edit = add a new note, matching PaymentTransaction's
+/// established append-only-ledger convention in this same file) rather than mutable.
+model OrderNote {
+  id        BigInt        @id @default(autoincrement())
+  orderId   BigInt        @map("order_id")
+  type      OrderNoteType
+  body      String
+  createdBy BigInt?       @map("created_by") // admin_user.id; NULL if ever customer-authored in a later phase
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, type])
+  @@map("order_note")
 }

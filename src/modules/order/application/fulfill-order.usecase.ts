@@ -1,6 +1,7 @@
 import type { OrderRepository, WarehouseResolver } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError } from '../domain/errors.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { FulfillOrderCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
@@ -8,6 +9,7 @@ export class FulfillOrder {
   constructor(
     private readonly orders: OrderRepository,
     private readonly warehouses: WarehouseResolver,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: FulfillOrderCommand): Promise<OrderViewDto> {
@@ -28,17 +30,35 @@ export class FulfillOrder {
       fulfillmentLines.push({ orderLineId: line.id, qty: requested.qty });
     }
 
-    await this.orders.createFulfillment({
+    const fulfillment = await this.orders.createFulfillment({
       orderId: order.id,
       warehouseId: warehouse.id,
       status: 'SHIPPED',
+      trackingNumber: cmd.trackingNumber ?? null,
+      carrier: cmd.carrier ?? null,
       lines: fulfillmentLines,
     });
 
     const updated = await this.orders.findByPublicId(cmd.orderPublicId);
     const allFulfilled = updated!.lines.every((l) => l.fulfilledQty >= l.qty);
     const anyFulfilled = updated!.lines.some((l) => l.fulfilledQty > 0);
-    await this.orders.setFulfillmentStatus(order.id, allFulfilled ? 'FULFILLED' : anyFulfilled ? 'PARTIALLY_FULFILLED' : 'UNFULFILLED');
+    const newFulfillmentStatus = allFulfilled ? 'FULFILLED' : anyFulfilled ? 'PARTIALLY_FULFILLED' : 'UNFULFILLED';
+    await this.orders.setFulfillmentStatus(order.id, newFulfillmentStatus);
+
+    await this.outbox.write({
+      aggregateType: 'Order',
+      aggregateId: order.publicId,
+      eventType: 'Shipped',
+      payload: { orderNumber: order.orderNumber, fulfillmentPublicId: fulfillment.publicId, trackingNumber: cmd.trackingNumber ?? null },
+    });
+    await this.orders.recordHistory({
+      orderId: order.id,
+      eventType: 'SHIPMENT_CREATED',
+      fromValue: order.fulfillmentStatus,
+      toValue: newFulfillmentStatus,
+      message: cmd.trackingNumber ? `Shipment created (tracking: ${cmd.trackingNumber})` : 'Shipment created',
+      actorType: 'ADMIN',
+    });
 
     const final = await this.orders.findByPublicId(cmd.orderPublicId);
     return toOrderDto(final!);

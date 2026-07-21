@@ -1,4 +1,4 @@
-import type { OrderStatus, FinancialStatus } from '@prisma/client';
+import type { OrderStatus, FinancialStatus, FulfillmentStatus } from '@prisma/client';
 
 export interface CreateCartCommand {
   storeViewId: string;
@@ -62,6 +62,8 @@ export interface CompleteCheckoutCommand {
   shippingMethodCode: string;
   paymentMethod: string;
   testScenario?: 'approve' | 'decline';
+  /** req.ip, captured at the HTTP layer — plan/15 Phase 0a, shown on the admin Order Information section. */
+  customerIp?: string | null;
 }
 
 export interface OrderLineViewDto {
@@ -70,9 +72,70 @@ export interface OrderLineViewDto {
   qty: number;
   unitPrice: string;
   taxAmount: string;
+  discountAmount: string;
   rowTotal: string;
   fulfilledQty: number;
   refundedQty: number;
+}
+
+export interface OrderAddressDto {
+  type: string;
+  name: string;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+}
+
+export interface PaymentTransactionDto {
+  method: string;
+  gateway: string;
+  type: string;
+  amount: string;
+  currency: string;
+  status: string;
+  gatewayRef: string | null;
+  createdAt: string;
+}
+
+export interface FulfillmentLineDto {
+  sku: string;
+  qty: number;
+}
+
+export interface FulfillmentDto {
+  publicId: string;
+  status: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  shippedAt: string | null;
+  createdAt: string;
+  lines: FulfillmentLineDto[];
+}
+
+export interface OrderReturnLineDto {
+  sku: string;
+  qty: number;
+  restock: boolean;
+}
+
+export interface OrderReturnDto {
+  publicId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  lines: OrderReturnLineDto[];
+}
+
+export interface OrderNoteDto {
+  id: string;
+  type: string;
+  body: string;
+  createdAt: string;
 }
 
 export interface OrderViewDto {
@@ -84,24 +147,43 @@ export interface OrderViewDto {
   financialStatus: string;
   fulfillmentStatus: string;
   subtotal: string;
+  discountTotal: string;
   taxTotal: string;
   shippingTotal: string;
   grandTotal: string;
+  shippingMethodCode: string | null;
+  customerIp: string | null;
+  placedAt: string;
+  closedAt: string | null;
   lines: OrderLineViewDto[];
+  addresses: OrderAddressDto[];
+  payments: PaymentTransactionDto[];
+  fulfillments: FulfillmentDto[];
+  returns: OrderReturnDto[];
+  notes: OrderNoteDto[];
 }
 
 export interface ListOrdersQuery {
   page?: number;
   pageSize?: number;
+  sortBy?: 'createdAt' | 'grandTotal' | 'customerName';
+  sortDir?: 'asc' | 'desc';
   status?: OrderStatus;
   financialStatus?: FinancialStatus;
+  fulfillmentStatus?: FulfillmentStatus;
   email?: string;
+  orderId?: string;
+  customerName?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface OrderListItemDto {
   publicId: string;
   orderNumber: string;
   email: string;
+  customerName: string;
+  paymentMethod: string | null;
   currency: string;
   status: string;
   financialStatus: string;
@@ -128,10 +210,14 @@ export interface RefundOrderCommand {
   orderPublicId: string;
   lines: Array<{ sku: string; qty: number }>;
   restock?: boolean;
+  /** plan/15 Phase 0e — where the refunded amount goes. Defaults to the pre-existing behavior (simulated gateway refund) so nothing breaks for existing callers. */
+  refundTo?: 'ORIGINAL_PAYMENT_METHOD' | 'WALLET';
 }
 
 export interface CancelOrderCommand {
   orderPublicId: string;
+  reason?: string;
+  refundTo?: 'ORIGINAL_PAYMENT_METHOD' | 'WALLET';
 }
 
 export interface ShippingMethodViewDto {
@@ -139,4 +225,22 @@ export interface ShippingMethodViewDto {
   name: string;
   flatRate: string;
   currency: string;
+}
+
+export interface OrderHistoryDto {
+  id: string;
+  eventType: string;
+  fromValue: string | null;
+  toValue: string | null;
+  message: string | null;
+  actorType: string;
+  actorName: string | null;
+  createdAt: string;
+}
+
+export interface AddOrderNoteCommand {
+  orderPublicId: string;
+  type: 'INTERNAL' | 'CUSTOMER';
+  body: string;
+  createdBy?: string | null;
 }

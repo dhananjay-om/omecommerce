@@ -1,5 +1,5 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { VariantLookup, WarehouseResolver, CustomerGroupLookup, CartProductMediaLookup } from '../domain/repositories.js';
+import type { VariantLookup, WarehouseResolver, CustomerGroupLookup, CartProductMediaLookup, AdminUserLookup } from '../domain/repositories.js';
 
 export class PrismaVariantLookup implements VariantLookup {
   constructor(private readonly db: Db) {}
@@ -84,5 +84,13 @@ export class PrismaWarehouseResolver implements WarehouseResolver {
       where: { id: line.fulfillment.warehouseId },
       select: { id: true, code: true },
     });
+  }
+}
+
+export class PrismaAdminUserLookup implements AdminUserLookup {
+  constructor(private readonly db: Db) {}
+
+  async findByPublicId(publicId: string): Promise<{ id: bigint; email: string } | null> {
+    return this.db.adminUser.findFirst({ where: { publicId }, select: { id: true, email: true } });
   }
 }

@@ -12,19 +12,70 @@ export function toOrderDto(order: OrderView): OrderViewDto {
     financialStatus: order.financialStatus,
     fulfillmentStatus: order.fulfillmentStatus,
     subtotal: order.subtotal,
+    discountTotal: order.discountTotal,
     taxTotal: order.taxTotal,
     shippingTotal: order.shippingTotal,
     grandTotal: order.grandTotal,
+    shippingMethodCode: order.shippingMethodCode,
+    customerIp: order.customerIp,
+    placedAt: order.placedAt.toISOString(),
+    closedAt: order.closedAt ? order.closedAt.toISOString() : null,
     lines: order.lines.map((l) => ({
       sku: l.sku,
       name: l.name,
       qty: l.qty,
       unitPrice: l.unitPrice,
       taxAmount: l.taxAmount,
+      discountAmount: l.discountAmount,
       rowTotal: l.rowTotal,
       fulfilledQty: l.fulfilledQty,
       refundedQty: l.refundedQty,
     })),
+    addresses: order.addresses.map((a) => ({
+      type: a.type,
+      name: a.name,
+      company: a.company,
+      line1: a.line1,
+      line2: a.line2,
+      city: a.city,
+      region: a.region,
+      postalCode: a.postalCode,
+      country: a.country,
+      phone: a.phone,
+    })),
+    payments: order.payments.map((p) => ({
+      method: p.method,
+      gateway: p.gateway,
+      type: p.type,
+      amount: p.amount,
+      currency: p.currency,
+      status: p.status,
+      gatewayRef: p.gatewayRef,
+      createdAt: p.createdAt.toISOString(),
+    })),
+    fulfillments: order.fulfillments.map((f) => ({
+      publicId: f.publicId,
+      status: f.status,
+      trackingNumber: f.trackingNumber,
+      carrier: f.carrier,
+      shippedAt: f.shippedAt ? f.shippedAt.toISOString() : null,
+      createdAt: f.createdAt.toISOString(),
+      lines: f.lines.map((l) => {
+        const orderLine = order.lines.find((ol) => ol.id === l.orderLineId);
+        return { sku: orderLine?.sku ?? l.orderLineId.toString(), qty: l.qty };
+      }),
+    })),
+    returns: order.returns.map((r) => ({
+      publicId: r.publicId,
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+      lines: r.lines.map((l) => {
+        const orderLine = order.lines.find((ol) => ol.id === l.orderLineId);
+        return { sku: orderLine?.sku ?? l.orderLineId.toString(), qty: l.qty, restock: l.restock };
+      }),
+    })),
+    notes: order.notes.map((n) => ({ id: n.id.toString(), type: n.type, body: n.body, createdAt: n.createdAt.toISOString() })),
   };
 }
 

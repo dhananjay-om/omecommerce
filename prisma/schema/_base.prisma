@@ -239,14 +239,31 @@ enum CartStatus {
 /// Order-level status. Independent of FinancialStatus/FulfillmentStatus, which
 /// track payment and shipping progress separately (plan/08 §1 "two decoupled
 /// state machines" — this third, coarser status is the merchant-facing summary).
+/// CONFIRMED/CLOSED added plan/15 Phase 0a, appended (not inserted at their
+/// semantically-nearest position) so the physical Postgres enum ordinal order
+/// matches this file's declaration order exactly — same convention as
+/// WalletSource's REFERRAL value below (`ALTER TYPE ... ADD VALUE` with no
+/// BEFORE/AFTER always appends). CONFIRMED sits conceptually between PENDING
+/// (cart just converted, payment not yet settled) and PROCESSING (fulfillment
+/// underway); CLOSED is a terminal merchant-initiated state distinct from
+/// COMPLETED (see CloseOrder's guards: fully delivered, no pending
+/// shipment/refund) — the list's *textual* order doesn't reflect lifecycle
+/// order, intentionally, to keep the migration's ADD VALUE statements trivial.
 enum OrderStatus {
   PENDING
   PROCESSING
   ON_HOLD
   COMPLETED
   CANCELLED
+  CONFIRMED
+  CLOSED
 }
 
+/// PARTIALLY_PAID/FAILED added plan/15 Phase 0a, appended (see OrderStatus's
+/// comment above for why). PARTIALLY_PAID covers split-tender orders (e.g.
+/// wallet + gateway) where only part of the grand total has settled; FAILED
+/// covers a capture attempt that didn't succeed (distinct from VOIDED, which
+/// is an authorization explicitly released before capture).
 enum FinancialStatus {
   PENDING
   AUTHORIZED
@@ -254,6 +271,8 @@ enum FinancialStatus {
   PARTIALLY_REFUNDED
   REFUNDED
   VOIDED
+  PARTIALLY_PAID
+  FAILED
 }
 
 /// Order-level fulfillment progress (aggregate across all order_line rows).
@@ -265,12 +284,14 @@ enum FulfillmentStatus {
 }
 
 /// A single fulfillment/shipment record's own lifecycle (distinct from the
-/// order-level FulfillmentStatus aggregate above).
+/// order-level FulfillmentStatus aggregate above). PACKED appended plan/15
+/// Phase 0a (see OrderStatus's comment on why appended, not inserted).
 enum ShipmentStatus {
   PENDING
   SHIPPED
   DELIVERED
   CANCELLED
+  PACKED
 }
 
 enum AddressType {
@@ -463,4 +484,20 @@ enum ReferralStatus {
 enum ReferralBeneficiary {
   REFERRER
   REFEREE
+}
+
+/// Who triggered an order_status_history row (plan/15 Phase 0b). SYSTEM covers
+/// checkout-saga-driven transitions (e.g. OrderPaid) where no admin acted.
+enum OrderHistoryActorType {
+  ADMIN
+  SYSTEM
+  CUSTOMER
+}
+
+/// plan/15 Phase 0b — internal notes are admin-only (never returned to the
+/// storefront); customer notes are shown on both the admin detail page and the
+/// customer's own order detail page.
+enum OrderNoteType {
+  INTERNAL
+  CUSTOMER
 }

@@ -9,4 +9,9 @@ export class PrismaCustomerLookup implements CustomerLookup {
     const row = await this.db.customer.findFirst({ where: { publicId: customerPublicId }, select: { id: true } });
     return row?.id ?? null;
   }
+
+  async findPublicIdById(customerId: bigint): Promise<string | null> {
+    const row = await this.db.customer.findFirst({ where: { id: customerId }, select: { publicId: true } });
+    return row?.publicId ?? null;
+  }
 }

@@ -84,8 +84,14 @@ async function main() {
   // --- RBAC: permissions, a super-admin role, and a default dev admin user ---
   const PERMISSIONS = [
     { code: 'admin:manage', description: 'Create/manage admin users' },
+    { code: 'orders:view', description: 'View orders, order history, and add order notes' },
+    { code: 'orders:fulfill', description: 'Create shipments/fulfillments for orders' },
     { code: 'orders:refund', description: 'Issue order refunds' },
     { code: 'orders:cancel', description: 'Cancel orders' },
+    { code: 'orders:invoice', description: 'Create, view, and email order invoices' },
+    { code: 'orders:email', description: 'Send order-related emails to customers' },
+    { code: 'orders:close', description: 'Close completed orders' },
+    { code: 'orders:export', description: 'Export the order grid to CSV/Excel' },
     { code: 'inventory:adjust', description: 'Adjust warehouse stock levels' },
     { code: 'catalog:manage', description: 'Manage attribute sets, attributes, and bulk product import' },
     { code: 'cms:manage', description: 'Manage CMS pages and blocks' },

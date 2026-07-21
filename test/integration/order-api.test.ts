@@ -447,4 +447,196 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     expect(byEmail.body.data.orders).toHaveLength(1);
     expect(byEmail.body.data.orders[0].email).toBe('guest@example.com');
   });
+
+  it('lists orders with the plan/15 filters: fulfillmentStatus, orderId, customerName, date range, sort', async () => {
+    const byFulfillment = await admin.get('/admin/v1/orders').query({ fulfillmentStatus: 'FULFILLED' });
+    expect(byFulfillment.status).toBe(200);
+    expect(byFulfillment.body.data.orders.length).toBeGreaterThanOrEqual(1);
+    expect(byFulfillment.body.data.orders.every((o: { fulfillmentStatus: string }) => o.fulfillmentStatus === 'FULFILLED')).toBe(true);
+
+    const first = byFulfillment.body.data.orders[0];
+    const byOrderId = await admin.get('/admin/v1/orders').query({ orderId: first.orderNumber });
+    expect(byOrderId.body.data.orders.some((o: { orderNumber: string }) => o.orderNumber === first.orderNumber)).toBe(true);
+
+    const byCustomerName = await admin.get('/admin/v1/orders').query({ customerName: 'Jane' });
+    expect(byCustomerName.status).toBe(200);
+    expect(byCustomerName.body.data.orders.length).toBeGreaterThanOrEqual(1);
+    expect(byCustomerName.body.data.orders[0]).toHaveProperty('customerName');
+    expect(byCustomerName.body.data.orders[0]).toHaveProperty('paymentMethod');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const byDate = await admin.get('/admin/v1/orders').query({ dateFrom: today, dateTo: today });
+    expect(byDate.status).toBe(200);
+    expect(byDate.body.data.orders.length).toBeGreaterThanOrEqual(1);
+
+    const farFuture = await admin.get('/admin/v1/orders').query({ dateFrom: '2099-01-01' });
+    expect(farFuture.body.data.orders).toEqual([]);
+
+    const sorted = await admin.get('/admin/v1/orders').query({ sortBy: 'grandTotal', sortDir: 'asc', pageSize: 100 });
+    expect(sorted.status).toBe(200);
+    const totals = sorted.body.data.orders.map((o: { grandTotal: string }) => Number(o.grandTotal));
+    expect(totals).toEqual([...totals].sort((a, b) => a - b));
+  });
+
+  it('records order history on create/pay, fulfill, and cancel; exposes it via GET .../history', async () => {
+    const variantId = await createVariant('ORD-SKU-HISTORY-1', '12.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const afterCreate = await admin.get(`/admin/v1/orders/${orderPublicId}/history`);
+    expect(afterCreate.status).toBe(200);
+    const eventTypes = afterCreate.body.data.map((h: { eventType: string }) => h.eventType);
+    expect(eventTypes).toContain('ORDER_CREATED');
+    expect(eventTypes).toContain('PAYMENT_RECEIVED');
+
+    await admin
+      .post(`/admin/v1/orders/${orderPublicId}/fulfillments`)
+      .send({ lines: [{ sku: 'ORD-SKU-HISTORY-1', qty: 1 }], trackingNumber: 'TRACK-123', carrier: 'UPS' });
+
+    const afterFulfill = await admin.get(`/admin/v1/orders/${orderPublicId}/history`);
+    expect(afterFulfill.body.data.map((h: { eventType: string }) => h.eventType)).toContain('SHIPMENT_CREATED');
+
+    const detail = await admin.get(`/admin/v1/orders/${orderPublicId}`);
+    expect(detail.body.data.fulfillments).toHaveLength(1);
+    expect(detail.body.data.fulfillments[0].trackingNumber).toBe('TRACK-123');
+    expect(detail.body.data.fulfillments[0].carrier).toBe('UPS');
+
+    const cancel = await admin.post(`/admin/v1/orders/${orderPublicId}/cancel`).send({ reason: 'customer request' });
+    expect(cancel.status).toBe(409); // already fulfilled -> CancelOrder blocks cancellation once any line is fulfilled
+  });
+
+  it('adds an order note and records it in history', async () => {
+    const variantId = await createVariant('ORD-SKU-NOTE-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const note = await admin.post(`/admin/v1/orders/${orderPublicId}/notes`).send({ type: 'INTERNAL', body: 'Called customer to confirm address.' });
+    expect(note.status).toBe(201);
+    expect(note.body.data.type).toBe('INTERNAL');
+    expect(note.body.data.body).toBe('Called customer to confirm address.');
+
+    const detail = await admin.get(`/admin/v1/orders/${orderPublicId}`);
+    expect(detail.body.data.notes).toHaveLength(1);
+    expect(detail.body.data.notes[0].body).toBe('Called customer to confirm address.');
+
+    const history = await admin.get(`/admin/v1/orders/${orderPublicId}/history`);
+    expect(history.body.data.map((h: { eventType: string }) => h.eventType)).toContain('NOTE_ADDED');
+  });
+
+  it('sets financialStatus=FAILED (not left at PENDING) when a checkout payment is declined', async () => {
+    const variantId = await createVariant('ORD-SKU-DECLINE-STATUS-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+        testScenario: 'decline',
+      });
+    expect(checkout.status).toBe(402);
+
+    const orderRow = await prisma.order.findFirstOrThrow({ where: { lines: { some: { sku: 'ORD-SKU-DECLINE-STATUS-1' } } } });
+    expect(orderRow.financialStatus).toBe('FAILED');
+    expect(orderRow.status).toBe('CANCELLED');
+  });
+
+  it('cancels an order with refundTo=WALLET: credits the customer wallet instead of the original payment method', async () => {
+    const variantId = await createVariant('ORD-SKU-WALLET-REFUND-1', '18.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+
+    await request(app)
+      .post('/store/v1/customers')
+      .send({ websiteCode: 'us_retail', email: 'wallet-refund-customer@example.com', password: 'correct-horse-battery' });
+    const login = await request(app)
+      .post('/store/v1/customers/actions/login')
+      .send({ websiteCode: 'us_retail', email: 'wallet-refund-customer@example.com', password: 'correct-horse-battery' });
+    const customerPublicId = login.body.data.customerPublicId as string;
+    const customerToken = login.body.data.token as string;
+
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId, customerPublicId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'wallet-refund-customer@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    expect(checkout.status).toBe(201);
+    const orderPublicId = checkout.body.data.publicId;
+
+    const cancel = await admin.post(`/admin/v1/orders/${orderPublicId}/cancel`).send({ reason: 'changed mind', refundTo: 'WALLET' });
+    expect(cancel.status).toBe(200);
+    expect(cancel.body.data.status).toBe('CANCELLED');
+    expect(cancel.body.data.financialStatus).toBe('REFUNDED');
+
+    const wallet = await request(app).get('/store/v1/me/wallet').set('Authorization', `Bearer ${customerToken}`);
+    expect(wallet.status).toBe(200);
+    // RefundOrder only refunds line items (unit price * qty + proportional tax), not shipping.
+    expect(wallet.body.data.balance).toBe('18.0000');
+  });
+
+  it('rejects refundTo=WALLET for a guest order (no customer to credit)', async () => {
+    const variantId = await createVariant('ORD-SKU-WALLET-GUEST-1', '10.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'guest@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const cancel = await admin.post(`/admin/v1/orders/${orderPublicId}/cancel`).send({ refundTo: 'WALLET' });
+    expect(cancel.status).toBe(422);
+  });
+
+  it('gates GET /orders, GET /orders/:id, and POST .../fulfillments behind admin auth (401 without a token)', async () => {
+    const list = await request(app).get('/admin/v1/orders');
+    expect(list.status).toBe(401);
+    const detail = await request(app).get('/admin/v1/orders/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b');
+    expect(detail.status).toBe(401);
+    const fulfill = await request(app).post('/admin/v1/orders/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/fulfillments').send({ lines: [] });
+    expect(fulfill.status).toBe(401);
+  });
 });
