@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiPost, ApiError } from '@/lib/api-client';
-import type { OrderDetail } from '@/lib/types';
+import type { OrderDetail, OrderNote } from '@/lib/types';
 
 export interface ActionState {
   error: string | null;
@@ -60,6 +60,24 @@ export async function refundOrder(orderPublicId: string, _prevState: ActionState
 export async function cancelOrder(orderPublicId: string, _prevState: ActionState): Promise<ActionState> {
   try {
     await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/cancel`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath(`/orders/${orderPublicId}`);
+  return { error: null, success: true };
+}
+
+export async function addOrderNote(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const type = formData.get('type');
+  const body = formData.get('body');
+  if (typeof body !== 'string' || body.trim().length === 0) {
+    return { error: 'Note body is required.', success: false };
+  }
+
+  try {
+    await apiPost<OrderNote>(`/admin/v1/orders/${orderPublicId}/notes`, { type: type === 'CUSTOMER' ? 'CUSTOMER' : 'INTERNAL', body });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

@@ -217,9 +217,115 @@ export interface OrderLine {
   qty: number;
   unitPrice: string;
   taxAmount: string;
+  discountAmount: string;
   rowTotal: string;
   fulfilledQty: number;
   refundedQty: number;
+}
+
+export interface OrderAddress {
+  type: 'BILLING' | 'SHIPPING';
+  name: string;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+}
+
+export interface OrderPayment {
+  method: string;
+  gateway: string;
+  type: 'AUTHORIZE' | 'CAPTURE' | 'REFUND' | 'VOID';
+  amount: string;
+  currency: string;
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
+  gatewayRef: string | null;
+  createdAt: string;
+}
+
+export interface OrderFulfillmentLine {
+  sku: string;
+  qty: number;
+}
+
+export interface OrderFulfillment {
+  publicId: string;
+  status: 'PENDING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'PACKED';
+  trackingNumber: string | null;
+  carrier: string | null;
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: string | null;
+  currentStatus: string | null;
+  shippingNotes: string | null;
+  hasPackingSlip: boolean;
+  shippedAt: string | null;
+  createdAt: string;
+  lines: OrderFulfillmentLine[];
+}
+
+export interface OrderReturnLine {
+  sku: string;
+  qty: number;
+  restock: boolean;
+}
+
+export interface OrderReturn {
+  publicId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  lines: OrderReturnLine[];
+}
+
+export interface OrderNote {
+  id: string;
+  type: 'INTERNAL' | 'CUSTOMER';
+  body: string;
+  createdAt: string;
+}
+
+export interface OrderInvoiceLine {
+  sku: string;
+  qty: number;
+  unitPrice: string;
+  taxAmount: string;
+  rowTotal: string;
+}
+
+export interface OrderInvoice {
+  publicId: string;
+  invoiceNumber: string;
+  status: 'DRAFT' | 'ISSUED';
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  grandTotal: string;
+  createdAt: string;
+  lines: OrderInvoiceLine[];
+}
+
+export interface OrderHistoryEntry {
+  id: string;
+  eventType: string;
+  fromValue: string | null;
+  toValue: string | null;
+  message: string | null;
+  actorType: 'ADMIN' | 'SYSTEM' | 'CUSTOMER';
+  actorName: string | null;
+  createdAt: string;
+}
+
+export interface OrderEmailLogEntry {
+  id: string;
+  emailType: string;
+  toEmail: string;
+  subject: string;
+  status: 'SENT' | 'FAILED';
+  createdAt: string;
 }
 
 export interface OrderDetail {
@@ -231,10 +337,21 @@ export interface OrderDetail {
   financialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
   subtotal: string;
+  discountTotal: string;
   taxTotal: string;
   shippingTotal: string;
   grandTotal: string;
+  shippingMethodCode: string | null;
+  customerIp: string | null;
+  placedAt: string;
+  closedAt: string | null;
   lines: OrderLine[];
+  addresses: OrderAddress[];
+  payments: OrderPayment[];
+  fulfillments: OrderFulfillment[];
+  returns: OrderReturn[];
+  notes: OrderNote[];
+  invoices: OrderInvoice[];
 }
 
 export interface CustomerListItem {
