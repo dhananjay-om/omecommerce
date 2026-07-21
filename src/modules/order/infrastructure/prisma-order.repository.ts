@@ -14,6 +14,8 @@ import type {
   OrderNoteView,
   CreateInvoiceInput,
   OrderInvoiceView,
+  RecordEmailLogInput,
+  OrderEmailLogView,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -374,6 +376,26 @@ export class PrismaOrderRepository implements OrderRepository {
 
   async setInvoicePdfKey(invoiceId: bigint, key: string): Promise<void> {
     await this.db.orderInvoice.update({ where: { id: invoiceId }, data: { pdfStorageKey: key } });
+  }
+
+  async recordEmailLog(input: RecordEmailLogInput): Promise<OrderEmailLogView> {
+    const row = await this.db.orderEmailLog.create({
+      data: {
+        orderId: input.orderId,
+        emailType: input.emailType,
+        toEmail: input.toEmail,
+        subject: input.subject,
+        status: input.status,
+        providerRef: input.providerRef ?? null,
+        sentBy: input.sentBy ?? null,
+      },
+    });
+    return { id: row.id, emailType: row.emailType, toEmail: row.toEmail, subject: row.subject, status: row.status, providerRef: row.providerRef, createdAt: row.createdAt };
+  }
+
+  async listEmailLog(orderId: bigint): Promise<OrderEmailLogView[]> {
+    const rows = await this.db.orderEmailLog.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+    return rows.map((r) => ({ id: r.id, emailType: r.emailType, toEmail: r.toEmail, subject: r.subject, status: r.status, providerRef: r.providerRef, createdAt: r.createdAt }));
   }
 }
 

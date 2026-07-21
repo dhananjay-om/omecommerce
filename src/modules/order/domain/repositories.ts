@@ -10,6 +10,8 @@ import type {
   OrderHistoryActorType,
   OrderNoteType,
   InvoiceStatus,
+  EmailLogStatus,
+  OrderEmailType,
 } from '@prisma/client';
 
 // --- Cross-module read-only lookups (each module resolves its own dependencies) ---
@@ -318,6 +320,27 @@ export interface CreateInvoiceInput {
   lines: Array<{ orderLineId: bigint; qty: number; unitPriceMinor: bigint; taxAmountMinor: bigint; rowTotalMinor: bigint }>;
 }
 
+/** plan/15 Phase 3 — one row of the manual-send email log. */
+export interface OrderEmailLogView {
+  id: bigint;
+  emailType: OrderEmailType;
+  toEmail: string;
+  subject: string;
+  status: EmailLogStatus;
+  providerRef: string | null;
+  createdAt: Date;
+}
+
+export interface RecordEmailLogInput {
+  orderId: bigint;
+  emailType: OrderEmailType;
+  toEmail: string;
+  subject: string;
+  status: EmailLogStatus;
+  providerRef?: string | null;
+  sentBy?: bigint | null;
+}
+
 export interface OrderView {
   id: bigint;
   publicId: string;
@@ -433,4 +456,7 @@ export interface OrderRepository {
   nextInvoiceNumber(websiteId: bigint): Promise<bigint>;
   createInvoice(input: CreateInvoiceInput): Promise<OrderInvoiceView>;
   setInvoicePdfKey(invoiceId: bigint, key: string): Promise<void>;
+  /** plan/15 Phase 3 — appends one email-log row (SENT or FAILED — the send attempt itself already happened by the time this is called). */
+  recordEmailLog(input: RecordEmailLogInput): Promise<OrderEmailLogView>;
+  listEmailLog(orderId: bigint): Promise<OrderEmailLogView[]>;
 }

@@ -282,3 +282,21 @@ export interface CreateInvoiceCommand {
   lines?: Array<{ sku: string; qty: number }>;
   createdBy?: string | null;
 }
+
+export interface OrderEmailLogDto {
+  id: string;
+  emailType: string;
+  toEmail: string;
+  subject: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface SendOrderEmailCommand {
+  orderPublicId: string;
+  type: 'CONFIRMATION' | 'INVOICE' | 'SHIPMENT' | 'CANCELLATION' | 'REFUND' | 'CUSTOM';
+  /** Required (and only used) when type is CUSTOM. */
+  subject?: string;
+  body?: string;
+  sentBy?: string | null;
+}

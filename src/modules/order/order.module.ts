@@ -42,6 +42,9 @@ import { GetInvoice } from './application/get-invoice.usecase.js';
 import { GetInvoicePdfUrl } from './application/get-invoice-pdf-url.usecase.js';
 import { RegenerateInvoice } from './application/regenerate-invoice.usecase.js';
 import { GetPackingSlipPdfUrl } from './application/get-packing-slip-pdf-url.usecase.js';
+import { SendOrderEmail } from './application/send-order-email.usecase.js';
+import { GetEmailLog } from './application/get-email-log.usecase.js';
+import { SimulatedEmailSender } from './infrastructure/simulated-email-sender.js';
 import { PuppeteerPdfRenderer } from './infrastructure/puppeteer-pdf-renderer.js';
 import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
@@ -56,6 +59,7 @@ import {
   cancelOrderSchema,
   addOrderNoteSchema,
   createInvoiceSchema,
+  sendOrderEmailSchema,
   createTaxClassSchema,
   createShippingMethodSchema,
   listOrdersQuerySchema,
@@ -139,6 +143,9 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const getInvoicePdfUrl = new GetInvoicePdfUrl(orders, mediaUrlResolver);
   const regenerateInvoice = new RegenerateInvoice(orders, pdfRenderer, pdfStorage);
   const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
+  const emailSender = new SimulatedEmailSender();
+  const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
+  const getEmailLog = new GetEmailLog(orders);
 
   const admin = Router();
   admin.post(
@@ -252,6 +259,21 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     authorize('orders:invoice'),
     asyncHandler(async (req, res) => {
       res.json({ data: await regenerateInvoice.execute(req.params.publicId!, req.params.invoiceId!) });
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/send-email',
+    authorize('orders:email'),
+    asyncHandler(async (req, res) => {
+      const body = parse(sendOrderEmailSchema, req.body);
+      res.status(201).json({ data: await sendOrderEmail.execute({ orderPublicId: req.params.publicId!, sentBy: req.adminUser?.adminUserPublicId, ...body }) });
+    }),
+  );
+  admin.get(
+    '/orders/:publicId/email-log',
+    authorize('orders:email'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getEmailLog.execute(req.params.publicId!) });
     }),
   );
 

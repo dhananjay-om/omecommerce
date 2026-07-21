@@ -511,3 +511,23 @@ enum InvoiceStatus {
   DRAFT
   ISSUED
 }
+
+/// plan/15 Phase 3 — email sending is simulated by default (SimulatedEmailSender,
+/// same precedent as TestPaymentGateway); FAILED covers a real provider adapter
+/// throwing in the future, exercised today only if the simulated sender itself
+/// is made to fail (it isn't).
+enum EmailLogStatus {
+  SENT
+  FAILED
+}
+
+/// The email "type" a manual Send Email action can trigger (plan/15 Phase 3).
+/// CUSTOM carries an admin-supplied subject/body instead of a template.
+enum OrderEmailType {
+  CONFIRMATION
+  INVOICE
+  SHIPMENT
+  CANCELLATION
+  REFUND
+  CUSTOM
+}

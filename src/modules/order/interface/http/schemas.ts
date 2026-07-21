@@ -67,6 +67,13 @@ export const createInvoiceSchema = z.object({
   lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive() })).min(1).optional(),
 });
 
+/** subject/body are optional at the schema layer — required only for type=CUSTOM, enforced in SendOrderEmail (plan/15 Phase 3). */
+export const sendOrderEmailSchema = z.object({
+  type: z.enum(['CONFIRMATION', 'INVOICE', 'SHIPMENT', 'CANCELLATION', 'REFUND', 'CUSTOM']),
+  subject: z.string().min(1).max(256).optional(),
+  body: z.string().min(1).max(20000).optional(),
+});
+
 export const createTaxClassSchema = z.object({
   code: z.string().min(1).max(64),
   name: z.string().min(1).max(256),

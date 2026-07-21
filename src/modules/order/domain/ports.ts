@@ -79,3 +79,15 @@ export interface PdfRenderer {
 export interface PdfStorage {
   store(key: string, body: Buffer): Promise<void>;
 }
+
+/**
+ * Sends a single email (plan/15 §1.2 decision: build the real port + a
+ * SimulatedEmailSender adapter by default, same precedent as
+ * TestPaymentGateway — no real provider credentials exist in this
+ * environment). Throws on failure, same as a real provider SDK call would;
+ * SendOrderEmail catches and records EmailLogStatus.FAILED rather than
+ * letting the whole usecase fail the HTTP request.
+ */
+export interface EmailSender {
+  send(input: { to: string; subject: string; html: string }): Promise<{ providerRef: string }>;
+}

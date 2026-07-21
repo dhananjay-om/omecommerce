@@ -829,4 +829,65 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     expect(f.shippingNotes).toBeNull();
     expect(f.hasPackingSlip).toBe(true);
   });
+
+  it('sends a templated CONFIRMATION email, logs it, and records history', async () => {
+    const variantId = await createVariant('ORD-SKU-EMAIL-1', '11.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const send = await admin.post(`/admin/v1/orders/${orderPublicId}/send-email`).send({ type: 'CONFIRMATION' });
+    expect(send.status).toBe(201);
+    expect(send.body.data.status).toBe('SENT');
+    expect(send.body.data.emailType).toBe('CONFIRMATION');
+    expect(send.body.data.toEmail).toBe('jane@example.com');
+    expect(send.body.data.subject).toContain(checkout.body.data.orderNumber);
+
+    const log = await admin.get(`/admin/v1/orders/${orderPublicId}/email-log`);
+    expect(log.status).toBe(200);
+    expect(log.body.data).toHaveLength(1);
+    expect(log.body.data[0].emailType).toBe('CONFIRMATION');
+
+    const history = await admin.get(`/admin/v1/orders/${orderPublicId}/history`);
+    expect(history.body.data.map((h: { eventType: string }) => h.eventType)).toContain('EMAIL_SENT');
+  });
+
+  it('sends a CUSTOM email with an admin-supplied subject/body, and rejects CUSTOM without them', async () => {
+    const variantId = await createVariant('ORD-SKU-EMAIL-CUSTOM-1', '11.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const missingBody = await admin.post(`/admin/v1/orders/${orderPublicId}/send-email`).send({ type: 'CUSTOM' });
+    expect(missingBody.status).toBe(422);
+
+    const custom = await admin
+      .post(`/admin/v1/orders/${orderPublicId}/send-email`)
+      .send({ type: 'CUSTOM', subject: 'A note about your order', body: '<p>Hello!</p>' });
+    expect(custom.status).toBe(201);
+    expect(custom.body.data.subject).toBe('A note about your order');
+    expect(custom.body.data.emailType).toBe('CUSTOM');
+  });
 });

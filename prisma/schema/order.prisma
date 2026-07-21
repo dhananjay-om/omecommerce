@@ -182,6 +182,7 @@ model Order {
   history      OrderStatusHistory[]
   notes        OrderNote[]
   invoices     OrderInvoice[]
+  emailLogs    OrderEmailLog[]
 
   @@unique([websiteId, orderNumber])
   @@index([storeId])
@@ -469,4 +470,25 @@ model OrderInvoiceLine {
 
   @@id([invoiceId, orderLineId])
   @@map("order_invoice_line")
+}
+
+/// Append-only log of every manually-triggered order email (plan/15 Phase 3).
+/// `sentBy` NULL means system-triggered — declared for forward-compat with a
+/// future auto-send-on-event fast-follow (plan/15 §7); every row this pass
+/// writes has a real admin, since only the manual Send Email action exists.
+model OrderEmailLog {
+  id          BigInt         @id @default(autoincrement())
+  orderId     BigInt         @map("order_id")
+  emailType   OrderEmailType @map("email_type")
+  toEmail     String         @map("to_email")
+  subject     String
+  status      EmailLogStatus
+  providerRef String?        @map("provider_ref")
+  sentBy      BigInt?        @map("sent_by") // admin_user.id; NULL = system-triggered
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_email_log")
 }
