@@ -184,14 +184,18 @@ export interface PriceList {
   priority: number;
 }
 
-export type OrderStatus = 'PENDING' | 'PROCESSING' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
-export type FinancialStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'VOIDED';
+export type OrderStatus = 'PENDING' | 'PROCESSING' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED' | 'CONFIRMED' | 'CLOSED';
+export type FinancialStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'VOIDED' | 'PARTIALLY_PAID' | 'FAILED';
 export type FulfillmentStatus = 'UNFULFILLED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'RETURNED';
 
 export interface OrderListItem {
   publicId: string;
   orderNumber: string;
   email: string;
+  /** plan/15 Phase 0c — the billing address's snapshotted name, falls back to email. */
+  customerName: string;
+  /** Most recent payment transaction's method, or null if none recorded yet. */
+  paymentMethod: string | null;
   currency: string;
   status: OrderStatus;
   financialStatus: FinancialStatus;

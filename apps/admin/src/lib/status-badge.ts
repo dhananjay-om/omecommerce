@@ -1,7 +1,7 @@
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'outline';
 
-const POSITIVE = new Set(['ACTIVE', 'PAID', 'COMPLETED', 'FULFILLED', 'BOTH']);
-const NEGATIVE = new Set(['DISABLED', 'CANCELLED', 'VOIDED', 'INACTIVE', 'NOT_VISIBLE']);
+const POSITIVE = new Set(['ACTIVE', 'PAID', 'COMPLETED', 'FULFILLED', 'BOTH', 'CLOSED', 'SENT', 'ISSUED', 'DELIVERED']);
+const NEGATIVE = new Set(['DISABLED', 'CANCELLED', 'VOIDED', 'INACTIVE', 'NOT_VISIBLE', 'FAILED']);
 const NEUTRAL_WARNING = new Set([
   'DRAFT',
   'PENDING',
@@ -11,6 +11,10 @@ const NEUTRAL_WARNING = new Set([
   'UNFULFILLED',
   'PARTIALLY_FULFILLED',
   'PARTIALLY_REFUNDED',
+  'CONFIRMED',
+  'PARTIALLY_PAID',
+  'PACKED',
+  'SHIPPED',
 ]);
 
 /** Maps the many status-like enum strings across products/orders/customers to a consistent badge color. */
