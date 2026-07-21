@@ -1,0 +1,530 @@
+openapi: 3.0.3
+info:
+  title: OMEcommerce — Order Management API
+  version: "15.14.0"
+  description: >
+    The full order-management surface (plan/15): cart/checkout, admin order
+    operations (fulfillment, refund, cancel, close, invoicing, shipment
+    tracking, email), and the customer-facing storefront order routes. This
+    is the first OpenAPI document in the repo — scoped to the order module,
+    not the whole backend (see plan/15 Phase 14). Written by hand against the
+    live route/schema definitions in src/modules/order and
+    src/modules/customer, not auto-generated from the Zod schemas.
+servers:
+  - url: http://localhost:4100
+    description: Local dev (scripts/dev-up.sh)
+
+components:
+  securitySchemes:
+    adminBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin JWT from POST /admin/v1/auth/login, carries RBAC permission codes.
+    customerBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Customer JWT from POST /store/v1/customers/actions/login.
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem+json error shape, returned by every endpoint on failure.
+      properties:
+        type: { type: string, example: "https://errors.ome/not-found" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        traceId: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties: { path: { type: string }, message: { type: string } }
+
+    Money:
+      type: string
+      description: Fixed-point decimal string, scale 4 (e.g. "45.0000").
+      example: "45.0000"
+
+    OrderLine:
+      type: object
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        qty: { type: integer }
+        unitPrice: { $ref: '#/components/schemas/Money' }
+        taxAmount: { $ref: '#/components/schemas/Money' }
+        discountAmount: { $ref: '#/components/schemas/Money' }
+        rowTotal: { $ref: '#/components/schemas/Money' }
+        fulfilledQty: { type: integer }
+        refundedQty: { type: integer }
+
+    OrderAddress:
+      type: object
+      properties:
+        type: { type: string, enum: [BILLING, SHIPPING] }
+        name: { type: string }
+        company: { type: string, nullable: true }
+        line1: { type: string }
+        line2: { type: string, nullable: true }
+        city: { type: string }
+        region: { type: string, nullable: true }
+        postalCode: { type: string }
+        country: { type: string }
+        phone: { type: string, nullable: true }
+
+    PaymentTransaction:
+      type: object
+      properties:
+        method: { type: string }
+        gateway: { type: string }
+        type: { type: string, enum: [AUTHORIZE, CAPTURE, REFUND, VOID] }
+        amount: { $ref: '#/components/schemas/Money' }
+        currency: { type: string }
+        status: { type: string, enum: [PENDING, SUCCEEDED, FAILED] }
+        gatewayRef: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Fulfillment:
+      type: object
+      properties:
+        publicId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, PACKED, SHIPPED, DELIVERED, CANCELLED] }
+        trackingNumber: { type: string, nullable: true }
+        carrier: { type: string, nullable: true }
+        carrierTrackingUrl: { type: string, nullable: true }
+        estimatedDeliveryAt: { type: string, format: date-time, nullable: true }
+        currentStatus: { type: string, nullable: true }
+        shippingNotes: { type: string, nullable: true }
+        hasPackingSlip: { type: boolean }
+        shippedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items:
+            type: object
+            properties: { sku: { type: string }, qty: { type: integer } }
+
+    OrderInvoice:
+      type: object
+      properties:
+        publicId: { type: string, format: uuid }
+        invoiceNumber: { type: string }
+        status: { type: string, enum: [DRAFT, ISSUED] }
+        subtotal: { $ref: '#/components/schemas/Money' }
+        discountTotal: { $ref: '#/components/schemas/Money' }
+        taxTotal: { $ref: '#/components/schemas/Money' }
+        grandTotal: { $ref: '#/components/schemas/Money' }
+        createdAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              sku: { type: string }
+              qty: { type: integer }
+              unitPrice: { $ref: '#/components/schemas/Money' }
+              taxAmount: { $ref: '#/components/schemas/Money' }
+              rowTotal: { $ref: '#/components/schemas/Money' }
+
+    OrderNote:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [INTERNAL, CUSTOMER] }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    OrderView:
+      type: object
+      properties:
+        publicId: { type: string, format: uuid }
+        orderNumber: { type: string }
+        email: { type: string, format: email }
+        currency: { type: string }
+        status: { type: string, enum: [PENDING, CONFIRMED, PROCESSING, ON_HOLD, COMPLETED, CLOSED, CANCELLED] }
+        financialStatus: { type: string, enum: [PENDING, AUTHORIZED, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED, VOIDED, FAILED] }
+        fulfillmentStatus: { type: string, enum: [UNFULFILLED, PARTIALLY_FULFILLED, FULFILLED, RETURNED] }
+        subtotal: { $ref: '#/components/schemas/Money' }
+        discountTotal: { $ref: '#/components/schemas/Money' }
+        taxTotal: { $ref: '#/components/schemas/Money' }
+        shippingTotal: { $ref: '#/components/schemas/Money' }
+        grandTotal: { $ref: '#/components/schemas/Money' }
+        shippingMethodCode: { type: string, nullable: true }
+        customerIp: { type: string, nullable: true }
+        placedAt: { type: string, format: date-time }
+        closedAt: { type: string, format: date-time, nullable: true }
+        lines: { type: array, items: { $ref: '#/components/schemas/OrderLine' } }
+        addresses: { type: array, items: { $ref: '#/components/schemas/OrderAddress' } }
+        payments: { type: array, items: { $ref: '#/components/schemas/PaymentTransaction' } }
+        fulfillments: { type: array, items: { $ref: '#/components/schemas/Fulfillment' } }
+        invoices: { type: array, items: { $ref: '#/components/schemas/OrderInvoice' } }
+        notes: { type: array, items: { $ref: '#/components/schemas/OrderNote' } }
+
+    OrderHistoryEntry:
+      type: object
+      properties:
+        id: { type: string }
+        eventType: { type: string, description: "Free-form, e.g. ORDER_CREATED, PAYMENT_RECEIVED, SHIPMENT_CREATED, INVOICE_CREATED, EMAIL_SENT, NOTE_ADDED, CANCELLED, REFUNDED, CLOSED." }
+        fromValue: { type: string, nullable: true }
+        toValue: { type: string, nullable: true }
+        message: { type: string, nullable: true }
+        actorType: { type: string, enum: [ADMIN, SYSTEM, CUSTOMER] }
+        actorName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+paths:
+  /admin/v1/orders:
+    get:
+      summary: List orders (paginated, filtered, sortable)
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:view] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: pageSize, in: query, schema: { type: integer } }
+        - { name: sortBy, in: query, schema: { type: string, enum: [createdAt, grandTotal, customerName] } }
+        - { name: sortDir, in: query, schema: { type: string, enum: [asc, desc] } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: financialStatus, in: query, schema: { type: string } }
+        - { name: fulfillmentStatus, in: query, schema: { type: string } }
+        - { name: email, in: query, schema: { type: string } }
+        - { name: orderId, in: query, schema: { type: string }, description: "Order number or publicId, exact/prefix." }
+        - { name: customerName, in: query, schema: { type: string } }
+        - { name: dateFrom, in: query, schema: { type: string, format: date } }
+        - { name: dateTo, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: OK }
+
+  /admin/v1/orders/export:
+    get:
+      summary: Export the order grid as CSV or Excel (capped at 10,000 rows)
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:export] }]
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [csv, xlsx] } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: financialStatus, in: query, schema: { type: string } }
+        - { name: fulfillmentStatus, in: query, schema: { type: string } }
+        - { name: email, in: query, schema: { type: string } }
+        - { name: orderId, in: query, schema: { type: string } }
+        - { name: customerName, in: query, schema: { type: string } }
+        - { name: dateFrom, in: query, schema: { type: string, format: date } }
+        - { name: dateTo, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: File stream
+          headers:
+            X-Export-Truncated: { schema: { type: string }, description: "Present when total rows exceeded the 10,000-row cap." }
+
+  /admin/v1/orders/{publicId}:
+    get:
+      summary: Get full order detail
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:view] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/OrderView' } } } } } }
+        '404': { description: "Not found", content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /admin/v1/orders/{publicId}/history:
+    get:
+      summary: Order activity timeline
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:view] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK }
+
+  /admin/v1/orders/{publicId}/notes:
+    post:
+      summary: Add an internal or customer-visible note
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:view] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, body]
+              properties:
+                type: { type: string, enum: [INTERNAL, CUSTOMER] }
+                body: { type: string, maxLength: 4000 }
+      responses:
+        '201': { description: Created }
+
+  /admin/v1/orders/{publicId}/fulfillments:
+    post:
+      summary: Fulfill (ship) order lines, with optional carrier tracking details
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:fulfill] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines: { type: array, items: { type: object, properties: { sku: { type: string }, qty: { type: integer } } } }
+                trackingNumber: { type: string }
+                carrier: { type: string }
+                carrierTrackingUrl: { type: string, format: uri }
+                estimatedDeliveryAt: { type: string, format: date }
+                shippingNotes: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/OrderView' } } } } } }
+        '409': { description: "Not paid, or a line's fulfillable qty exceeded", content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /admin/v1/orders/{publicId}/shipment/{fulfillmentId}/packing-slip:
+    get:
+      summary: Download a fulfillment's packing-slip PDF
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:fulfill] }]
+      parameters:
+        - { name: publicId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: fulfillmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '302': { description: Redirects to a short-lived presigned S3/MinIO URL }
+
+  /admin/v1/orders/{publicId}/refunds:
+    post:
+      summary: Refund order lines (proportional tax, optional restock, optional wallet credit)
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:refund] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines: { type: array, items: { type: object, properties: { sku: { type: string }, qty: { type: integer } } } }
+                restock: { type: boolean, default: true }
+                refundTo: { type: string, enum: [ORIGINAL_PAYMENT_METHOD, WALLET], default: ORIGINAL_PAYMENT_METHOD }
+      responses:
+        '200': { description: OK }
+
+  /admin/v1/orders/{publicId}/cancel:
+    post:
+      summary: Cancel an unfulfilled order (full refund + restock)
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:cancel] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 1024 }
+                refundTo: { type: string, enum: [ORIGINAL_PAYMENT_METHOD, WALLET] }
+      responses:
+        '200': { description: OK }
+        '409': { description: Already (partially) fulfilled — use a return instead }
+
+  /admin/v1/orders/{publicId}/close:
+    post:
+      summary: Close a fully-shipped, financially-settled order (terminal state)
+      tags: [Admin Orders]
+      security: [{ adminBearer: [orders:close] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK }
+        '409': { description: "Not fully shipped, or a pending financial state" }
+
+  /admin/v1/orders/{publicId}/invoice:
+    post:
+      summary: Create an invoice (defaults to every line's full remaining qty — supports partial invoicing)
+      tags: [Admin Invoices]
+      security: [{ adminBearer: [orders:invoice] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lines: { type: array, items: { type: object, properties: { sku: { type: string }, qty: { type: integer } } } }
+      responses:
+        '201': { description: Created }
+        '409': { description: "Not paid, already fully invoiced, or qty exceeds remaining" }
+
+  /admin/v1/orders/{publicId}/invoices:
+    get:
+      summary: List every invoice on the order
+      tags: [Admin Invoices]
+      security: [{ adminBearer: [orders:invoice] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/OrderInvoice' } } } } } } }
+
+  /admin/v1/orders/{publicId}/invoice/{invoiceId}:
+    get:
+      summary: Get one invoice's detail
+      tags: [Admin Invoices]
+      security: [{ adminBearer: [orders:invoice] }]
+      parameters:
+        - { name: publicId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: invoiceId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK }
+
+  /admin/v1/orders/{publicId}/invoice/{invoiceId}/pdf:
+    get:
+      summary: Download the invoice PDF
+      tags: [Admin Invoices]
+      security: [{ adminBearer: [orders:invoice] }]
+      parameters:
+        - { name: publicId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: invoiceId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '302': { description: Redirects to a short-lived presigned S3/MinIO URL }
+
+  /admin/v1/orders/{publicId}/invoice/{invoiceId}/regenerate:
+    post:
+      summary: Re-render the invoice PDF (never changes invoiceNumber or amounts)
+      tags: [Admin Invoices]
+      security: [{ adminBearer: [orders:invoice] }]
+      parameters:
+        - { name: publicId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: invoiceId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK }
+
+  /admin/v1/orders/{publicId}/send-email:
+    post:
+      summary: Send a templated or custom order email (recorded in the email log)
+      tags: [Admin Email]
+      security: [{ adminBearer: [orders:email] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [CONFIRMATION, INVOICE, SHIPMENT, CANCELLATION, REFUND, CUSTOM] }
+                subject: { type: string, description: "Required (and only used) when type=CUSTOM." }
+                body: { type: string, description: "Required (and only used) when type=CUSTOM." }
+      responses:
+        '201': { description: "Created — the resulting email-log entry (status SENT or FAILED, never a 5xx for a simulated-provider failure)" }
+
+  /admin/v1/orders/{publicId}/email-log:
+    get:
+      summary: List every email sent for the order
+      tags: [Admin Email]
+      security: [{ adminBearer: [orders:email] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK }
+
+  /store/v1/carts/{publicId}/checkout:
+    post:
+      summary: Complete checkout (cart -> reserve -> order -> capture payment)
+      tags: [Storefront Checkout]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, billingAddress, shippingAddress, shippingMethodCode, paymentMethod]
+              properties:
+                email: { type: string, format: email }
+                shippingMethodCode: { type: string }
+                paymentMethod: { type: string }
+                testScenario: { type: string, enum: [approve, decline] }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/OrderView' } } } } } }
+        '402': { description: Payment declined }
+        '409': { description: "Cart not active, or insufficient stock" }
+
+  /store/v1/orders/{publicId}:
+    get:
+      summary: Get an order by publicId (no ownership check — used by the checkout success/receipt page)
+      tags: [Storefront Checkout]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/OrderView' } } } } } }
+
+  /store/v1/me/orders:
+    get:
+      summary: List the logged-in customer's own orders (paginated, searchable)
+      tags: [Storefront My Orders]
+      security: [{ customerBearer: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: pageSize, in: query, schema: { type: integer } }
+        - { name: search, in: query, schema: { type: string }, description: "Matches the order number, exact or prefix." }
+      responses:
+        '200': { description: OK }
+
+  /store/v1/me/orders/{publicId}:
+    get:
+      summary: Get full detail for one of the logged-in customer's own orders
+      tags: [Storefront My Orders]
+      security: [{ customerBearer: [] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/OrderView' } } } } } }
+        '404': { description: "Not found, or belongs to a different customer" }
+
+  /store/v1/me/orders/{publicId}/invoice:
+    get:
+      summary: Download the order's most recent invoice PDF
+      tags: [Storefront My Orders]
+      security: [{ customerBearer: [] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '302': { description: Redirects to a short-lived presigned S3/MinIO URL }
+        '404': { description: "No invoice exists yet, or order not found/not owned" }
+
+  /store/v1/me/orders/{publicId}/tracking:
+    get:
+      summary: Get shipment tracking + a shipment-scoped activity history
+      tags: [Storefront My Orders]
+      security: [{ customerBearer: [] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      fulfillments: { type: array, items: { $ref: '#/components/schemas/Fulfillment' } }
+                      history: { type: array, items: { $ref: '#/components/schemas/OrderHistoryEntry' } }
+
+  /store/v1/me/orders/{publicId}/reorder:
+    post:
+      summary: Add every line from a past order into a fresh cart
+      tags: [Storefront My Orders]
+      security: [{ customerBearer: [] }]
+      parameters: [{ name: publicId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: OK — a new cart was created (never merged into an existing one)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      cartPublicId: { type: string, format: uuid }
+                      skipped:
+                        type: array
+                        description: Lines skipped because the variant no longer exists or is inactive.
+                        items:
+                          type: object
+                          properties: { sku: { type: string }, name: { type: string }, reason: { type: string } }

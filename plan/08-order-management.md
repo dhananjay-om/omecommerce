@@ -3,6 +3,12 @@
 > Cart → Checkout → Order → Fulfillment → Post-order. Orders are immutable financial
 > records with a state machine; money is captured at order time (currency snapshot);
 > everything is event-driven and idempotent.
+>
+> **See also:** [plan/15](./15-order-management-enhancement.md) — the concrete
+> build-out of admin order operations (invoicing, shipment tracking, email,
+> close/export) and the customer-facing storefront order pages on top of the
+> foundation this document designed. `plan/15`'s `docs/openapi/order-api.yaml`
+> documents the resulting API surface.
 
 ---
 

@@ -38,7 +38,7 @@ export function ShipmentsCard({ orderPublicId, fulfillments }: { orderPublicId: 
             {f.estimatedDeliveryAt ? (
               <div>
                 <span className="text-muted-foreground">ETA: </span>
-                {new Date(f.estimatedDeliveryAt).toLocaleDateString()}
+                {new Date(f.estimatedDeliveryAt).toLocaleDateString('en-US')}
               </div>
             ) : null}
             {f.currentStatus ? (

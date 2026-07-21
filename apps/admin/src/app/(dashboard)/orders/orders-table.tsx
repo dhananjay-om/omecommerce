@@ -95,7 +95,7 @@ export function OrdersTable({
                 <TableCell>
                   {o.currency} {o.grandTotal}
                 </TableCell>
-                <TableCell>{new Date(o.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell>{new Date(o.createdAt).toLocaleDateString('en-US')}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger
