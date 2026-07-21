@@ -70,9 +70,27 @@ export async function refundOrder(orderPublicId: string, _prevState: ActionState
   return { error: null, success: true };
 }
 
-export async function cancelOrder(orderPublicId: string, _prevState: ActionState): Promise<ActionState> {
+export async function cancelOrder(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const reason = formData.get('reason');
+  const refundTo = formData.get('refundTo');
+
   try {
-    await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/cancel`);
+    await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/cancel`, {
+      reason: typeof reason === 'string' && reason ? reason : undefined,
+      refundTo: refundTo === 'WALLET' ? 'WALLET' : 'ORIGINAL_PAYMENT_METHOD',
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath(`/orders/${orderPublicId}`);
+  return { error: null, success: true };
+}
+
+export async function closeOrder(orderPublicId: string, _prevState: ActionState): Promise<ActionState> {
+  try {
+    await apiPost<OrderDetail>(`/admin/v1/orders/${orderPublicId}/close`);
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

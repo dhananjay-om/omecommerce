@@ -11,6 +11,7 @@ import { AddNoteForm } from '../add-note-form';
 import { CreateInvoiceDialog } from '../create-invoice-dialog';
 import { InvoicesCard } from '../invoices-card';
 import { ShipmentsCard } from '../shipments-card';
+import { CloseOrderDialog } from '../close-order-dialog';
 import { statusBadgeVariant } from '@/lib/status-badge';
 
 function sum(values: string[]): number {
@@ -55,10 +56,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <FulfillDialog orderPublicId={order.publicId} lines={order.lines} />
         <RefundDialog orderPublicId={order.publicId} lines={order.lines} />
         <CreateInvoiceDialog orderPublicId={order.publicId} lines={order.lines} invoices={order.invoices} />
+        <CloseOrderDialog order={order} />
         {cancellable ? <CancelDialog orderPublicId={order.publicId} /> : null}
       </div>
 
