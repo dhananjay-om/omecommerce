@@ -5,7 +5,7 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-function endOfDayIfDateOnly(value: string): Date {
+export function endOfDayIfDateOnly(value: string): Date {
   return DATE_ONLY.test(value) ? new Date(`${value}T23:59:59.999Z`) : new Date(value);
 }
 

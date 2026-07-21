@@ -890,4 +890,62 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     expect(custom.body.data.subject).toBe('A note about your order');
     expect(custom.body.data.emailType).toBe('CUSTOM');
   });
+
+  it('closes a fully-fulfilled, paid order, and rejects closing an unfulfilled or already-closed order', async () => {
+    const variantId = await createVariant('ORD-SKU-CLOSE-1', '13.00');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'ORD-WH', delta: 5, reason: 'PURCHASE' });
+    const cart = await request(app).post('/store/v1/carts').send({ storeViewId });
+    const cartId = cart.body.data.publicId;
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+        paymentMethod: 'test_card',
+      });
+    const orderPublicId = checkout.body.data.publicId;
+
+    const closeBeforeFulfill = await admin.post(`/admin/v1/orders/${orderPublicId}/close`);
+    expect(closeBeforeFulfill.status).toBe(409);
+
+    await admin.post(`/admin/v1/orders/${orderPublicId}/fulfillments`).send({ lines: [{ sku: 'ORD-SKU-CLOSE-1', qty: 1 }] });
+
+    const close = await admin.post(`/admin/v1/orders/${orderPublicId}/close`);
+    expect(close.status).toBe(200);
+    expect(close.body.data.status).toBe('CLOSED');
+    expect(close.body.data.closedAt).not.toBeNull();
+
+    const history = await admin.get(`/admin/v1/orders/${orderPublicId}/history`);
+    expect(history.body.data.map((h: { eventType: string }) => h.eventType)).toContain('CLOSED');
+
+    const closeAgain = await admin.post(`/admin/v1/orders/${orderPublicId}/close`);
+    expect(closeAgain.status).toBe(409);
+  });
+
+  it('exports orders as CSV and XLSX with real file bytes, honoring filters', async () => {
+    const csv = await admin.get('/admin/v1/orders/export').query({ status: 'CLOSED', format: 'csv' });
+    expect(csv.status).toBe(200);
+    expect(csv.headers['content-type']).toContain('text/csv');
+    const csvText = csv.text;
+    expect(csvText.split('\n')[0]).toContain('Order #');
+    expect(csvText.split('\n').filter((l: string) => l.trim()).length).toBeGreaterThanOrEqual(2); // header + at least 1 CLOSED order from the prior test
+
+    const xlsx = await admin.get('/admin/v1/orders/export').query({ format: 'xlsx' }).buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(xlsx.status).toBe(200);
+    expect(xlsx.headers['content-type']).toContain('spreadsheetml');
+    const xlsxBuffer = xlsx.body as Buffer;
+    expect(xlsxBuffer.length).toBeGreaterThan(100);
+    expect(xlsxBuffer.slice(0, 2).toString('utf8')).toBe('PK'); // xlsx is a zip archive
+
+    const noMatch = await admin.get('/admin/v1/orders/export').query({ email: 'no-such-order-exists@example.com', format: 'csv' });
+    expect(noMatch.status).toBe(200);
+    expect(noMatch.text.split('\n').filter((l: string) => l.trim()).length).toBe(1); // header only
+  });
 });

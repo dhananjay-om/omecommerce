@@ -103,3 +103,8 @@ export const listOrdersQuerySchema = z.object({
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
 });
+
+/** Same filters as listOrdersQuerySchema (minus pagination — export always returns everything up to the cap) plus format (plan/15 Phase 4). */
+export const exportOrdersQuerySchema = listOrdersQuerySchema.omit({ page: true, pageSize: true, sortBy: true, sortDir: true }).extend({
+  format: z.enum(['csv', 'xlsx']).default('csv'),
+});

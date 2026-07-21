@@ -45,6 +45,8 @@ import { GetPackingSlipPdfUrl } from './application/get-packing-slip-pdf-url.use
 import { SendOrderEmail } from './application/send-order-email.usecase.js';
 import { GetEmailLog } from './application/get-email-log.usecase.js';
 import { SimulatedEmailSender } from './infrastructure/simulated-email-sender.js';
+import { CloseOrder } from './application/close-order.usecase.js';
+import { ExportOrders } from './application/export-orders.usecase.js';
 import { PuppeteerPdfRenderer } from './infrastructure/puppeteer-pdf-renderer.js';
 import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
@@ -63,6 +65,7 @@ import {
   createTaxClassSchema,
   createShippingMethodSchema,
   listOrdersQuerySchema,
+  exportOrdersQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface OrderRouters {
@@ -146,6 +149,8 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const emailSender = new SimulatedEmailSender();
   const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
   const getEmailLog = new GetEmailLog(orders);
+  const closeOrder = new CloseOrder(orders, outbox);
+  const exportOrders = new ExportOrders(orders);
 
   const admin = Router();
   admin.post(
@@ -168,6 +173,18 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     asyncHandler(async (req, res) => {
       const query = parse(listOrdersQuerySchema, req.query);
       res.json({ data: await listOrders.execute(query) });
+    }),
+  );
+  admin.get(
+    '/orders/export',
+    authorize('orders:export'),
+    asyncHandler(async (req, res) => {
+      const { format, ...filter } = parse(exportOrdersQuerySchema, req.query);
+      const result = await exportOrders.execute(filter, format ?? 'csv');
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      if (result.truncated) res.setHeader('X-Export-Truncated', 'true');
+      res.send(result.buffer);
     }),
   );
   admin.get(
@@ -274,6 +291,13 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     authorize('orders:email'),
     asyncHandler(async (req, res) => {
       res.json({ data: await getEmailLog.execute(req.params.publicId!) });
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/close',
+    authorize('orders:close'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await closeOrder.execute(req.params.publicId!) });
     }),
   );
 
