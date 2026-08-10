@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPut, ApiError } from '@/lib/api-client';
+import { apiPost, apiPut, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
 import type { PriceList, PriceListType } from '@/lib/types';
 
 export interface ActionState {
@@ -49,6 +49,52 @@ export async function setPrice(_prevState: ActionState, formData: FormData): Pro
 
   try {
     await apiPut(`/admin/v1/price-lists/${priceListCode}/prices`, { variantId, price });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/pricing');
+  return { error: null, success: true };
+}
+
+export async function updatePriceList(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  const name = String(formData.get('name') ?? '').trim();
+  const currency = String(formData.get('currency') ?? '').trim().toUpperCase();
+  const type = String(formData.get('type') ?? '') as PriceListType | '';
+  const priorityRaw = String(formData.get('priority') ?? '').trim();
+  const isActive = String(formData.get('isActive') ?? 'true') === 'true';
+
+  if (!code || !name || currency.length !== 3) {
+    return { error: 'Name and a 3-letter currency code are required.', success: false };
+  }
+
+  try {
+    await apiPatch<PriceList>(`/admin/v1/price-lists/${code}`, {
+      name,
+      currency,
+      type: type || undefined,
+      priority: priorityRaw ? Number(priorityRaw) : undefined,
+      isActive,
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/pricing');
+  return { error: null, success: true };
+}
+
+export async function deletePriceList(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  if (!code) {
+    return { error: 'Missing price list code.', success: false };
+  }
+
+  try {
+    await apiDelete(`/admin/v1/price-lists/${code}`);
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

@@ -23,6 +23,14 @@ export const createPriceListSchema = z.object({
   endsAt: z.string().datetime().nullish(),
 });
 
+export const updatePriceListSchema = z.object({
+  name: z.string().min(1).max(256).optional(),
+  currency: z.string().length(3).optional(),
+  type: z.nativeEnum(PriceListType).optional(),
+  priority: z.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+
 export const setProductPriceSchema = z.object({
   variantId: z.string().uuid(),
   price: decimalString,

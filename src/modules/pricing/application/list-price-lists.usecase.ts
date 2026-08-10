@@ -13,6 +13,7 @@ export class ListPriceLists {
       currency: pl.currency,
       type: pl.type,
       priority: pl.priority,
+      isActive: pl.isActive,
     }));
   }
 }

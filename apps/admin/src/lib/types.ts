@@ -184,6 +184,7 @@ export interface PriceList {
   currency: string;
   type: PriceListType;
   priority: number;
+  isActive: boolean;
 }
 
 /** One price list's price for a single variant — powers the product-edit page's Pricing & Inventory section. */

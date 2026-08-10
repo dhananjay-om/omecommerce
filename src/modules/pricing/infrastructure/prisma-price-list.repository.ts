@@ -3,8 +3,31 @@ import type {
   PriceListRepository,
   PriceListInfo,
   CreatePriceListInput,
+  UpdatePriceListInput,
   VariantPriceRow,
 } from '../domain/repositories.js';
+
+function toInfo(row: {
+  id: bigint;
+  publicId: string;
+  code: string;
+  name: string;
+  currency: string;
+  type: PriceListInfo['type'];
+  priority: number;
+  isActive: boolean;
+}): PriceListInfo {
+  return {
+    id: row.id,
+    publicId: row.publicId,
+    code: row.code,
+    name: row.name,
+    currency: row.currency,
+    type: row.type,
+    priority: row.priority,
+    isActive: row.isActive,
+  };
+}
 
 export class PrismaPriceListRepository implements PriceListRepository {
   constructor(private readonly db: Db) {}
@@ -23,30 +46,12 @@ export class PrismaPriceListRepository implements PriceListRepository {
         endsAt: input.endsAt ?? null,
       },
     });
-    return {
-      id: row.id,
-      publicId: row.publicId,
-      code: row.code,
-      name: row.name,
-      currency: row.currency,
-      type: row.type,
-      priority: row.priority,
-    };
+    return toInfo(row);
   }
 
   async findByCode(code: string): Promise<PriceListInfo | null> {
     const row = await this.db.priceList.findFirst({ where: { code } });
-    return row
-      ? {
-          id: row.id,
-          publicId: row.publicId,
-          code: row.code,
-          name: row.name,
-          currency: row.currency,
-          type: row.type,
-          priority: row.priority,
-        }
-      : null;
+    return row ? toInfo(row) : null;
   }
 
   async list(): Promise<PriceListInfo[]> {
@@ -54,15 +59,28 @@ export class PrismaPriceListRepository implements PriceListRepository {
       where: { deletedAt: null },
       orderBy: { priority: 'desc' },
     });
-    return rows.map((row) => ({
-      id: row.id,
-      publicId: row.publicId,
-      code: row.code,
-      name: row.name,
-      currency: row.currency,
-      type: row.type,
-      priority: row.priority,
-    }));
+    return rows.map(toInfo);
+  }
+
+  async update(id: bigint, input: UpdatePriceListInput): Promise<PriceListInfo> {
+    const row = await this.db.priceList.update({
+      where: { id },
+      data: {
+        name: input.name,
+        currency: input.currency,
+        type: input.type,
+        priority: input.priority,
+        isActive: input.isActive,
+      },
+    });
+    return toInfo(row);
+  }
+
+  async softDelete(id: bigint): Promise<void> {
+    await this.db.priceList.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
   }
 
   async setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void> {
@@ -92,7 +110,7 @@ export class PrismaPriceListRepository implements PriceListRepository {
              pp.price::text AS price
         FROM price_list pl
         LEFT JOIN product_price pp ON pp.price_list_id = pl.id AND pp.variant_id = ${variantId}
-       WHERE pl.deleted_at IS NULL
+       WHERE pl.deleted_at IS NULL AND pl.is_active = true
        ORDER BY pl.priority DESC`;
     return rows.map((row) => ({
       priceListCode: row.price_list_code,

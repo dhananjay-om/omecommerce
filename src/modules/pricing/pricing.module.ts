@@ -10,6 +10,8 @@ import { PrismaPriceListRepository } from './infrastructure/prisma-price-list.re
 import { PrismaPriceResolver } from './infrastructure/prisma-price-resolver.js';
 import { CreateCustomerGroup } from './application/create-customer-group.usecase.js';
 import { CreatePriceList } from './application/create-price-list.usecase.js';
+import { UpdatePriceList } from './application/update-price-list.usecase.js';
+import { DeletePriceList } from './application/delete-price-list.usecase.js';
 import { ListPriceLists } from './application/list-price-lists.usecase.js';
 import { SetProductPrice } from './application/set-product-price.usecase.js';
 import { SetPriceTier } from './application/set-price-tier.usecase.js';
@@ -18,6 +20,7 @@ import { ListVariantPrices } from './application/list-variant-prices.usecase.js'
 import {
   createCustomerGroupSchema,
   createPriceListSchema,
+  updatePriceListSchema,
   setProductPriceSchema,
   setPriceTierSchema,
   resolvePriceQuerySchema,
@@ -37,6 +40,8 @@ export function createPricingModule(db: Db): PricingRouters {
 
   const createCustomerGroup = new CreateCustomerGroup(customerGroups);
   const createPriceList = new CreatePriceList(priceLists, customerGroups, websites);
+  const updatePriceList = new UpdatePriceList(priceLists);
+  const deletePriceList = new DeletePriceList(priceLists);
   const listPriceLists = new ListPriceLists(priceLists);
   const setProductPrice = new SetProductPrice(priceLists, variants);
   const setPriceTier = new SetPriceTier(priceLists, variants);
@@ -67,6 +72,23 @@ export function createPricingModule(db: Db): PricingRouters {
     '/price-lists',
     asyncHandler(async (_req, res) => {
       res.json({ data: await listPriceLists.execute() });
+    }),
+  );
+
+  admin.patch(
+    '/price-lists/:code',
+    asyncHandler(async (req, res) => {
+      const body = parse(updatePriceListSchema, req.body);
+      const view = await updatePriceList.execute({ code: req.params.code!, ...body });
+      res.json({ data: view });
+    }),
+  );
+
+  admin.delete(
+    '/price-lists/:code',
+    asyncHandler(async (req, res) => {
+      await deletePriceList.execute(req.params.code!);
+      res.status(204).send();
     }),
   );
 

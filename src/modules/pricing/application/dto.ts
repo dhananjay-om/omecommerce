@@ -31,6 +31,16 @@ export interface PriceListView {
   currency: string;
   type: PriceListType;
   priority: number;
+  isActive: boolean;
+}
+
+export interface UpdatePriceListCommand {
+  code: string;
+  name?: string;
+  currency?: string;
+  type?: PriceListType;
+  priority?: number;
+  isActive?: boolean;
 }
 
 export interface VariantPriceView {

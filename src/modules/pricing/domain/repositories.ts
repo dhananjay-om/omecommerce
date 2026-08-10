@@ -37,6 +37,7 @@ export interface PriceListInfo {
   currency: string;
   type: PriceListType;
   priority: number;
+  isActive: boolean;
 }
 
 export interface CreatePriceListInput {
@@ -51,6 +52,14 @@ export interface CreatePriceListInput {
   endsAt?: Date | null;
 }
 
+export interface UpdatePriceListInput {
+  name?: string;
+  currency?: string;
+  type?: PriceListType;
+  priority?: number;
+  isActive?: boolean;
+}
+
 export interface VariantPriceRow {
   priceListCode: string;
   priceListName: string;
@@ -63,9 +72,14 @@ export interface PriceListRepository {
   create(input: CreatePriceListInput): Promise<PriceListInfo>;
   findByCode(code: string): Promise<PriceListInfo | null>;
   list(): Promise<PriceListInfo[]>;
+  update(id: bigint, input: UpdatePriceListInput): Promise<PriceListInfo>;
+  /** Soft-delete only, same as WarehouseRepository.softDelete: sets deletedAt + isActive=false. Safe to
+   *  do even for a price list with prices set — PriceResolver already filters is_active/deleted_at, and
+   *  ProductPrice/PriceTier rows are kept (not cascaded), so reactivating restores the same prices. */
+  softDelete(id: bigint): Promise<void>;
   setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void>;
   setPriceTier(priceListId: bigint, variantId: bigint, minQty: number, price: string): Promise<void>;
-  /** Every price list's price for one variant (product-edit page) — lists not yet priced for this variant still appear, with price: null. */
+  /** Every active price list's price for one variant (product-edit page) — lists not yet priced for this variant still appear, with price: null. */
   listPricesForVariant(variantId: bigint): Promise<VariantPriceRow[]>;
 }
 

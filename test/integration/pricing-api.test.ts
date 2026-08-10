@@ -177,4 +177,58 @@ describe.skipIf(!process.env.INTEGRATION)('pricing API (live DB)', () => {
     const res = await admin.get('/admin/v1/variants/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/prices');
     expect(res.status).toBe(404);
   });
+
+  it('updates a price list\'s name/currency/priority/isActive, and deactivating hides it from the variant-prices view', async () => {
+    const created = await admin
+      .post('/admin/v1/price-lists')
+      .send({ code: 'PL-EDIT', name: 'Original Name', currency: 'USD' });
+    expect(created.status).toBe(201);
+    expect(created.body.data).toMatchObject({ code: 'PL-EDIT', name: 'Original Name', priority: 0, isActive: true });
+
+    const updated = await admin
+      .patch('/admin/v1/price-lists/PL-EDIT')
+      .send({ name: 'Renamed List', priority: 7 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toMatchObject({ code: 'PL-EDIT', name: 'Renamed List', priority: 7, isActive: true });
+
+    const variantId = await createVariant('PRICE-SKU-EDIT-1');
+    let prices = await admin.get(`/admin/v1/variants/${variantId}/prices`);
+    expect(prices.body.data.map((r: { priceListCode: string }) => r.priceListCode)).toContain('PL-EDIT');
+
+    const deactivated = await admin.patch('/admin/v1/price-lists/PL-EDIT').send({ isActive: false });
+    expect(deactivated.status).toBe(200);
+    expect(deactivated.body.data.isActive).toBe(false);
+
+    // Deactivated price lists drop out of the still-active list of variant prices.
+    const lists = await admin.get('/admin/v1/price-lists');
+    expect(lists.body.data.map((pl: { code: string }) => pl.code)).toContain('PL-EDIT');
+    prices = await admin.get(`/admin/v1/variants/${variantId}/prices`);
+    expect(prices.body.data.map((r: { priceListCode: string }) => r.priceListCode)).not.toContain('PL-EDIT');
+  });
+
+  it('404s updating an unknown price list', async () => {
+    const res = await admin.patch('/admin/v1/price-lists/NOPE-EDIT').send({ name: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  it('deletes a price list (soft-delete, not blocked even if it already has prices set)', async () => {
+    await admin.post('/admin/v1/price-lists').send({ code: 'PL-DELETE', name: 'Delete Me', currency: 'USD' });
+    const variantId = await createVariant('PRICE-SKU-DELETE-1');
+    await admin.put('/admin/v1/price-lists/PL-DELETE/prices').send({ variantId, price: '12.00' });
+
+    const del = await admin.delete('/admin/v1/price-lists/PL-DELETE');
+    expect(del.status).toBe(204);
+
+    const lists = await admin.get('/admin/v1/price-lists');
+    expect(lists.body.data.map((pl: { code: string }) => pl.code)).not.toContain('PL-DELETE');
+
+    // The variant no longer resolves through the deleted list, even though the price row itself is untouched.
+    const prices = await admin.get(`/admin/v1/variants/${variantId}/prices`);
+    expect(prices.body.data.map((r: { priceListCode: string }) => r.priceListCode)).not.toContain('PL-DELETE');
+  });
+
+  it('404s deleting an unknown price list', async () => {
+    const res = await admin.delete('/admin/v1/price-lists/NOPE-DELETE');
+    expect(res.status).toBe(404);
+  });
 });

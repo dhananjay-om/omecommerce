@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { NewPriceListDialog } from './new-price-list-dialog';
 import { SetPriceDialog } from './set-price-dialog';
+import { EditPriceListDialog } from './edit-price-list-dialog';
+import { DeletePriceListDialog } from './delete-price-list-dialog';
 
 export default async function PricingPage() {
   const priceLists = await apiGet<PriceList[]>('/admin/v1/price-lists');
@@ -24,13 +26,14 @@ export default async function PricingPage() {
               <TableHead>Currency</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Priority</TableHead>
-              <TableHead />
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {priceLists.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No price lists yet.
                 </TableCell>
               </TableRow>
@@ -44,8 +47,17 @@ export default async function PricingPage() {
                     <Badge variant="secondary">{pl.type}</Badge>
                   </TableCell>
                   <TableCell>{pl.priority}</TableCell>
+                  <TableCell>
+                    <Badge variant={pl.isActive ? 'success' : 'secondary'}>
+                      {pl.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
-                    <SetPriceDialog priceListCode={pl.code} />
+                    <div className="flex justify-end gap-2">
+                      <SetPriceDialog priceListCode={pl.code} />
+                      <EditPriceListDialog priceList={pl} />
+                      <DeletePriceListDialog code={pl.code} name={pl.name} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
