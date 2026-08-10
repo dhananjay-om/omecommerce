@@ -25,7 +25,7 @@ export default async function OrderDetailLayout({ children, params }: { children
   const cancellable = !['CANCELLED', 'COMPLETED', 'CLOSED'].includes(order.status);
 
   return (
-    <div className="max-w-6xl">
+    <div>
       <Link href="/orders" className="text-sm text-muted-foreground hover:underline">
         ← Back to Orders
       </Link>
@@ -53,7 +53,7 @@ export default async function OrderDetailLayout({ children, params }: { children
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[200px_1fr]">
+      <div className="mt-6 grid gap-6 md:grid-cols-[220px_1fr]">
         <OrderViewNav orderPublicId={order.publicId} />
         <div className="min-w-0">{children}</div>
       </div>

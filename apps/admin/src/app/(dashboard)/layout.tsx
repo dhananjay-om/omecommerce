@@ -46,7 +46,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopHeader />
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl p-8">{children}</div>
+          <div className="mx-auto max-w-[1600px] p-8">{children}</div>
         </main>
       </div>
       <Toaster />
