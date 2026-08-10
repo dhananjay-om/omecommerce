@@ -15,7 +15,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const attributeEntries = Object.entries(product.attributes);
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <Link href="/products" className="text-sm text-muted-foreground hover:underline">
           ← Back to Products
@@ -35,7 +35,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 text-sm">
+        <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
           <div>
             <div className="text-muted-foreground">SKU</div>
             <div className="font-medium">{product.sku}</div>
@@ -73,7 +73,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               .
             </p>
           ) : (
-            <div className="grid grid-cols-6 gap-3">
+            <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
               {product.media.map((m) => (
                 // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
                 <img key={m.productMediaId} src={m.url} alt={m.altText ?? ''} className="aspect-square w-full rounded-md border object-cover" />

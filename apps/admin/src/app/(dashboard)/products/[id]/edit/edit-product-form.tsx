@@ -45,9 +45,9 @@ export function EditProductForm({
   const selectedSetDetail = attributeSetDetails[attributeSetId];
 
   return (
-    <form action={formAction} className="max-w-4xl space-y-6">
+    <form action={formAction} className="space-y-6">
       <SectionCard title="Basic Information">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label>SKU</Label>
             <Input value={product.sku} disabled />
@@ -56,14 +56,6 @@ export function EditProductForm({
           <div className="space-y-2">
             <Label>Type</Label>
             <Input value={product.type} disabled />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="nameDefault">Name</Label>
-            <Input id="nameDefault" name="nameDefault" defaultValue={product.name ?? ''} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="weight">Weight (kg)</Label>
-            <Input id="weight" name="weight" type="number" step="0.0001" min="0" defaultValue={product.weight ?? ''} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="attributeSetId">Attribute set</Label>
@@ -82,11 +74,19 @@ export function EditProductForm({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="nameDefault">Name</Label>
+            <Input id="nameDefault" name="nameDefault" defaultValue={product.name ?? ''} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="weight">Weight (kg)</Label>
+            <Input id="weight" name="weight" type="number" step="0.0001" min="0" defaultValue={product.weight ?? ''} />
+          </div>
         </div>
       </SectionCard>
 
       <SectionCard title="Status & Visibility">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
             <Select name="status" defaultValue={product.status}>
