@@ -186,6 +186,25 @@ describe.skipIf(!process.env.INTEGRATION)('inventory API (live DB)', () => {
     expect(unknown.status).toBe(404);
   });
 
+  it('lists a variant\'s stock across every active warehouse, including ones never stocked (product-edit page)', async () => {
+    await admin.post('/admin/v1/warehouses').send({ code: 'WH-VARLIST-A', name: 'Var List Warehouse A' });
+    await admin.post('/admin/v1/warehouses').send({ code: 'WH-VARLIST-B', name: 'Var List Warehouse B' });
+    const variantId = await createVariant('INV-SKU-VARLIST-1');
+    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'WH-VARLIST-A', delta: 4, reason: 'PURCHASE' });
+    // Deliberately never adjust stock in WH-VARLIST-B for this variant.
+
+    const res = await admin.get(`/admin/v1/variants/${variantId}/stock`);
+    expect(res.status).toBe(200);
+    const byCode = Object.fromEntries(res.body.data.map((r: { warehouseCode: string }) => [r.warehouseCode, r]));
+    expect(byCode['WH-VARLIST-A']).toMatchObject({ onHand: 4, reserved: 0, available: 4 });
+    expect(byCode['WH-VARLIST-B']).toMatchObject({ onHand: 0, reserved: 0, available: 0 });
+  });
+
+  it('404s listing stock for a non-existent variant', async () => {
+    const res = await admin.get('/admin/v1/variants/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/stock');
+    expect(res.status).toBe(404);
+  });
+
   it('validates input and 404s on unknown warehouse/variant', async () => {
     const variantId = await createVariant('INV-SKU-VALIDATE-1');
 

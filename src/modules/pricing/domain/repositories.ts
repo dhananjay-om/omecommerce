@@ -51,12 +51,22 @@ export interface CreatePriceListInput {
   endsAt?: Date | null;
 }
 
+export interface VariantPriceRow {
+  priceListCode: string;
+  priceListName: string;
+  currency: string;
+  /** null when no ProductPrice row exists yet for this variant in this list. */
+  price: string | null;
+}
+
 export interface PriceListRepository {
   create(input: CreatePriceListInput): Promise<PriceListInfo>;
   findByCode(code: string): Promise<PriceListInfo | null>;
   list(): Promise<PriceListInfo[]>;
   setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void>;
   setPriceTier(priceListId: bigint, variantId: bigint, minQty: number, price: string): Promise<void>;
+  /** Every price list's price for one variant (product-edit page) — lists not yet priced for this variant still appear, with price: null. */
+  listPricesForVariant(variantId: bigint): Promise<VariantPriceRow[]>;
 }
 
 export interface ResolvePriceInput {

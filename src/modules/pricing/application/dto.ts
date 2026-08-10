@@ -33,6 +33,13 @@ export interface PriceListView {
   priority: number;
 }
 
+export interface VariantPriceView {
+  priceListCode: string;
+  priceListName: string;
+  currency: string;
+  price: string | null;
+}
+
 export interface SetProductPriceCommand {
   priceListCode: string;
   variantPublicId: string;

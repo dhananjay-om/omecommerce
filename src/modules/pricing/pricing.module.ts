@@ -14,6 +14,7 @@ import { ListPriceLists } from './application/list-price-lists.usecase.js';
 import { SetProductPrice } from './application/set-product-price.usecase.js';
 import { SetPriceTier } from './application/set-price-tier.usecase.js';
 import { ResolvePrice } from './application/resolve-price.usecase.js';
+import { ListVariantPrices } from './application/list-variant-prices.usecase.js';
 import {
   createCustomerGroupSchema,
   createPriceListSchema,
@@ -40,6 +41,7 @@ export function createPricingModule(db: Db): PricingRouters {
   const setProductPrice = new SetProductPrice(priceLists, variants);
   const setPriceTier = new SetPriceTier(priceLists, variants);
   const resolvePrice = new ResolvePrice(resolver, variants, customerGroups, websites);
+  const listVariantPrices = new ListVariantPrices(priceLists, variants);
 
   const admin = Router();
 
@@ -92,6 +94,13 @@ export function createPricingModule(db: Db): PricingRouters {
         price: body.price,
       });
       res.status(204).send();
+    }),
+  );
+
+  admin.get(
+    '/variants/:variantId/prices',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listVariantPrices.execute(req.params.variantId!) });
     }),
   );
 

@@ -6,6 +6,7 @@ import type {
   ReservationHandle,
   ReservationInfo,
   WarehouseStockRow,
+  VariantStockRow,
 } from '../domain/repositories.js';
 import { InsufficientStockError, InvalidReservationStateError } from '../domain/errors.js';
 import { computeExpiry } from '../domain/reservation.js';
@@ -174,6 +175,28 @@ export class PrismaStockLedger implements StockLedger {
     return rows.map((row) => ({
       variantPublicId: row.variant_public_id,
       sku: row.sku,
+      onHand: row.on_hand,
+      reserved: row.reserved,
+      available: row.available,
+    }));
+  }
+
+  async listByVariant(variantId: bigint): Promise<VariantStockRow[]> {
+    // LEFT JOIN from warehouse (not stock_item) so a warehouse with no
+    // stock_item row for this variant yet still shows up as a zeroed row —
+    // "not stocked here" is a real, visible state, not an absent one.
+    const rows = await this.db.$queryRaw<
+      Array<{ warehouse_code: string; warehouse_name: string; on_hand: number; reserved: number; available: number }>
+    >`
+      SELECT w.code AS warehouse_code, w.name AS warehouse_name,
+             COALESCE(si.on_hand, 0) AS on_hand, COALESCE(si.reserved, 0) AS reserved, COALESCE(si.available, 0) AS available
+        FROM warehouse w
+        LEFT JOIN stock_item si ON si.warehouse_id = w.id AND si.variant_id = ${variantId}
+       WHERE w.deleted_at IS NULL AND w.is_active = true
+       ORDER BY w.code`;
+    return rows.map((row) => ({
+      warehouseCode: row.warehouse_code,
+      warehouseName: row.warehouse_name,
       onHand: row.on_hand,
       reserved: row.reserved,
       available: row.available,

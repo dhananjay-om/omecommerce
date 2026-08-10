@@ -38,6 +38,11 @@ export interface WarehouseStockRow extends StockSnapshot {
   sku: string;
 }
 
+export interface VariantStockRow extends StockSnapshot {
+  warehouseCode: string;
+  warehouseName: string;
+}
+
 export interface ReservationHandle {
   id: bigint;
   publicId: string;
@@ -92,4 +97,6 @@ export interface StockLedger {
 
   /** All stock rows for a warehouse (admin browse), joined with the variant's sku/publicId. */
   listByWarehouse(warehouseId: bigint): Promise<WarehouseStockRow[]>;
+  /** Every active warehouse's stock snapshot for one variant (product-edit page) — includes warehouses with no stock_item row yet as a zeroed row, so "no stock anywhere" is still visible per-warehouse rather than an empty list. */
+  listByVariant(variantId: bigint): Promise<VariantStockRow[]>;
 }

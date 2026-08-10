@@ -2,10 +2,11 @@
 
 import { useActionState, useState } from 'react';
 import { updateProduct, type UpdateProductFormState } from '../../actions';
-import type { AttributeSet, AttributeSetDetail, Category, ProductDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, VariantPrice, VariantStock } from '@/lib/types';
 import { AttributeFieldsSection } from '../../attribute-fields-section';
 import { CategoryPicker } from '../../category-picker';
 import { ImageUploadField } from './image-upload-field';
+import { PricingInventorySection } from './pricing-inventory-section';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,11 +34,17 @@ export function EditProductForm({
   attributeSets,
   attributeSetDetails,
   categories,
+  pricingVariantId,
+  variantPrices,
+  variantStock,
 }: {
   product: ProductDetail;
   attributeSets: AttributeSet[];
   attributeSetDetails: Record<string, AttributeSetDetail>;
   categories: Category[];
+  pricingVariantId: string | null;
+  variantPrices: VariantPrice[];
+  variantStock: VariantStock[];
 }) {
   const action = updateProduct.bind(null, product.publicId);
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -123,6 +130,17 @@ export function EditProductForm({
       {selectedSetDetail ? (
         <SectionCard title="Attributes">
           <AttributeFieldsSection groups={selectedSetDetail.groups} values={product.attributes} />
+        </SectionCard>
+      ) : null}
+
+      {pricingVariantId ? (
+        <SectionCard title="Pricing & Inventory">
+          <PricingInventorySection
+            productPublicId={product.publicId}
+            variantId={pricingVariantId}
+            prices={variantPrices}
+            stock={variantStock}
+          />
         </SectionCard>
       ) : null}
 

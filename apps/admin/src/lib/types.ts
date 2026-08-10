@@ -184,6 +184,23 @@ export interface PriceList {
   priority: number;
 }
 
+/** One price list's price for a single variant — powers the product-edit page's Pricing & Inventory section. */
+export interface VariantPrice {
+  priceListCode: string;
+  priceListName: string;
+  currency: string;
+  price: string | null;
+}
+
+/** One warehouse's stock for a single variant — every active warehouse appears, zeroed if never stocked. */
+export interface VariantStock {
+  warehouseCode: string;
+  warehouseName: string;
+  onHand: number;
+  reserved: number;
+  available: number;
+}
+
 export type OrderStatus = 'PENDING' | 'PROCESSING' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED' | 'CONFIRMED' | 'CLOSED';
 export type FinancialStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'VOIDED' | 'PARTIALLY_PAID' | 'FAILED';
 export type FulfillmentStatus = 'UNFULFILLED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'RETURNED';

@@ -6,6 +6,7 @@ import { PrismaStockLedger } from './infrastructure/prisma-stock-ledger.js';
 import { CreateWarehouse } from './application/create-warehouse.usecase.js';
 import { ListWarehouses } from './application/list-warehouses.usecase.js';
 import { ListWarehouseStock } from './application/list-warehouse-stock.usecase.js';
+import { ListVariantStock } from './application/list-variant-stock.usecase.js';
 import { AdjustStock } from './application/adjust-stock.usecase.js';
 import { GetStock } from './application/get-stock.usecase.js';
 import { ReserveStock } from './application/reserve-stock.usecase.js';
@@ -32,6 +33,7 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
   const createWarehouse = new CreateWarehouse(warehouses);
   const listWarehouses = new ListWarehouses(warehouses);
   const listWarehouseStock = new ListWarehouseStock(warehouses, ledger);
+  const listVariantStock = new ListVariantStock(variants, ledger);
   const adjustStock = new AdjustStock(variants, warehouses, ledger);
   const getStock = new GetStock(variants, warehouses, ledger);
   const reserveStock = new ReserveStock(variants, warehouses, ledger);
@@ -89,6 +91,13 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
         warehouseCode: query.warehouseCode,
       });
       res.json({ data: view });
+    }),
+  );
+
+  admin.get(
+    '/variants/:variantId/stock',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listVariantStock.execute(req.params.variantId!) });
     }),
   );
 

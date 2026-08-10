@@ -3,6 +3,7 @@ import type {
   PriceListRepository,
   PriceListInfo,
   CreatePriceListInput,
+  VariantPriceRow,
 } from '../domain/repositories.js';
 
 export class PrismaPriceListRepository implements PriceListRepository {
@@ -78,5 +79,26 @@ export class PrismaPriceListRepository implements PriceListRepository {
       update: { price },
       create: { priceListId, variantId, minQty, price },
     });
+  }
+
+  async listPricesForVariant(variantId: bigint): Promise<VariantPriceRow[]> {
+    // LEFT JOIN from price_list (not product_price) so a list this variant
+    // has no price in yet still shows up, with price: null — "not priced
+    // here" is a visible state, not an absent row.
+    const rows = await this.db.$queryRaw<
+      Array<{ price_list_code: string; price_list_name: string; currency: string; price: string | null }>
+    >`
+      SELECT pl.code AS price_list_code, pl.name AS price_list_name, pl.currency,
+             pp.price::text AS price
+        FROM price_list pl
+        LEFT JOIN product_price pp ON pp.price_list_id = pl.id AND pp.variant_id = ${variantId}
+       WHERE pl.deleted_at IS NULL
+       ORDER BY pl.priority DESC`;
+    return rows.map((row) => ({
+      priceListCode: row.price_list_code,
+      priceListName: row.price_list_name,
+      currency: row.currency,
+      price: row.price,
+    }));
   }
 }

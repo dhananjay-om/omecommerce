@@ -160,4 +160,21 @@ describe.skipIf(!process.env.INTEGRATION)('pricing API (live DB)', () => {
     const priorities = res.body.data.map((pl: { priority: number }) => pl.priority);
     expect(priorities).toEqual([...priorities].sort((a: number, b: number) => b - a));
   });
+
+  it('lists every price list for a variant, with price:null where none was ever set (product-edit page)', async () => {
+    const variantId = await createVariant('PRICE-SKU-6');
+    await admin.put('/admin/v1/price-lists/BASE-USD/prices').send({ variantId, price: '42.50' });
+    // Deliberately leave WHOLESALE-USD unpriced for this variant.
+
+    const res = await admin.get(`/admin/v1/variants/${variantId}/prices`);
+    expect(res.status).toBe(200);
+    const byCode = Object.fromEntries(res.body.data.map((r: { priceListCode: string; price: string | null }) => [r.priceListCode, r.price]));
+    expect(byCode['BASE-USD']).toBe('42.5000');
+    expect(byCode['WHOLESALE-USD']).toBeNull();
+  });
+
+  it('404s listing prices for a non-existent variant', async () => {
+    const res = await admin.get('/admin/v1/variants/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/prices');
+    expect(res.status).toBe(404);
+  });
 });

@@ -54,3 +54,11 @@ export interface WarehouseStockItemView {
   reserved: number;
   available: number;
 }
+
+export interface VariantStockItemView {
+  warehouseCode: string;
+  warehouseName: string;
+  onHand: number;
+  reserved: number;
+  available: number;
+}
