@@ -348,8 +348,10 @@ export interface ProductMediaRepository {
   listForProduct(productId: bigint): Promise<ProductMediaInfo[]>;
   findById(id: bigint): Promise<ProductMediaInfo | null>;
   detach(id: bigint): Promise<void>;
-  /** Admin grid thumbnail (plan/13 Phase J) — the first GALLERY/THUMBNAIL-role image's storage key per product, batched for a page of products. Keyed by `productId.toString()`. */
+  /** Admin grid thumbnail — the product's designated THUMBNAIL image if one is set, else its lowest-position GALLERY image, batched for a page of products. Keyed by `productId.toString()`. */
   listThumbnailStorageKeysForProducts(productIds: bigint[]): Promise<Map<string, string>>;
+  /** Marks one media row as the product's single THUMBNAIL ("main image"), demoting any other row on the same product currently holding that role back to GALLERY — exactly one thumbnail at a time. */
+  setThumbnail(productId: bigint, productMediaId: bigint): Promise<void>;
 }
 
 /** Port over the MinIO/S3-backed object store (plan/13 Phase J) — lets use-cases stay unit-testable without a real bucket. */

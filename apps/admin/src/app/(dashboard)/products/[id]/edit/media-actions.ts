@@ -64,3 +64,22 @@ export async function detachMedia(productPublicId: string, productMediaId: strin
   revalidatePath('/products');
   return { error: null };
 }
+
+export interface SetThumbnailResult {
+  error: string | null;
+}
+
+/** Marks one image as the product's "main image" — used wherever only a single thumbnail is shown (collection/PLP grid, search hits, mini-cart, cart line, admin grid). */
+export async function setThumbnail(productPublicId: string, productMediaId: string): Promise<SetThumbnailResult> {
+  try {
+    await apiPost(`/admin/v1/products/${productPublicId}/media/${productMediaId}/set-thumbnail`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidatePath(`/products/${productPublicId}/edit`);
+  revalidatePath(`/products/${productPublicId}`);
+  revalidatePath('/products');
+  return { error: null };
+}

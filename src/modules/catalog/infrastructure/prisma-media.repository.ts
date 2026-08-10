@@ -100,15 +100,24 @@ export class PrismaProductMediaRepository implements ProductMediaRepository {
     const result = new Map<string, string>();
     if (productIds.length === 0) return result;
 
+    // A designated THUMBNAIL row always wins over plain gallery-position
+    // ordering — `(pm.role = 'THUMBNAIL') DESC` sorts true before false.
     const rows = await this.db.$queryRaw<Array<{ product_id: bigint; storage_key: string }>>`
       SELECT DISTINCT ON (pm.product_id) pm.product_id AS product_id, ma.storage_key AS storage_key
         FROM product_media pm
         JOIN media_asset ma ON ma.id = pm.asset_id
        WHERE pm.product_id IN (${Prisma.join(productIds)})
          AND pm.role IN ('GALLERY', 'THUMBNAIL')
-       ORDER BY pm.product_id, pm.position ASC`;
+       ORDER BY pm.product_id, (pm.role = 'THUMBNAIL') DESC, pm.position ASC`;
 
     for (const row of rows) result.set(row.product_id.toString(), row.storage_key);
     return result;
+  }
+
+  async setThumbnail(productId: bigint, productMediaId: bigint): Promise<void> {
+    await this.db.$transaction([
+      this.db.productMedia.updateMany({ where: { productId, role: 'THUMBNAIL' }, data: { role: 'GALLERY' } }),
+      this.db.productMedia.update({ where: { id: productMediaId }, data: { role: 'THUMBNAIL' } }),
+    ]);
   }
 }

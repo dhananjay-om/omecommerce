@@ -53,6 +53,7 @@ import { RequestMediaUpload } from './application/request-media-upload.usecase.j
 import { CreateMediaAsset } from './application/create-media-asset.usecase.js';
 import { AttachProductMedia } from './application/attach-product-media.usecase.js';
 import { DetachProductMedia } from './application/detach-product-media.usecase.js';
+import { SetProductThumbnail } from './application/set-product-thumbnail.usecase.js';
 import {
   createProductSchema,
   updateProductSchema,
@@ -142,6 +143,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createMediaAsset = new CreateMediaAsset(mediaAssets);
   const attachProductMedia = new AttachProductMedia(products, mediaAssets, productMedia, mediaStorage);
   const detachProductMedia = new DetachProductMedia(products, productMedia);
+  const setProductThumbnail = new SetProductThumbnail(products, productMedia, mediaStorage);
 
   // --- Admin API ---
   const admin = Router();
@@ -355,6 +357,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       await detachProductMedia.execute({ productPublicId: req.params.publicId!, productMediaId: req.params.productMediaId! });
       res.status(204).send();
+    }),
+  );
+  admin.post(
+    '/products/:publicId/media/:productMediaId/set-thumbnail',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const view = await setProductThumbnail.execute({ productPublicId: req.params.publicId!, productMediaId: req.params.productMediaId! });
+      res.json({ data: view });
     }),
   );
   admin.post(

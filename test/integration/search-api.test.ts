@@ -158,6 +158,25 @@ describe.skipIf(!process.env.INTEGRATION)('search API (live DB + OpenSearch)', (
     expect(res.body.data.hits[0].imageUrl).toContain(upload.body.data.storageKey);
   });
 
+  it('the search-result image prefers the designated THUMBNAIL over the lower-position gallery image', async () => {
+    const publicId = await createProduct('SEARCH-SKU-THUMB', 'Thumbnail Preference Widget', 'Acme', 8, '25.00');
+
+    const uploadFirst = await admin.post('/admin/v1/media/uploads').send({ filename: 'first.jpg', mimeType: 'image/jpeg' });
+    const assetFirst = await admin.post('/admin/v1/media').send({ storageKey: uploadFirst.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    await admin.post(`/admin/v1/products/${publicId}/media`).send({ mediaPublicId: assetFirst.body.data.publicId });
+
+    const uploadSecond = await admin.post('/admin/v1/media/uploads').send({ filename: 'second.jpg', mimeType: 'image/jpeg' });
+    const assetSecond = await admin.post('/admin/v1/media').send({ storageKey: uploadSecond.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    const attachSecond = await admin.post(`/admin/v1/products/${publicId}/media`).send({ mediaPublicId: assetSecond.body.data.publicId });
+    await admin.post(`/admin/v1/products/${publicId}/media/${attachSecond.body.data.productMediaId}/set-thumbnail`);
+
+    await admin.post('/admin/v1/search/reindex');
+
+    const res = await request(app).get(`/store/v1/search?storeViewId=${storeViewId}&q=Thumbnail Preference`);
+    expect(res.body.data.hits).toHaveLength(1);
+    expect(res.body.data.hits[0].imageUrl).toContain(uploadSecond.body.data.storageKey);
+  });
+
   it('filters by availability (inStock)', async () => {
     await createProduct('SEARCH-SKU-OOS', 'Out Of Stock Widget', 'Acme', 16, '15.00');
     await createProduct('SEARCH-SKU-INSTOCK', 'In Stock Widget', 'Acme', 16, '15.00');

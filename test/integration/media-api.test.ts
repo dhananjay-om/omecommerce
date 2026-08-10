@@ -105,4 +105,65 @@ describe.skipIf(!process.env.INTEGRATION)('media API (live DB + MinIO)', () => {
     const found = all.body.data.products.find((p: { publicId: string }) => p.publicId === productPublicId);
     expect(found.thumbnailUrl).toEqual(expect.any(String));
   });
+
+  it('sets a media row as the product thumbnail, enforcing exactly one THUMBNAIL at a time', async () => {
+    const uploadA = await admin.post('/admin/v1/media/uploads').send({ filename: 'first.jpg', mimeType: 'image/jpeg' });
+    const assetA = await admin.post('/admin/v1/media').send({ storageKey: uploadA.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    const attachA = await admin.post(`/admin/v1/products/${productPublicId}/media`).send({ mediaPublicId: assetA.body.data.publicId });
+    const mediaIdA = attachA.body.data.productMediaId;
+
+    const uploadB = await admin.post('/admin/v1/media/uploads').send({ filename: 'second.jpg', mimeType: 'image/jpeg' });
+    const assetB = await admin.post('/admin/v1/media').send({ storageKey: uploadB.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    const attachB = await admin.post(`/admin/v1/products/${productPublicId}/media`).send({ mediaPublicId: assetB.body.data.publicId });
+    const mediaIdB = attachB.body.data.productMediaId;
+
+    // Both start as GALLERY (attach's default role).
+    const beforeDetail = await admin.get(`/admin/v1/products/${productPublicId}`);
+    expect(beforeDetail.body.data.media.every((m: { role: string }) => m.role === 'GALLERY')).toBe(true);
+
+    const setA = await admin.post(`/admin/v1/products/${productPublicId}/media/${mediaIdA}/set-thumbnail`);
+    expect(setA.status).toBe(200);
+    expect(setA.body.data).toMatchObject({ productMediaId: mediaIdA, role: 'THUMBNAIL' });
+
+    const afterA = await admin.get(`/admin/v1/products/${productPublicId}`);
+    const rolesAfterA = Object.fromEntries(afterA.body.data.media.map((m: { productMediaId: string; role: string }) => [m.productMediaId, m.role]));
+    expect(rolesAfterA[mediaIdA]).toBe('THUMBNAIL');
+    expect(rolesAfterA[mediaIdB]).toBe('GALLERY');
+
+    // Setting B demotes A back to GALLERY — exactly one THUMBNAIL at a time.
+    const setB = await admin.post(`/admin/v1/products/${productPublicId}/media/${mediaIdB}/set-thumbnail`);
+    expect(setB.status).toBe(200);
+    const afterB = await admin.get(`/admin/v1/products/${productPublicId}`);
+    const rolesAfterB = Object.fromEntries(afterB.body.data.media.map((m: { productMediaId: string; role: string }) => [m.productMediaId, m.role]));
+    expect(rolesAfterB[mediaIdA]).toBe('GALLERY');
+    expect(rolesAfterB[mediaIdB]).toBe('THUMBNAIL');
+  });
+
+  it('the products grid thumbnail prefers the designated THUMBNAIL over a lower-position GALLERY image', async () => {
+    const uploadFirst = await admin.post('/admin/v1/media/uploads').send({ filename: 'grid-first.jpg', mimeType: 'image/jpeg' });
+    const assetFirst = await admin.post('/admin/v1/media').send({ storageKey: uploadFirst.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    await admin.post(`/admin/v1/products/${productPublicId}/media`).send({ mediaPublicId: assetFirst.body.data.publicId });
+
+    const uploadSecond = await admin.post('/admin/v1/media/uploads').send({ filename: 'grid-second.jpg', mimeType: 'image/jpeg' });
+    const assetSecond = await admin.post('/admin/v1/media').send({ storageKey: uploadSecond.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    const attachSecond = await admin.post(`/admin/v1/products/${productPublicId}/media`).send({ mediaPublicId: assetSecond.body.data.publicId });
+
+    await admin.post(`/admin/v1/products/${productPublicId}/media/${attachSecond.body.data.productMediaId}/set-thumbnail`);
+
+    const all = await admin.get('/admin/v1/products?pageSize=100');
+    const found = all.body.data.products.find((p: { publicId: string }) => p.publicId === productPublicId);
+    expect(found.thumbnailUrl).toContain(uploadSecond.body.data.storageKey);
+  });
+
+  it('404s setting a thumbnail on a media row that belongs to a different product', async () => {
+    const otherProduct = await prisma.product.create({
+      data: { type: 'SIMPLE', sku: `MEDIA-TEST-OTHER-${Date.now()}`, attributeSetId: (await prisma.attributeSet.findFirstOrThrow({ where: { code: 'media-test-set' } })).id, status: 'DRAFT', visibility: 'BOTH' },
+    });
+    const upload = await admin.post('/admin/v1/media/uploads').send({ filename: 'mismatched.jpg', mimeType: 'image/jpeg' });
+    const asset = await admin.post('/admin/v1/media').send({ storageKey: upload.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });
+    const attach = await admin.post(`/admin/v1/products/${productPublicId}/media`).send({ mediaPublicId: asset.body.data.publicId });
+
+    const res = await admin.post(`/admin/v1/products/${otherProduct.publicId}/media/${attach.body.data.productMediaId}/set-thumbnail`);
+    expect(res.status).toBe(404);
+  });
 });

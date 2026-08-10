@@ -353,6 +353,11 @@ export interface DetachProductMediaCommand {
   productMediaId: string;
 }
 
+export interface SetProductThumbnailCommand {
+  productPublicId: string;
+  productMediaId: string;
+}
+
 export interface CreateBrandCommand {
   name: string;
   description?: string | null;

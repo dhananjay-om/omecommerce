@@ -31,7 +31,8 @@ export class PrismaCartProductMediaLookup implements CartProductMediaLookup {
       FROM product_media pm
       JOIN media_asset ma ON ma.id = pm.asset_id
       WHERE pm.product_id = ${productId}
-      ORDER BY pm.position ASC
+        AND pm.role IN ('GALLERY', 'THUMBNAIL')
+      ORDER BY (pm.role = 'THUMBNAIL') DESC, pm.position ASC
       LIMIT 1`;
     return rows[0]?.storage_key ?? null;
   }

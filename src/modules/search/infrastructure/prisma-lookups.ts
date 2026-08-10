@@ -135,13 +135,15 @@ export class PrismaBrandLookup implements BrandLookup {
 export class PrismaProductMediaLookup implements ProductMediaLookup {
   constructor(private readonly db: Db) {}
 
+  /** Feeds the search index's PLP/search-hit thumbnail — must match every other "single image" lookup's role filter + THUMBNAIL-first ordering (own copy of catalog module's identical query, per-module lookup convention). */
   async primaryImageKey(productId: bigint): Promise<string | null> {
     const rows = await this.db.$queryRaw<Array<{ storage_key: string }>>`
       SELECT ma.storage_key
       FROM product_media pm
       JOIN media_asset ma ON ma.id = pm.asset_id
       WHERE pm.product_id = ${productId}
-      ORDER BY pm.position ASC
+        AND pm.role IN ('GALLERY', 'THUMBNAIL')
+      ORDER BY (pm.role = 'THUMBNAIL') DESC, pm.position ASC
       LIMIT 1`;
     return rows[0]?.storage_key ?? null;
   }
