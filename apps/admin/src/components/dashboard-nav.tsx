@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Package,
   Boxes,
+  Warehouse,
   Tag,
   ShoppingCart,
   Users,
@@ -29,6 +30,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
     items: [
       { href: '/products', label: 'Products', icon: Package },
       { href: '/inventory', label: 'Inventory', icon: Boxes },
+      { href: '/inventory/warehouses', label: 'Warehouses', icon: Warehouse },
       { href: '/pricing', label: 'Pricing', icon: Tag },
       { href: '/categories', label: 'Categories', icon: FolderTree },
       { href: '/attribute-sets', label: 'Attribute Sets', icon: ListTree },
@@ -44,8 +46,17 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
   },
 ];
 
+/** The most specific href matching this pathname, so e.g. /inventory/warehouses highlights
+ *  only "Warehouses" and not also its parent "Inventory" entry. */
+function bestMatchingHref(pathname: string): string | undefined {
+  return NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href))
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+}
+
 export function DashboardNav() {
   const pathname = usePathname();
+  const activeHref = bestMatchingHref(pathname);
 
   return (
     <nav className="flex flex-col gap-4">
@@ -58,7 +69,7 @@ export function DashboardNav() {
           ) : null}
           <div className="flex flex-col gap-0.5">
             {group.items.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active = item.href === activeHref;
               const Icon = item.icon;
               return (
                 <Link
