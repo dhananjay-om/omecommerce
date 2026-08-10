@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, ApiError } from '@/lib/api-client';
+import { apiPost, apiDelete, ApiError } from '@/lib/api-client';
 import type { AttributeSet, AttributeSetGroupDetail } from '@/lib/types';
 
 export interface ActionState {
@@ -41,6 +41,41 @@ export async function createAttributeSetGroup(_prevState: ActionState, formData:
 
   try {
     await apiPost<AttributeSetGroupDetail>(`/admin/v1/attribute-sets/${attributeSetId}/groups`, { name, sortOrder });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath(`/attribute-sets/${attributeSetId}`);
+  return { error: null, success: true };
+}
+
+export async function deleteAttributeSet(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const id = String(formData.get('id') ?? '').trim();
+  if (!id) {
+    return { error: 'Missing attribute set id.', success: false };
+  }
+
+  try {
+    await apiDelete(`/admin/v1/attribute-sets/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/attribute-sets');
+  return { error: null, success: true };
+}
+
+export async function removeAttributeFromSet(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const attributeSetId = String(formData.get('attributeSetId') ?? '').trim();
+  const attributeCode = String(formData.get('attributeCode') ?? '').trim();
+  if (!attributeSetId || !attributeCode) {
+    return { error: 'Missing attribute set or attribute code.', success: false };
+  }
+
+  try {
+    await apiDelete(`/admin/v1/attribute-sets/${attributeSetId}/attributes/${attributeCode}`);
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

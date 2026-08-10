@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, ApiError } from '@/lib/api-client';
+import { apiPost, apiDelete, ApiError } from '@/lib/api-client';
 import type { Attribute, AttributeDataType, AttributeInputType } from '@/lib/types';
 
 export interface ActionState {
@@ -51,5 +51,23 @@ export async function createAttribute(_prevState: ActionState, formData: FormDat
   }
 
   revalidatePath('/attributes');
+  return { error: null, success: true };
+}
+
+export async function deleteAttribute(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  if (!code) {
+    return { error: 'Missing attribute code.', success: false };
+  }
+
+  try {
+    await apiDelete(`/admin/v1/attributes/${code}`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/attributes');
+  revalidatePath('/attribute-sets');
   return { error: null, success: true };
 }

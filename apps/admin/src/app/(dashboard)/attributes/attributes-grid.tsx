@@ -5,6 +5,7 @@ import type { Attribute, AttributeDataType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DeleteAttributeDialog } from './delete-attribute-dialog';
 import {
   Type,
   Hash,
@@ -80,7 +81,10 @@ export function AttributesGrid({ attributes }: { attributes: Attribute[] }) {
                     <Icon className="size-5" strokeWidth={2} />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1.5">
-                    <p className="truncate font-medium leading-none">{a.label}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate font-medium leading-none">{a.label}</p>
+                      <DeleteAttributeDialog code={a.code} label={a.label} />
+                    </div>
                     <p className="truncate font-mono text-xs text-muted-foreground">{a.code}</p>
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       <Badge variant="outline">{a.dataType}</Badge>

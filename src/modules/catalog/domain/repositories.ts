@@ -124,6 +124,12 @@ export interface AttributeRepository {
   create(input: CreateAttributeInput): Promise<AttributeInfo>;
   /** Admin browse (plan/13 Phase L) — the reusable-attribute library + "assign existing attribute" picker. */
   list(): Promise<AttributeInfo[]>;
+  /** Soft-delete only — attribute_set_attribute.attribute_id and product_attribute_value.attribute_id
+   *  are both ON DELETE RESTRICT, so a hard delete would fail the moment this attribute has ever been
+   *  assigned or valued. Guarded in the use-case via isAssignedToAnySet, not here. */
+  softDelete(id: bigint): Promise<void>;
+  /** True if this attribute is currently assigned into any attribute set's group — guards deletion. */
+  isAssignedToAnySet(id: bigint): Promise<boolean>;
 }
 
 export interface AttributeSetInfo {
@@ -196,6 +202,13 @@ export interface AttributeSetRepository {
   findGroupById(attributeSetId: bigint, groupId: bigint): Promise<AttributeSetGroupInfo | null>;
   assignAttribute(attributeSetId: bigint, groupId: bigint, attributeId: bigint, sortOrder: number): Promise<void>;
   isAttributeAssigned(attributeSetId: bigint, attributeId: bigint): Promise<boolean>;
+  /** Removes the assignment row only — never touches the Attribute itself or any product's stored values. */
+  removeAttributeAssignment(attributeSetId: bigint, attributeId: bigint): Promise<void>;
+  /** Soft-delete only — product.attribute_set_id is a required, ON DELETE RESTRICT FK, so a hard
+   *  delete would fail the moment any product uses this set. Guarded in the use-case via hasProducts. */
+  softDelete(id: bigint): Promise<void>;
+  /** True if any non-deleted product currently uses this set — guards deletion. */
+  hasProducts(id: bigint): Promise<boolean>;
 }
 
 export interface WriteScopedValueInput {

@@ -30,6 +30,9 @@ import { GetStoreProductDetail } from './application/get-store-product-detail.us
 import { CreateAttributeSet } from './application/create-attribute-set.usecase.js';
 import { CreateAttributeSetGroup } from './application/create-attribute-set-group.usecase.js';
 import { CreateAttribute } from './application/create-attribute.usecase.js';
+import { DeleteAttribute } from './application/delete-attribute.usecase.js';
+import { DeleteAttributeSet } from './application/delete-attribute-set.usecase.js';
+import { RemoveAttributeFromSet } from './application/remove-attribute-from-set.usecase.js';
 import { AssignAttributeToGroup } from './application/assign-attribute-to-group.usecase.js';
 import { ListProductVariants } from './application/list-product-variants.usecase.js';
 import { ListProducts } from './application/list-products.usecase.js';
@@ -120,6 +123,9 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createAttributeSet = new CreateAttributeSet(attributeSets);
   const createAttributeSetGroup = new CreateAttributeSetGroup(attributeSets);
   const createAttribute = new CreateAttribute(attributes);
+  const deleteAttribute = new DeleteAttribute(attributes);
+  const deleteAttributeSet = new DeleteAttributeSet(attributeSets);
+  const removeAttributeFromSet = new RemoveAttributeFromSet(attributeSets, attributes);
   const assignAttributeToGroup = new AssignAttributeToGroup(attributeSets, attributes);
   const listProductVariants = new ListProductVariants(products, variants);
   const listProducts = new ListProducts(products, productMedia, mediaStorage);
@@ -226,6 +232,22 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       res.status(201).json({ data: await createAttributeSetGroup.execute({ ...body, attributeSetId: req.params.id! }) });
     }),
   );
+  admin.delete(
+    '/attribute-sets/:id',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteAttributeSet.execute(req.params.id!);
+      res.status(204).send();
+    }),
+  );
+  admin.delete(
+    '/attribute-sets/:id/attributes/:attributeCode',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await removeAttributeFromSet.execute(req.params.id!, req.params.attributeCode!);
+      res.status(204).send();
+    }),
+  );
   admin.get(
     '/attributes',
     asyncHandler(async (req, res) => {
@@ -238,6 +260,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       const body = parse(createAttributeSchema, req.body);
       res.status(201).json({ data: await createAttribute.execute(body) });
+    }),
+  );
+  admin.delete(
+    '/attributes/:code',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteAttribute.execute(req.params.code!);
+      res.status(204).send();
     }),
   );
   admin.post(

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { NewGroupDialog } from './new-group-dialog';
 import { AssignAttributeDialog } from './assign-attribute-dialog';
+import { RemoveAttributeDialog } from './remove-attribute-dialog';
 
 export default async function AttributeSetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -52,12 +53,13 @@ export default async function AttributeSetDetailPage({ params }: { params: Promi
                     <TableHead>Label</TableHead>
                     <TableHead>Data Type</TableHead>
                     <TableHead>Required</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {group.attributes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
                         No attributes assigned yet.
                       </TableCell>
                     </TableRow>
@@ -71,6 +73,9 @@ export default async function AttributeSetDetailPage({ params }: { params: Promi
                         </TableCell>
                         <TableCell>
                           {a.isRequired ? <Badge variant="warning">Required</Badge> : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <RemoveAttributeDialog attributeSetId={detail.id} attributeCode={a.code} attributeLabel={a.label} />
                         </TableCell>
                       </TableRow>
                     ))

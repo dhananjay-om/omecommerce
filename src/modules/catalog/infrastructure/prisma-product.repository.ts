@@ -18,6 +18,7 @@ import type {
   VariantStockLookup,
 } from '../domain/repositories.js';
 import { Prisma } from '@prisma/client';
+import { ConflictError } from '../../../shared/domain/errors.js';
 import type { Product as PrismaProductRow } from '@prisma/client';
 
 function toDomainProps(row: PrismaProductRow) {
@@ -197,49 +198,76 @@ export class PrismaVariantStockLookup implements VariantStockLookup {
 
 const ATTRIBUTE_SELECT = { id: true, code: true, label: true, dataType: true, inputType: true } as const;
 
+/** `code` is a plain (non-partial) unique DB constraint, so it isn't relaxed by `deletedAt` — a soft-deleted
+ *  row's code stays permanently taken. findByCode() filters deletedAt so it can't see it, which means the
+ *  usual "check then create" duplicate guard can't catch this case; catching P2002 here is the backstop. */
+function isCodeUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false;
+  const target = err.meta?.target;
+  if (typeof target === 'string') return target.includes('code');
+  if (Array.isArray(target)) return target.includes('code');
+  return false;
+}
+
 export class PrismaAttributeRepository implements AttributeRepository {
   constructor(private readonly db: Db) {}
 
   async findByCode(code: string): Promise<AttributeInfo | null> {
-    const row = await this.db.attribute.findFirst({ where: { code }, select: ATTRIBUTE_SELECT });
+    const row = await this.db.attribute.findFirst({ where: { code, deletedAt: null }, select: ATTRIBUTE_SELECT });
     return row;
   }
 
   async list(): Promise<AttributeInfo[]> {
-    return this.db.attribute.findMany({ select: ATTRIBUTE_SELECT, orderBy: { label: 'asc' } });
+    return this.db.attribute.findMany({ where: { deletedAt: null }, select: ATTRIBUTE_SELECT, orderBy: { label: 'asc' } });
+  }
+
+  async softDelete(id: bigint): Promise<void> {
+    await this.db.attribute.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  async isAssignedToAnySet(id: bigint): Promise<boolean> {
+    const found = await this.db.attributeSetAttribute.findFirst({ where: { attributeId: id }, select: { id: true } });
+    return found !== null;
   }
 
   async create(input: CreateAttributeInput): Promise<AttributeInfo> {
-    const row = await this.db.attribute.create({
-      data: {
-        code: input.code,
-        label: input.label,
-        dataType: input.dataType,
-        inputType: input.inputType,
-        isRequired: input.isRequired,
-        isFilterable: input.isFilterable,
-        isSearchable: input.isSearchable,
-        isComparable: input.isComparable,
-        isSortable: input.isSortable,
-        isVisiblePdp: input.isVisiblePdp,
-        isVisiblePlp: input.isVisiblePlp,
-        usedInSearch: input.usedInSearch,
-        usedInLayeredNav: input.usedInLayeredNav,
-        isVariantForming: input.isVariantForming,
-        options: input.options?.length
-          ? {
-              create: input.options.map((o) => ({
-                value: o.value,
-                label: o.label,
-                swatch: o.swatch,
-                sortOrder: o.sortOrder ?? 0,
-              })),
-            }
-          : undefined,
-      },
-      select: ATTRIBUTE_SELECT,
-    });
-    return row;
+    try {
+      const row = await this.db.attribute.create({
+        data: {
+          code: input.code,
+          label: input.label,
+          dataType: input.dataType,
+          inputType: input.inputType,
+          isRequired: input.isRequired,
+          isFilterable: input.isFilterable,
+          isSearchable: input.isSearchable,
+          isComparable: input.isComparable,
+          isSortable: input.isSortable,
+          isVisiblePdp: input.isVisiblePdp,
+          isVisiblePlp: input.isVisiblePlp,
+          usedInSearch: input.usedInSearch,
+          usedInLayeredNav: input.usedInLayeredNav,
+          isVariantForming: input.isVariantForming,
+          options: input.options?.length
+            ? {
+                create: input.options.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+                  swatch: o.swatch,
+                  sortOrder: o.sortOrder ?? 0,
+                })),
+              }
+            : undefined,
+        },
+        select: ATTRIBUTE_SELECT,
+      });
+      return row;
+    } catch (err) {
+      if (isCodeUniqueViolation(err)) {
+        throw new ConflictError(`attribute code already exists: ${input.code}`);
+      }
+      throw err;
+    }
   }
 }
 
@@ -248,27 +276,57 @@ export class PrismaAttributeSetRepository implements AttributeSetRepository {
   constructor(private readonly db: Db) {}
 
   async createSet(input: CreateAttributeSetInput): Promise<AttributeSetInfo> {
-    return this.db.attributeSet.create({
-      data: { code: input.code, name: input.name, isDefault: input.isDefault },
+    try {
+      return await this.db.attributeSet.create({
+        data: { code: input.code, name: input.name, isDefault: input.isDefault },
+        select: { id: true, code: true, name: true, isDefault: true },
+      });
+    } catch (err) {
+      if (isCodeUniqueViolation(err)) {
+        throw new ConflictError(`attribute set code already exists: ${input.code}`);
+      }
+      throw err;
+    }
+  }
+
+  async findSetByCode(code: string): Promise<AttributeSetInfo | null> {
+    return this.db.attributeSet.findFirst({
+      where: { code, deletedAt: null },
       select: { id: true, code: true, name: true, isDefault: true },
     });
   }
 
-  async findSetByCode(code: string): Promise<AttributeSetInfo | null> {
-    return this.db.attributeSet.findFirst({ where: { code }, select: { id: true, code: true, name: true, isDefault: true } });
-  }
-
   async findSetById(id: bigint): Promise<AttributeSetInfo | null> {
-    return this.db.attributeSet.findFirst({ where: { id }, select: { id: true, code: true, name: true, isDefault: true } });
+    return this.db.attributeSet.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, code: true, name: true, isDefault: true },
+    });
   }
 
   async listSets(): Promise<AttributeSetInfo[]> {
-    return this.db.attributeSet.findMany({ select: { id: true, code: true, name: true, isDefault: true }, orderBy: { name: 'asc' } });
+    return this.db.attributeSet.findMany({
+      where: { deletedAt: null },
+      select: { id: true, code: true, name: true, isDefault: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async softDelete(id: bigint): Promise<void> {
+    await this.db.attributeSet.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  async hasProducts(id: bigint): Promise<boolean> {
+    const found = await this.db.product.findFirst({ where: { attributeSetId: id, deletedAt: null }, select: { id: true } });
+    return found !== null;
+  }
+
+  async removeAttributeAssignment(attributeSetId: bigint, attributeId: bigint): Promise<void> {
+    await this.db.attributeSetAttribute.deleteMany({ where: { attributeSetId, attributeId } });
   }
 
   async getSetDetail(id: bigint): Promise<AttributeSetDetail | null> {
     const set = await this.db.attributeSet.findFirst({
-      where: { id },
+      where: { id, deletedAt: null },
       select: {
         id: true,
         code: true,
