@@ -42,6 +42,16 @@ function buildAttrTypesMap(groups: AttributeSetGroupDetail[]): Record<string, st
   return map;
 }
 
+/** Label with a red asterisk when the attribute is required on its set. */
+function FieldLabel({ htmlFor, attr }: { htmlFor?: string; attr: { label: string; isRequired: boolean } }) {
+  return (
+    <Label htmlFor={htmlFor}>
+      {attr.label}
+      {attr.isRequired ? <span className="ml-0.5 text-destructive">*</span> : null}
+    </Label>
+  );
+}
+
 export function AttributeFieldsSection({
   groups,
   values,
@@ -50,118 +60,133 @@ export function AttributeFieldsSection({
   values: Record<string, unknown>;
 }) {
   const attrTypes = buildAttrTypesMap(groups);
-  const groupsWithFields = groups.filter((g) => g.attributes.some((a) => !NOT_EDITABLE_TYPES.has(a.dataType)));
+  const groupsWithAttributes = groups.filter((g) => g.attributes.length > 0);
 
-  if (groupsWithFields.length === 0) {
+  if (groupsWithAttributes.length === 0) {
     return null;
   }
 
   return (
-    <div className="space-y-6 border-t pt-6">
+    <div className="space-y-6">
       <input type="hidden" name="__attrTypes" value={JSON.stringify(attrTypes)} />
-      {groupsWithFields.map((group) => (
-        <div key={group.id} className="space-y-4">
-          <h3 className="text-sm font-semibold text-muted-foreground">{group.name}</h3>
-          {group.attributes.map((attr) => {
-            if (NOT_EDITABLE_TYPES.has(attr.dataType)) return null;
-            const name = attributeInputName(attr.code);
-            const current = values[attr.code];
-
-            if (attr.dataType === 'BOOLEAN') {
-              return (
-                <div key={attr.code} className="flex items-center gap-2">
-                  <input id={name} name={name} type="checkbox" className="size-4" defaultChecked={Boolean(current)} />
-                  <Label htmlFor={name}>{attr.label}</Label>
-                </div>
-              );
-            }
-
-            if (attr.dataType === 'TEXTAREA' || attr.dataType === 'RICHTEXT') {
-              return (
-                <div key={attr.code} className="space-y-2">
-                  <Label htmlFor={name}>{attr.label}</Label>
-                  <Textarea id={name} name={name} defaultValue={current != null ? String(current) : ''} />
-                </div>
-              );
-            }
-
-            if (attr.dataType === 'SELECT') {
-              const defaultValue = current != null ? String(current) : undefined;
-              return (
-                <div key={attr.code} className="space-y-2">
-                  <Label htmlFor={name}>{attr.label}</Label>
-                  <Select name={name} defaultValue={defaultValue}>
-                    <SelectTrigger id={name} className="w-full">
-                      <SelectValue placeholder={`Select ${attr.label}`}>
-                        {(value: string | null) => attr.options.find((o) => o.id === value)?.label ?? `Select ${attr.label}`}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {attr.options.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-            }
-
-            if (attr.dataType === 'MULTISELECT') {
-              const currentValues = Array.isArray(current) ? current.map(String) : [];
-              return (
-                <div key={attr.code} className="space-y-2">
-                  <Label>{attr.label}</Label>
-                  <div className="space-y-1.5">
-                    {attr.options.map((o) => (
-                      <div key={o.id} className="flex items-center gap-2">
-                        <input
-                          id={`${name}__${o.value}`}
-                          name={name}
-                          type="checkbox"
-                          value={o.value}
-                          className="size-4"
-                          defaultChecked={currentValues.includes(o.value)}
-                        />
-                        <Label htmlFor={`${name}__${o.value}`}>{o.label}</Label>
-                      </div>
-                    ))}
+      {groupsWithAttributes.map((group) => (
+        <div key={group.id} className="rounded-lg border bg-muted/20 p-4">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">{group.name}</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {group.attributes.map((attr) => {
+              if (NOT_EDITABLE_TYPES.has(attr.dataType)) {
+                return (
+                  <div key={attr.code} className="space-y-2">
+                    <FieldLabel attr={attr} />
+                    <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                      {attr.dataType} attributes aren&apos;t editable from this page yet.
+                    </p>
                   </div>
+                );
+              }
+
+              const name = attributeInputName(attr.code);
+              const current = values[attr.code];
+
+              if (attr.dataType === 'BOOLEAN') {
+                return (
+                  <div key={attr.code} className="flex items-center gap-2 self-end pb-2">
+                    <input id={name} name={name} type="checkbox" className="size-4" defaultChecked={Boolean(current)} />
+                    <FieldLabel htmlFor={name} attr={attr} />
+                  </div>
+                );
+              }
+
+              if (attr.dataType === 'TEXTAREA' || attr.dataType === 'RICHTEXT') {
+                return (
+                  <div key={attr.code} className="space-y-2 sm:col-span-2">
+                    <FieldLabel htmlFor={name} attr={attr} />
+                    <Textarea id={name} name={name} defaultValue={current != null ? String(current) : ''} />
+                  </div>
+                );
+              }
+
+              if (attr.dataType === 'SELECT') {
+                const defaultValue = current != null ? String(current) : undefined;
+                return (
+                  <div key={attr.code} className="space-y-2">
+                    <FieldLabel htmlFor={name} attr={attr} />
+                    <Select name={name} defaultValue={defaultValue}>
+                      <SelectTrigger id={name} className="w-full">
+                        <SelectValue placeholder={`Select ${attr.label}`}>
+                          {(value: string | null) => attr.options.find((o) => o.id === value)?.label ?? `Select ${attr.label}`}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {attr.options.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              }
+
+              if (attr.dataType === 'MULTISELECT') {
+                const currentValues = Array.isArray(current) ? current.map(String) : [];
+                return (
+                  <div key={attr.code} className="space-y-2">
+                    <FieldLabel attr={attr} />
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-md border px-3 py-2">
+                      {attr.options.map((o) => (
+                        <div key={o.id} className="flex items-center gap-2">
+                          <input
+                            id={`${name}__${o.value}`}
+                            name={name}
+                            type="checkbox"
+                            value={o.value}
+                            className="size-4"
+                            defaultChecked={currentValues.includes(o.value)}
+                          />
+                          <Label htmlFor={`${name}__${o.value}`} className="font-normal">
+                            {o.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              const inputType =
+                attr.dataType === 'NUMBER'
+                  ? 'number'
+                  : attr.dataType === 'DECIMAL'
+                    ? 'number'
+                    : attr.dataType === 'DATE'
+                      ? 'date'
+                      : attr.dataType === 'DATETIME'
+                        ? 'datetime-local'
+                        : attr.dataType === 'COLOR'
+                          ? 'color'
+                          : attr.dataType === 'EMAIL'
+                            ? 'email'
+                            : attr.dataType === 'URL'
+                              ? 'url'
+                              : 'text';
+
+              return (
+                <div key={attr.code} className="space-y-2">
+                  <FieldLabel htmlFor={name} attr={attr} />
+                  <Input
+                    id={name}
+                    name={name}
+                    type={inputType}
+                    step={attr.dataType === 'DECIMAL' ? 'any' : undefined}
+                    defaultValue={current != null ? String(current) : ''}
+                    className={inputType === 'color' ? 'h-10 w-20 p-1' : undefined}
+                  />
                 </div>
               );
-            }
-
-            const inputType =
-              attr.dataType === 'NUMBER'
-                ? 'number'
-                : attr.dataType === 'DECIMAL'
-                  ? 'number'
-                  : attr.dataType === 'DATE'
-                    ? 'date'
-                    : attr.dataType === 'DATETIME'
-                      ? 'datetime-local'
-                      : attr.dataType === 'COLOR'
-                        ? 'color'
-                        : attr.dataType === 'EMAIL'
-                          ? 'email'
-                          : attr.dataType === 'URL'
-                            ? 'url'
-                            : 'text';
-
-            return (
-              <div key={attr.code} className="space-y-2">
-                <Label htmlFor={name}>{attr.label}</Label>
-                <Input
-                  id={name}
-                  name={name}
-                  type={inputType}
-                  step={attr.dataType === 'DECIMAL' ? 'any' : undefined}
-                  defaultValue={current != null ? String(current) : ''}
-                />
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
       ))}
     </div>
