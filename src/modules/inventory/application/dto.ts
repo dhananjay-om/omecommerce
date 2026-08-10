@@ -7,11 +7,21 @@ export interface CreateWarehouseCommand {
   priority?: number;
 }
 
+export interface UpdateWarehouseCommand {
+  code: string;
+  name?: string;
+  type?: WarehouseType;
+  priority?: number;
+  isActive?: boolean;
+}
+
 export interface WarehouseView {
   publicId: string;
   code: string;
   name: string;
   type: WarehouseType;
+  priority: number;
+  isActive: boolean;
 }
 
 export interface AdjustStockCommand {

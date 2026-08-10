@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
 import type { Warehouse, WarehouseStockItem } from '@/lib/types';
 import { buttonVariants } from '@/components/ui/button';
@@ -22,7 +23,12 @@ export default async function InventoryPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-        <NewWarehouseDialog />
+        <div className="flex items-center gap-2">
+          <Link href="/inventory/warehouses" className={cn(buttonVariants({ variant: 'outline' }))}>
+            Manage Warehouses
+          </Link>
+          <NewWarehouseDialog />
+        </div>
       </div>
 
       {warehouses.length === 0 ? (

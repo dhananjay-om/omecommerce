@@ -4,6 +4,8 @@ import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaWarehouseRepository, PrismaVariantLookup } from './infrastructure/prisma-warehouse.repository.js';
 import { PrismaStockLedger } from './infrastructure/prisma-stock-ledger.js';
 import { CreateWarehouse } from './application/create-warehouse.usecase.js';
+import { UpdateWarehouse } from './application/update-warehouse.usecase.js';
+import { DeleteWarehouse } from './application/delete-warehouse.usecase.js';
 import { ListWarehouses } from './application/list-warehouses.usecase.js';
 import { ListWarehouseStock } from './application/list-warehouse-stock.usecase.js';
 import { ListVariantStock } from './application/list-variant-stock.usecase.js';
@@ -15,6 +17,7 @@ import { ReleaseReservation } from './application/release-reservation.usecase.js
 import { ReleaseExpiredReservations } from './application/release-expired-reservations.usecase.js';
 import {
   createWarehouseSchema,
+  updateWarehouseSchema,
   adjustStockSchema,
   getStockQuerySchema,
   reserveStockSchema,
@@ -31,6 +34,8 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
   const ledger = new PrismaStockLedger(db);
 
   const createWarehouse = new CreateWarehouse(warehouses);
+  const updateWarehouse = new UpdateWarehouse(warehouses);
+  const deleteWarehouse = new DeleteWarehouse(warehouses, ledger);
   const listWarehouses = new ListWarehouses(warehouses);
   const listWarehouseStock = new ListWarehouseStock(warehouses, ledger);
   const listVariantStock = new ListVariantStock(variants, ledger);
@@ -56,6 +61,25 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
     '/warehouses',
     asyncHandler(async (_req, res) => {
       res.json({ data: await listWarehouses.execute() });
+    }),
+  );
+
+  admin.patch(
+    '/warehouses/:code',
+    authorize('inventory:adjust'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateWarehouseSchema, req.body);
+      const view = await updateWarehouse.execute({ code: req.params.code!, ...body });
+      res.json({ data: view });
+    }),
+  );
+
+  admin.delete(
+    '/warehouses/:code',
+    authorize('inventory:adjust'),
+    asyncHandler(async (req, res) => {
+      await deleteWarehouse.execute(req.params.code!);
+      res.status(204).send();
     }),
   );
 

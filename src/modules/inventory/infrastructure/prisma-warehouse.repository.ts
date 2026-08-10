@@ -1,5 +1,31 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { WarehouseRepository, WarehouseInfo, CreateWarehouseInput, VariantLookup } from '../domain/repositories.js';
+import type {
+  WarehouseRepository,
+  WarehouseInfo,
+  CreateWarehouseInput,
+  UpdateWarehouseInput,
+  VariantLookup,
+} from '../domain/repositories.js';
+
+function toInfo(row: {
+  id: bigint;
+  publicId: string;
+  code: string;
+  name: string;
+  type: WarehouseInfo['type'];
+  priority: number;
+  isActive: boolean;
+}): WarehouseInfo {
+  return {
+    id: row.id,
+    publicId: row.publicId,
+    code: row.code,
+    name: row.name,
+    type: row.type,
+    priority: row.priority,
+    isActive: row.isActive,
+  };
+}
 
 export class PrismaWarehouseRepository implements WarehouseRepository {
   constructor(private readonly db: Db) {}
@@ -13,14 +39,12 @@ export class PrismaWarehouseRepository implements WarehouseRepository {
         priority: input.priority,
       },
     });
-    return { id: row.id, publicId: row.publicId, code: row.code, name: row.name, type: row.type };
+    return toInfo(row);
   }
 
   async findByCode(code: string): Promise<WarehouseInfo | null> {
     const row = await this.db.warehouse.findFirst({ where: { code } });
-    return row
-      ? { id: row.id, publicId: row.publicId, code: row.code, name: row.name, type: row.type }
-      : null;
+    return row ? toInfo(row) : null;
   }
 
   async list(): Promise<WarehouseInfo[]> {
@@ -28,7 +52,27 @@ export class PrismaWarehouseRepository implements WarehouseRepository {
       where: { deletedAt: null },
       orderBy: { code: 'asc' },
     });
-    return rows.map((row) => ({ id: row.id, publicId: row.publicId, code: row.code, name: row.name, type: row.type }));
+    return rows.map(toInfo);
+  }
+
+  async update(id: bigint, input: UpdateWarehouseInput): Promise<WarehouseInfo> {
+    const row = await this.db.warehouse.update({
+      where: { id },
+      data: {
+        name: input.name,
+        type: input.type,
+        priority: input.priority,
+        isActive: input.isActive,
+      },
+    });
+    return toInfo(row);
+  }
+
+  async softDelete(id: bigint): Promise<void> {
+    await this.db.warehouse.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
   }
 }
 

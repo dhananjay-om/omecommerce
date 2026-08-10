@@ -163,6 +163,8 @@ export interface Warehouse {
   code: string;
   name: string;
   type: WarehouseType;
+  priority: number;
+  isActive: boolean;
 }
 
 export interface WarehouseStockItem {

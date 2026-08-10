@@ -8,6 +8,13 @@ export const createWarehouseSchema = z.object({
   priority: z.number().int().optional(),
 });
 
+export const updateWarehouseSchema = z.object({
+  name: z.string().min(1).max(256).optional(),
+  type: z.nativeEnum(WarehouseType).optional(),
+  priority: z.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+
 const ADJUST_REASONS = ['PURCHASE', 'RETURN', 'ADJUSTMENT', 'TRANSFER', 'CORRECTION'] as const;
 
 export const adjustStockSchema = z.object({

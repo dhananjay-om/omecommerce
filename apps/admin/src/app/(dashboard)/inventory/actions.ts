@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, ApiError } from '@/lib/api-client';
+import { apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
 import type { Warehouse, WarehouseType } from '@/lib/types';
 
 export interface ActionState {
@@ -26,6 +26,53 @@ export async function createWarehouse(_prevState: ActionState, formData: FormDat
   }
 
   revalidatePath('/inventory');
+  revalidatePath('/inventory/warehouses');
+  return { error: null, success: true };
+}
+
+export async function updateWarehouse(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  const name = String(formData.get('name') ?? '').trim();
+  const type = String(formData.get('type') ?? '') as WarehouseType | '';
+  const priorityRaw = String(formData.get('priority') ?? '').trim();
+  const isActive = String(formData.get('isActive') ?? 'true') === 'true';
+
+  if (!code || !name) {
+    return { error: 'Name is required.', success: false };
+  }
+
+  try {
+    await apiPatch<Warehouse>(`/admin/v1/warehouses/${code}`, {
+      name,
+      type: type || undefined,
+      priority: priorityRaw ? Number(priorityRaw) : undefined,
+      isActive,
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/inventory');
+  revalidatePath('/inventory/warehouses');
+  return { error: null, success: true };
+}
+
+export async function deleteWarehouse(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  if (!code) {
+    return { error: 'Missing warehouse code.', success: false };
+  }
+
+  try {
+    await apiDelete(`/admin/v1/warehouses/${code}`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/inventory');
+  revalidatePath('/inventory/warehouses');
   return { error: null, success: true };
 }
 

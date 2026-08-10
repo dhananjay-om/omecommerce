@@ -203,6 +203,15 @@ export class PrismaStockLedger implements StockLedger {
     }));
   }
 
+  async hasStock(warehouseId: bigint): Promise<boolean> {
+    const rows = await this.db.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1 FROM stock_item
+         WHERE warehouse_id = ${warehouseId} AND (on_hand <> 0 OR reserved <> 0)
+      ) AS exists`;
+    return rows[0]?.exists ?? false;
+  }
+
   private async releaseByStatus(
     reservationPublicId: string,
     toStatus: 'RELEASED' | 'EXPIRED',

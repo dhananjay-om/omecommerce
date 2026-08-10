@@ -186,6 +186,72 @@ describe.skipIf(!process.env.INTEGRATION)('inventory API (live DB)', () => {
     expect(unknown.status).toBe(404);
   });
 
+  it('updates a warehouse\'s name/type/priority/isActive, and deactivating hides it from the variant-stock view', async () => {
+    const created = await admin
+      .post('/admin/v1/warehouses')
+      .send({ code: 'WH-EDIT', name: 'Original Name' });
+    expect(created.status).toBe(201);
+    expect(created.body.data).toMatchObject({ code: 'WH-EDIT', name: 'Original Name', priority: 0, isActive: true });
+
+    const updated = await admin
+      .patch('/admin/v1/warehouses/WH-EDIT')
+      .send({ name: 'Renamed Warehouse', type: 'VIRTUAL', priority: 5 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toMatchObject({
+      code: 'WH-EDIT',
+      name: 'Renamed Warehouse',
+      type: 'VIRTUAL',
+      priority: 5,
+      isActive: true,
+    });
+
+    const variantId = await createVariant('INV-SKU-EDIT-1');
+    let stock = await admin.get(`/admin/v1/variants/${variantId}/stock`);
+    expect(stock.body.data.map((r: { warehouseCode: string }) => r.warehouseCode)).toContain('WH-EDIT');
+
+    const deactivated = await admin.patch('/admin/v1/warehouses/WH-EDIT').send({ isActive: false });
+    expect(deactivated.status).toBe(200);
+    expect(deactivated.body.data.isActive).toBe(false);
+
+    // Deactivated warehouses drop out of the still-active list (list()/listByVariant() both filter it).
+    const warehouses = await admin.get('/admin/v1/warehouses');
+    expect(warehouses.body.data.map((w: { code: string }) => w.code)).toContain('WH-EDIT');
+    stock = await admin.get(`/admin/v1/variants/${variantId}/stock`);
+    expect(stock.body.data.map((r: { warehouseCode: string }) => r.warehouseCode)).not.toContain('WH-EDIT');
+  });
+
+  it('404s updating an unknown warehouse', async () => {
+    const res = await admin.patch('/admin/v1/warehouses/NOPE-EDIT').send({ name: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  it('deletes an empty warehouse, but rejects deleting one that still has stock', async () => {
+    await admin.post('/admin/v1/warehouses').send({ code: 'WH-DELETE-EMPTY', name: 'Empty Warehouse' });
+    const emptyDelete = await admin.delete('/admin/v1/warehouses/WH-DELETE-EMPTY');
+    expect(emptyDelete.status).toBe(204);
+
+    const afterDelete = await admin.get('/admin/v1/warehouses');
+    expect(afterDelete.body.data.map((w: { code: string }) => w.code)).not.toContain('WH-DELETE-EMPTY');
+
+    await admin.post('/admin/v1/warehouses').send({ code: 'WH-DELETE-STOCKED', name: 'Stocked Warehouse' });
+    const variantId = await createVariant('INV-SKU-DELETE-1');
+    await admin
+      .post('/admin/v1/inventory/adjustments')
+      .send({ variantId, warehouseCode: 'WH-DELETE-STOCKED', delta: 3, reason: 'PURCHASE' });
+
+    const blockedDelete = await admin.delete('/admin/v1/warehouses/WH-DELETE-STOCKED');
+    expect(blockedDelete.status).toBe(409);
+    expect(blockedDelete.body.type).toContain('conflict');
+
+    const stillThere = await admin.get('/admin/v1/warehouses');
+    expect(stillThere.body.data.map((w: { code: string }) => w.code)).toContain('WH-DELETE-STOCKED');
+  });
+
+  it('404s deleting an unknown warehouse', async () => {
+    const res = await admin.delete('/admin/v1/warehouses/NOPE-DELETE');
+    expect(res.status).toBe(404);
+  });
+
   it('lists a variant\'s stock across every active warehouse, including ones never stocked (product-edit page)', async () => {
     await admin.post('/admin/v1/warehouses').send({ code: 'WH-VARLIST-A', name: 'Var List Warehouse A' });
     await admin.post('/admin/v1/warehouses').send({ code: 'WH-VARLIST-B', name: 'Var List Warehouse B' });

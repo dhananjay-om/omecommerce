@@ -16,6 +16,6 @@ export class CreateWarehouse {
       type: cmd.type,
       priority: cmd.priority,
     });
-    return { publicId: w.publicId, code: w.code, name: w.name, type: w.type };
+    return { publicId: w.publicId, code: w.code, name: w.name, type: w.type, priority: w.priority, isActive: w.isActive };
   }
 }

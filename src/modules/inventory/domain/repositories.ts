@@ -6,6 +6,8 @@ export interface WarehouseInfo {
   code: string;
   name: string;
   type: WarehouseType;
+  priority: number;
+  isActive: boolean;
 }
 
 export interface CreateWarehouseInput {
@@ -15,11 +17,23 @@ export interface CreateWarehouseInput {
   priority?: number;
 }
 
+export interface UpdateWarehouseInput {
+  name?: string;
+  type?: WarehouseType;
+  priority?: number;
+  isActive?: boolean;
+}
+
 /** Persistence port for warehouses. */
 export interface WarehouseRepository {
   create(input: CreateWarehouseInput): Promise<WarehouseInfo>;
   findByCode(code: string): Promise<WarehouseInfo | null>;
   list(): Promise<WarehouseInfo[]>;
+  update(id: bigint, input: UpdateWarehouseInput): Promise<WarehouseInfo>;
+  /** Soft-delete only — every FK from stock_item/store_warehouse into warehouse is ON DELETE RESTRICT
+   *  by design (the stock ledger is append-only), so a hard delete would fail once a warehouse has
+   *  any history. This sets deletedAt (and isActive=false), which list()/listByVariant() already filter on. */
+  softDelete(id: bigint): Promise<void>;
 }
 
 /** Resolves a catalog variant's publicId to its internal id (read-only cross-module lookup). */
@@ -99,4 +113,6 @@ export interface StockLedger {
   listByWarehouse(warehouseId: bigint): Promise<WarehouseStockRow[]>;
   /** Every active warehouse's stock snapshot for one variant (product-edit page) — includes warehouses with no stock_item row yet as a zeroed row, so "no stock anywhere" is still visible per-warehouse rather than an empty list. */
   listByVariant(variantId: bigint): Promise<VariantStockRow[]>;
+  /** True if the warehouse has any non-zero on-hand or reserved stock anywhere — guards warehouse deletion. */
+  hasStock(warehouseId: bigint): Promise<boolean>;
 }
