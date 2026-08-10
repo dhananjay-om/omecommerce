@@ -1,20 +1,9 @@
-import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
-import type { OrderDetail, OrderHistoryEntry, OrderEmailLogEntry } from '@/lib/types';
+import type { OrderDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FulfillDialog } from '../fulfill-dialog';
-import { RefundDialog } from '../refund-dialog';
-import { CancelDialog } from '../cancel-dialog';
 import { AddNoteForm } from '../add-note-form';
-import { CreateInvoiceDialog } from '../create-invoice-dialog';
-import { InvoicesCard } from '../invoices-card';
-import { ShipmentsCard } from '../shipments-card';
-import { CloseOrderDialog } from '../close-order-dialog';
-import { SendEmailDialog } from '../send-email-dialog';
-import { EmailLogCard } from '../email-log-card';
-import { statusBadgeVariant } from '@/lib/status-badge';
 
 function sum(values: string[]): number {
   return values.reduce((acc, v) => acc + Number(v), 0);
@@ -24,212 +13,33 @@ function invoicedQty(order: OrderDetail, sku: string): number {
   return sum(order.invoices.flatMap((inv) => inv.lines).filter((l) => l.sku === sku).map((l) => String(l.qty)));
 }
 
-export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const [order, history, emailLog] = await Promise.all([
-    apiGet<OrderDetail>(`/admin/v1/orders/${id}`),
-    apiGet<OrderHistoryEntry[]>(`/admin/v1/orders/${id}/history`),
-    apiGet<OrderEmailLogEntry[]>(`/admin/v1/orders/${id}/email-log`),
-  ]);
-  const cancellable = !['CANCELLED', 'COMPLETED', 'CLOSED'].includes(order.status);
-  const billing = order.addresses.find((a) => a.type === 'BILLING');
-  const shipping = order.addresses.find((a) => a.type === 'SHIPPING');
-  const customerName = billing?.name ?? order.email;
-
-  const paidTotal = sum(order.payments.filter((p) => p.type === 'CAPTURE' && p.status === 'SUCCEEDED').map((p) => p.amount));
-  const refundedTotal = sum(order.payments.filter((p) => p.type === 'REFUND' && p.status === 'SUCCEEDED').map((p) => p.amount));
-  const remaining = Number(order.grandTotal) - paidTotal + refundedTotal;
-
+function InfoRow({ label, value }: { label: React.ReactNode; value: React.ReactNode }) {
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <Link href="/orders" className="text-sm text-muted-foreground hover:underline">
-          ← Back to Orders
-        </Link>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">Order #{order.orderNumber}</h1>
-          <Badge variant={statusBadgeVariant(order.status)}>{order.status}</Badge>
-          <Badge variant={statusBadgeVariant(order.financialStatus)}>{order.financialStatus}</Badge>
-          <Badge variant={statusBadgeVariant(order.fulfillmentStatus)}>{order.fulfillmentStatus}</Badge>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Placed {new Date(order.placedAt).toLocaleString()}
-          {order.closedAt ? ` · Closed ${new Date(order.closedAt).toLocaleString()}` : ''}
-          {order.shippingMethodCode ? ` · Ships via ${order.shippingMethodCode}` : ''}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <FulfillDialog orderPublicId={order.publicId} lines={order.lines} />
-        <RefundDialog orderPublicId={order.publicId} lines={order.lines} />
-        <CreateInvoiceDialog orderPublicId={order.publicId} lines={order.lines} invoices={order.invoices} />
-        <SendEmailDialog orderPublicId={order.publicId} />
-        <CloseOrderDialog order={order} />
-        {cancellable ? <CancelDialog orderPublicId={order.publicId} /> : null}
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Customer</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <div className="font-medium">{customerName}</div>
-            <div className="text-muted-foreground">{order.email}</div>
-            {order.customerIp ? <div className="text-muted-foreground">IP: {order.customerIp}</div> : null}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Addresses</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4 text-sm">
-            <AddressBlock label="Billing" address={billing} />
-            <AddressBlock label="Shipping" address={shipping} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Unit Price</TableHead>
-                <TableHead>Discount</TableHead>
-                <TableHead>Row Total</TableHead>
-                <TableHead>Invoiced</TableHead>
-                <TableHead>Fulfilled</TableHead>
-                <TableHead>Refunded</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {order.lines.map((line) => (
-                <TableRow key={line.sku}>
-                  <TableCell className="font-medium">{line.sku}</TableCell>
-                  <TableCell>{line.name}</TableCell>
-                  <TableCell>{line.qty}</TableCell>
-                  <TableCell>{line.unitPrice}</TableCell>
-                  <TableCell>{line.discountAmount}</TableCell>
-                  <TableCell>{line.rowTotal}</TableCell>
-                  <TableCell>{invoicedQty(order, line.sku)}</TableCell>
-                  <TableCell>{line.fulfilledQty}</TableCell>
-                  <TableCell>{line.refundedQty}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Price Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-          <SummaryItem label="Subtotal" value={order.subtotal} currency={order.currency} />
-          <SummaryItem label="Discount" value={order.discountTotal} currency={order.currency} />
-          <SummaryItem label="Shipping" value={order.shippingTotal} currency={order.currency} />
-          <SummaryItem label="Tax" value={order.taxTotal} currency={order.currency} />
-          <SummaryItem label="Grand Total" value={order.grandTotal} currency={order.currency} emphasize />
-          <SummaryItem label="Paid" value={paidTotal.toFixed(4)} currency={order.currency} />
-          <SummaryItem label="Refunded" value={refundedTotal.toFixed(4)} currency={order.currency} />
-          <SummaryItem label="Remaining" value={remaining.toFixed(4)} currency={order.currency} emphasize />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Invoices</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <InvoicesCard orderPublicId={order.publicId} invoices={order.invoices} currency={order.currency} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Shipments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ShipmentsCard orderPublicId={order.publicId} fulfillments={order.fulfillments} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {history.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activity recorded.</p>
-          ) : (
-            <ul className="space-y-3 text-sm">
-              {history.map((h) => (
-                <li key={h.id} className="flex justify-between gap-4 border-b pb-2 last:border-0">
-                  <div>
-                    <div className="font-medium">{h.message ?? h.eventType}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {h.actorType === 'ADMIN' && h.actorName ? h.actorName : h.actorType}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-xs text-muted-foreground">{new Date(h.createdAt).toLocaleString()}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Notes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {order.notes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notes yet.</p>
-          ) : (
-            <ul className="space-y-3 text-sm">
-              {order.notes.map((n) => (
-                <li key={n.id} className="border-b pb-2 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={n.type === 'INTERNAL' ? 'secondary' : 'outline'}>{n.type}</Badge>
-                    <span className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="mt-1">{n.body}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          <AddNoteForm orderPublicId={order.publicId} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Email History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EmailLogCard log={emailLog} />
-        </CardContent>
-      </Card>
+    <div className="flex justify-between gap-4 border-b px-3 py-2.5 text-sm odd:bg-muted/30 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-right font-medium">{value}</span>
     </div>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader className="border-b pb-4">
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2">{children}</CardContent>
+    </Card>
   );
 }
 
 function AddressBlock({ label, address }: { label: string; address: OrderDetail['addresses'][number] | undefined }) {
   return (
     <div>
-      <div className="text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold">{label}</div>
       {address ? (
-        <div className="font-medium">
-          <div>{address.name}</div>
+        <div className="mt-2 text-sm leading-relaxed">
+          <div className="font-medium">{address.name}</div>
           {address.company ? <div>{address.company}</div> : null}
           <div>{address.line1}</div>
           {address.line2 ? <div>{address.line2}</div> : null}
@@ -237,21 +47,153 @@ function AddressBlock({ label, address }: { label: string; address: OrderDetail[
             {address.city}, {address.region ?? ''} {address.postalCode}
           </div>
           <div>{address.country}</div>
-          {address.phone ? <div>{address.phone}</div> : null}
+          {address.phone ? <div>T: {address.phone}</div> : null}
         </div>
       ) : (
-        <div className="text-muted-foreground">—</div>
+        <div className="mt-2 text-sm text-muted-foreground">—</div>
       )}
     </div>
   );
 }
 
-function SummaryItem({ label, value, currency, emphasize }: { label: string; value: string; currency: string; emphasize?: boolean }) {
+export default async function OrderInformationPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const order = await apiGet<OrderDetail>(`/admin/v1/orders/${id}`);
+  const billing = order.addresses.find((a) => a.type === 'BILLING');
+  const shipping = order.addresses.find((a) => a.type === 'SHIPPING');
+  const customerName = billing?.name ?? order.email;
+  const latestPayment = order.payments[order.payments.length - 1];
+
+  const paidTotal = sum(order.payments.filter((p) => p.type === 'CAPTURE' && p.status === 'SUCCEEDED').map((p) => p.amount));
+  const refundedTotal = sum(order.payments.filter((p) => p.type === 'REFUND' && p.status === 'SUCCEEDED').map((p) => p.amount));
+  const remaining = Number(order.grandTotal) - paidTotal + refundedTotal;
+
   return (
-    <div>
-      <div className="text-muted-foreground">{label}</div>
-      <div className={emphasize ? 'font-semibold' : 'font-medium'}>
-        {currency} {value}
+    <div className="space-y-6">
+      <SectionCard title="Order & Account Information">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border">
+            <InfoRow label="Order Date" value={new Date(order.placedAt).toLocaleString('en-US')} />
+            <InfoRow label="Order Status" value={order.status} />
+            {order.customerIp ? <InfoRow label="Placed from IP" value={order.customerIp} /> : null}
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <InfoRow label="Customer Name" value={customerName} />
+            <InfoRow label="Email" value={order.email} />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Address Information">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <AddressBlock label="Billing Address" address={billing} />
+          <AddressBlock label="Shipping Address" address={shipping} />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Payment & Shipping Method">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <div className="text-sm font-semibold">Payment Information</div>
+            <div className="mt-2 text-sm">
+              {latestPayment ? (
+                <>
+                  <div>{latestPayment.method}</div>
+                  <div className="text-muted-foreground">The order was placed using {order.currency}.</div>
+                </>
+              ) : (
+                <div className="text-muted-foreground">No payment recorded yet.</div>
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-semibold">Shipping & Handling Information</div>
+            <div className="mt-2 text-sm">
+              <div>{order.shippingMethodCode ?? '—'}</div>
+              <div className="text-muted-foreground">
+                {order.currency} {order.shippingTotal}
+              </div>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Items Ordered">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Unit Price</TableHead>
+                <TableHead>Ordered</TableHead>
+                <TableHead>Invoiced</TableHead>
+                <TableHead>Shipped</TableHead>
+                <TableHead>Refunded</TableHead>
+                <TableHead>Discount</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {order.lines.map((line) => (
+                <TableRow key={line.sku}>
+                  <TableCell>
+                    <div className="font-medium">{line.name}</div>
+                    <div className="text-xs text-muted-foreground">SKU: {line.sku}</div>
+                  </TableCell>
+                  <TableCell>
+                    {order.currency} {line.unitPrice}
+                  </TableCell>
+                  <TableCell>{line.qty}</TableCell>
+                  <TableCell>{invoicedQty(order, line.sku)}</TableCell>
+                  <TableCell>{line.fulfilledQty}</TableCell>
+                  <TableCell>{line.refundedQty}</TableCell>
+                  <TableCell>
+                    {order.currency} {line.discountAmount}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {order.currency} {line.rowTotal}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </SectionCard>
+
+      <div className="grid gap-6 md:grid-cols-[1fr_320px]">
+        <SectionCard title="Notes for this Order">
+          <div className="space-y-4">
+            <AddNoteForm orderPublicId={order.publicId} />
+            {order.notes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No notes yet.</p>
+            ) : (
+              <ul className="space-y-3 text-sm">
+                {order.notes.map((n) => (
+                  <li key={n.id} className="border-b pb-3 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={n.type === 'INTERNAL' ? 'secondary' : 'outline'}>{n.type}</Badge>
+                      <span className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleString('en-US')}</span>
+                    </div>
+                    <p className="mt-1">{n.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Order Totals">
+          <div className="overflow-hidden rounded-lg border">
+            <InfoRow label="Subtotal" value={`${order.currency} ${order.subtotal}`} />
+            <InfoRow label="Discount" value={`-${order.currency} ${order.discountTotal}`} />
+            <InfoRow label="Shipping & Handling" value={`${order.currency} ${order.shippingTotal}`} />
+            <InfoRow label="Tax" value={`${order.currency} ${order.taxTotal}`} />
+            <InfoRow label={<span className="font-semibold">Grand Total</span>} value={<span className="font-bold">{order.currency} {order.grandTotal}</span>} />
+            <InfoRow label="Total Paid" value={`${order.currency} ${paidTotal.toFixed(4)}`} />
+            <InfoRow label="Total Refunded" value={`${order.currency} ${refundedTotal.toFixed(4)}`} />
+            <InfoRow label={<span className="font-semibold">Total Due</span>} value={<span className="font-bold">{order.currency} {remaining.toFixed(4)}</span>} />
+          </div>
+        </SectionCard>
       </div>
     </div>
   );
