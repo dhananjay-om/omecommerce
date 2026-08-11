@@ -27,6 +27,7 @@ export class GetAttributeSetDetail {
           dataType: a.dataType,
           inputType: a.inputType,
           isRequired: a.isRequired,
+          isVariantForming: a.isVariantForming,
           sortOrder: a.sortOrder,
           options: a.options.map((o) => ({
             id: o.id.toString(),

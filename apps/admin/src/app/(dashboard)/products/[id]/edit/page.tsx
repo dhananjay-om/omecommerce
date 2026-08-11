@@ -1,6 +1,12 @@
 import { apiGet } from '@/lib/api-client';
-import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, VariantPrice, VariantStock } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, Variant, VariantPrice, VariantStock } from '@/lib/types';
 import { EditProductForm } from './edit-product-form';
+
+export interface VariantPricingEntry {
+  variant: Variant;
+  prices: VariantPrice[];
+  stock: VariantStock[];
+}
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,17 +21,19 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   const attributeSetDetails: Record<string, AttributeSetDetail> = {};
   for (const d of details) attributeSetDetails[d.id] = d;
 
-  // Pricing & Inventory are variant-scoped, not product-scoped. SIMPLE/DIGITAL/VIRTUAL
-  // products have exactly one implicit variant sharing the product's own SKU, so that
-  // variant's public ID is the right target — CONFIGURABLE/BUNDLE products manage price
-  // and stock per child variant elsewhere, so this section is skipped for them.
-  const pricingVariant = product.variants.length === 1 ? product.variants[0] : null;
-  const [variantPrices, variantStock] = pricingVariant
-    ? await Promise.all([
-        apiGet<VariantPrice[]>(`/admin/v1/variants/${pricingVariant.publicId}/prices`),
-        apiGet<VariantStock[]>(`/admin/v1/variants/${pricingVariant.publicId}/stock`),
-      ])
-    : [[], []];
+  // Pricing & Inventory are variant-scoped, not product-scoped. SIMPLE/DIGITAL/VIRTUAL products
+  // have exactly one implicit variant sharing the product's own SKU; CONFIGURABLE products can
+  // have any number of generated variants (Size/Color combinations) — either way, every variant
+  // the product currently has gets its own Pricing & Inventory block.
+  const variantPricing: VariantPricingEntry[] = await Promise.all(
+    product.variants.map(async (variant) => {
+      const [prices, stock] = await Promise.all([
+        apiGet<VariantPrice[]>(`/admin/v1/variants/${variant.publicId}/prices`),
+        apiGet<VariantStock[]>(`/admin/v1/variants/${variant.publicId}/stock`),
+      ]);
+      return { variant, prices, stock };
+    }),
+  );
 
   return (
     <div>
@@ -36,9 +44,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           attributeSets={attributeSets}
           attributeSetDetails={attributeSetDetails}
           categories={categories}
-          pricingVariantId={pricingVariant?.publicId ?? null}
-          variantPrices={variantPrices}
-          variantStock={variantStock}
+          variantPricing={variantPricing}
         />
       </div>
     </div>

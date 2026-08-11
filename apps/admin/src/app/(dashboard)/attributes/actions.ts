@@ -18,6 +18,7 @@ export async function createAttribute(_prevState: ActionState, formData: FormDat
   const isFilterable = formData.get('isFilterable') === 'on';
   const isSearchable = formData.get('isSearchable') === 'on';
   const isComparable = formData.get('isComparable') === 'on';
+  const isVariantForming = formData.get('isVariantForming') === 'on';
 
   let options: Array<{ value: string; label: string }> = [];
   const optionsRaw = String(formData.get('options') ?? '');
@@ -43,6 +44,7 @@ export async function createAttribute(_prevState: ActionState, formData: FormDat
       isFilterable,
       isSearchable,
       isComparable,
+      isVariantForming,
       options: options.length ? options : undefined,
     });
   } catch (err) {

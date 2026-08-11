@@ -36,6 +36,9 @@ import { DeleteAttributeSet } from './application/delete-attribute-set.usecase.j
 import { RemoveAttributeFromSet } from './application/remove-attribute-from-set.usecase.js';
 import { AssignAttributeToGroup } from './application/assign-attribute-to-group.usecase.js';
 import { ListProductVariants } from './application/list-product-variants.usecase.js';
+import { GenerateProductVariants } from './application/generate-product-variants.usecase.js';
+import { UpdateProductVariant } from './application/update-product-variant.usecase.js';
+import { DeleteProductVariant } from './application/delete-product-variant.usecase.js';
 import { ListProducts } from './application/list-products.usecase.js';
 import { GetProductDetail } from './application/get-product-detail.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
@@ -61,6 +64,8 @@ import { SetProductThumbnail } from './application/set-product-thumbnail.usecase
 import {
   createProductSchema,
   updateProductSchema,
+  generateVariantsSchema,
+  updateVariantSchema,
   assignAttributeValueSchema,
   assignAttributeValuesSchema,
   storeViewQuerySchema,
@@ -130,6 +135,9 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const removeAttributeFromSet = new RemoveAttributeFromSet(attributeSets, attributes);
   const assignAttributeToGroup = new AssignAttributeToGroup(attributeSets, attributes);
   const listProductVariants = new ListProductVariants(products, variants);
+  const generateProductVariants = new GenerateProductVariants(products, variants, attributeSets, attributes);
+  const updateProductVariant = new UpdateProductVariant(variants);
+  const deleteProductVariant = new DeleteProductVariant(variants);
   const listProducts = new ListProducts(products, productMedia, mediaStorage);
   const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories, productMedia, mediaStorage);
   const listAttributeSets = new ListAttributeSets(attributeSets);
@@ -212,6 +220,36 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/products/:publicId/variants',
     asyncHandler(async (req, res) => {
       res.json({ data: await listProductVariants.execute(req.params.publicId!) });
+    }),
+  );
+  admin.post(
+    '/products/:publicId/variants/generate',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(generateVariantsSchema, req.body);
+      const result = await generateProductVariants.execute({ productPublicId: req.params.publicId!, axes: body.axes });
+      res.status(201).json({ data: result });
+    }),
+  );
+  admin.patch(
+    '/products/:publicId/variants/:variantPublicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateVariantSchema, req.body);
+      const view = await updateProductVariant.execute({
+        productPublicId: req.params.publicId!,
+        variantPublicId: req.params.variantPublicId!,
+        ...body,
+      });
+      res.json({ data: view });
+    }),
+  );
+  admin.delete(
+    '/products/:publicId/variants/:variantPublicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteProductVariant.execute(req.params.variantPublicId!);
+      res.status(204).send();
     }),
   );
   admin.get(

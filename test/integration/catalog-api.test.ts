@@ -401,4 +401,195 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
     const recreate = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-DELETE-REUSE', attributeSetId });
     expect(recreate.status).toBe(409);
   });
+
+  describe('configurable product variant generation', () => {
+    async function buildConfigurableFixture(setCode: string) {
+      const set = await admin.post('/admin/v1/attribute-sets').send({ code: setCode, name: setCode });
+      const configSetId = set.body.data.id as string;
+      const group = await admin.post(`/admin/v1/attribute-sets/${configSetId}/groups`).send({ name: 'Options' });
+      const groupId = group.body.data.id as string;
+
+      const size = await admin.post('/admin/v1/attributes').send({
+        code: `size-${setCode}`,
+        label: 'Size',
+        dataType: 'SELECT',
+        inputType: 'DROPDOWN',
+        isVariantForming: true,
+        options: [
+          { value: 'S', label: 'Small' },
+          { value: 'M', label: 'Medium' },
+          { value: 'L', label: 'Large' },
+        ],
+      });
+      const color = await admin.post('/admin/v1/attributes').send({
+        code: `color-${setCode}`,
+        label: 'Color',
+        dataType: 'SELECT',
+        inputType: 'DROPDOWN',
+        isVariantForming: true,
+        options: [
+          { value: 'RED', label: 'Red' },
+          { value: 'BLUE', label: 'Blue' },
+        ],
+      });
+
+      await admin.post(`/admin/v1/attribute-sets/${configSetId}/attributes`).send({ groupId, attributeCode: size.body.data.code });
+      await admin.post(`/admin/v1/attribute-sets/${configSetId}/attributes`).send({ groupId, attributeCode: color.body.data.code });
+
+      const detail = await admin.get(`/admin/v1/attribute-sets/${configSetId}`);
+      const attrs = detail.body.data.groups[0].attributes as Array<{ code: string; options: Array<{ id: string; value: string }> }>;
+      const sizeDetail = attrs.find((a) => a.code === size.body.data.code)!;
+      const colorDetail = attrs.find((a) => a.code === color.body.data.code)!;
+
+      const product = await admin.post('/admin/v1/products').send({ type: 'CONFIGURABLE', sku: `CONFIG-${setCode}`, attributeSetId: configSetId });
+
+      return {
+        productPublicId: product.body.data.publicId as string,
+        sizeCode: size.body.data.code as string,
+        colorCode: color.body.data.code as string,
+        sizeOptionIds: sizeDetail.options.map((o) => o.id),
+        colorOptionIds: colorDetail.options.map((o) => o.id),
+      };
+    }
+
+    it('generates the full Cartesian matrix of variants from two SELECT axes, with auto-built SKUs', async () => {
+      const fx = await buildConfigurableFixture('gen-matrix');
+
+      const res = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [
+          { attributeCode: fx.sizeCode, optionIds: fx.sizeOptionIds },
+          { attributeCode: fx.colorCode, optionIds: fx.colorOptionIds },
+        ],
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.created).toBe(6);
+      expect(res.body.data.skipped).toBe(0);
+      const skus = res.body.data.variants.map((v: { sku: string }) => v.sku).sort();
+      expect(skus).toEqual([
+        `CONFIG-gen-matrix-S-BLUE`,
+        `CONFIG-gen-matrix-S-RED`,
+        `CONFIG-gen-matrix-M-BLUE`,
+        `CONFIG-gen-matrix-M-RED`,
+        `CONFIG-gen-matrix-L-BLUE`,
+        `CONFIG-gen-matrix-L-RED`,
+      ].sort());
+
+      const oneVariant = res.body.data.variants[0];
+      expect(oneVariant.axisValues).toHaveLength(2);
+      expect(oneVariant.axisValues.map((a: { attributeCode: string }) => a.attributeCode).sort()).toEqual(
+        [fx.sizeCode, fx.colorCode].sort(),
+      );
+
+      const list = await admin.get(`/admin/v1/products/${fx.productPublicId}/variants`);
+      expect(list.body.data).toHaveLength(6);
+
+      const detail = await admin.get(`/admin/v1/products/${fx.productPublicId}`);
+      expect(detail.body.data.variants).toHaveLength(6);
+    });
+
+    it('is idempotent: re-generating the same axes creates nothing, and adding one more option only creates the new combos', async () => {
+      const fx = await buildConfigurableFixture('gen-idempotent');
+      const first = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [{ attributeCode: fx.sizeCode, optionIds: fx.sizeOptionIds.slice(0, 2) }],
+      });
+      expect(first.body.data.created).toBe(2);
+
+      const again = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [{ attributeCode: fx.sizeCode, optionIds: fx.sizeOptionIds.slice(0, 2) }],
+      });
+      expect(again.body.data.created).toBe(0);
+      expect(again.body.data.skipped).toBe(2);
+
+      const withThirdOption = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [{ attributeCode: fx.sizeCode, optionIds: fx.sizeOptionIds }],
+      });
+      expect(withThirdOption.body.data.created).toBe(1);
+      expect(withThirdOption.body.data.skipped).toBe(2);
+    });
+
+    it('rejects generating variants for a non-CONFIGURABLE product', async () => {
+      const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'NOT-CONFIGURABLE-1', attributeSetId });
+      const res = await admin.post(`/admin/v1/products/${created.body.data.publicId}/variants/generate`).send({
+        axes: [{ attributeCode: 'ram', optionIds: ['1'] }],
+      });
+      expect(res.status).toBe(422);
+    });
+
+    it('rejects an axis attribute that is not marked variant-forming', async () => {
+      const fx = await buildConfigurableFixture('gen-not-forming');
+      const notForming = await admin.post('/admin/v1/attributes').send({ code: 'material-gen-not-forming', label: 'Material', dataType: 'TEXT', inputType: 'TEXT' });
+      const group = await admin.get(`/admin/v1/attribute-sets`);
+      const setId = (group.body.data as Array<{ code: string; id: string }>).find((s) => s.code === 'gen-not-forming')!.id;
+      const detail = await admin.get(`/admin/v1/attribute-sets/${setId}`);
+      const groupId = detail.body.data.groups[0].id;
+      await admin.post(`/admin/v1/attribute-sets/${setId}/attributes`).send({ groupId, attributeCode: notForming.body.data.code });
+
+      const res = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [{ attributeCode: 'material-gen-not-forming', optionIds: ['1'] }],
+      });
+      expect(res.status).toBe(422);
+    });
+
+    it('404s generating variants for an unknown product', async () => {
+      const res = await admin
+        .post('/admin/v1/products/00000000-0000-7000-8000-000000000000/variants/generate')
+        .send({ axes: [{ attributeCode: 'ram', optionIds: ['1'] }] });
+      expect(res.status).toBe(404);
+    });
+
+    it('renames a variant SKU and toggles its status', async () => {
+      const fx = await buildConfigurableFixture('gen-update');
+      const gen = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [{ attributeCode: fx.sizeCode, optionIds: fx.sizeOptionIds.slice(0, 1) }],
+      });
+      const variantPublicId = gen.body.data.variants[0].publicId;
+
+      const renamed = await admin
+        .patch(`/admin/v1/products/${fx.productPublicId}/variants/${variantPublicId}`)
+        .send({ sku: 'RENAMED-VARIANT-SKU', status: 'INACTIVE' });
+      expect(renamed.status).toBe(200);
+      expect(renamed.body.data).toMatchObject({ sku: 'RENAMED-VARIANT-SKU', status: 'INACTIVE' });
+    });
+
+    it('404s updating an unknown variant', async () => {
+      const fx = await buildConfigurableFixture('gen-update-404');
+      const res = await admin
+        .patch(`/admin/v1/products/${fx.productPublicId}/variants/00000000-0000-7000-8000-000000000000`)
+        .send({ sku: 'X' });
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects deleting a variant that still has stock, then allows it once stock is zeroed', async () => {
+      await admin.post('/admin/v1/warehouses').send({ code: 'WH-VARIANT-DELETE-TEST', name: 'Variant Delete Test Warehouse' });
+      const fx = await buildConfigurableFixture('gen-delete');
+      const gen = await admin.post(`/admin/v1/products/${fx.productPublicId}/variants/generate`).send({
+        axes: [{ attributeCode: fx.sizeCode, optionIds: fx.sizeOptionIds.slice(0, 1) }],
+      });
+      const variantPublicId = gen.body.data.variants[0].publicId;
+
+      await admin
+        .post('/admin/v1/inventory/adjustments')
+        .send({ variantId: variantPublicId, warehouseCode: 'WH-VARIANT-DELETE-TEST', delta: 3, reason: 'PURCHASE' });
+
+      const blocked = await admin.delete(`/admin/v1/products/${fx.productPublicId}/variants/${variantPublicId}`);
+      expect(blocked.status).toBe(409);
+
+      await admin
+        .post('/admin/v1/inventory/adjustments')
+        .send({ variantId: variantPublicId, warehouseCode: 'WH-VARIANT-DELETE-TEST', delta: -3, reason: 'CORRECTION' });
+
+      const nowDeletable = await admin.delete(`/admin/v1/products/${fx.productPublicId}/variants/${variantPublicId}`);
+      expect(nowDeletable.status).toBe(204);
+
+      const list = await admin.get(`/admin/v1/products/${fx.productPublicId}/variants`);
+      expect(list.body.data.map((v: { publicId: string }) => v.publicId)).not.toContain(variantPublicId);
+    });
+
+    it('404s deleting an unknown variant', async () => {
+      const res = await admin.delete(
+        '/admin/v1/products/00000000-0000-7000-8000-000000000000/variants/00000000-0000-7000-8000-000000000000',
+      );
+      expect(res.status).toBe(404);
+    });
+  });
 });

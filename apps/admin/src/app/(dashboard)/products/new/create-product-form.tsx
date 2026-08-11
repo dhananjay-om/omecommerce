@@ -40,6 +40,7 @@ export function CreateProductForm({
   const [state, formAction, pending] = useActionState(createProduct, initialState);
   const defaultAttributeSetId = attributeSets.find((s) => s.isDefault)?.id ?? attributeSets[0]?.id ?? '';
   const [attributeSetId, setAttributeSetId] = useState(defaultAttributeSetId);
+  const [type, setType] = useState('SIMPLE');
   const selectedSetDetail = attributeSetDetails[attributeSetId];
 
   return (
@@ -52,7 +53,7 @@ export function CreateProductForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
-            <Select name="type" defaultValue="SIMPLE">
+            <Select name="type" value={type} onValueChange={(value) => setType(String(value))}>
               <SelectTrigger id="type" className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -64,6 +65,11 @@ export function CreateProductForm({
                 ))}
               </SelectContent>
             </Select>
+            {type === 'CONFIGURABLE' ? (
+              <p className="text-xs text-muted-foreground">
+                Save the product first, then generate its Size/Color variants from the edit page.
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label htmlFor="attributeSetId">Attribute set</Label>

@@ -79,6 +79,13 @@ export interface ProductRepository {
   hasStock(id: bigint): Promise<boolean>;
 }
 
+export interface VariantAxisValueInfo {
+  attributeCode: string;
+  attributeLabel: string;
+  optionId: string;
+  optionLabel: string;
+}
+
 export interface VariantInfo {
   /** Internal id — needed to resolve price/stock for a specific variant (plan/14 Phase 0c); never serialized directly. */
   id: bigint;
@@ -86,11 +93,41 @@ export interface VariantInfo {
   sku: string;
   status: string;
   position: number;
+  /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — empty for a SIMPLE/DIGITAL/VIRTUAL product's single implicit variant. */
+  axisValues: VariantAxisValueInfo[];
 }
 
-/** Read-only port over a product's own variants (admin browse — plan/12 Admin UI). */
+export interface VariantAxisInput {
+  attributeId: bigint;
+  optionId: bigint;
+}
+
+export interface GeneratedVariantInput {
+  sku: string;
+  axisValues: VariantAxisInput[];
+}
+
+export interface UpdateVariantInput {
+  sku?: string;
+  status?: string;
+}
+
+/** Port over a product's own variants — read (admin browse, plan/12) and, for CONFIGURABLE
+ * products, write (generate/edit/delete — plan/13 configurable-product phase). */
 export interface ProductVariantRepository {
   listByProductId(productId: bigint): Promise<VariantInfo[]>;
+  findByPublicId(publicId: string): Promise<VariantInfo | null>;
+  /** Existing axis-value combinations already used by this product's (non-deleted) variants, as
+   * canonical sorted "attributeId:optionId,attributeId:optionId" keys — GenerateProductVariants
+   * skips these so re-running generate after adding one more option only creates the new combos. */
+  existingAxisCombos(productId: bigint): Promise<Set<string>>;
+  /** Creates many variants + their axis values in one transaction. */
+  bulkCreate(productId: bigint, inputs: GeneratedVariantInput[]): Promise<VariantInfo[]>;
+  update(variantId: bigint, input: UpdateVariantInput): Promise<VariantInfo>;
+  /** Soft-delete only — same RESTRICT-FK/append-only-ledger rationale as ProductRepository.softDelete. */
+  softDelete(variantId: bigint): Promise<void>;
+  /** True if this variant currently has non-zero on-hand or reserved stock anywhere — guards deletion. */
+  hasStock(variantId: bigint): Promise<boolean>;
 }
 
 export interface AttributeInfo {
@@ -177,6 +214,8 @@ export interface AttributeSetAttributeDetail {
   dataType: AttributeDataType;
   inputType: AttributeInputType;
   isRequired: boolean;
+  /** Whether this attribute is eligible as a configurable-product variant axis (Size, Color, ...). */
+  isVariantForming: boolean;
   sortOrder: number;
   options: AttributeOptionInfo[];
 }

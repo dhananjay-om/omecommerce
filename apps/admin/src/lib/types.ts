@@ -21,11 +21,18 @@ export interface ProductList {
   products: ProductListItem[];
 }
 
+export interface VariantAxisValue {
+  attributeCode: string;
+  attributeLabel: string;
+  optionLabel: string;
+}
+
 export interface Variant {
   publicId: string;
   sku: string;
   status: string;
   position: number;
+  axisValues: VariantAxisValue[];
 }
 
 export type ProductMediaRole = 'GALLERY' | 'THUMBNAIL' | 'SWATCH' | 'VIDEO' | 'DOCUMENT';
@@ -112,6 +119,7 @@ export interface AttributeSetAttribute {
   label: string;
   dataType: AttributeDataType;
   isRequired: boolean;
+  isVariantForming: boolean;
   sortOrder: number;
   options: AttributeOption[];
 }

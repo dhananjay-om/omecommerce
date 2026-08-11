@@ -9,6 +9,7 @@ import type {
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { fromRow } from '../domain/attribute-value.js';
 import { toView } from './create-product.usecase.js';
+import { toVariantView } from './list-product-variants.usecase.js';
 import type { ProductDetailView, ProductMediaView } from './dto.js';
 
 /**
@@ -59,7 +60,7 @@ export class GetProductDetail {
     return {
       ...toView(product),
       attributeSetId: product.props.attributeSetId.toString(),
-      variants: variantRows,
+      variants: variantRows.map(toVariantView),
       attributes,
       categoryIds,
       media,

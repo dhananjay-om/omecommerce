@@ -9,6 +9,7 @@ import {
   CategoryType,
   CategorySortMode,
   ProductMediaRole,
+  VariantStatus,
 } from '@prisma/client';
 
 const decimalString = z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount, e.g. "2.5"');
@@ -21,6 +22,20 @@ export const createProductSchema = z.object({
   visibility: z.nativeEnum(ProductVisibility).optional(),
   nameDefault: z.string().max(512).nullish(),
   weight: decimalString.nullish(),
+});
+
+const variantAxisSchema = z.object({
+  attributeCode: z.string().min(1),
+  optionIds: z.array(z.string().min(1)).min(1),
+});
+
+export const generateVariantsSchema = z.object({
+  axes: z.array(variantAxisSchema).min(1),
+});
+
+export const updateVariantSchema = z.object({
+  sku: z.string().min(1).max(128).optional(),
+  status: z.nativeEnum(VariantStatus).optional(),
 });
 
 export const updateProductSchema = z.object({

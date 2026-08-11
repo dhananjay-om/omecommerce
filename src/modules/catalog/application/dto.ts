@@ -167,6 +167,7 @@ export interface AttributeSetAttributeView {
   dataType: AttributeDataType;
   inputType: AttributeInputType;
   isRequired: boolean;
+  isVariantForming: boolean;
   sortOrder: number;
   options: AttributeOptionView[];
 }
@@ -259,11 +260,41 @@ export interface BulkImportResult {
   errors: BulkImportRowError[];
 }
 
+export interface VariantAxisValueView {
+  attributeCode: string;
+  attributeLabel: string;
+  optionLabel: string;
+}
+
 export interface VariantView {
   publicId: string;
   sku: string;
   status: string;
   position: number;
+  axisValues: VariantAxisValueView[];
+}
+
+export interface GenerateVariantsAxisInput {
+  attributeCode: string;
+  optionIds: string[];
+}
+
+export interface GenerateVariantsCommand {
+  productPublicId: string;
+  axes: GenerateVariantsAxisInput[];
+}
+
+export interface GenerateVariantsResult {
+  created: number;
+  skipped: number;
+  variants: VariantView[];
+}
+
+export interface UpdateVariantCommand {
+  productPublicId: string;
+  variantPublicId: string;
+  sku?: string;
+  status?: string;
 }
 
 export interface CreateCategoryCommand {

@@ -17,8 +17,16 @@ export const DESCRIPTION_GROUP: AttributeSetGroupDetail = {
   name: 'Description',
   sortOrder: -2,
   attributes: [
-    { code: 'description', label: 'Description', dataType: 'RICHTEXT', isRequired: false, sortOrder: 0, options: [] },
-    { code: 'short_description', label: 'Short Description', dataType: 'TEXTAREA', isRequired: false, sortOrder: 1, options: [] },
+    { code: 'description', label: 'Description', dataType: 'RICHTEXT', isRequired: false, isVariantForming: false, sortOrder: 0, options: [] },
+    {
+      code: 'short_description',
+      label: 'Short Description',
+      dataType: 'TEXTAREA',
+      isRequired: false,
+      isVariantForming: false,
+      sortOrder: 1,
+      options: [],
+    },
   ],
 };
 
@@ -27,10 +35,26 @@ export const SEO_GROUP: AttributeSetGroupDetail = {
   name: 'Search Engine Optimization',
   sortOrder: -1,
   attributes: [
-    { code: 'url_key', label: 'URL Key', dataType: 'TEXT', isRequired: false, sortOrder: 0, options: [] },
-    { code: 'meta_title', label: 'Meta Title', dataType: 'TEXT', isRequired: false, sortOrder: 1, options: [] },
-    { code: 'meta_keywords', label: 'Meta Keywords', dataType: 'TEXT', isRequired: false, sortOrder: 2, options: [] },
-    { code: 'meta_description', label: 'Meta Description', dataType: 'TEXTAREA', isRequired: false, sortOrder: 3, options: [] },
+    { code: 'url_key', label: 'URL Key', dataType: 'TEXT', isRequired: false, isVariantForming: false, sortOrder: 0, options: [] },
+    { code: 'meta_title', label: 'Meta Title', dataType: 'TEXT', isRequired: false, isVariantForming: false, sortOrder: 1, options: [] },
+    {
+      code: 'meta_keywords',
+      label: 'Meta Keywords',
+      dataType: 'TEXT',
+      isRequired: false,
+      isVariantForming: false,
+      sortOrder: 2,
+      options: [],
+    },
+    {
+      code: 'meta_description',
+      label: 'Meta Description',
+      dataType: 'TEXTAREA',
+      isRequired: false,
+      isVariantForming: false,
+      sortOrder: 3,
+      options: [],
+    },
   ],
 };
 

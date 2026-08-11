@@ -134,7 +134,19 @@ export function NewAttributeDialog() {
               <input id="attr-comparable" name="isComparable" type="checkbox" className="size-4" />
               <Label htmlFor="attr-comparable">Comparable</Label>
             </div>
+            {dataType === 'SELECT' ? (
+              <div className="flex items-center gap-2">
+                <input id="attr-variant-forming" name="isVariantForming" type="checkbox" className="size-4" />
+                <Label htmlFor="attr-variant-forming">Variant Forming</Label>
+              </div>
+            ) : null}
           </div>
+          {dataType === 'SELECT' ? (
+            <p className="text-xs text-muted-foreground">
+              Variant Forming attributes (like Size or Color) can be used to generate a
+              configurable product&apos;s variants once assigned to its attribute set.
+            </p>
+          ) : null}
           {OPTION_DATA_TYPES.has(dataType) ? <OptionsBuilder /> : null}
           {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
           <DialogFooter>

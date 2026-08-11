@@ -12,6 +12,8 @@ import type {
   AttributeSetGroupInfo,
   ProductVariantRepository,
   VariantInfo,
+  GeneratedVariantInput,
+  UpdateVariantInput,
   ListProductsFilter,
   ProductListResult,
   UpdateProductInput,
@@ -200,15 +202,133 @@ export class PrismaProductRepository implements ProductRepository {
 }
 
 /** Read-only adapter over a product's own variants (admin browse). */
+const VARIANT_SELECT = {
+  id: true,
+  publicId: true,
+  sku: true,
+  status: true,
+  position: true,
+  axes: {
+    select: {
+      attribute: { select: { code: true, label: true } },
+      option: { select: { id: true, label: true } },
+    },
+  },
+} as const;
+
+function toVariantInfo(row: {
+  id: bigint;
+  publicId: string;
+  sku: string;
+  status: string;
+  position: number;
+  axes: Array<{ attribute: { code: string; label: string }; option: { id: bigint; label: string } }>;
+}): VariantInfo {
+  return {
+    id: row.id,
+    publicId: row.publicId,
+    sku: row.sku,
+    status: row.status,
+    position: row.position,
+    axisValues: row.axes.map((a) => ({
+      attributeCode: a.attribute.code,
+      attributeLabel: a.attribute.label,
+      optionId: a.option.id.toString(),
+      optionLabel: a.option.label,
+    })),
+  };
+}
+
+/** Read (admin browse) and, for CONFIGURABLE products, write (generate/edit/delete) port over a product's own variants. */
 export class PrismaProductVariantRepository implements ProductVariantRepository {
   constructor(private readonly db: Db) {}
 
   async listByProductId(productId: bigint): Promise<VariantInfo[]> {
-    return this.db.productVariant.findMany({
-      where: { productId },
-      select: { id: true, publicId: true, sku: true, status: true, position: true },
+    const rows = await this.db.productVariant.findMany({
+      where: { productId, deletedAt: null },
+      select: VARIANT_SELECT,
       orderBy: { position: 'asc' },
     });
+    return rows.map(toVariantInfo);
+  }
+
+  async findByPublicId(publicId: string): Promise<VariantInfo | null> {
+    const row = await this.db.productVariant.findFirst({ where: { publicId, deletedAt: null }, select: VARIANT_SELECT });
+    return row ? toVariantInfo(row) : null;
+  }
+
+  async existingAxisCombos(productId: bigint): Promise<Set<string>> {
+    const rows = await this.db.variantAxisValue.findMany({
+      where: { variant: { productId, deletedAt: null } },
+      select: { variantId: true, attributeId: true, optionId: true },
+    });
+    const byVariant = new Map<string, string[]>();
+    for (const r of rows) {
+      const key = `${r.attributeId}:${r.optionId}`;
+      const variantKey = r.variantId.toString();
+      const list = byVariant.get(variantKey) ?? [];
+      list.push(key);
+      byVariant.set(variantKey, list);
+    }
+    return new Set([...byVariant.values()].map((keys) => keys.sort().join(',')));
+  }
+
+  async bulkCreate(productId: bigint, inputs: GeneratedVariantInput[]): Promise<VariantInfo[]> {
+    if (inputs.length === 0) return [];
+    try {
+      const createdIds = await this.db.$transaction(async (tx) => {
+        const maxPos = await tx.productVariant.aggregate({ where: { productId }, _max: { position: true } });
+        let nextPosition = (maxPos._max.position ?? -1) + 1;
+        const ids: bigint[] = [];
+        for (const input of inputs) {
+          const row = await tx.productVariant.create({
+            data: { productId, sku: input.sku, status: 'ACTIVE', position: nextPosition++ },
+          });
+          if (input.axisValues.length > 0) {
+            await tx.variantAxisValue.createMany({
+              data: input.axisValues.map((a) => ({ variantId: row.id, attributeId: a.attributeId, optionId: a.optionId })),
+            });
+          }
+          ids.push(row.id);
+        }
+        return ids;
+      });
+      const rows = await this.db.productVariant.findMany({ where: { id: { in: createdIds } }, select: VARIANT_SELECT, orderBy: { position: 'asc' } });
+      return rows.map(toVariantInfo);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError('one or more generated variant SKUs already exist');
+      }
+      throw err;
+    }
+  }
+
+  async update(variantId: bigint, input: UpdateVariantInput): Promise<VariantInfo> {
+    try {
+      const row = await this.db.productVariant.update({
+        where: { id: variantId },
+        data: { sku: input.sku, status: input.status as Prisma.ProductVariantUpdateInput['status'] },
+        select: VARIANT_SELECT,
+      });
+      return toVariantInfo(row);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError(`variant sku already exists: ${input.sku}`);
+      }
+      throw err;
+    }
+  }
+
+  async softDelete(variantId: bigint): Promise<void> {
+    await this.db.productVariant.update({ where: { id: variantId }, data: { deletedAt: new Date() } });
+  }
+
+  async hasStock(variantId: bigint): Promise<boolean> {
+    const rows = await this.db.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1 FROM stock_item WHERE variant_id = ${variantId} AND (on_hand <> 0 OR reserved <> 0)
+      ) AS exists`;
+    return rows[0]?.exists ?? false;
   }
 }
 
@@ -377,6 +497,7 @@ export class PrismaAttributeSetRepository implements AttributeSetRepository {
                     dataType: true,
                     inputType: true,
                     isRequired: true,
+                    isVariantForming: true,
                     options: {
                       orderBy: { sortOrder: 'asc' },
                       select: { id: true, value: true, label: true, swatch: true, sortOrder: true },
@@ -405,6 +526,7 @@ export class PrismaAttributeSetRepository implements AttributeSetRepository {
           dataType: a.attribute.dataType,
           inputType: a.attribute.inputType,
           isRequired: a.isRequiredOverride ?? a.attribute.isRequired,
+          isVariantForming: a.attribute.isVariantForming,
           sortOrder: a.sortOrder,
           options: a.attribute.options,
         })),

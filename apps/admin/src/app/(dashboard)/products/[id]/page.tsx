@@ -95,6 +95,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <TableHeader>
                 <TableRow>
                   <TableHead>SKU</TableHead>
+                  <TableHead>Axis Values</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Public ID</TableHead>
                 </TableRow>
@@ -103,6 +104,19 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 {product.variants.map((v) => (
                   <TableRow key={v.publicId}>
                     <TableCell>{v.sku}</TableCell>
+                    <TableCell>
+                      {v.axisValues.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {v.axisValues.map((a) => (
+                            <Badge key={a.attributeCode} variant="outline">
+                              {a.attributeLabel}: {a.optionLabel}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={statusBadgeVariant(v.status)}>{v.status}</Badge>
                     </TableCell>

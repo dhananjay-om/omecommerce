@@ -1,6 +1,20 @@
-import type { ProductRepository, ProductVariantRepository } from '../domain/repositories.js';
+import type { ProductRepository, ProductVariantRepository, VariantInfo } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import type { VariantView } from './dto.js';
+
+export function toVariantView(v: VariantInfo): VariantView {
+  return {
+    publicId: v.publicId,
+    sku: v.sku,
+    status: v.status,
+    position: v.position,
+    axisValues: v.axisValues.map((a) => ({
+      attributeCode: a.attributeCode,
+      attributeLabel: a.attributeLabel,
+      optionLabel: a.optionLabel,
+    })),
+  };
+}
 
 /**
  * Admin browse endpoint (no prior endpoint exposed a variant's publicId at
@@ -18,6 +32,7 @@ export class ListProductVariants {
     if (!product || product.props.id === null) {
       throw new NotFoundError('product', productPublicId);
     }
-    return this.variants.listByProductId(product.props.id);
+    const rows = await this.variants.listByProductId(product.props.id);
+    return rows.map(toVariantView);
   }
 }
