@@ -1,6 +1,7 @@
 import type { AttributeRepository } from '../domain/repositories.js';
 import { ConflictError } from '../../../shared/domain/errors.js';
 import type { CreateAttributeCommand, AttributeView } from './dto.js';
+import { toAttributeView } from './list-attributes.usecase.js';
 
 export class CreateAttribute {
   constructor(private readonly attributes: AttributeRepository) {}
@@ -11,12 +12,6 @@ export class CreateAttribute {
       throw new ConflictError(`attribute code already exists: ${code}`);
     }
     const attribute = await this.attributes.create({ ...cmd, code });
-    return {
-      id: attribute.id.toString(),
-      code: attribute.code,
-      label: attribute.label,
-      dataType: attribute.dataType,
-      inputType: attribute.inputType,
-    };
+    return toAttributeView(attribute);
   }
 }

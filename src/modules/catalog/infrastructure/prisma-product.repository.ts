@@ -5,6 +5,7 @@ import type {
   AttributeRepository,
   AttributeInfo,
   CreateAttributeInput,
+  UpdateAttributeInput,
   AttributeSetRepository,
   AttributeSetInfo,
   AttributeSetDetail,
@@ -343,7 +344,23 @@ export class PrismaVariantStockLookup implements VariantStockLookup {
   }
 }
 
-const ATTRIBUTE_SELECT = { id: true, code: true, label: true, dataType: true, inputType: true } as const;
+const ATTRIBUTE_SELECT = {
+  id: true,
+  code: true,
+  label: true,
+  dataType: true,
+  inputType: true,
+  isRequired: true,
+  isFilterable: true,
+  isSearchable: true,
+  isComparable: true,
+  isSortable: true,
+  isVisiblePdp: true,
+  isVisiblePlp: true,
+  usedInSearch: true,
+  usedInLayeredNav: true,
+  isVariantForming: true,
+} as const;
 
 /** `code` is a plain (non-partial) unique DB constraint, so it isn't relaxed by `deletedAt` — a soft-deleted
  *  row's code stays permanently taken. findByCode() filters deletedAt so it can't see it, which means the
@@ -370,6 +387,10 @@ export class PrismaAttributeRepository implements AttributeRepository {
 
   async softDelete(id: bigint): Promise<void> {
     await this.db.attribute.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  async update(id: bigint, input: UpdateAttributeInput): Promise<AttributeInfo> {
+    return this.db.attribute.update({ where: { id }, data: input, select: ATTRIBUTE_SELECT });
   }
 
   async isAssignedToAnySet(id: bigint): Promise<boolean> {

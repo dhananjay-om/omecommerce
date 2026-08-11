@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DeleteAttributeDialog } from './delete-attribute-dialog';
+import { EditAttributeDialog } from './edit-attribute-dialog';
 import {
   Type,
   Hash,
@@ -83,12 +84,18 @@ export function AttributesGrid({ attributes }: { attributes: Attribute[] }) {
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
                       <p className="truncate font-medium leading-none">{a.label}</p>
-                      <DeleteAttributeDialog code={a.code} label={a.label} />
+                      <div className="flex shrink-0 items-center">
+                        <EditAttributeDialog attribute={a} />
+                        <DeleteAttributeDialog code={a.code} label={a.label} />
+                      </div>
                     </div>
                     <p className="truncate font-mono text-xs text-muted-foreground">{a.code}</p>
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       <Badge variant="outline">{a.dataType}</Badge>
                       <Badge variant="secondary">{a.inputType}</Badge>
+                      {a.isVariantForming ? <Badge variant="default">Variant Forming</Badge> : null}
+                      {a.isRequired ? <Badge variant="outline">Required</Badge> : null}
+                      {a.isFilterable ? <Badge variant="outline">Filterable</Badge> : null}
                     </div>
                   </div>
                 </CardContent>

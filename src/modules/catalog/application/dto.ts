@@ -230,6 +230,30 @@ export interface AttributeView {
   label: string;
   dataType: AttributeDataType;
   inputType: AttributeInputType;
+  isRequired: boolean;
+  isFilterable: boolean;
+  isSearchable: boolean;
+  isComparable: boolean;
+  isSortable: boolean;
+  isVisiblePdp: boolean;
+  isVisiblePlp: boolean;
+  usedInSearch: boolean;
+  usedInLayeredNav: boolean;
+  isVariantForming: boolean;
+}
+
+export interface UpdateAttributeCommand {
+  label?: string;
+  isRequired?: boolean;
+  isFilterable?: boolean;
+  isSearchable?: boolean;
+  isComparable?: boolean;
+  isSortable?: boolean;
+  isVisiblePdp?: boolean;
+  isVisiblePlp?: boolean;
+  usedInSearch?: boolean;
+  usedInLayeredNav?: boolean;
+  isVariantForming?: boolean;
 }
 
 export interface AssignAttributeToGroupCommand {

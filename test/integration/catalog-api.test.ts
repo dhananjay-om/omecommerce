@@ -16,7 +16,11 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
   let admin: ReturnType<typeof adminRequest>;
 
   beforeAll(async () => {
-    await prisma.$executeRawUnsafe('TRUNCATE product RESTART IDENTITY CASCADE');
+    // `warehouse` is truncated alongside `product` — this file owns its own hardcoded-code
+    // warehouse fixtures (WH-CATALOG-DELETE-TEST, WH-VARIANT-DELETE-TEST) end to end, and
+    // `code` is a plain (non-partial) unique DB constraint that a soft-delete doesn't free, so a
+    // second run of this file against the same DB would otherwise 409 trying to recreate them.
+    await prisma.$executeRawUnsafe('TRUNCATE product, warehouse RESTART IDENTITY CASCADE');
 
     await prisma.currency.upsert({
       where: { code: 'USD' },

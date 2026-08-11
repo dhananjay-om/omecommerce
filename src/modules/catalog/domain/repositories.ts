@@ -136,6 +136,33 @@ export interface AttributeInfo {
   label: string;
   dataType: AttributeDataType;
   inputType: AttributeInputType;
+  isRequired: boolean;
+  isFilterable: boolean;
+  isSearchable: boolean;
+  isComparable: boolean;
+  isSortable: boolean;
+  isVisiblePdp: boolean;
+  isVisiblePlp: boolean;
+  usedInSearch: boolean;
+  usedInLayeredNav: boolean;
+  isVariantForming: boolean;
+}
+
+/** Scalar-field updates only — code/dataType/inputType/options stay immutable after creation (same
+ *  rationale as Product's SKU/type: changing them could invalidate already-stored values), matching
+ *  UpdateCategory's "not everything is editable post-creation" pattern. */
+export interface UpdateAttributeInput {
+  label?: string;
+  isRequired?: boolean;
+  isFilterable?: boolean;
+  isSearchable?: boolean;
+  isComparable?: boolean;
+  isSortable?: boolean;
+  isVisiblePdp?: boolean;
+  isVisiblePlp?: boolean;
+  usedInSearch?: boolean;
+  usedInLayeredNav?: boolean;
+  isVariantForming?: boolean;
 }
 
 export interface CreateAttributeOptionInput {
@@ -167,6 +194,7 @@ export interface CreateAttributeInput {
 export interface AttributeRepository {
   findByCode(code: string): Promise<AttributeInfo | null>;
   create(input: CreateAttributeInput): Promise<AttributeInfo>;
+  update(id: bigint, input: UpdateAttributeInput): Promise<AttributeInfo>;
   /** Admin browse (plan/13 Phase L) — the reusable-attribute library + "assign existing attribute" picker. */
   list(): Promise<AttributeInfo[]>;
   /** Soft-delete only — attribute_set_attribute.attribute_id and product_attribute_value.attribute_id

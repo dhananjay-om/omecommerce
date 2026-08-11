@@ -122,6 +122,20 @@ export const createAttributeSchema = z.object({
   options: z.array(attributeOptionSchema).optional(),
 });
 
+export const updateAttributeSchema = z.object({
+  label: z.string().min(1).max(255).optional(),
+  isRequired: z.boolean().optional(),
+  isFilterable: z.boolean().optional(),
+  isSearchable: z.boolean().optional(),
+  isComparable: z.boolean().optional(),
+  isSortable: z.boolean().optional(),
+  isVisiblePdp: z.boolean().optional(),
+  isVisiblePlp: z.boolean().optional(),
+  usedInSearch: z.boolean().optional(),
+  usedInLayeredNav: z.boolean().optional(),
+  isVariantForming: z.boolean().optional(),
+});
+
 export const assignAttributeToGroupSchema = z.object({
   groupId: z.string().regex(/^\d+$/, 'expected numeric id'),
   attributeCode: z.string().min(1),

@@ -73,6 +73,16 @@ describe.skipIf(!process.env.INTEGRATION)('attribute-set builder API (live DB)',
       label: 'Screen Size',
       dataType: 'SELECT',
       inputType: 'DROPDOWN',
+      isRequired: false,
+      isFilterable: true,
+      isSearchable: false,
+      isComparable: false,
+      isSortable: false,
+      isVisiblePdp: true,
+      isVisiblePlp: false,
+      usedInSearch: false,
+      usedInLayeredNav: false,
+      isVariantForming: false,
     });
     const options = await prisma.attributeOption.findMany({ where: { attribute: { code: 'screen-size' } } });
     expect(options.map((o) => o.value).sort()).toEqual(['13', '15']);
@@ -89,7 +99,49 @@ describe.skipIf(!process.env.INTEGRATION)('attribute-set builder API (live DB)',
       label: 'Screen Size',
       dataType: 'SELECT',
       inputType: 'DROPDOWN',
+      isRequired: false,
+      isFilterable: true,
+      isSearchable: false,
+      isComparable: false,
+      isSortable: false,
+      isVisiblePdp: true,
+      isVisiblePlp: false,
+      usedInSearch: false,
+      usedInLayeredNav: false,
+      isVariantForming: false,
     });
+  });
+
+  it('updates an attribute’s editable flags (label + Variant Forming) without touching code/dataType/inputType', async () => {
+    const created = await admin.post('/admin/v1/attributes').send({
+      code: 'trim',
+      label: 'Trim',
+      dataType: 'SELECT',
+      inputType: 'DROPDOWN',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.isVariantForming).toBe(false);
+
+    // The exact bug this endpoint exists to fix: an attribute created without "Variant Forming"
+    // checked is otherwise stuck that way forever — there was no way to flip it after creation.
+    const updated = await admin.patch('/admin/v1/attributes/trim').send({ label: 'Trim Level', isVariantForming: true });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.label).toBe('Trim Level');
+    expect(updated.body.data.isVariantForming).toBe(true);
+    // code/dataType/inputType are untouched — not accepted by the schema at all.
+    expect(updated.body.data.code).toBe('trim');
+    expect(updated.body.data.dataType).toBe('SELECT');
+    expect(updated.body.data.inputType).toBe('DROPDOWN');
+
+    const list = await admin.get('/admin/v1/attributes');
+    const row = list.body.data.find((a: { code: string }) => a.code === 'trim');
+    expect(row.label).toBe('Trim Level');
+    expect(row.isVariantForming).toBe(true);
+  });
+
+  it('404s updating an unknown attribute', async () => {
+    const res = await admin.patch('/admin/v1/attributes/does-not-exist').send({ label: 'x' });
+    expect(res.status).toBe(404);
   });
 
   it('rejects a duplicate attribute code with 409', async () => {

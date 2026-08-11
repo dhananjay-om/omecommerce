@@ -1,4 +1,6 @@
+import { Prisma } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
+import { ConflictError } from '../../../shared/domain/errors.js';
 import type {
   WarehouseRepository,
   WarehouseInfo,
@@ -6,6 +8,19 @@ import type {
   UpdateWarehouseInput,
   VariantLookup,
 } from '../domain/repositories.js';
+
+/** `code` is a plain (non-partial) unique DB constraint, so it isn't relaxed by `deletedAt` — a
+ *  soft-deleted warehouse's code stays permanently taken at the DB level even though reads (via the
+ *  shared Prisma extension) can no longer see that row. Without this, re-using a deleted warehouse's
+ *  code throws an unhandled P2002 instead of a clean 409 — same fix already applied to Attribute/
+ *  AttributeSet/Product's create(). */
+function isCodeUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false;
+  const target = err.meta?.target;
+  if (typeof target === 'string') return target.includes('code');
+  if (Array.isArray(target)) return target.includes('code');
+  return false;
+}
 
 function toInfo(row: {
   id: bigint;
@@ -31,15 +46,22 @@ export class PrismaWarehouseRepository implements WarehouseRepository {
   constructor(private readonly db: Db) {}
 
   async create(input: CreateWarehouseInput): Promise<WarehouseInfo> {
-    const row = await this.db.warehouse.create({
-      data: {
-        code: input.code,
-        name: input.name,
-        type: input.type,
-        priority: input.priority,
-      },
-    });
-    return toInfo(row);
+    try {
+      const row = await this.db.warehouse.create({
+        data: {
+          code: input.code,
+          name: input.name,
+          type: input.type,
+          priority: input.priority,
+        },
+      });
+      return toInfo(row);
+    } catch (err) {
+      if (isCodeUniqueViolation(err)) {
+        throw new ConflictError(`warehouse code already exists: ${input.code}`);
+      }
+      throw err;
+    }
   }
 
   async findByCode(code: string): Promise<WarehouseInfo | null> {

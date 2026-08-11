@@ -31,6 +31,7 @@ import { GetStoreProductDetail } from './application/get-store-product-detail.us
 import { CreateAttributeSet } from './application/create-attribute-set.usecase.js';
 import { CreateAttributeSetGroup } from './application/create-attribute-set-group.usecase.js';
 import { CreateAttribute } from './application/create-attribute.usecase.js';
+import { UpdateAttribute } from './application/update-attribute.usecase.js';
 import { DeleteAttribute } from './application/delete-attribute.usecase.js';
 import { DeleteAttributeSet } from './application/delete-attribute-set.usecase.js';
 import { RemoveAttributeFromSet } from './application/remove-attribute-from-set.usecase.js';
@@ -73,6 +74,7 @@ import {
   createAttributeSetSchema,
   createAttributeSetGroupSchema,
   createAttributeSchema,
+  updateAttributeSchema,
   assignAttributeToGroupSchema,
   bulkImportProductsSchema,
   createCategorySchema,
@@ -130,6 +132,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createAttributeSet = new CreateAttributeSet(attributeSets);
   const createAttributeSetGroup = new CreateAttributeSetGroup(attributeSets);
   const createAttribute = new CreateAttribute(attributes);
+  const updateAttribute = new UpdateAttribute(attributes);
   const deleteAttribute = new DeleteAttribute(attributes);
   const deleteAttributeSet = new DeleteAttributeSet(attributeSets);
   const removeAttributeFromSet = new RemoveAttributeFromSet(attributeSets, attributes);
@@ -308,6 +311,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       const body = parse(createAttributeSchema, req.body);
       res.status(201).json({ data: await createAttribute.execute(body) });
+    }),
+  );
+  admin.patch(
+    '/attributes/:code',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateAttributeSchema, req.body);
+      res.json({ data: await updateAttribute.execute(req.params.code!, body) });
     }),
   );
   admin.delete(
