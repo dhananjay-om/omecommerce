@@ -64,6 +64,23 @@ async function main() {
     create: { attributeSetId: set.id, groupId: group.id, attributeId: ram.id, sortOrder: 0 },
   });
 
+  // --- system default attributes (plan/13): Description/Short Description/SEO fields that
+  // every product's edit form shows regardless of its attribute set. Deliberately NOT assigned
+  // into any AttributeSetAttribute row — AssignAttributeValues only requires the Attribute to
+  // exist in the reusable library, not that it's set-scoped, so the admin UI renders these as a
+  // fixed section instead of a per-set one. See apps/admin/.../products/default-attribute-groups.ts.
+  const DEFAULT_ATTRIBUTES = [
+    { code: 'description', label: 'Description', dataType: 'RICHTEXT', inputType: 'RICHTEXT' },
+    { code: 'short_description', label: 'Short Description', dataType: 'TEXTAREA', inputType: 'TEXTAREA' },
+    { code: 'url_key', label: 'URL Key', dataType: 'TEXT', inputType: 'TEXT' },
+    { code: 'meta_title', label: 'Meta Title', dataType: 'TEXT', inputType: 'TEXT' },
+    { code: 'meta_keywords', label: 'Meta Keywords', dataType: 'TEXT', inputType: 'TEXT' },
+    { code: 'meta_description', label: 'Meta Description', dataType: 'TEXTAREA', inputType: 'TEXTAREA' },
+  ] as const;
+  for (const a of DEFAULT_ATTRIBUTES) {
+    await prisma.attribute.upsert({ where: { code: a.code }, update: {}, create: a });
+  }
+
   // --- a demo product with a GLOBAL + STORE_VIEW scoped attribute value ---
   const product = await prisma.product.upsert({
     where: { sku: 'SKU-1' },

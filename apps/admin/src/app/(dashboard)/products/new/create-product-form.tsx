@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { createProduct, type CreateProductFormState } from '../actions';
 import type { AttributeSet, AttributeSetDetail, Category } from '@/lib/types';
 import { AttributeFieldsSection } from '../attribute-fields-section';
+import { DEFAULT_ATTRIBUTE_GROUPS } from '../default-attribute-groups';
 import { CategoryPicker } from '../category-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -112,11 +113,9 @@ export function CreateProductForm({
         </div>
       </SectionCard>
 
-      {selectedSetDetail ? (
-        <SectionCard title="Attributes">
-          <AttributeFieldsSection groups={selectedSetDetail.groups} values={{}} />
-        </SectionCard>
-      ) : null}
+      <SectionCard title="Attributes">
+        <AttributeFieldsSection groups={[...DEFAULT_ATTRIBUTE_GROUPS, ...(selectedSetDetail?.groups ?? [])]} values={{}} />
+      </SectionCard>
 
       <SectionCard title="Categories">
         <CategoryPicker categories={categories} selectedIds={[]} />

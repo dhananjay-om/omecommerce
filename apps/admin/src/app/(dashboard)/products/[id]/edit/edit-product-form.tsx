@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { updateProduct, type UpdateProductFormState } from '../../actions';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, VariantPrice, VariantStock } from '@/lib/types';
 import { AttributeFieldsSection } from '../../attribute-fields-section';
+import { DEFAULT_ATTRIBUTE_GROUPS } from '../../default-attribute-groups';
 import { CategoryPicker } from '../../category-picker';
 import { ImageUploadField } from './image-upload-field';
 import { PricingInventorySection } from './pricing-inventory-section';
@@ -127,11 +128,12 @@ export function EditProductForm({
         </div>
       </SectionCard>
 
-      {selectedSetDetail ? (
-        <SectionCard title="Attributes">
-          <AttributeFieldsSection groups={selectedSetDetail.groups} values={product.attributes} />
-        </SectionCard>
-      ) : null}
+      <SectionCard title="Attributes">
+        <AttributeFieldsSection
+          groups={[...DEFAULT_ATTRIBUTE_GROUPS, ...(selectedSetDetail?.groups ?? [])]}
+          values={product.attributes}
+        />
+      </SectionCard>
 
       {pricingVariantId ? (
         <SectionCard title="Pricing & Inventory">
