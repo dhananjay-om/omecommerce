@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ImageIcon } from 'lucide-react';
 import type { ProductListItem } from '@/lib/types';
 import { bulkUpdateProductStatus } from './actions';
+import { DeleteProductDialog } from './delete-product-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -130,12 +131,13 @@ export function ProductsTable({
                 activeSortBy={activeSortBy}
                 activeSortDir={activeSortDir}
               />
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">
+                <TableCell colSpan={10} className="text-center text-muted-foreground">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -174,6 +176,9 @@ export function ProductsTable({
                     <Badge variant={statusBadgeVariant(p.status)}>{p.status}</Badge>
                   </TableCell>
                   <TableCell>{new Date(p.createdAt).toLocaleDateString('en-US')}</TableCell>
+                  <TableCell className="text-right">
+                    <DeleteProductDialog publicId={p.publicId} sku={p.sku} />
+                  </TableCell>
                 </TableRow>
               ))
             )}

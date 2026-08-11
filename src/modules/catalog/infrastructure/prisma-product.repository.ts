@@ -49,40 +49,66 @@ export class PrismaProductRepository implements ProductRepository {
   constructor(private readonly db: Db) {}
 
   async existsBySku(sku: string): Promise<boolean> {
-    const found = await this.db.product.findFirst({ where: { sku }, select: { id: true } });
+    const found = await this.db.product.findFirst({ where: { sku, deletedAt: null }, select: { id: true } });
     return found !== null;
   }
 
   async create(product: Product): Promise<Product> {
     const p = product.props;
-    const row = await this.db.$transaction(async (tx) => {
-      const created = await tx.product.create({
-        data: {
-          type: p.type,
-          sku: p.sku,
-          attributeSetId: p.attributeSetId,
-          status: p.status,
-          visibility: p.visibility,
-          nameDefault: p.nameDefault,
-          weight: p.weight,
-          isDigital: p.isDigital,
-          isVirtual: p.isVirtual,
-        },
-      });
-      if (IMPLICIT_VARIANT_TYPES.has(created.type)) {
-        await tx.productVariant.create({
-          data: { productId: created.id, sku: created.sku, status: 'ACTIVE' },
+    try {
+      const row = await this.db.$transaction(async (tx) => {
+        const created = await tx.product.create({
+          data: {
+            type: p.type,
+            sku: p.sku,
+            attributeSetId: p.attributeSetId,
+            status: p.status,
+            visibility: p.visibility,
+            nameDefault: p.nameDefault,
+            weight: p.weight,
+            isDigital: p.isDigital,
+            isVirtual: p.isVirtual,
+          },
         });
+        if (IMPLICIT_VARIANT_TYPES.has(created.type)) {
+          await tx.productVariant.create({
+            data: { productId: created.id, sku: created.sku, status: 'ACTIVE' },
+          });
+        }
+        return created;
+      });
+      return Product.fromPersistence(toDomainProps(row));
+    } catch (err) {
+      // `sku` is a plain (non-partial) unique DB constraint, so a soft-deleted product's sku
+      // stays permanently taken — existsBySku()'s deletedAt-filtered pre-check can't see it.
+      // Same backstop as PrismaAttributeRepository.create()/PrismaAttributeSetRepository.createSet().
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError(`sku already exists: ${p.sku}`);
       }
-      return created;
-    });
-    return Product.fromPersistence(toDomainProps(row));
+      throw err;
+    }
   }
 
   async findByPublicId(publicId: string): Promise<Product | null> {
-    const row = await this.db.product.findFirst({ where: { publicId } });
+    const row = await this.db.product.findFirst({ where: { publicId, deletedAt: null } });
     if (!row) return null;
     return Product.fromPersistence(toDomainProps(row));
+  }
+
+  async softDelete(id: bigint): Promise<void> {
+    await this.db.product.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  /** True if any variant of this product currently has non-zero on-hand or reserved stock
+   *  anywhere — guards deletion, same shape as the warehouse/attribute "in use" guards. */
+  async hasStock(id: bigint): Promise<boolean> {
+    const rows = await this.db.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1 FROM stock_item si
+        JOIN product_variant pv ON pv.id = si.variant_id
+        WHERE pv.product_id = ${id} AND (si.on_hand <> 0 OR si.reserved <> 0)
+      ) AS exists`;
+    return rows[0]?.exists ?? false;
   }
 
   async update(publicId: string, input: UpdateProductInput): Promise<Product> {
@@ -102,6 +128,7 @@ export class PrismaProductRepository implements ProductRepository {
 
   async list(filter: ListProductsFilter): Promise<ProductListResult> {
     const where: Prisma.ProductWhereInput = {
+      deletedAt: null,
       status: filter.status,
       type: filter.type,
       attributeSetId: filter.attributeSetId,

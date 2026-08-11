@@ -69,6 +69,14 @@ export interface ProductRepository {
   list(filter: ListProductsFilter): Promise<ProductListResult>;
   /** Storefront PDP (plan/14 Phase 0c) — the assigned brand's slug, if any. A small cross-aggregate convenience read, same precedent as sumStockByProduct's raw joins. */
   findBrandSlug(productId: bigint): Promise<string | null>;
+  /** Soft-delete only — order_line/cart_line/stock_item/product_price/price_tier are all ON DELETE
+   *  RESTRICT against product_variant.id, so a hard delete would fail once a variant has any
+   *  history. Order lines snapshot sku/name/price at placement and Order is never soft-deleted
+   *  itself, so past orders keep displaying correctly regardless of this. Doesn't cascade to the
+   *  product's own variants, same as AttributeSet's softDelete not cascading to its groups. */
+  softDelete(id: bigint): Promise<void>;
+  /** True if any variant currently has non-zero on-hand or reserved stock anywhere — guards deletion. */
+  hasStock(id: bigint): Promise<boolean>;
 }
 
 export interface VariantInfo {

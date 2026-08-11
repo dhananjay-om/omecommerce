@@ -17,14 +17,14 @@ export class PrismaProductLookup implements ProductLookup {
 
   async byPublicId(publicId: string): Promise<ProductCoreInfo | null> {
     return this.db.product.findFirst({
-      where: { publicId },
+      where: { publicId, deletedAt: null },
       select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, visibility: true, attributeSetId: true },
     }).then((r) => (r ? toCore(r) : null));
   }
 
   async allActive(): Promise<ProductCoreInfo[]> {
     const rows = await this.db.product.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', deletedAt: null },
       select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, visibility: true, attributeSetId: true },
     });
     return rows.map(toCore);

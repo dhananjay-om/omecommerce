@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPatch, apiPut, ApiError } from '@/lib/api-client';
+import { apiPost, apiPatch, apiPut, apiDelete, ApiError } from '@/lib/api-client';
 import type { ProductDetail } from '@/lib/types';
 
 export interface CreateProductFormState {
@@ -143,4 +143,26 @@ export async function bulkUpdateProductStatus(publicIds: string[], status: strin
 
   revalidatePath('/products');
   return { error: null };
+}
+
+export interface ActionState {
+  error: string | null;
+  success: boolean;
+}
+
+export async function deleteProduct(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const publicId = String(formData.get('publicId') ?? '').trim();
+  if (!publicId) {
+    return { error: 'Missing product id.', success: false };
+  }
+
+  try {
+    await apiDelete(`/admin/v1/products/${publicId}`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/products');
+  return { error: null, success: true };
 }

@@ -23,6 +23,7 @@ import { PrismaProductAttributeStore } from './infrastructure/product-attribute.
 import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-resolver.js';
 import { CreateProduct } from './application/create-product.usecase.js';
 import { UpdateProduct } from './application/update-product.usecase.js';
+import { DeleteProduct } from './application/delete-product.usecase.js';
 import { AssignAttributeValue } from './application/assign-attribute-value.usecase.js';
 import { AssignAttributeValues } from './application/assign-attribute-values.usecase.js';
 import { GetProductForStoreView } from './application/get-product-for-store-view.usecase.js';
@@ -106,6 +107,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
 
   const createProduct = new CreateProduct(products, outbox);
   const updateProduct = new UpdateProduct(products, brands);
+  const deleteProduct = new DeleteProduct(products, outbox);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
   const assignAttributeValues = new AssignAttributeValues(products, attributes, attrStore, cache, outbox);
   const getProductForStoreView = new GetProductForStoreView(products, attrStore, storeContext, cache);
@@ -180,6 +182,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       const body = parse(updateProductSchema, req.body);
       const view = await updateProduct.execute({ ...body, publicId: req.params.publicId! });
       res.json({ data: view });
+    }),
+  );
+  admin.delete(
+    '/products/:publicId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteProduct.execute(req.params.publicId!);
+      res.status(204).send();
     }),
   );
   admin.put(

@@ -350,4 +350,55 @@ describe.skipIf(!process.env.INTEGRATION)('catalog API (live DB)', () => {
       .send({ values: [{ attributeCode: 'ram', value: 1 }] });
     expect(res.status).toBe(404);
   });
+
+  it('deletes a product with no stock, and it disappears from list/detail/search', async () => {
+    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-DELETE-1', attributeSetId });
+    const publicId = created.body.data.publicId as string;
+
+    const del = await admin.delete(`/admin/v1/products/${publicId}`);
+    expect(del.status).toBe(204);
+
+    const detail = await admin.get(`/admin/v1/products/${publicId}`);
+    expect(detail.status).toBe(404);
+
+    const list = await admin.get('/admin/v1/products').query({ search: 'API-SKU-DELETE-1' });
+    expect(list.body.data.products.map((p: { sku: string }) => p.sku)).not.toContain('API-SKU-DELETE-1');
+  });
+
+  it('rejects deleting a product that still has stock, then allows it once stock is zeroed', async () => {
+    await admin.post('/admin/v1/warehouses').send({ code: 'WH-CATALOG-DELETE-TEST', name: 'Catalog Delete Test Warehouse' });
+    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-DELETE-2', attributeSetId });
+    const publicId = created.body.data.publicId as string;
+    const variantId = (await prisma.productVariant.findFirstOrThrow({ where: { sku: 'API-SKU-DELETE-2' } })).publicId;
+
+    await admin
+      .post('/admin/v1/inventory/adjustments')
+      .send({ variantId, warehouseCode: 'WH-CATALOG-DELETE-TEST', delta: 5, reason: 'PURCHASE' });
+
+    const blocked = await admin.delete(`/admin/v1/products/${publicId}`);
+    expect(blocked.status).toBe(409);
+
+    await admin
+      .post('/admin/v1/inventory/adjustments')
+      .send({ variantId, warehouseCode: 'WH-CATALOG-DELETE-TEST', delta: -5, reason: 'CORRECTION' });
+
+    const nowDeletable = await admin.delete(`/admin/v1/products/${publicId}`);
+    expect(nowDeletable.status).toBe(204);
+  });
+
+  it('404s deleting an unknown product', async () => {
+    const res = await admin.delete('/admin/v1/products/00000000-0000-7000-8000-000000000000');
+    expect(res.status).toBe(404);
+  });
+
+  it('cleanly 409s (not 500s) re-creating a product with a just-deleted sku', async () => {
+    // `sku` is a plain, non-partial unique DB constraint — same P2002 backstop as attributes/attribute sets.
+    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-DELETE-REUSE', attributeSetId });
+    const publicId = created.body.data.publicId as string;
+    const del = await admin.delete(`/admin/v1/products/${publicId}`);
+    expect(del.status).toBe(204);
+
+    const recreate = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku: 'API-SKU-DELETE-REUSE', attributeSetId });
+    expect(recreate.status).toBe(409);
+  });
 });
