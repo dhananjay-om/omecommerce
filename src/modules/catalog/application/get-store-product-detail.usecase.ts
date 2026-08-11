@@ -66,7 +66,19 @@ export class GetStoreProductDetail {
           }),
           this.variantStock.isInStock(v.id),
         ]);
-        return { publicId: v.publicId, sku: v.sku, status: v.status, position: v.position, price: resolvedPrice?.price ?? null, inStock };
+        return {
+          publicId: v.publicId,
+          sku: v.sku,
+          status: v.status,
+          position: v.position,
+          price: resolvedPrice?.price ?? null,
+          inStock,
+          axisValues: v.axisValues.map((a) => ({
+            attributeCode: a.attributeCode,
+            attributeLabel: a.attributeLabel,
+            optionLabel: a.optionLabel,
+          })),
+        };
       }),
     );
 

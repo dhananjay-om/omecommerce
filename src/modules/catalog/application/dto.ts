@@ -84,6 +84,9 @@ export interface StoreProductVariantView {
   position: number;
   price: string | null;
   inStock: boolean;
+  /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — powers the
+   * storefront's variant picker. Empty for a SIMPLE/DIGITAL/VIRTUAL product's single implicit variant. */
+  axisValues: VariantAxisValueView[];
 }
 
 /**

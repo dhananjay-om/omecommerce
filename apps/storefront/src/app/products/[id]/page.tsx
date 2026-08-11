@@ -8,7 +8,7 @@ import { ApiError } from '@/lib/api-client';
 import { CATEGORY_FACET_CODE } from '@/lib/facet-codes';
 import { SITE_URL } from '@/lib/config';
 import { ProductGallery } from '@/components/pdp/product-gallery';
-import { ProductActions } from '@/components/pdp/product-actions';
+import { ProductPurchasePanel } from '@/components/pdp/product-purchase-panel';
 import { ProductTabs } from '@/components/pdp/product-tabs';
 import { RecentlyViewed } from '@/components/pdp/recently-viewed';
 import { ProductCarousel } from '@/components/product/product-carousel';
@@ -80,7 +80,6 @@ export default async function ProductDetailPage({ params }: Props) {
   const relatedHits = related.hits.filter((h) => h.productId !== product.publicId).slice(0, 8);
   const breadcrumbCategory = categories.find((c) => c.publicId === primaryCategoryId);
 
-  const representativeVariant = product.variants[0];
   const priceNumber = product.price ? Number(product.price) : null;
   const shortDescription = stringAttr(product.attributes, 'short_description');
   const description = stringAttr(product.attributes, 'description');
@@ -143,15 +142,8 @@ export default async function ProductDetailPage({ params }: Props) {
             <span className="text-xs text-muted-foreground">No ratings yet</span>
           </div>
 
-          <p className="mt-4 text-3xl font-bold">
-            {priceNumber !== null ? `${product.currency} ${priceNumber.toFixed(2)}` : 'Price unavailable'}
-          </p>
-          <p className={`mt-1 text-sm font-medium ${product.inStock ? 'text-success' : 'text-destructive'}`}>
-            {product.inStock ? 'In Stock' : 'Out of Stock'}
-          </p>
-
-          <div className="mt-6">
-            <ProductActions productId={product.publicId} variant={representativeVariant} inStock={product.inStock} />
+          <div className="mt-4">
+            <ProductPurchasePanel productId={product.publicId} currency={product.currency} variants={product.variants} />
           </div>
 
           {shortDescription ? <p className="mt-6 text-sm text-muted-foreground">{shortDescription}</p> : null}

@@ -129,6 +129,48 @@ describe.skipIf(!process.env.INTEGRATION)('store product detail API (live DB + M
     expect(res.body.data.variants).toHaveLength(1);
   });
 
+  it('returns each variant\'s axis values (Size/Color) for a CONFIGURABLE product\'s storefront PDP', async () => {
+    const set = await admin.post('/admin/v1/attribute-sets').send({ code: `pdp-config-set-${Date.now()}`, name: 'PDP Config Set' });
+    const setId = set.body.data.id as string;
+    const group = await admin.post(`/admin/v1/attribute-sets/${setId}/groups`).send({ name: 'Options' });
+    const groupId = group.body.data.id as string;
+
+    const size = await admin.post('/admin/v1/attributes').send({
+      code: `pdp-size-${Date.now()}`,
+      label: 'Size',
+      dataType: 'SELECT',
+      inputType: 'DROPDOWN',
+      isVariantForming: true,
+      options: [{ value: 'S', label: 'Small' }, { value: 'M', label: 'Medium' }],
+    });
+    await admin.post(`/admin/v1/attribute-sets/${setId}/attributes`).send({ groupId, attributeCode: size.body.data.code });
+
+    const product = await admin.post('/admin/v1/products').send({
+      type: 'CONFIGURABLE',
+      sku: `PDP-CONFIG-${Date.now()}`,
+      attributeSetId: setId,
+      status: 'ACTIVE',
+    });
+    const productPublicId = product.body.data.publicId as string;
+
+    const detail = await admin.get(`/admin/v1/attribute-sets/${setId}`);
+    const sizeOptionIds = (detail.body.data.groups[0].attributes[0].options as Array<{ id: string }>).map((o) => o.id);
+
+    const gen = await admin.post(`/admin/v1/products/${productPublicId}/variants/generate`).send({
+      axes: [{ attributeCode: size.body.data.code, optionIds: sizeOptionIds }],
+    });
+    expect(gen.body.data.created).toBe(2);
+
+    const res = await admin.get(`/store/v1/products/${productPublicId}?storeViewId=${storeViewId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.variants).toHaveLength(2);
+    for (const variant of res.body.data.variants) {
+      expect(variant.axisValues).toHaveLength(1);
+      expect(variant.axisValues[0]).toMatchObject({ attributeCode: size.body.data.code, attributeLabel: 'Size' });
+      expect(['Small', 'Medium']).toContain(variant.axisValues[0].optionLabel);
+    }
+  });
+
   it('404s getting the storefront PDP for a non-existent product', async () => {
     const res = await admin.get(`/store/v1/products/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b?storeViewId=${storeViewId}`);
     expect(res.status).toBe(404);

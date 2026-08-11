@@ -6,6 +6,12 @@ export interface ProductMedia {
   altText: string | null;
 }
 
+export interface VariantAxisValue {
+  attributeCode: string;
+  attributeLabel: string;
+  optionLabel: string;
+}
+
 export interface ProductVariant {
   publicId: string;
   sku: string;
@@ -13,6 +19,9 @@ export interface ProductVariant {
   position: number;
   price: string | null;
   inStock: boolean;
+  /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — powers the
+   * variant picker on the PDP. Empty for a SIMPLE/DIGITAL/VIRTUAL product's single variant. */
+  axisValues: VariantAxisValue[];
 }
 
 export interface ProductDetail {
