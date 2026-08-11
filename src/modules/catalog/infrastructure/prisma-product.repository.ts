@@ -373,7 +373,13 @@ export class PrismaAttributeRepository implements AttributeRepository {
   }
 
   async isAssignedToAnySet(id: bigint): Promise<boolean> {
-    const found = await this.db.attributeSetAttribute.findFirst({ where: { attributeId: id }, select: { id: true } });
+    // A soft-deleted attribute set no longer counts as "in use" — otherwise an attribute
+    // that was only ever assigned to a set that's since been deleted becomes permanently
+    // undeletable, even though nothing currently references it.
+    const found = await this.db.attributeSetAttribute.findFirst({
+      where: { attributeId: id, attributeSet: { deletedAt: null } },
+      select: { id: true },
+    });
     return found !== null;
   }
 

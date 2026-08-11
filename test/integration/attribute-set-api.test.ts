@@ -170,6 +170,28 @@ describe.skipIf(!process.env.INTEGRATION)('attribute-set builder API (live DB)',
     expect(list.body.data.map((a: { code: string }) => a.code)).not.toContain('weight-class');
   });
 
+  it('allows deleting an attribute once the only attribute set assigning it has itself been deleted (no un-assign needed)', async () => {
+    const attr = await admin.post('/admin/v1/attributes').send({ code: 'trim-level', label: 'Trim Level', dataType: 'TEXT', inputType: 'TEXT' });
+    expect(attr.status).toBe(201);
+    const set = await admin.post('/admin/v1/attribute-sets').send({ code: 'convertibles', name: 'Convertibles' });
+    const group = await admin.post(`/admin/v1/attribute-sets/${set.body.data.id}/groups`).send({ name: 'General' });
+    await admin
+      .post(`/admin/v1/attribute-sets/${set.body.data.id}/attributes`)
+      .send({ groupId: group.body.data.id, attributeCode: 'trim-level' });
+
+    const blocked = await admin.delete('/admin/v1/attributes/trim-level');
+    expect(blocked.status).toBe(409);
+
+    // Delete the set directly (no product ever used it) instead of un-assigning the attribute first.
+    const setDeleted = await admin.delete(`/admin/v1/attribute-sets/${set.body.data.id}`);
+    expect(setDeleted.status).toBe(204);
+
+    // The attribute-set-attribute row still exists in the DB (delete doesn't cascade-clean it),
+    // but a soft-deleted set no longer counts as "in use" — the attribute must now be deletable.
+    const nowDeletable = await admin.delete('/admin/v1/attributes/trim-level');
+    expect(nowDeletable.status).toBe(204);
+  });
+
   it('404s deleting an unknown attribute, and 404s un-assigning one never assigned to the set', async () => {
     const unknownAttr = await admin.delete('/admin/v1/attributes/does-not-exist');
     expect(unknownAttr.status).toBe(404);
