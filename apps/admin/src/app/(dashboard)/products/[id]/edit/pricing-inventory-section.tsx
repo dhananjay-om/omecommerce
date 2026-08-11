@@ -91,6 +91,7 @@ function AdjustStockRowDialog({
   const [state, formAction, pending] = useActionState(action, initialState);
   const [open, setOpen] = useState(false);
   const [handledState, setHandledState] = useState(state);
+  const [delta, setDelta] = useState('');
 
   if (state !== handledState) {
     setHandledState(state);
@@ -98,7 +99,13 @@ function AdjustStockRowDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setDelta('');
+      }}
+    >
       <DialogTrigger render={<Button variant="outline" size="sm">Adjust</Button>} />
       <DialogContent>
         <DialogHeader>
@@ -111,15 +118,35 @@ function AdjustStockRowDialog({
           <input type="hidden" name="variantId" value={variantId} />
           <input type="hidden" name="warehouseCode" value={row.warehouseCode} />
           <div className="space-y-2">
-            <Label htmlFor={`delta-${row.warehouseCode}`}>Quantity delta</Label>
+            <Label htmlFor={`delta-${row.warehouseCode}`}>Quantity change</Label>
             <Input
               id={`delta-${row.warehouseCode}`}
               name="delta"
               type="number"
               step="1"
               required
-              placeholder="e.g. 10 or -2"
+              placeholder="e.g. 10 to add, -2 to remove"
+              value={delta}
+              onChange={(e) => setDelta(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              This is a <strong>change</strong>, not the new total — enter a positive number to add
+              stock or a negative number to remove it.
+              {row.onHand !== 0 ? (
+                <>
+                  {' '}
+                  To bring this to 0, use{' '}
+                  <button
+                    type="button"
+                    className="font-medium text-primary underline underline-offset-2"
+                    onClick={() => setDelta(String(-row.onHand))}
+                  >
+                    {-row.onHand}
+                  </button>
+                  .
+                </>
+              ) : null}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor={`reason-${row.warehouseCode}`}>Reason</Label>

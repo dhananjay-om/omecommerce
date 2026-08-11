@@ -40,8 +40,13 @@ export function AdjustStockDialog({ warehouseCode }: { warehouseCode: string }) 
             <Input id="variantId" name="variantId" required placeholder="e.g. 019f6979-c446-7016-98da-629179a3094a" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="delta">Quantity delta</Label>
-            <Input id="delta" name="delta" type="number" step="1" required placeholder="e.g. 10 or -2" />
+            <Label htmlFor="delta">Quantity change</Label>
+            <Input id="delta" name="delta" type="number" step="1" required placeholder="e.g. 10 to add, -2 to remove" />
+            <p className="text-xs text-muted-foreground">
+              This is a <strong>change</strong>, not the new total. To zero out stock, check the
+              variant&apos;s current On Hand on this warehouse&apos;s stock table (or the product&apos;s
+              own Pricing &amp; Inventory section) and enter that same number as negative.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="reason">Reason</Label>
