@@ -6,18 +6,32 @@ function formatLabel(code: string): string {
   return code.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function ProductTabs({ sku, attributes }: { sku: string; attributes: Record<string, unknown> }) {
-  const specEntries = Object.entries(attributes).filter(([, value]) => value !== null && value !== undefined && value !== '');
+/** Codes that are either shown elsewhere on the PDP (description, short description) or exist
+ * purely for SEO metadata (<head> tags, never visible page content) — never listed as a spec. */
+const NON_SPEC_CODES = new Set(['description', 'short_description', 'url_key', 'meta_title', 'meta_keywords', 'meta_description']);
+
+export function ProductTabs({
+  sku,
+  description,
+  attributes,
+}: {
+  sku: string;
+  description: string | null;
+  attributes: Record<string, unknown>;
+}) {
+  const specEntries = Object.entries(attributes).filter(
+    ([code, value]) => !NON_SPEC_CODES.has(code) && value !== null && value !== undefined && value !== '',
+  );
 
   return (
-    <Tabs defaultValue="description" className="mt-10">
+    <Tabs defaultValue="description">
       <TabsList>
         <TabsTrigger value="description">Description</TabsTrigger>
         <TabsTrigger value="specifications">Specifications</TabsTrigger>
         <TabsTrigger value="reviews">Reviews</TabsTrigger>
       </TabsList>
       <TabsContent value="description" className="pt-4 text-muted-foreground">
-        <p>Product details for SKU {sku}.</p>
+        {description ? <p className="whitespace-pre-line">{description}</p> : <p>No description available for SKU {sku} yet.</p>}
       </TabsContent>
       <TabsContent value="specifications" className="pt-4">
         {specEntries.length === 0 ? (

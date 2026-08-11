@@ -17,16 +17,30 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+/** A product's `meta_title`/`meta_description`/`meta_keywords` are SEO-content attributes set
+ * on the admin's product-edit page — they belong in <head> tags for search engines/social
+ * previews, never as visible page content. Falls back to a synthesized title/description when
+ * an admin hasn't filled them in for a given product. */
+function stringAttr(attributes: Record<string, unknown>, code: string): string | null {
+  const value = attributes[code];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   try {
     const product = await getProduct(id);
-    const title = product.name ?? product.sku;
-    const description = `${title} — ${product.price ? `${product.currency} ${Number(product.price).toFixed(2)}` : 'shop now'} at OMEShop.`;
+    const fallbackTitle = product.name ?? product.sku;
+    const fallbackDescription = `${fallbackTitle} — ${product.price ? `${product.currency} ${Number(product.price).toFixed(2)}` : 'shop now'} at OMEShop.`;
+    const title = stringAttr(product.attributes, 'meta_title') ?? fallbackTitle;
+    const description = stringAttr(product.attributes, 'meta_description') ?? fallbackDescription;
+    const metaKeywords = stringAttr(product.attributes, 'meta_keywords');
+    const keywords = metaKeywords ? metaKeywords.split(',').map((k) => k.trim()).filter(Boolean) : undefined;
     const image = product.media[0]?.url;
     return {
       title,
       description,
+      keywords,
       openGraph: {
         title,
         description,
@@ -68,6 +82,8 @@ export default async function ProductDetailPage({ params }: Props) {
 
   const representativeVariant = product.variants[0];
   const priceNumber = product.price ? Number(product.price) : null;
+  const shortDescription = stringAttr(product.attributes, 'short_description');
+  const description = stringAttr(product.attributes, 'description');
 
   const productJsonLd = {
     '@context': 'https://schema.org',
@@ -138,8 +154,12 @@ export default async function ProductDetailPage({ params }: Props) {
             <ProductActions productId={product.publicId} variant={representativeVariant} inStock={product.inStock} />
           </div>
 
-          <ProductTabs sku={product.sku} attributes={product.attributes} />
+          {shortDescription ? <p className="mt-6 text-sm text-muted-foreground">{shortDescription}</p> : null}
         </div>
+      </div>
+
+      <div className="mt-10">
+        <ProductTabs sku={product.sku} description={description} attributes={product.attributes} />
       </div>
 
       <ProductCarousel title="Related Products" hits={relatedHits} />
