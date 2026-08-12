@@ -115,20 +115,34 @@ one has to be a real text edit, not just a `.env` value.
 
 ## 4. Build and start everything
 
+Every `docker compose` command from here on needs **both** `-f
+docker-compose.prod.yml` and `--env-file .env.production` — set up a shell
+alias once so you don't have to retype (or forget) it:
+
+```bash
+alias dc='docker compose -f docker-compose.prod.yml --env-file .env.production'
+```
+
+> **If you skip `--env-file`:** `docker compose exec` will still work against
+> an *already-running* container (its real env vars were fixed when it was
+> started, not when you `exec` into it) — but you'll get a wall of `WARN...
+> variable is not set. Defaulting to a blank string.` noise, and any command
+> that needs to *create* something new (`up`, `run`) will get real blank
+> values, not just warnings. Always pass it.
+
 Start everything **except nginx** first — nginx's config points at a TLS
 certificate that doesn't exist yet, so starting it now would just crash-loop:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  up -d --build postgres redis opensearch minio api admin storefront certbot
+dc up -d --build postgres redis opensearch minio api admin storefront certbot
 ```
 
 First run takes a few minutes (builds the API image + both Next.js images).
 Watch it come up:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f api
+dc ps
+dc logs -f api
 ```
 
 Wait until `api`, `postgres`, `redis`, `opensearch`, and `minio` all show
@@ -153,8 +167,8 @@ over).
 ## 5. Database: migrate + seed
 
 ```bash
-docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy
-docker compose -f docker-compose.prod.yml exec api npm run db:seed
+dc exec api npm run migrate:deploy
+dc exec api npm run db:seed
 ```
 
 - `migrate:deploy` runs every committed Prisma migration (including the raw
@@ -175,9 +189,9 @@ docker compose -f docker-compose.prod.yml exec api npm run db:seed
 The app does **not** auto-create its S3 bucket — do it once:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec minio \
+dc exec minio \
   mc alias set local http://localhost:9000 "$(grep S3_ACCESS_KEY .env.production | cut -d= -f2)" "$(grep S3_SECRET_KEY .env.production | cut -d= -f2)"
-docker compose -f docker-compose.prod.yml exec minio mc mb local/ome-media --ignore-existing
+dc exec minio mc mb local/ome-media --ignore-existing
 ```
 
 (Adjust `ome-media` if you changed `S3_BUCKET` in `.env.production`.)
@@ -191,7 +205,7 @@ The seed creates a **known dev credential**: `admin@ome.local` /
 that password. Right after seeding:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec api node -e "
+dc exec api node -e "
 const email = 'admin@ome.local', password = 'dev-only-password-change-me';
 fetch('http://localhost:3000/admin/v1/auth/login', {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -227,11 +241,11 @@ follow-up work), and don't rely on it in the meantime.
   account, confirm the dashboard loads.
 - `https://www.yourdomain.com` — storefront home page loads with the seeded
   category/product data.
-- `docker compose -f docker-compose.prod.yml exec api node -e "fetch('http://localhost:3000/health/ready').then(r=>r.json()).then(console.log)"`
+- `dc exec api node -e "fetch('http://localhost:3000/health/ready').then(r=>r.json()).then(console.log)"`
   — should report `database`/`redis` both `ok`.
 - Optional: trigger a full search reindex so the storefront's search/PLP has
-  data — same `docker compose exec api node -e "..."` pattern as §7, POSTing
-  to `http://localhost:3000/admin/v1/search/reindex` with the token from
+  data — same `dc exec api node -e "..."` pattern as §7, POSTing to
+  `http://localhost:3000/admin/v1/search/reindex` with the token from
   logging in, `catalog:manage` permission required.
 
 ---
@@ -241,9 +255,9 @@ follow-up work), and don't rely on it in the meantime.
 ```bash
 cd /opt/omecommerce
 git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+dc up -d --build
 # only if this deploy includes new Prisma migrations:
-docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy
+dc exec api npm run migrate:deploy
 ```
 
 `docker compose up -d --build` only recreates containers whose image
@@ -258,13 +272,14 @@ topology in plan/09 §1–2 if you need zero-downtime rolling deploys later.
 
 - **Postgres** (the only truly irreplaceable data):
   ```bash
-  docker compose -f docker-compose.prod.yml exec -T postgres \
-    pg_dump -U ome omecommerce | gzip > backup-$(date +%F).sql.gz
+  dc exec -T postgres pg_dump -U ome omecommerce | gzip > backup-$(date +%F).sql.gz
   ```
   Put this on a daily cron job and ship the file off-box (S3, another host,
   etc.) — a backup that lives only on the server it's backing up doesn't
-  survive a disk failure.
-- **MinIO media**: `docker compose exec minio mc mirror local/ome-media <destination>`,
+  survive a disk failure. `dc` is the alias from §4 — if this runs from
+  cron (not an interactive shell), define the same alias as a variable in
+  the cron script instead, since cron doesn't load your shell's aliases.
+- **MinIO media**: `dc exec minio mc mirror local/ome-media <destination>`,
   or just snapshot the `miniodata` Docker volume.
 - **OpenSearch**: don't bother backing it up — it's a derived index,
   fully rebuildable from Postgres via the reindex endpoint in §8.

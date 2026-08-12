@@ -27,6 +27,14 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+# `npm run db:seed` runs `tsx prisma/seed.ts` directly (not the compiled
+# dist/ output) — and prisma/seed.ts imports
+# ../src/modules/auth/infrastructure/scrypt-password-hasher.js by a relative
+# TS path, not from dist. Without src/ present, that import 404s at runtime
+# with ERR_MODULE_NOT_FOUND — confirmed by actually running `db:seed`
+# against this image, not just building it. dist/ stays the thing CMD
+# actually runs; src/ only needs to be here for tsx-run scripts like this.
+COPY --from=build /app/src ./src
 COPY package.json ./
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]

@@ -710,20 +710,41 @@ cd /opt/omecommerce</code></pre>
 
     <section class="step" id="build-start">
       <div class="step-head"><span class="step-num">04</span><h2 class="step-title">Build and start everything</h2></div>
+      <p>Every <code>docker compose</code> command from here on needs
+        <b>both</b> <code>-f docker-compose.prod.yml</code> and
+        <code>--env-file .env.production</code> — set up a shell alias once
+        so you don't have to retype (or forget) it:</p>
+      <div class="code-block">
+        <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code>alias dc='docker compose -f docker-compose.prod.yml --env-file .env.production'</code></pre>
+      </div>
+      <div class="callout warn">
+        <span class="callout-icon">!</span>
+        <div class="callout-body">
+          <p class="callout-title">If you skip --env-file</p>
+          <p><code>docker compose exec</code> will still work against an
+            <i>already-running</i> container (its real env vars were fixed
+            when it was started, not when you <code>exec</code> into it) —
+            but you'll get a wall of <code>WARN... variable is not set.
+            Defaulting to a blank string.</code> noise, and any command that
+            needs to <i>create</i> something new (<code>up</code>,
+            <code>run</code>) will get real blank values, not just warnings.
+            Always pass it.</p>
+        </div>
+      </div>
       <p>Start everything <b>except nginx</b> first — nginx's config points
         at a TLS certificate that doesn't exist yet, so starting it now
         would just crash-loop:</p>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml --env-file .env.production \
-  up -d --build postgres redis opensearch minio api admin storefront certbot</code></pre>
+        <pre><code>dc up -d --build postgres redis opensearch minio api admin storefront certbot</code></pre>
       </div>
       <p>First run takes a few minutes (builds the API image + both Next.js
         images). Watch it come up:</p>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f api</code></pre>
+        <pre><code>dc ps
+dc logs -f api</code></pre>
       </div>
       <p>Wait until <code>api</code>, <code>postgres</code>,
         <code>redis</code>, <code>opensearch</code>, and <code>minio</code>
@@ -747,8 +768,8 @@ docker compose -f docker-compose.prod.yml logs -f api</code></pre>
       <div class="step-head"><span class="step-num">05</span><h2 class="step-title">Database: migrate + seed</h2></div>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy
-docker compose -f docker-compose.prod.yml exec api npm run db:seed</code></pre>
+        <pre><code>dc exec api npm run migrate:deploy
+dc exec api npm run db:seed</code></pre>
       </div>
       <ul>
         <li><code>migrate:deploy</code> runs every committed Prisma
@@ -771,9 +792,9 @@ docker compose -f docker-compose.prod.yml exec api npm run db:seed</code></pre>
       <p>The app does <b>not</b> auto-create its S3 bucket — do it once:</p>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml exec minio \
+        <pre><code>dc exec minio \
   mc alias set local http://localhost:9000 "$(grep S3_ACCESS_KEY .env.production | cut -d= -f2)" "$(grep S3_SECRET_KEY .env.production | cut -d= -f2)"
-docker compose -f docker-compose.prod.yml exec minio mc mb local/ome-media --ignore-existing</code></pre>
+dc exec minio mc mb local/ome-media --ignore-existing</code></pre>
       </div>
       <p>Adjust <code>ome-media</code> if you changed <code>S3_BUCKET</code>
         in <code>.env.production</code>.</p>
@@ -793,7 +814,7 @@ docker compose -f docker-compose.prod.yml exec minio mc mb local/ome-media --ign
       </div>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml exec api node -e "
+        <pre><code>dc exec api node -e "
 const email = 'admin@ome.local', password = 'dev-only-password-change-me';
 fetch('http://localhost:3000/admin/v1/auth/login', {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -833,14 +854,14 @@ fetch('http://localhost:3000/admin/v1/auth/login', {
         <li>Readiness probe from inside the container:
           <div class="code-block">
             <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-            <pre><code>docker compose -f docker-compose.prod.yml exec api \
+            <pre><code>dc exec api \
   node -e "fetch('http://localhost:3000/health/ready').then(r=&gt;r.json()).then(console.log)"</code></pre>
           </div>
           should report <code>database</code>/<code>redis</code> both
           <code>ok</code>.
         </li>
         <li>Optional: trigger a full search reindex so the storefront's
-          search/PLP has data — same <code>docker compose exec api node -e</code>
+          search/PLP has data — same <code>dc exec api node -e</code>
           pattern as §7, POSTing to
           <code>http://localhost:3000/admin/v1/search/reindex</code> with the
           token from logging in, <code>catalog:manage</code> permission
@@ -854,9 +875,9 @@ fetch('http://localhost:3000/admin/v1/auth/login', {
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
         <pre><code>cd /opt/omecommerce
 git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+dc up -d --build
 <span class="cm"># only if this deploy includes new Prisma migrations:</span>
-docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy</code></pre>
+dc exec api npm run migrate:deploy</code></pre>
       </div>
       <p><code>docker compose up -d --build</code> only recreates containers
         whose image actually changed, so it's safe to run after every pull.
@@ -872,15 +893,17 @@ docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy</code>
       <p><b>Postgres</b> — the only truly irreplaceable data:</p>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_dump -U ome omecommerce | gzip > backup-$(date +%F).sql.gz</code></pre>
+        <pre><code>dc exec -T postgres pg_dump -U ome omecommerce | gzip > backup-$(date +%F).sql.gz</code></pre>
       </div>
       <p>Put this on a daily cron job and ship the file off-box (S3, another
         host, etc.) — a backup that lives only on the server it's backing up
-        doesn't survive a disk failure.</p>
+        doesn't survive a disk failure. <code>dc</code> is the alias from
+        §4 — if this runs from cron (not an interactive shell), define the
+        same alias as a variable in the cron script instead, since cron
+        doesn't load your shell's aliases.</p>
       <ul>
         <li><b>MinIO media</b> —
-          <code>docker compose exec minio mc mirror local/ome-media &lt;destination&gt;</code>,
+          <code>dc exec minio mc mirror local/ome-media &lt;destination&gt;</code>,
           or just snapshot the <code>miniodata</code> Docker volume.</li>
         <li><b>OpenSearch</b> — don't bother backing it up; it's a derived
           index, fully rebuildable from Postgres via the reindex endpoint
