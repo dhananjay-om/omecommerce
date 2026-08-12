@@ -12,7 +12,12 @@ export async function createSession(token: string): Promise<void> {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    path: '/',
+    // Scoped to /admin (not '/'): this app is reverse-proxied at /admin on
+    // the same domain as the storefront (see next.config.ts's basePath) —
+    // narrowing the cookie's path means the browser never sends the admin
+    // token on storefront requests at all, rather than relying solely on
+    // httpOnly to keep it inert there.
+    path: '/admin',
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 }
@@ -20,7 +25,10 @@ export async function createSession(token: string): Promise<void> {
 /** Server Action / Route Handler only. */
 export async function destroySession(): Promise<void> {
   const store = await cookies();
-  store.delete(SESSION_COOKIE);
+  // A cookie is identified by name + path together — deleting by name alone
+  // targets path '/' by default and would silently fail to clear this
+  // cookie, since it was set with path: '/admin' above.
+  store.delete({ name: SESSION_COOKIE, path: '/admin' });
 }
 
 /** Read-only — safe from Server Components too. Returns null if not logged in. */

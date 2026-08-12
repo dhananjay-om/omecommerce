@@ -1,0 +1,166 @@
+# Production stack for a single-server deployment (see DEPLOYMENT.md).
+# Only Caddy publishes ports to the host — every other service is reachable
+# solely over the internal `ome` network, matching plan/09-deployment-
+# architecture.md's principle of not exposing infra directly to the internet.
+#
+# Usage:
+#   cp .env.production.example .env.production          # fill in real secrets
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# See DEPLOYMENT.md for the full first-deploy checklist (migrations, seed,
+# bucket creation) — this file only defines the runtime topology.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [ome]
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD}', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [ome]
+
+  opensearch:
+    image: opensearchproject/opensearch:2.16.0
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      # No external network path reaches this container (see header note),
+      # so the dev-mode security bypass is an accepted internal-only trade-off
+      # rather than a full OpenSearch security-plugin setup — tighten this if
+      # you ever add another workload to the same Docker network.
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    volumes:
+      - osdata:/usr/share/opensearch/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9200/_cluster/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [ome]
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [ome]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      OPENSEARCH_URL: http://opensearch:9200
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      JWT_SECRET: ${JWT_SECRET}
+      GIFT_CARD_HMAC_SECRET: ${GIFT_CARD_HMAC_SECRET}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      opensearch: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    healthcheck:
+      # node:22-slim has neither curl nor wget installed — Node 22's global
+      # `fetch` avoids adding a package just for this check.
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [ome]
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:3000
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [ome]
+
+  storefront:
+    build:
+      context: .
+      dockerfile: apps/storefront/Dockerfile
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:3000
+      WEBSITE_CODE: ${WEBSITE_CODE:-us_retail}
+      STORE_VIEW_ID: ${STORE_VIEW_ID:-1}
+      # Used for metadataBase/OpenGraph/sitemap.xml/robots.txt — the
+      # storefront serves the domain root (see deploy/Caddyfile), so this is
+      # just the bare domain, no path.
+      SITE_URL: https://${DOMAIN}
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [ome]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN}
+    depends_on: [admin, storefront]
+    networks: [ome]
+
+networks:
+  ome:
+
+volumes:
+  pgdata:
+  redisdata:
+  osdata:
+  miniodata:
+  caddy_data:
+  caddy_config:
