@@ -548,19 +548,19 @@
       <h1 class="doc-title">Ship OMEcommerce to a single VPS</h1>
       <p class="doc-dek">
         A complete, sequential walkthrough for putting the full stack — API,
-        admin, and storefront — on one server with Docker Compose and Caddy,
+        admin, and storefront — on one server with Docker Compose and nginx,
         matching this repo's own <code>plan/09-deployment-architecture.md</code>
         topology for single-tenant, smaller deployments.
       </p>
       <div class="fact-row">
         <span class="fact-chip">Target <b>1 Linux VPS</b></span>
         <span class="fact-chip">Orchestration <b>Docker Compose</b></span>
-        <span class="fact-chip">TLS <b>Caddy, automatic</b></span>
+        <span class="fact-chip">TLS <b>nginx + certbot</b></span>
         <span class="fact-chip">Domain <b>1, path-based split</b></span>
       </div>
 
       <figure class="diagram">
-        <svg viewBox="0 0 720 410" role="img" aria-label="Only Caddy is reachable from the public internet, on one domain. Caddy splits requests by path: /admin routes to the admin Next.js app, everything else routes to the storefront Next.js app. Both call the Express API server-side over an internal Docker network. The API is the only thing that talks to Postgres, Redis, OpenSearch, and MinIO — none of those, nor the API itself, have public ports.">
+        <svg viewBox="0 0 720 410" role="img" aria-label="Only nginx is reachable from the public internet, on one domain. nginx splits requests by path: /admin routes to the admin Next.js app, everything else routes to the storefront Next.js app. Both call the Express API server-side over an internal Docker network. The API is the only thing that talks to Postgres, Redis, OpenSearch, and MinIO — none of those, nor the API itself, have public ports.">
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
@@ -571,8 +571,8 @@
           <line x1="360" y1="22" x2="360" y2="34" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
 
           <rect x="280" y="36" width="160" height="52" rx="8" class="box accent-line" stroke-width="1.6" />
-          <text x="360" y="58" text-anchor="middle" class="label" font-size="14">Caddy</text>
-          <text x="360" y="76" text-anchor="middle" class="sub" font-size="11">:80 / :443 · auto-TLS</text>
+          <text x="360" y="58" text-anchor="middle" class="label" font-size="14">nginx</text>
+          <text x="360" y="76" text-anchor="middle" class="sub" font-size="11">:80 / :443 · TLS via certbot</text>
 
           <rect x="40" y="112" width="640" height="278" rx="14" class="boundary" stroke-width="1.4" />
           <text x="58" y="130" class="tag" font-size="10.5" letter-spacing="0.04em">INTERNAL DOCKER NETWORK — NO PUBLIC PORTS</text>
@@ -619,8 +619,8 @@
           <text x="615" y="384" text-anchor="middle" class="sub" font-size="10">media (S3)</text>
         </svg>
         <figcaption>
-          One domain, split by path: Caddy sends <code>/admin*</code> to the
-          admin app and everything else to the storefront. Only Caddy takes
+          One domain, split by path: nginx sends <code>/admin*</code> to the
+          admin app and everything else to the storefront. Only nginx takes
           public traffic — the API and every data store sit on an internal
           Docker network; see <a href="#why-api">“Why the API isn't public.”</a>
         </figcaption>
@@ -638,8 +638,9 @@
           <code>www.yourdomain.com</code> → server IP. Admin lives at
           <code>/admin</code> on this same domain, so no second subdomain is
           needed.</li>
-        <li>Ports <b>80</b> and <b>443</b> open to the internet (Caddy needs
-          both for the Let's Encrypt HTTP-01/TLS-ALPN challenge).</li>
+        <li>Ports <b>80</b> and <b>443</b> open to the internet (80 for the
+          Let's Encrypt HTTP-01 challenge and the HTTP→HTTPS redirect, 443
+          for the site itself).</li>
       </ul>
     </section>
 
@@ -694,20 +695,28 @@ cd /opt/omecommerce</code></pre>
           <p><code>JWT_SECRET</code> and <code>GIFT_CARD_HMAC_SECRET</code>
             <b>must be different values</b> — the codebase deliberately keeps
             them separate (see the comment in <code>src/config/env.ts</code>).
-            Also set <code>DOMAIN</code> to your real domain, matching the DNS
-            record from §0 — it's used by both Caddy (TLS cert) and the
-            storefront (<code>SITE_URL</code>, for
-            metadataBase/OpenGraph/sitemap.xml).</p>
+            Also set <code>DOMAIN</code> (matching the DNS record from §0)
+            and <code>LETSENCRYPT_EMAIL</code> — <code>DOMAIN</code> feeds
+            the storefront's <code>SITE_URL</code> and
+            <code>deploy/init-certbot.sh</code>'s certificate request.</p>
         </div>
       </div>
+      <p>Also edit <b><code>deploy/nginx.conf</code></b> and replace every
+        <code>YOUR_DOMAIN_HERE</code> with that same domain — nginx, unlike
+        Caddy, has no env-var substitution, so this one has to be a real
+        text edit, not just a <code>.env</code> value.</p>
       <p><code>.env.production</code> is git-ignored — never commit it.</p>
     </section>
 
     <section class="step" id="build-start">
       <div class="step-head"><span class="step-num">04</span><h2 class="step-title">Build and start everything</h2></div>
+      <p>Start everything <b>except nginx</b> first — nginx's config points
+        at a TLS certificate that doesn't exist yet, so starting it now
+        would just crash-loop:</p>
       <div class="code-block">
         <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
-        <pre><code>docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build</code></pre>
+        <pre><code>docker compose -f docker-compose.prod.yml --env-file .env.production \
+  up -d --build postgres redis opensearch minio api admin storefront certbot</code></pre>
       </div>
       <p>First run takes a few minutes (builds the API image + both Next.js
         images). Watch it come up:</p>
@@ -719,6 +728,19 @@ docker compose -f docker-compose.prod.yml logs -f api</code></pre>
       <p>Wait until <code>api</code>, <code>postgres</code>,
         <code>redis</code>, <code>opensearch</code>, and <code>minio</code>
         all show <code>healthy</code>.</p>
+      <p>Then get your first TLS certificate — a one-time bootstrap (see
+        <code>deploy/init-certbot.sh</code>'s header comment for exactly why
+        this needs a script rather than "just start nginx"):</p>
+      <div class="code-block">
+        <div class="code-block-bar"><span class="code-block-tag">bash</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code>./deploy/init-certbot.sh</code></pre>
+      </div>
+      <p>This starts <code>nginx</code> itself as one of its steps — you
+        won't need to start it separately. From here on, the
+        <code>certbot</code> service you already started keeps the
+        certificate renewed automatically; you never run this script again
+        on this server (only if you tear down the <code>certbot_certs</code>
+        volume and start over).</p>
     </section>
 
     <section class="step" id="migrate-seed">
@@ -899,10 +921,11 @@ docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy</code>
             JWT. So the API only needs to be reachable on the internal
             Docker network, which is simpler and reduces attack surface.</p>
           <p>If you later need direct external API access — a mobile app,
-            inbound payment-gateway webhooks — uncomment the
-            <code>api_domain</code> block in <code>deploy/Caddyfile</code>
-            and add an <code>API_DOMAIN</code> entry to
-            <code>.env.production</code>.</p>
+            inbound payment-gateway webhooks — uncomment the commented-out
+            <code>server</code> block at the bottom of
+            <code>deploy/nginx.conf</code> (needs its own subdomain +
+            certificate — see the block's own comments) and add an
+            <code>API_DOMAIN</code> entry to <code>.env.production</code>.</p>
         </div>
       </div>
     </section>
@@ -946,7 +969,7 @@ docker compose -f docker-compose.prod.yml exec api npm run migrate:deploy</code>
     </section>
 
     <footer class="doc-footer">
-      OMEcommerce · Deployment Guide · matches <code>docker-compose.prod.yml</code>, <code>deploy/Caddyfile</code>, <code>.env.production.example</code> in the repo root
+      OMEcommerce · Deployment Guide · matches <code>docker-compose.prod.yml</code>, <code>deploy/nginx.conf</code>, <code>deploy/init-certbot.sh</code>, <code>.env.production.example</code> in the repo root
     </footer>
   </main>
 </div>

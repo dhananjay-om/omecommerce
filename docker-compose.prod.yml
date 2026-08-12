@@ -1,5 +1,5 @@
 # Production stack for a single-server deployment (see DEPLOYMENT.md).
-# Only Caddy publishes ports to the host — every other service is reachable
+# Only nginx publishes ports to the host — every other service is reachable
 # solely over the internal `ome` network, matching plan/09-deployment-
 # architecture.md's principle of not exposing infra directly to the internet.
 #
@@ -132,26 +132,39 @@ services:
       WEBSITE_CODE: ${WEBSITE_CODE:-us_retail}
       STORE_VIEW_ID: ${STORE_VIEW_ID:-1}
       # Used for metadataBase/OpenGraph/sitemap.xml/robots.txt — the
-      # storefront serves the domain root (see deploy/Caddyfile), so this is
+      # storefront serves the domain root (see deploy/nginx.conf), so this is
       # just the bare domain, no path.
       SITE_URL: https://${DOMAIN}
     depends_on:
       api: { condition: service_healthy }
     networks: [ome]
 
-  caddy:
-    image: caddy:2
+  nginx:
+    image: nginx:alpine
     restart: unless-stopped
     ports:
       - '80:80'
       - '443:443'
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      DOMAIN: ${DOMAIN}
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
     depends_on: [admin, storefront]
+    networks: [ome]
+
+  # Renews the Let's Encrypt certificate automatically, forever, on a 12h
+  # loop — no host cron job needed. Does NOT issue the FIRST certificate;
+  # that's a chicken-and-egg problem (nginx won't start without a cert file
+  # to point at, but there's no cert yet) solved once, manually, by running
+  # deploy/init-certbot.sh — see that script's header comment for the full
+  # explanation and the exact first-deploy sequence.
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done"
     networks: [ome]
 
 networks:
@@ -162,5 +175,5 @@ volumes:
   redisdata:
   osdata:
   miniodata:
-  caddy_data:
-  caddy_config:
+  certbot_certs:
+  certbot_webroot:

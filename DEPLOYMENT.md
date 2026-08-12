@@ -1,4 +1,4 @@
-# Deployment Guide — Single VPS (Docker Compose + Caddy)
+# Deployment Guide — Single VPS (Docker Compose + nginx)
 
 This deploys the full stack to **one server**, matching
 `plan/09-deployment-architecture.md`'s "Docker Compose (small clients)"
@@ -6,7 +6,7 @@ topology: a single-tenant deployment, all services containerized, one
 `docker-compose.prod.yml` on the box.
 
 ```
-                         Caddy (:80/:443, auto‑TLS)
+                          nginx (:80/:443, TLS via certbot)
                           www.yourdomain.com
                          /                  \
                 path = /admin*          everything else
@@ -25,10 +25,16 @@ topology: a single-tenant deployment, all services containerized, one
 `www.yourdomain.com/admin` — one DNS record, one TLS cert, no subdomains.
 This works because `apps/admin/next.config.ts` sets `basePath: '/admin'`,
 which makes Next itself prefix every internal link, redirect, and static
-asset URL — so Caddy's `deploy/Caddyfile` just needs to route by path
-(`handle /admin*` vs. everything else), not rewrite anything.
+asset URL — so `deploy/nginx.conf` just needs to route by path (`location
+/admin` vs. everything else), not rewrite anything.
 
-Only Caddy publishes ports to the internet. Postgres/Redis/OpenSearch/MinIO/
+Unlike Caddy, nginx has no built-in ACME client, so a separate `certbot`
+container handles TLS: a one-time bootstrap script
+(`deploy/init-certbot.sh`) gets the first certificate, and the `certbot`
+service then renews it automatically forever after — see
+[§4](#4-build-and-start-everything).
+
+Only nginx publishes ports to the internet. Postgres/Redis/OpenSearch/MinIO/
 the API are reachable **only** on the internal Docker network — see
 ["Why the API isn't public"](#why-the-api-isnt-public) below.
 
@@ -42,8 +48,8 @@ the API are reachable **only** on the internal Docker network — see
 - A domain you control, with **one** DNS **A record** already pointed at the
   server's public IP — e.g. `www.yourdomain.com` → server IP. (Admin lives at
   `/admin` on this same domain — no second subdomain needed.)
-- Ports **80** and **443** open to the internet (Caddy needs both for the
-  Let's Encrypt HTTP-01/TLS-ALPN challenge).
+- Ports **80** and **443** open to the internet (80 for the Let's Encrypt
+  HTTP-01 challenge and the HTTP→HTTPS redirect, 443 for the site itself).
 
 ---
 
@@ -94,9 +100,14 @@ openssl rand -base64 32
 
 `JWT_SECRET` and `GIFT_CARD_HMAC_SECRET` **must be different values** (the
 codebase deliberately keeps them separate — see the comment in
-`src/config/env.ts`). Also set `DOMAIN` to your real domain (must match the
-DNS record from §0) — it's used both by Caddy (TLS cert) and by the
-storefront (`SITE_URL`, for `metadataBase`/OpenGraph/sitemap.xml).
+`src/config/env.ts`). Also set `DOMAIN` (must match the DNS record from §0)
+and `LETSENCRYPT_EMAIL` — `DOMAIN` feeds the storefront's `SITE_URL` (for
+`metadataBase`/OpenGraph/sitemap.xml) and `deploy/init-certbot.sh`'s
+certificate request.
+
+Also edit **`deploy/nginx.conf`** and replace every `YOUR_DOMAIN_HERE` with
+that same domain — nginx, unlike Caddy, has no env-var substitution, so this
+one has to be a real text edit, not just a `.env` value.
 
 `.env.production` is git-ignored — never commit it.
 
@@ -104,8 +115,12 @@ storefront (`SITE_URL`, for `metadataBase`/OpenGraph/sitemap.xml).
 
 ## 4. Build and start everything
 
+Start everything **except nginx** first — nginx's config points at a TLS
+certificate that doesn't exist yet, so starting it now would just crash-loop:
+
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  up -d --build postgres redis opensearch minio api admin storefront certbot
 ```
 
 First run takes a few minutes (builds the API image + both Next.js images).
@@ -118,6 +133,20 @@ docker compose -f docker-compose.prod.yml logs -f api
 
 Wait until `api`, `postgres`, `redis`, `opensearch`, and `minio` all show
 `healthy`.
+
+Then get your first TLS certificate — a one-time bootstrap (see
+`deploy/init-certbot.sh`'s header comment for exactly why this needs a
+script rather than "just start nginx"):
+
+```bash
+./deploy/init-certbot.sh
+```
+
+This starts `nginx` itself as one of its steps — you won't need to start it
+separately. From here on, the `certbot` service you already started keeps
+the certificate renewed automatically; you never run this script again on
+this server (only if you tear down the `certbot_certs` volume and start
+over).
 
 ---
 
@@ -265,9 +294,10 @@ Server Actions / the storefront's own Route Handlers proxy) — the browser
 never talks to `api` directly, and neither app's client-side code holds a raw
 JWT. So the API only needs to be reachable on the internal Docker network,
 which is both simpler and reduces attack surface. If you later need direct
-external API access (a mobile app, inbound payment-gateway webhooks), uncomment
-the `api_domain` block in `deploy/Caddyfile` and add an `API_DOMAIN` entry to
-`.env.production`.
+external API access (a mobile app, inbound payment-gateway webhooks),
+uncomment the commented-out `server` block at the bottom of
+`deploy/nginx.conf` (needs its own subdomain + certificate — see the block's
+own comments) and add an `API_DOMAIN` entry to `.env.production`.
 
 ---
 
