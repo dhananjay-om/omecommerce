@@ -1,0 +1,743 @@
+{
+  "info": {
+    "name": "OMEcommerce",
+    "description": "End-to-end walkthrough of the OMEcommerce backend API: auth, customers, catalog/inventory/pricing setup, checkout, wallet, gift cards, loyalty, and referral. Run folders top-to-bottom (or use Collection Runner) — later requests depend on variables set by earlier ones via test scripts.\n\n**One manual step required:** there is no HTTP endpoint to look up a product variant's publicId by SKU. After running \"Create Product\" in the Catalog Setup folder, run this on your machine and paste the result into the `variantId` collection variable:\n\n```\ndocker exec ome-pg-dev psql -U ome -d ome -tA -c \"SELECT public_id FROM product_variant WHERE sku='{{productSku}}';\"\n```\n\nEverything else auto-chains (tokens, ids, codes) via test scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4100" },
+    { "key": "adminEmail", "value": "admin@ome.local" },
+    { "key": "adminPassword", "value": "dev-only-password-change-me" },
+    { "key": "adminToken", "value": "" },
+    { "key": "websiteCode", "value": "us_retail" },
+    { "key": "storeViewId", "value": "1" },
+    { "key": "attributeSetId", "value": "1" },
+    { "key": "referrerEmail", "value": "referrer@example.com" },
+    { "key": "refereeEmail", "value": "referee@example.com" },
+    { "key": "customerPassword", "value": "correct-horse-battery" },
+    { "key": "referrerToken", "value": "" },
+    { "key": "referrerId", "value": "" },
+    { "key": "refereeToken", "value": "" },
+    { "key": "refereeId", "value": "" },
+    { "key": "productSku", "value": "PM-SKU-1" },
+    { "key": "productPublicId", "value": "" },
+    { "key": "variantId", "value": "", "description": "MANUAL: paste the variant publicId here after running Create Product — see collection description." },
+    { "key": "warehouseCode", "value": "PM-WH" },
+    { "key": "priceListCode", "value": "PM-PL" },
+    { "key": "shippingMethodCode", "value": "PM-SHIP" },
+    { "key": "taxClassCode", "value": "PM-TAX" },
+    { "key": "cartId", "value": "" },
+    { "key": "orderPublicId", "value": "" },
+    { "key": "giftCardCode", "value": "" },
+    { "key": "loyaltyProgramPublicId", "value": "" },
+    { "key": "referralCode", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('adminToken', json.data.token);",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "auth", "login"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Customer",
+      "item": [
+        {
+          "name": "Register Referrer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"email\": \"{{referrerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/store/v1/customers", "host": ["{{baseUrl}}"], "path": ["store", "v1", "customers"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Referrer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('referrerToken', json.data.token);",
+                  "pm.collectionVariables.set('referrerId', json.data.customerPublicId);",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"email\": \"{{referrerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/store/v1/customers/actions/login", "host": ["{{baseUrl}}"], "path": ["store", "v1", "customers", "actions", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Referee",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"email\": \"{{refereeEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/store/v1/customers", "host": ["{{baseUrl}}"], "path": ["store", "v1", "customers"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Referee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('refereeToken', json.data.token);",
+                  "pm.collectionVariables.set('refereeId', json.data.customerPublicId);",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"email\": \"{{refereeEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/store/v1/customers/actions/login", "host": ["{{baseUrl}}"], "path": ["store", "v1", "customers", "actions", "login"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Catalog Setup",
+      "item": [
+        {
+          "name": "Create Attribute Set (optional — seed already has id=1 'electronics')",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"postman-set\",\n  \"name\": \"Postman Attribute Set\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/attribute-sets", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "attribute-sets"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('productPublicId', json.data.publicId);",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SIMPLE\",\n  \"sku\": \"{{productSku}}\",\n  \"attributeSetId\": \"{{attributeSetId}}\",\n  \"status\": \"ACTIVE\",\n  \"nameDefault\": \"Postman Test Product\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/products", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "products"] },
+            "description": "MANUAL STEP after this request: there is no endpoint to look up a variant by SKU. Run:\n\n```\ndocker exec ome-pg-dev psql -U ome -d ome -tA -c \"SELECT public_id FROM product_variant WHERE sku='{{productSku}}';\"\n```\n\n...and paste the result into the `variantId` collection variable before continuing."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Inventory",
+      "item": [
+        {
+          "name": "Create Warehouse",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{warehouseCode}}\",\n  \"name\": \"Postman Warehouse\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/warehouses", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "warehouses"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock (requires variantId set manually — see Create Product)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantId\": \"{{variantId}}\",\n  \"warehouseCode\": \"{{warehouseCode}}\",\n  \"delta\": 100,\n  \"reason\": \"PURCHASE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/inventory/adjustments", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "inventory", "adjustments"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Pricing",
+      "item": [
+        {
+          "name": "Create Price List",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{priceListCode}}\",\n  \"name\": \"Postman Price List\",\n  \"currency\": \"USD\",\n  \"priority\": 0\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/price-lists", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "price-lists"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Product Price (requires variantId)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantId\": \"{{variantId}}\",\n  \"price\": \"50.00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/v1/price-lists/{{priceListCode}}/prices",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "v1", "price-lists", "{{priceListCode}}", "prices"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Order Setup",
+      "item": [
+        {
+          "name": "Create Shipping Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{shippingMethodCode}}\",\n  \"name\": \"Postman Shipping\",\n  \"flatRate\": \"0.00\",\n  \"currency\": \"USD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/shipping-methods", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "shipping-methods"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Tax Class (optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{taxClassCode}}\",\n  \"name\": \"Postman Tax\",\n  \"rate\": \"0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/tax-classes", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "tax-classes"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Loyalty",
+      "item": [
+        {
+          "name": "Create Loyalty Program",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('loyaltyProgramPublicId', json.data.publicId);",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"name\": \"Postman Rewards\",\n  \"pointsPerCurrencyUnit\": \"1\",\n  \"pointValue\": \"0.01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/loyalty/programs", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "loyalty", "programs"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Loyalty Tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Silver\",\n  \"thresholdPoints\": \"100\",\n  \"earnMultiplier\": \"1.5\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/v1/loyalty/programs/{{loyaltyProgramPublicId}}/tiers",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "v1", "loyalty", "programs", "{{loyaltyProgramPublicId}}", "tiers"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Referral",
+      "item": [
+        {
+          "name": "Create Referral Program",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"name\": \"Postman Referrals\",\n  \"qualifyingEvent\": \"FIRST_ORDER\",\n  \"minOrderAmount\": \"20.00\",\n  \"attributionWindowDays\": 30,\n  \"maxReferralsPerCustomer\": 10,\n  \"referrerRewardType\": \"STORE_CREDIT\",\n  \"referrerRewardAmount\": \"10.00\",\n  \"refereeRewardType\": \"POINTS\",\n  \"refereeRewardPoints\": \"100\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/referral/programs", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "referral", "programs"] },
+            "description": "Requires the Loyalty program to already exist (refereeRewardType is POINTS)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Referrals (Referrer) — fetch code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('referralCode', json.data.code);",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{referrerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/referrals", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "referrals"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Attach Referral (Referee)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{refereeToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{referralCode}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/v1/me/referrals/actions/attach",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "v1", "me", "referrals", "actions", "attach"]
+            },
+            "description": "Issues the referee's POINTS reward immediately. The referrer's STORE_CREDIT reward comes later, automatically, once the referee places a qualifying order (see the Checkout folder) — no manual trigger needed."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Checkout (as Referee — this is the qualifying order)",
+      "item": [
+        {
+          "name": "Create Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('cartId', json.data.publicId);",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storeViewId\": \"{{storeViewId}}\",\n  \"customerPublicId\": \"{{refereeId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/store/v1/carts", "host": ["{{baseUrl}}"], "path": ["store", "v1", "carts"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Cart Line (requires variantId)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantId\": \"{{variantId}}\",\n  \"qty\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/v1/carts/{{cartId}}/lines",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "v1", "carts", "{{cartId}}", "lines"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('orderPublicId', json.data.publicId);",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}", "description": "Optional — prevents accidental double-submission if you replay this request." }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{refereeEmail}}\",\n  \"billingAddress\": { \"name\": \"Referee\", \"line1\": \"1 Demo St\", \"city\": \"Demo City\", \"postalCode\": \"00000\", \"country\": \"US\" },\n  \"shippingAddress\": { \"name\": \"Referee\", \"line1\": \"1 Demo St\", \"city\": \"Demo City\", \"postalCode\": \"00000\", \"country\": \"US\" },\n  \"shippingMethodCode\": \"{{shippingMethodCode}}\",\n  \"paymentMethod\": \"test_card\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/v1/carts/{{cartId}}/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "v1", "carts", "{{cartId}}", "checkout"]
+            },
+            "description": "grandTotal = 2 x $50.00 = $100.00, which is >= the referral program's $20 minOrderAmount, so this order qualifies the referral automatically once the background worker picks it up (usually within a couple seconds)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Post-Purchase Checks",
+      "item": [
+        {
+          "name": "Get My Referrals (Referrer) — reward appears automatically",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{referrerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/referrals", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "referrals"] },
+            "description": "Re-send this a few times a couple seconds apart if status is still SIGNED_UP — it's worker-driven, not instant. Expect status REWARDED and referrerReward.amount = '10.0000'."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Wallet (Referrer) — should show $10.00",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{referrerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/wallet", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "wallet"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Loyalty Account (Referee) — should show 100 points",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{refereeToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/loyalty", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "loyalty"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Loyalty Transactions (Referee)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{refereeToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/loyalty/transactions", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "loyalty", "transactions"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Refund & Clawback",
+      "item": [
+        {
+          "name": "Refund Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lines\": [{ \"sku\": \"{{productSku}}\", \"qty\": 2 }],\n  \"restock\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/v1/orders/{{orderPublicId}}/refunds",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "v1", "orders", "{{orderPublicId}}", "refunds"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Referrals (Referrer) — status REVERSED",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{referrerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/referrals", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "referrals"] },
+            "description": "Re-send a few times a couple seconds apart if still REWARDED — worker-driven. Expect status REVERSED."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Wallet (Referrer) — back to $0.00",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{referrerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/store/v1/me/wallet", "host": ["{{baseUrl}}"], "path": ["store", "v1", "me", "wallet"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. Wallet (admin ops)",
+      "item": [
+        {
+          "name": "Get Customer Wallet (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/v1/customers/{{referrerId}}/wallet",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "v1", "customers", "{{referrerId}}", "wallet"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Credit Wallet (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"25.00\",\n  \"bucket\": \"STORE_CREDIT\",\n  \"source\": \"GOODWILL\",\n  \"reason\": \"Postman test credit\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/v1/customers/{{referrerId}}/wallet/actions/credit",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "v1", "customers", "{{referrerId}}", "wallet", "actions", "credit"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Wallet (admin, negative)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"-5.00\",\n  \"bucket\": \"STORE_CREDIT\",\n  \"reason\": \"Postman test adjustment\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/v1/customers/{{referrerId}}/wallet/actions/adjust",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "v1", "customers", "{{referrerId}}", "wallet", "actions", "adjust"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12. Gift Card",
+      "item": [
+        {
+          "name": "Issue Gift Card (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('giftCardCode', json.data.code);",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"websiteCode\": \"{{websiteCode}}\",\n  \"amount\": \"20.00\",\n  \"kind\": \"DIGITAL\",\n  \"recipientEmail\": \"{{refereeEmail}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/v1/gift-cards", "host": ["{{baseUrl}}"], "path": ["admin", "v1", "gift-cards"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Redeem Gift Card into Wallet (Referee)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{refereeToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{giftCardCode}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/v1/me/wallet/actions/redeem-gift-card",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "v1", "me", "wallet", "actions", "redeem-gift-card"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

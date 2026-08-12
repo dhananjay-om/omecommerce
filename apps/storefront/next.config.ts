@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(import.meta.dirname),
   },
+  // Same multi-lockfile ambiguity applies to the production build's file
+  // tracer (used by `output: 'standalone'`) as to Turbopack above — pin it
+  // explicitly rather than letting Next guess the wrong monorepo root.
+  outputFileTracingRoot: path.join(import.meta.dirname),
+  // Minimal self-contained `.next/standalone` output (server.js + only the
+  // node_modules files actually traced as needed) — keeps the production
+  // Docker image small instead of shipping the full node_modules tree.
+  output: 'standalone',
 };
 
 export default nextConfig;
