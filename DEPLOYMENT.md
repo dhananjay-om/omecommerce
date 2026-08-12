@@ -302,6 +302,35 @@ topology in plan/09 §1–2 if you need zero-downtime rolling deploys later.
 
 ---
 
+## Alternative: fronting with an existing host nginx
+
+Everything above assumes this project's own `nginx` + `certbot` services own
+ports 80/443. If your server already has a **different**, pre-existing
+nginx running directly on the host (outside Docker) — already
+Certbot-managed for this domain — you don't need to fight it for the ports
+or run `deploy/init-certbot.sh` at all. Instead:
+
+1. Don't start this project's `nginx`/`certbot` services — just never
+   include them when you `docker compose up` (or `docker compose stop nginx
+   certbot` if they're already up).
+2. `admin` and `storefront` already publish to `127.0.0.1:3000` and
+   `127.0.0.1:3001` respectively (see their `ports:` in
+   `docker-compose.prod.yml`) specifically for this case — nothing external
+   can reach those, only processes on the same host.
+3. Add the `location /admin` / `location /` blocks from
+   `deploy/host-nginx-alternative.conf` into your existing host nginx
+   config, proxying to those two `127.0.0.1` addresses. Keep your existing
+   `listen`/`ssl_certificate*` lines and HTTP→HTTPS redirect block as they
+   already are — a working Certbot-managed config doesn't need those
+   touched.
+4. `nginx -t` (or `sudo nginx -t` if the config lives in a root-owned path),
+   then reload: `systemctl reload nginx`.
+
+Same "no trailing path after the proxy_pass port" rule applies here as in
+`deploy/nginx.conf` — see that file's comments for why.
+
+---
+
 ## Why the API isn't public
 
 Both Next.js apps call the backend **server-side** (Server Components /

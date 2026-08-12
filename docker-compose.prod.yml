@@ -121,6 +121,15 @@ services:
     depends_on:
       api: { condition: service_healthy }
     networks: [ome]
+    # Published to localhost ONLY (not 0.0.0.0) — this is for the alternative
+    # deployment mode where an existing HOST nginx (already managing its own
+    # TLS, e.g. via system Certbot) proxies to these containers directly,
+    # instead of using this file's own `nginx`/`certbot` services. Harmless
+    # to leave published even if you're using the default all-Docker path —
+    # nothing on the public internet can reach 127.0.0.1. See DEPLOYMENT.md
+    # "Alternative: fronting with an existing host nginx".
+    ports:
+      - '127.0.0.1:3000:3000'
 
   storefront:
     build:
@@ -138,6 +147,9 @@ services:
     depends_on:
       api: { condition: service_healthy }
     networks: [ome]
+    # See the same comment on the admin service above.
+    ports:
+      - '127.0.0.1:3001:3001'
 
   nginx:
     image: nginx:alpine
