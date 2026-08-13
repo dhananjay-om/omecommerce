@@ -13,6 +13,7 @@ import {
   ListTree,
   SlidersHorizontal,
   FolderTree,
+  Coins,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,10 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/orders', label: 'Orders', icon: ShoppingCart },
       { href: '/customers', label: 'Customers', icon: Users },
     ],
+  },
+  {
+    label: 'Stores',
+    items: [{ href: '/stores/currencies', label: 'Currency Setup', icon: Coins }],
   },
 ];
 

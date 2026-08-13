@@ -213,6 +213,13 @@ export interface VariantPrice {
   price: string | null;
 }
 
+export interface Currency {
+  code: string;
+  symbol: string;
+  name: string;
+  minorUnits: number;
+}
+
 /** One warehouse's stock for a single variant — every active warehouse appears, zeroed if never stocked. */
 export interface VariantStock {
   warehouseCode: string;
