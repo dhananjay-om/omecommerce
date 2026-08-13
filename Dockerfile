@@ -35,6 +35,10 @@ COPY --from=build /app/prisma ./prisma
 # against this image, not just building it. dist/ stays the thing CMD
 # actually runs; src/ only needs to be here for tsx-run scripts like this.
 COPY --from=build /app/src ./src
+# For scripts/seed-demo-data.mjs (run via `docker compose exec api node
+# scripts/seed-demo-data.mjs`) — not needed by the app itself at runtime,
+# but small, and simplest to just always have available.
+COPY --from=build /app/scripts ./scripts
 COPY package.json ./
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]

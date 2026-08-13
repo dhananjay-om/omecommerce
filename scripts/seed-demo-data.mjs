@@ -1,16 +1,24 @@
 #!/usr/bin/env node
 // Seeds a small, coherent demo catalog (categories, brands, products with
-// real prices/stock/images) against a running local backend — the dev DB is
-// otherwise empty or full of leftover integration-test fixtures (product/
-// category tables get TRUNCATEd by several test files' beforeAll hooks), and
-// every storefront phase from here on needs something real to browse.
+// real prices/stock/images) against a running backend — the DB is otherwise
+// empty or full of leftover integration-test fixtures (product/category
+// tables get TRUNCATEd by several test files' beforeAll hooks), and every
+// storefront phase from here on needs something real to browse.
 // Idempotent: skips creating a category/brand/product that already exists by
-// name/sku, so it's safe to re-run after a test suite wipes the DB. Usage:
-//   node scripts/seed-demo-data.mjs
+// name/sku, so it's safe to re-run after a test suite wipes the DB.
+//
+// Needs both API_BASE_URL (the backend's own HTTP API) and DATABASE_URL (a
+// direct Postgres connection, for the one write with no admin endpoint yet
+// — see below) pointed at the same environment. Works unmodified against
+// local dev (scripts/dev-up.sh already exports both) or inside the
+// production api container (docker compose already sets both) — see
+// deploy/seed-demo-data.sh for the production invocation.
+//
+// Usage: node scripts/seed-demo-data.mjs
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
 import path from 'node:path';
+import { PrismaClient } from '@prisma/client';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMAGES_DIR = path.join(__dirname, 'seed-assets');
@@ -63,14 +71,16 @@ console.log('warehouse + price list + shipping method ok:', warehouse.code, pric
 // id", which silently picks a leftover test warehouse with zero stock for our
 // demo products whenever the backend test suite has run in this DB. Pin the
 // mapping explicitly so checkout is deterministic regardless of what other
-// warehouses exist.
-execSync(
-  `docker exec ome-pg-dev psql -U ome -d ome -c "` +
-    `INSERT INTO store_warehouse (store_id, warehouse_id, priority) ` +
-    `SELECT s.id, w.id, 0 FROM store s, warehouse w WHERE s.code = 'main' AND w.code = 'WH-MAIN' ` +
-    `ON CONFLICT (store_id, warehouse_id) DO UPDATE SET priority = 0"`,
-  { stdio: 'inherit' },
-);
+// warehouses exist. A direct Prisma connection (not a `docker exec` into a
+// specific local container name) so this step works the same way in any
+// environment this script runs in.
+const prisma = new PrismaClient();
+await prisma.$executeRaw`
+  INSERT INTO store_warehouse (store_id, warehouse_id, priority)
+  SELECT s.id, w.id, 0 FROM store s, warehouse w WHERE s.code = 'main' AND w.code = 'WH-MAIN'
+  ON CONFLICT (store_id, warehouse_id) DO UPDATE SET priority = 0
+`;
+await prisma.$disconnect();
 console.log('store-warehouse mapping ok');
 
 async function ensureCategory(name, parentId) {
