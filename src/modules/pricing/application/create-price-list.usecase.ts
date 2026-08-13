@@ -2,6 +2,7 @@ import type {
   PriceListRepository,
   CustomerGroupRepository,
   WebsiteLookup,
+  CurrencyLookup,
 } from '../domain/repositories.js';
 import { ConflictError, NotFoundError } from '../../../shared/domain/errors.js';
 import type { CreatePriceListCommand, PriceListView } from './dto.js';
@@ -11,12 +12,17 @@ export class CreatePriceList {
     private readonly priceLists: PriceListRepository,
     private readonly customerGroups: CustomerGroupRepository,
     private readonly websites: WebsiteLookup,
+    private readonly currencies: CurrencyLookup,
   ) {}
 
   async execute(cmd: CreatePriceListCommand): Promise<PriceListView> {
     const code = cmd.code.trim();
     if (await this.priceLists.findByCode(code)) {
       throw new ConflictError(`price list code already exists: ${code}`);
+    }
+
+    if (!(await this.currencies.byCode(cmd.currency))) {
+      throw new NotFoundError('Currency', cmd.currency);
     }
 
     let customerGroupId: bigint | null = null;

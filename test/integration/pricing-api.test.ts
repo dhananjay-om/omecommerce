@@ -152,6 +152,20 @@ describe.skipIf(!process.env.INTEGRATION)('pricing API (live DB)', () => {
     expect(badPrice.status).toBe(422);
   });
 
+  it('rejects an unregistered currency with a clean 404, not a raw FK-constraint 500', async () => {
+    const created = await admin
+      .post('/admin/v1/price-lists')
+      .send({ code: 'PL-BAD-CURRENCY', name: 'Bad Currency', currency: 'ZZZ' });
+    expect(created.status).toBe(404);
+    expect(created.body.title).toMatch(/currency/i);
+
+    // Same check on the update path — editing an existing list to an unregistered currency.
+    await admin.post('/admin/v1/price-lists').send({ code: 'PL-EDIT-CURRENCY', name: 'Editable', currency: 'USD' });
+    const updated = await admin.patch('/admin/v1/price-lists/PL-EDIT-CURRENCY').send({ currency: 'ZZZ' });
+    expect(updated.status).toBe(404);
+    expect(updated.body.title).toMatch(/currency/i);
+  });
+
   it('lists price lists ordered by priority', async () => {
     const res = await admin.get('/admin/v1/price-lists');
     expect(res.status).toBe(200);
