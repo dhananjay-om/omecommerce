@@ -51,7 +51,7 @@ export function ShipmentsCard({ orderPublicId, fulfillments }: { orderPublicId: 
           {f.shippingNotes ? <p className="text-muted-foreground">{f.shippingNotes}</p> : null}
           {f.hasPackingSlip ? (
             <a
-              href={`/api/orders/${orderPublicId}/shipment/${f.publicId}/packing-slip`}
+              href={`/admin/api/orders/${orderPublicId}/shipment/${f.publicId}/packing-slip`}
               target="_blank"
               rel="noreferrer"
               className="inline-block text-primary hover:underline"
