@@ -5,6 +5,7 @@ import type {
   CreateCustomerGroupInput,
   VariantLookup,
   WebsiteLookup,
+  CurrencyLookup,
 } from '../domain/repositories.js';
 
 export class PrismaCustomerGroupRepository implements CustomerGroupRepository {
@@ -38,5 +39,14 @@ export class PrismaWebsiteLookup implements WebsiteLookup {
 
   async byCode(code: string): Promise<{ id: bigint } | null> {
     return this.db.website.findFirst({ where: { code }, select: { id: true } });
+  }
+}
+
+/** Read-only cross-module lookup: resolves a registered currency code. */
+export class PrismaCurrencyLookup implements CurrencyLookup {
+  constructor(private readonly db: Db) {}
+
+  async byCode(code: string): Promise<{ code: string } | null> {
+    return this.db.currency.findUnique({ where: { code }, select: { code: true } });
   }
 }

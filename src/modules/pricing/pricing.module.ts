@@ -5,6 +5,7 @@ import {
   PrismaCustomerGroupRepository,
   PrismaVariantLookup,
   PrismaWebsiteLookup,
+  PrismaCurrencyLookup,
 } from './infrastructure/prisma-customer-group.repository.js';
 import { PrismaPriceListRepository } from './infrastructure/prisma-price-list.repository.js';
 import { PrismaPriceResolver } from './infrastructure/prisma-price-resolver.js';
@@ -35,12 +36,13 @@ export function createPricingModule(db: Db): PricingRouters {
   const customerGroups = new PrismaCustomerGroupRepository(db);
   const variants = new PrismaVariantLookup(db);
   const websites = new PrismaWebsiteLookup(db);
+  const currencies = new PrismaCurrencyLookup(db);
   const priceLists = new PrismaPriceListRepository(db);
   const resolver = new PrismaPriceResolver(db);
 
   const createCustomerGroup = new CreateCustomerGroup(customerGroups);
-  const createPriceList = new CreatePriceList(priceLists, customerGroups, websites);
-  const updatePriceList = new UpdatePriceList(priceLists);
+  const createPriceList = new CreatePriceList(priceLists, customerGroups, websites, currencies);
+  const updatePriceList = new UpdatePriceList(priceLists, currencies);
   const deletePriceList = new DeletePriceList(priceLists);
   const listPriceLists = new ListPriceLists(priceLists);
   const setProductPrice = new SetProductPrice(priceLists, variants);

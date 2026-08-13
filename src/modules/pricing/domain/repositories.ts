@@ -11,6 +11,15 @@ export interface WebsiteLookup {
   byCode(code: string): Promise<{ id: bigint } | null>;
 }
 
+/** price_list.currency has a raw-SQL FK to currency(code) (see prisma/sql/0003_pricing_raw.sql) —
+ *  without checking this first, an unregistered currency falls through to a bare Prisma FK
+ *  violation instead of a clean NotFoundError (this was a real production bug: the "New Price
+ *  List" dialog accepts any 3-letter code, but only currencies actually seeded into the
+ *  `currency` table — just USD, out of the box — can be used). */
+export interface CurrencyLookup {
+  byCode(code: string): Promise<{ code: string } | null>;
+}
+
 export interface CustomerGroupInfo {
   id: bigint;
   publicId: string;
