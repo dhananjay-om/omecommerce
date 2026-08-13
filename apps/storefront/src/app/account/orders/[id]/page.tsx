@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getCustomerOrder } from '@/services/order.service';
 import { ApiError } from '@/lib/api-client';
+import { formatPrice } from '@/lib/format-price';
 import type { OrderAddress } from '@/types/order';
 import { ReorderButton } from '@/components/account/reorder-button';
 
@@ -111,9 +112,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <div className="text-xs text-muted-foreground">SKU: {line.sku}</div>
                 </td>
                 <td className="px-4 py-3">{line.qty}</td>
-                <td className="px-4 py-3 text-right">
-                  {order.currency} {Number(line.rowTotal).toFixed(2)}
-                </td>
+                <td className="px-4 py-3 text-right">{formatPrice(line.rowTotal, order.currency)}</td>
               </tr>
             ))}
           </tbody>
@@ -123,33 +122,23 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       <div className="mt-6 ml-auto flex max-w-xs flex-col gap-1 text-sm">
         <div className="flex justify-between text-muted-foreground">
           <span>Subtotal</span>
-          <span>
-            {order.currency} {Number(order.subtotal).toFixed(2)}
-          </span>
+          <span>{formatPrice(order.subtotal, order.currency)}</span>
         </div>
         <div className="flex justify-between text-muted-foreground">
           <span>Discount</span>
-          <span>
-            -{order.currency} {Number(order.discountTotal).toFixed(2)}
-          </span>
+          <span>-{formatPrice(order.discountTotal, order.currency)}</span>
         </div>
         <div className="flex justify-between text-muted-foreground">
           <span>Shipping</span>
-          <span>
-            {order.currency} {Number(order.shippingTotal).toFixed(2)}
-          </span>
+          <span>{formatPrice(order.shippingTotal, order.currency)}</span>
         </div>
         <div className="flex justify-between text-muted-foreground">
           <span>Tax</span>
-          <span>
-            {order.currency} {Number(order.taxTotal).toFixed(2)}
-          </span>
+          <span>{formatPrice(order.taxTotal, order.currency)}</span>
         </div>
         <div className="flex justify-between border-t pt-1 text-base font-bold">
           <span>Total</span>
-          <span>
-            {order.currency} {Number(order.grandTotal).toFixed(2)}
-          </span>
+          <span>{formatPrice(order.grandTotal, order.currency)}</span>
         </div>
       </div>
 

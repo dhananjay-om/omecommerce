@@ -14,6 +14,7 @@ import { useCartStore } from '@/store/cart-store';
 import { CheckoutSteps } from './checkout-steps';
 import { AddressFields } from './address-fields';
 import { checkoutSchema, STEP_FIELDS, type CheckoutFormValues } from './checkout-schema';
+import { formatPrice } from '@/lib/format-price';
 import type { Cart } from '@/types/cart';
 import type { ShippingMethod } from '@/types/order';
 
@@ -136,9 +137,7 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
                         <input type="radio" value={method.code} {...register('shippingMethodCode')} />
                         {method.name}
                       </span>
-                      <span className="font-medium">
-                        {method.currency} {Number(method.flatRate).toFixed(2)}
-                      </span>
+                      <span className="font-medium">{formatPrice(method.flatRate, method.currency)}</span>
                     </label>
                   ))}
                 </div>
@@ -177,7 +176,7 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
                     <span>
                       {line.name} &times; {line.qty}
                     </span>
-                    <span>{line.lineTotal ? `${cart.currency} ${Number(line.lineTotal).toFixed(2)}` : '—'}</span>
+                    <span>{line.lineTotal ? formatPrice(line.lineTotal, cart.currency) : '—'}</span>
                   </div>
                 ))}
               </div>
@@ -218,11 +217,11 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>{cart.subtotal ? `${cart.currency} ${Number(cart.subtotal).toFixed(2)}` : '—'}</span>
+              <span>{cart.subtotal ? formatPrice(cart.subtotal, cart.currency) : '—'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
-              <span>{selectedShippingMethod ? `${selectedShippingMethod.currency} ${Number(selectedShippingMethod.flatRate).toFixed(2)}` : '—'}</span>
+              <span>{selectedShippingMethod ? formatPrice(selectedShippingMethod.flatRate, selectedShippingMethod.currency) : '—'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax</span>

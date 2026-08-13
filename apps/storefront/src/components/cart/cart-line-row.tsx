@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { MinusIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/cart-store';
+import { formatPrice } from '@/lib/format-price';
 import type { CartLine } from '@/types/cart';
 
 export function CartLineRow({ line, currency }: { line: CartLine; currency: string }) {
@@ -50,7 +51,7 @@ export function CartLineRow({ line, currency }: { line: CartLine; currency: stri
           <p className="font-medium">{line.name}</p>
           <p className="text-xs text-muted-foreground">SKU: {line.sku}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {line.price ? `${currency} ${Number(line.price).toFixed(2)} each` : 'Price unavailable'}
+            {line.price ? `${formatPrice(line.price, currency)} each` : 'Price unavailable'}
           </p>
         </div>
 
@@ -77,7 +78,7 @@ export function CartLineRow({ line, currency }: { line: CartLine; currency: stri
       </div>
 
       <div className="text-right font-semibold whitespace-nowrap">
-        {line.lineTotal ? `${currency} ${Number(line.lineTotal).toFixed(2)}` : '—'}
+        {line.lineTotal ? formatPrice(line.lineTotal, currency) : '—'}
       </div>
     </div>
   );

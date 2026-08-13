@@ -4,6 +4,7 @@ import type { CustomerOrderList } from '@/types/customer';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatPrice } from '@/lib/format-price';
 import { OrderRowActions } from '@/components/account/order-row-actions';
 
 export const metadata = { title: 'Order History' };
@@ -89,9 +90,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   <td className="px-4 py-3 text-muted-foreground">{order.itemsCount}</td>
                   <td className={`px-4 py-3 font-medium ${statusColor(order.financialStatus)}`}>{order.financialStatus}</td>
                   <td className={`px-4 py-3 font-medium ${statusColor(order.fulfillmentStatus)}`}>{order.fulfillmentStatus}</td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {order.currency} {Number(order.grandTotal).toFixed(2)}
-                  </td>
+                  <td className="px-4 py-3 text-right font-semibold">{formatPrice(order.grandTotal, order.currency)}</td>
                   <td className="px-4 py-3">
                     <OrderRowActions orderPublicId={order.publicId} />
                   </td>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { formatPrice } from '@/lib/format-price';
 import type { SearchHit } from '@/types/product';
 
 /**
@@ -32,7 +33,7 @@ export function ProductCard({ hit }: { hit: SearchHit }) {
       <div className="flex flex-1 flex-col gap-1 p-3">
         <span className="line-clamp-2 text-sm font-medium">{hit.name}</span>
         <span className="mt-auto text-sm font-semibold text-foreground">
-          {hit.priceDisplay ? `${hit.currency ?? ''} ${Number(hit.priceDisplay).toFixed(2)}` : 'Price unavailable'}
+          {hit.priceDisplay && hit.currency ? formatPrice(hit.priceDisplay, hit.currency) : 'Price unavailable'}
         </span>
       </div>
     </Link>

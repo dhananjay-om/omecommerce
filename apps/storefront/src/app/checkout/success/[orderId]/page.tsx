@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { getOrder } from '@/services/order.service';
 import { ApiError } from '@/lib/api-client';
+import { formatPrice } from '@/lib/format-price';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = { title: 'Order Confirmed' };
@@ -38,36 +39,26 @@ export default async function CheckoutSuccessPage({ params }: Props) {
               <span>
                 {line.name} &times; {line.qty}
               </span>
-              <span>
-                {order.currency} {Number(line.rowTotal).toFixed(2)}
-              </span>
+              <span>{formatPrice(line.rowTotal, order.currency)}</span>
             </div>
           ))}
         </div>
         <div className="mt-4 flex flex-col gap-1 border-t pt-4 text-sm">
           <div className="flex justify-between text-muted-foreground">
             <span>Subtotal</span>
-            <span>
-              {order.currency} {Number(order.subtotal).toFixed(2)}
-            </span>
+            <span>{formatPrice(order.subtotal, order.currency)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Shipping</span>
-            <span>
-              {order.currency} {Number(order.shippingTotal).toFixed(2)}
-            </span>
+            <span>{formatPrice(order.shippingTotal, order.currency)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Tax</span>
-            <span>
-              {order.currency} {Number(order.taxTotal).toFixed(2)}
-            </span>
+            <span>{formatPrice(order.taxTotal, order.currency)}</span>
           </div>
           <div className="flex justify-between text-base font-bold">
             <span>Total</span>
-            <span>
-              {order.currency} {Number(order.grandTotal).toFixed(2)}
-            </span>
+            <span>{formatPrice(order.grandTotal, order.currency)}</span>
           </div>
         </div>
       </div>
