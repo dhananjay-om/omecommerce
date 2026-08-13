@@ -5,6 +5,7 @@ import { PrismaCurrencyRepository } from './infrastructure/prisma-currency.repos
 import { CreateCurrency } from './application/create-currency.usecase.js';
 import { UpdateCurrency } from './application/update-currency.usecase.js';
 import { ListCurrencies } from './application/list-currencies.usecase.js';
+import { DeleteCurrency } from './application/delete-currency.usecase.js';
 import { createCurrencySchema, updateCurrencySchema } from './interface/http/schemas.js';
 
 export interface StoreRouters {
@@ -19,6 +20,7 @@ export function createStoreModule(db: Db): StoreRouters {
   const createCurrency = new CreateCurrency(currencies);
   const updateCurrency = new UpdateCurrency(currencies);
   const listCurrencies = new ListCurrencies(currencies);
+  const deleteCurrency = new DeleteCurrency(currencies);
 
   const admin = Router();
 
@@ -44,6 +46,14 @@ export function createStoreModule(db: Db): StoreRouters {
       const body = parse(updateCurrencySchema, req.body);
       const view = await updateCurrency.execute({ code: req.params.code!, ...body });
       res.json({ data: view });
+    }),
+  );
+
+  admin.delete(
+    '/currencies/:code',
+    asyncHandler(async (req, res) => {
+      await deleteCurrency.execute(req.params.code!);
+      res.status(204).send();
     }),
   );
 

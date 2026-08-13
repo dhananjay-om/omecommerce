@@ -13,7 +13,7 @@ describe.skipIf(!process.env.INTEGRATION)('store API (live DB)', () => {
   const app = createApp();
   let admin: ReturnType<typeof adminRequest>;
 
-  const testCodes = ['ZZT', 'ZZU', 'ZZV', 'ZZW'];
+  const testCodes = ['ZZT', 'ZZU', 'ZZV', 'ZZW', 'ZZX', 'ZZY', 'ZZZ'];
 
   beforeAll(async () => {
     admin = adminRequest(app, await getAdminToken(app));
@@ -27,6 +27,9 @@ describe.skipIf(!process.env.INTEGRATION)('store API (live DB)', () => {
     // over some other way.
     await prisma.$executeRaw`DELETE FROM price_list WHERE currency = ANY(${testCodes})`;
     await prisma.currency.deleteMany({ where: { code: { in: testCodes } } });
+    // Known baseline for the isDefault tests below, regardless of what any other
+    // manual testing against this DB set as the default beforehand.
+    await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
   });
 
   afterAll(async () => {
@@ -70,5 +73,48 @@ describe.skipIf(!process.env.INTEGRATION)('store API (live DB)', () => {
       .post('/admin/v1/price-lists')
       .send({ code: 'PL-ZZW', name: 'ZZW List', currency: 'ZZW' });
     expect(priceList.status).toBe(201);
+  });
+
+  it('setting a currency as default un-sets whichever one was default before', async () => {
+    await admin.post('/admin/v1/currencies').send({ code: 'ZZX', symbol: 'X', name: 'First Default' });
+    await admin.post('/admin/v1/currencies').send({ code: 'ZZY', symbol: 'Y', name: 'Second Default' });
+
+    const first = await admin.patch('/admin/v1/currencies/ZZX').send({ isDefault: true });
+    expect(first.status).toBe(200);
+    expect(first.body.data.isDefault).toBe(true);
+
+    let list = await admin.get('/admin/v1/currencies');
+    let defaults = list.body.data.filter((c: { isDefault: boolean }) => c.isDefault);
+    expect(defaults.map((c: { code: string }) => c.code)).toEqual(['ZZX']);
+
+    const second = await admin.patch('/admin/v1/currencies/ZZY').send({ isDefault: true });
+    expect(second.status).toBe(200);
+    expect(second.body.data.isDefault).toBe(true);
+
+    list = await admin.get('/admin/v1/currencies');
+    defaults = list.body.data.filter((c: { isDefault: boolean }) => c.isDefault);
+    // Exactly one default at a time — ZZX got unset when ZZY became default.
+    expect(defaults.map((c: { code: string }) => c.code)).toEqual(['ZZY']);
+  });
+
+  it('deletes an unused currency', async () => {
+    await admin.post('/admin/v1/currencies').send({ code: 'ZZZ', symbol: 'Z', name: 'Deletable' });
+    const deleted = await admin.delete('/admin/v1/currencies/ZZZ');
+    expect(deleted.status).toBe(204);
+
+    const list = await admin.get('/admin/v1/currencies');
+    expect(list.body.data.map((c: { code: string }) => c.code)).not.toContain('ZZZ');
+  });
+
+  it('404s deleting an unknown currency', async () => {
+    const res = await admin.delete('/admin/v1/currencies/NOPE');
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects deleting a currency that is still in use with a clean 409, not a raw FK 500', async () => {
+    // ZZW still has PL-ZZW pricing against it from the earlier test.
+    const res = await admin.delete('/admin/v1/currencies/ZZW');
+    expect(res.status).toBe(409);
+    expect(res.body.title).toMatch(/still in use/i);
   });
 });

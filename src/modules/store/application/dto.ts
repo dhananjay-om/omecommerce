@@ -10,6 +10,7 @@ export interface UpdateCurrencyCommand {
   symbol?: string;
   name?: string;
   minorUnits?: number;
+  isDefault?: boolean;
 }
 
 export interface CurrencyView {
@@ -17,4 +18,5 @@ export interface CurrencyView {
   symbol: string;
   name: string;
   minorUnits: number;
+  isDefault: boolean;
 }

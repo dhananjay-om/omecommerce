@@ -13,7 +13,8 @@ export class UpdateCurrency {
       symbol: cmd.symbol,
       name: cmd.name,
       minorUnits: cmd.minorUnits,
+      isDefault: cmd.isDefault,
     });
-    return { code: c.code, symbol: c.symbol, name: c.name, minorUnits: c.minorUnits };
+    return { code: c.code, symbol: c.symbol, name: c.name, minorUnits: c.minorUnits, isDefault: c.isDefault };
   }
 }

@@ -16,6 +16,6 @@ export class CreateCurrency {
       name: cmd.name,
       minorUnits: cmd.minorUnits,
     });
-    return { code: c.code, symbol: c.symbol, name: c.name, minorUnits: c.minorUnits };
+    return { code: c.code, symbol: c.symbol, name: c.name, minorUnits: c.minorUnits, isDefault: c.isDefault };
   }
 }

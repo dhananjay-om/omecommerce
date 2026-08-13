@@ -218,6 +218,7 @@ export interface Currency {
   symbol: string;
   name: string;
   minorUnits: number;
+  isDefault: boolean;
 }
 
 /** One warehouse's stock for a single variant — every active warehouse appears, zeroed if never stocked. */
