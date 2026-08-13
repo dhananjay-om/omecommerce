@@ -23,6 +23,9 @@ import { PrismaClient } from '@prisma/client';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMAGES_DIR = path.join(__dirname, 'seed-assets');
 const API = process.env.API_BASE_URL ?? 'http://localhost:4100';
+// Must already be registered (Stores > Currency Setup, or deploy/add-currency.sh) —
+// this script only sets prices in it, it doesn't create the currency itself.
+const CURRENCY = process.env.DEMO_CURRENCY ?? 'USD';
 
 async function api(method, apiPath, body, token) {
   const res = await fetch(`${API}${apiPath}`, {
@@ -55,13 +58,13 @@ const warehouse = await ensure(
 );
 const priceList = await ensure(
   () => A('GET', '/admin/v1/price-lists'),
-  (p) => p.code === 'PL-DEMO-USD',
-  () => A('POST', '/admin/v1/price-lists', { code: 'PL-DEMO-USD', name: 'Demo USD', currency: 'USD', priority: 0 }),
+  (p) => p.code === `PL-DEMO-${CURRENCY}`,
+  () => A('POST', '/admin/v1/price-lists', { code: `PL-DEMO-${CURRENCY}`, name: `Demo ${CURRENCY}`, currency: CURRENCY, priority: 0 }),
 );
 const shippingMethod = await ensure(
-  () => A('GET', '/store/v1/shipping-methods?currency=USD'),
+  () => A('GET', `/store/v1/shipping-methods?currency=${CURRENCY}`),
   (m) => m.code === 'STANDARD',
-  () => A('POST', '/admin/v1/shipping-methods', { code: 'STANDARD', name: 'Standard Shipping (3-5 days)', flatRate: '5.00', currency: 'USD' }),
+  () => A('POST', '/admin/v1/shipping-methods', { code: 'STANDARD', name: 'Standard Shipping (3-5 days)', flatRate: '5.00', currency: CURRENCY }),
 );
 console.log('warehouse + price list + shipping method ok:', warehouse.code, priceList.code, shippingMethod.code);
 
