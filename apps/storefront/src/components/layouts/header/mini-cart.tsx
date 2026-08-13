@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetTrigger } from '@/components/ui/sheet';
 import { useCartStore } from '@/store/cart-store';
+import { formatPrice } from '@/lib/format-price';
 
 export function MiniCart() {
   const { cart, itemCount, hydrated, hydrate, removeLine } = useCartStore();
@@ -50,7 +51,7 @@ export function MiniCart() {
                     <span className="line-clamp-1 font-medium">{line.name}</span>
                     <span className="text-muted-foreground">Qty {line.qty}</span>
                     <span className="font-semibold">
-                      {line.lineTotal ? `${cart.currency} ${Number(line.lineTotal).toFixed(2)}` : 'Price unavailable'}
+                      {line.lineTotal ? formatPrice(line.lineTotal, cart.currency) : 'Price unavailable'}
                     </span>
                   </div>
                   <Button variant="ghost" size="icon-sm" aria-label="Remove item" onClick={() => removeLine(line.variantId)}>
@@ -64,9 +65,7 @@ export function MiniCart() {
         {cart && cart.subtotal ? (
           <div className="flex items-center justify-between border-t px-4 pt-4 text-sm font-semibold">
             <span>Subtotal</span>
-            <span>
-              {cart.currency} {Number(cart.subtotal).toFixed(2)}
-            </span>
+            <span>{formatPrice(cart.subtotal, cart.currency)}</span>
           </div>
         ) : null}
         <SheetFooter>

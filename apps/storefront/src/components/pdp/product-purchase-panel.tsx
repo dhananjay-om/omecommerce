@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ProductActions } from './product-actions';
+import { formatPrice } from '@/lib/format-price';
 import type { ProductVariant } from '@/types/product';
 
 interface VariantAxis {
@@ -66,7 +67,7 @@ export function ProductPurchasePanel({
 
   return (
     <div>
-      <p className="text-3xl font-bold">{priceNumber !== null ? `${currency} ${priceNumber.toFixed(2)}` : 'Price unavailable'}</p>
+      <p className="text-3xl font-bold">{priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}</p>
       <p className={`mt-1 text-sm font-medium ${selectedVariant ? (inStock ? 'text-success' : 'text-destructive') : 'text-muted-foreground'}`}>
         {selectedVariant ? (inStock ? 'In Stock' : 'Out of Stock') : 'Select options to see availability'}
       </p>

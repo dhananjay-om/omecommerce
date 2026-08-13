@@ -7,6 +7,7 @@ import { listCategories } from '@/services/category.service';
 import { ApiError } from '@/lib/api-client';
 import { CATEGORY_FACET_CODE } from '@/lib/facet-codes';
 import { SITE_URL } from '@/lib/config';
+import { formatPrice } from '@/lib/format-price';
 import { ProductGallery } from '@/components/pdp/product-gallery';
 import { ProductPurchasePanel } from '@/components/pdp/product-purchase-panel';
 import { ProductTabs } from '@/components/pdp/product-tabs';
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const product = await getProduct(id);
     const fallbackTitle = product.name ?? product.sku;
-    const fallbackDescription = `${fallbackTitle} — ${product.price ? `${product.currency} ${Number(product.price).toFixed(2)}` : 'shop now'} at OMEShop.`;
+    const fallbackDescription = `${fallbackTitle} — ${product.price ? formatPrice(product.price, product.currency) : 'shop now'} at OMEShop.`;
     const title = stringAttr(product.attributes, 'meta_title') ?? fallbackTitle;
     const description = stringAttr(product.attributes, 'meta_description') ?? fallbackDescription;
     const metaKeywords = stringAttr(product.attributes, 'meta_keywords');

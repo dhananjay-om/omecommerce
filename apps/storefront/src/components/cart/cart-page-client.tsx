@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCartStore, countItems } from '@/store/cart-store';
+import { formatPrice } from '@/lib/format-price';
 import { CartLineRow } from './cart-line-row';
 import type { Cart } from '@/types/cart';
 
@@ -69,7 +70,7 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>{displayCart.subtotal ? `${displayCart.currency} ${Number(displayCart.subtotal).toFixed(2)}` : '—'}</span>
+              <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
@@ -82,7 +83,7 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
           </div>
           <div className="flex justify-between border-t pt-3 text-base font-bold">
             <span>Estimated Total</span>
-            <span>{displayCart.subtotal ? `${displayCart.currency} ${Number(displayCart.subtotal).toFixed(2)}` : '—'}</span>
+            <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
           </div>
 
           <CouponField />
