@@ -44,17 +44,19 @@ if curl -s -o /dev/null http://localhost:4100/health --max-time 2; then
   echo "    already running"
 else
   cd "$REPO_ROOT"
-  if [ ! -f dist/src/main.js ]; then
-    echo "    building backend first..."
-    npm run build >"$LOG_DIR/backend-build.log" 2>&1
-  fi
+  # `tsx watch` (npm run dev), not a one-off `npm run build && node dist/...` —
+  # the latter silently keeps serving whatever was compiled at the moment this
+  # script first ran, so an edit to src/ afterward has zero effect until the
+  # process is manually rebuilt and restarted. Bit me directly once already:
+  # a real fix looked unverifiable because I was curling a stale process the
+  # whole time. tsx watch picks up every src/ change automatically instead.
   # PORT is scoped to just this command, not exported globally — an earlier
   # version exported it for the whole script, which leaked into admin's
   # `next dev` below (no -p flag) and made it try to bind :4100 too,
   # crashing with EADDRINUSE instead of ever reaching port 3000.
-  PORT=4100 nohup node dist/src/main.js >"$LOG_DIR/backend.log" 2>&1 &
+  PORT=4100 nohup npm run dev >"$LOG_DIR/backend.log" 2>&1 &
   disown
-  for i in $(seq 1 15); do
+  for i in $(seq 1 30); do
     curl -s -o /dev/null http://localhost:4100/health --max-time 2 && break
     sleep 1
   done
