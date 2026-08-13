@@ -38,5 +38,11 @@ tail -30 /var/log/nginx/omecom.vcto.in.error.log
 
 echo
 echo "=================================================================="
+echo "6. storefront container logs (last 100 lines)"
+echo "=================================================================="
+$COMPOSE logs storefront --tail 100
+
+echo
+echo "=================================================================="
 echo "Done. Copy this WHOLE output back."
 echo "=================================================================="
