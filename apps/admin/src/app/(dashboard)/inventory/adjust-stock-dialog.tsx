@@ -62,7 +62,7 @@ export function AdjustStockDialog({
       }}
     >
       <DialogTrigger
-        render={<Button variant={initialVariant ? 'ghost' : 'outline'} size={initialVariant ? 'sm' : 'default'}>{initialVariant ? 'Adjust' : 'Adjust Stock'}</Button>}
+        render={<Button variant="outline" size={initialVariant ? 'sm' : 'default'}>{initialVariant ? 'Adjust' : 'Adjust Stock'}</Button>}
       />
       <DialogContent>
         <DialogHeader>
