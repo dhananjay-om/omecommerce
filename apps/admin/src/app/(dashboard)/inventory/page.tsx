@@ -62,12 +62,13 @@ export default async function InventoryPage({
                       <TableHead>On Hand</TableHead>
                       <TableHead>Reserved</TableHead>
                       <TableHead>Available</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {stock.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
                           No stock items in this warehouse yet.
                         </TableCell>
                       </TableRow>
@@ -78,6 +79,12 @@ export default async function InventoryPage({
                           <TableCell>{item.onHand}</TableCell>
                           <TableCell>{item.reserved}</TableCell>
                           <TableCell>{item.available}</TableCell>
+                          <TableCell className="text-right">
+                            <AdjustStockDialog
+                              warehouseCode={selectedCode}
+                              initialVariant={{ publicId: item.variantPublicId, sku: item.sku }}
+                            />
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
