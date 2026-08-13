@@ -8,6 +8,7 @@ import { healthRouter } from './shared/interface/http/health.route.js';
 import { prisma } from './shared/infrastructure/prisma/client.js';
 import { redis } from './shared/infrastructure/redis/client.js';
 import { createCatalogModule } from './modules/catalog/catalog.module.js';
+import { createStoreModule } from './modules/store/store.module.js';
 import { createInventoryModule } from './modules/inventory/inventory.module.js';
 import { createPricingModule } from './modules/pricing/pricing.module.js';
 import { createOrderModule } from './modules/order/order.module.js';
@@ -49,6 +50,9 @@ export function createApp(): Express {
   const catalog = createCatalogModule(prisma, redis, auth.authorize);
   app.use('/admin/v1', catalog.admin);
   app.use('/store/v1', catalog.store);
+
+  const store = createStoreModule(prisma);
+  app.use('/admin/v1', store.admin);
 
   const inventory = createInventoryModule(prisma, auth.authorize);
   app.use('/admin/v1', inventory.admin);
