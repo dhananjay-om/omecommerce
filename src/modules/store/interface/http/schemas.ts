@@ -11,4 +11,5 @@ export const updateCurrencySchema = z.object({
   symbol: z.string().min(1).max(8).optional(),
   name: z.string().min(1).max(64).optional(),
   minorUnits: z.number().int().min(0).max(6).optional(),
+  isDefault: z.boolean().optional(),
 });

@@ -1,5 +1,5 @@
 import { apiGet } from '@/lib/api-client';
-import type { PriceList } from '@/lib/types';
+import type { PriceList, Currency } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { NewPriceListDialog } from './new-price-list-dialog';
@@ -8,13 +8,17 @@ import { EditPriceListDialog } from './edit-price-list-dialog';
 import { DeletePriceListDialog } from './delete-price-list-dialog';
 
 export default async function PricingPage() {
-  const priceLists = await apiGet<PriceList[]>('/admin/v1/price-lists');
+  const [priceLists, currencies] = await Promise.all([
+    apiGet<PriceList[]>('/admin/v1/price-lists'),
+    apiGet<Currency[]>('/admin/v1/currencies'),
+  ]);
+  const defaultCurrency = currencies.find((c) => c.isDefault)?.code;
 
   return (
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
-        <NewPriceListDialog />
+        <NewPriceListDialog defaultCurrency={defaultCurrency} />
       </div>
 
       <div className="mt-6 rounded-md border">

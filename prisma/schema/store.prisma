@@ -8,11 +8,16 @@ model Currency {
   symbol     String
   minorUnits Int      @default(2) @map("minor_units")
   name       String
+  isDefault  Boolean  @default(false) @map("is_default")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   websitesBase Website[]   @relation("WebsiteBaseCurrency")
   storeViews   StoreView[]
 
+  // Exactly one default currency enforced by a partial unique index (raw SQL),
+  // same pattern as Website.isDefault/AttributeSet.isDefault/CustomerGroup.isDefault.
+  // Drives the default pre-filled currency in the admin's "New Price List" dialog.
   @@map("currency")
 }
 

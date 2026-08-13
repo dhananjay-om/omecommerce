@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPatch, ApiError } from '@/lib/api-client';
+import { apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
 import type { Currency } from '@/lib/types';
 
 export interface ActionState {
@@ -51,6 +51,37 @@ export async function updateCurrency(_prevState: ActionState, formData: FormData
       name,
       minorUnits: minorUnitsRaw ? Number(minorUnitsRaw) : undefined,
     });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/stores/currencies');
+  return { error: null, success: true };
+}
+
+export async function setDefaultCurrency(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  if (!code) return { error: 'Missing currency code.', success: false };
+
+  try {
+    await apiPatch<Currency>(`/admin/v1/currencies/${code}`, { isDefault: true });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/stores/currencies');
+  revalidatePath('/pricing');
+  return { error: null, success: true };
+}
+
+export async function deleteCurrency(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  if (!code) return { error: 'Missing currency code.', success: false };
+
+  try {
+    await apiDelete(`/admin/v1/currencies/${code}`);
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

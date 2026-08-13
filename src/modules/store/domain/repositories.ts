@@ -3,6 +3,7 @@ export interface CurrencyInfo {
   symbol: string;
   minorUnits: number;
   name: string;
+  isDefault: boolean;
 }
 
 export interface CreateCurrencyInput {
@@ -16,6 +17,11 @@ export interface UpdateCurrencyInput {
   symbol?: string;
   name?: string;
   minorUnits?: number;
+  /** true: sets this one as default, unsetting whichever currency was default before, in the
+   *  same transaction (the uq_one_default_currency partial unique index is the real guarantee —
+   *  this is defense in depth, same reasoning as customer_address's is_default_shipping/billing).
+   *  false: just unsets this one, leaving no default at all. undefined: flag untouched. */
+  isDefault?: boolean;
 }
 
 /** Currency Setup (admin-facing) — the registry price_list.currency and store_view.currency
@@ -27,4 +33,11 @@ export interface CurrencyRepository {
   findByCode(code: string): Promise<CurrencyInfo | null>;
   list(): Promise<CurrencyInfo[]>;
   update(code: string, input: UpdateCurrencyInput): Promise<CurrencyInfo>;
+  /** Hard delete — Currency has no soft-delete. Deliberately no pre-check against every
+   *  referencing table (price_list, cart, order, shipping_method, payment_transaction, wallet,
+   *  wallet_transaction, gift_card, gift_card_transaction, website.baseCurrency,
+   *  store_view.currency — all ON DELETE RESTRICT): that's ~11 tables to duplicate and keep in
+   *  sync by hand. Instead this catches the DB's own FK violation and translates it to a clean
+   *  ConflictError — the database is already the single source of truth for "is this in use". */
+  delete(code: string): Promise<void>;
 }

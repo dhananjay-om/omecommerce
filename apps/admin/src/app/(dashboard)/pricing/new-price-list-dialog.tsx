@@ -12,7 +12,7 @@ const PRICE_LIST_TYPES = ['BASE', 'WHOLESALE', 'B2B', 'SPECIAL'];
 
 const initialState: ActionState = { error: null, success: false };
 
-export function NewPriceListDialog() {
+export function NewPriceListDialog({ defaultCurrency }: { defaultCurrency?: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createPriceList, initialState);
   const [handledState, setHandledState] = useState(state);
@@ -40,7 +40,7 @@ export function NewPriceListDialog() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="pl-currency">Currency</Label>
-            <Input id="pl-currency" name="currency" required maxLength={3} placeholder="USD" />
+            <Input id="pl-currency" name="currency" required maxLength={3} placeholder="USD" defaultValue={defaultCurrency} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pl-type">Type</Label>
