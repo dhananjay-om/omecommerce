@@ -518,6 +518,7 @@
     </ol>
     <p class="toc-group-label">Reference</p>
     <ol class="toc-aside">
+      <li><a href="#alt-host-nginx">Alt: existing host nginx</a></li>
       <li><a href="#why-api">Why the API isn't public</a></li>
       <li><a href="#gaps">Known gaps</a></li>
     </ol>
@@ -537,6 +538,7 @@
       <a href="#redeploy">Redeploy</a>
       <a href="#backups">Backups</a>
       <a href="#checklist">Checklist</a>
+      <a href="#alt-host-nginx">Host nginx alt</a>
       <a href="#why-api">Why no public API</a>
       <a href="#gaps">Gaps</a>
     </div>
@@ -935,6 +937,53 @@ dc exec api npm run migrate:deploy</code></pre>
         <li>You have a working, <i>tested</i> restore of the Postgres
           backup from §10 — an untested backup is not a backup.</li>
       </ul>
+    </section>
+
+    <section class="step" id="alt-host-nginx">
+      <div class="step-head"><h2 class="step-title">Alternative: fronting with an existing host nginx</h2></div>
+      <p>Everything above assumes this project's own <code>nginx</code> +
+        <code>certbot</code> services own ports 80/443. If your server
+        already has a <b>different</b>, pre-existing nginx running directly
+        on the host (outside Docker) — already Certbot-managed for this
+        domain — you don't need to fight it for the ports or run
+        <code>deploy/init-certbot.sh</code> at all. Instead:</p>
+      <ul>
+        <li>Don't start this project's <code>nginx</code>/<code>certbot</code>
+          services — just never include them when you
+          <code>docker compose up</code> (or
+          <code>docker compose stop nginx certbot</code> if they're already
+          up).</li>
+        <li><code>admin</code>, <code>storefront</code>, and
+          <code>minio</code> already publish to
+          <code>127.0.0.1:7975</code>, <code>127.0.0.1:3001</code>, and
+          <code>127.0.0.1:9000</code> respectively (see their
+          <code>ports:</code> in <code>docker-compose.prod.yml</code>)
+          specifically for this case — nothing external can reach those,
+          only processes on the same host. Admin deliberately uses 7975,
+          not 3000 — 3000 is a very common default port and easily already
+          taken by something else on a shared server; change it in
+          <code>docker-compose.prod.yml</code> (and the nginx config in the
+          next step) if 7975 or 9000 collide with something on yours too.</li>
+        <li>Add the <code>location /admin</code> /
+          <code>location /ome-media</code> / <code>location /</code> blocks
+          from <code>deploy/host-nginx-alternative.conf</code> into your
+          existing host nginx config, proxying to those
+          <code>127.0.0.1</code> addresses. Keep your existing
+          <code>listen</code>/<code>ssl_certificate*</code> lines and
+          HTTP→HTTPS redirect block as they already are — a working
+          Certbot-managed config doesn't need those touched. The
+          <code>/ome-media</code> block matters even if you don't care
+          about images specifically — without it, every presigned S3 URL
+          this app generates (product images, invoice/packing-slip PDFs)
+          is signed against your public domain but has nowhere to
+          actually land, and 404s/times out in the browser.</li>
+        <li><code>nginx -t</code> (or <code>sudo nginx -t</code> if the
+          config lives in a root-owned path), then reload:
+          <code>systemctl reload nginx</code>.</li>
+      </ul>
+      <p>Same "no trailing path after the proxy_pass port" rule applies
+        here as in <code>deploy/nginx.conf</code> — see that file's
+        comments for why.</p>
     </section>
 
     <section class="step" id="why-api">

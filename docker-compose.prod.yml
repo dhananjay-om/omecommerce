@@ -78,6 +78,14 @@ services:
       timeout: 5s
       retries: 10
     networks: [ome]
+    # Published to localhost ONLY — same reasoning and same pattern as
+    # admin/storefront's ports below: an existing HOST nginx (the
+    # "Alternative: fronting with an existing host nginx" path in
+    # DEPLOYMENT.md) needs to reach minio to proxy presigned media URLs
+    # through to it, and can only do that via a published localhost port,
+    # since it runs outside the `ome` Docker network entirely.
+    ports:
+      - '127.0.0.1:9000:9000'
 
   api:
     build:
@@ -92,6 +100,14 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       OPENSEARCH_URL: http://opensearch:9200
       S3_ENDPOINT: http://minio:9000
+      # Used ONLY for presigning URLs returned to the browser (product
+      # images, admin media uploads, invoice/packing-slip downloads) —
+      # http://minio:9000 above is an internal Docker network address no
+      # browser outside it can reach. Requires the media proxy location in
+      # deploy/nginx.conf (or deploy/omecom.vcto.in.nginx.conf /
+      # deploy/host-nginx-alternative.conf if using an existing host nginx)
+      # to actually forward ${S3_BUCKET}'s path through to minio.
+      S3_PUBLIC_ENDPOINT: https://${DOMAIN}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET}

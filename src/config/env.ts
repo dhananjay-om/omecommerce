@@ -13,6 +13,16 @@ const EnvSchema = z.object({
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   OPENSEARCH_URL: z.string().url().default('http://localhost:9200'),
   S3_ENDPOINT: z.string().url().optional(),
+  // Presigned PUT/GET URLs are meant for the BROWSER to hit directly (never
+  // proxied through this server) — but S3_ENDPOINT is typically an
+  // internal-only Docker network address (e.g. http://minio:9000), which no
+  // browser outside that network can resolve. When set, S3_PUBLIC_ENDPOINT
+  // is used instead, ONLY for presigning URLs that get returned to
+  // clients; S3_ENDPOINT keeps being used for the server's own direct
+  // reads/writes (e.g. generated PDFs), where internal networking is both
+  // fine and faster. Falls back to S3_ENDPOINT when unset, matching prior
+  // behavior for local dev where MinIO is already directly reachable.
+  S3_PUBLIC_ENDPOINT: z.string().url().optional(),
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET: z.string().optional(),

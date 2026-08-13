@@ -317,20 +317,24 @@ or run `deploy/init-certbot.sh` at all. Instead:
 1. Don't start this project's `nginx`/`certbot` services — just never
    include them when you `docker compose up` (or `docker compose stop nginx
    certbot` if they're already up).
-2. `admin` and `storefront` already publish to `127.0.0.1:7975` and
-   `127.0.0.1:3001` respectively (see their `ports:` in
-   `docker-compose.prod.yml`) specifically for this case — nothing external
-   can reach those, only processes on the same host. Admin deliberately
-   uses 7975, not 3000 — 3000 is a very common default port and easily
-   already taken by something else on a shared server; change it in
-   `docker-compose.prod.yml` (and the nginx config in the next step) if
-   7975 collides with something on yours too.
-3. Add the `location /admin` / `location /` blocks from
-   `deploy/host-nginx-alternative.conf` into your existing host nginx
-   config, proxying to those two `127.0.0.1` addresses. Keep your existing
+2. `admin`, `storefront`, and `minio` already publish to `127.0.0.1:7975`,
+   `127.0.0.1:3001`, and `127.0.0.1:9000` respectively (see their `ports:`
+   in `docker-compose.prod.yml`) specifically for this case — nothing
+   external can reach those, only processes on the same host. Admin
+   deliberately uses 7975, not 3000 — 3000 is a very common default port
+   and easily already taken by something else on a shared server; change
+   it in `docker-compose.prod.yml` (and the nginx config in the next step)
+   if 7975 or 9000 collide with something on yours too.
+3. Add the `location /admin` / `location /ome-media` / `location /` blocks
+   from `deploy/host-nginx-alternative.conf` into your existing host nginx
+   config, proxying to those `127.0.0.1` addresses. Keep your existing
    `listen`/`ssl_certificate*` lines and HTTP→HTTPS redirect block as they
    already are — a working Certbot-managed config doesn't need those
-   touched.
+   touched. The `/ome-media` block matters even if you don't care about
+   images specifically — without it, every presigned S3 URL this app
+   generates (product images, invoice/packing-slip PDFs) is signed against
+   your public domain but has nowhere to actually land, and 404s/times out
+   in the browser.
 4. `nginx -t` (or `sudo nginx -t` if the config lives in a root-owned path),
    then reload: `systemctl reload nginx`.
 
