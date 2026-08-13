@@ -28,14 +28,31 @@ fi
 
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
-echo "==> Stopping and removing the postgres container"
-$COMPOSE rm -sf postgres
+echo "==> Stopping and removing the postgres container (skips cleanly if already gone)"
+$COMPOSE rm -sf postgres || true
+
+# Filtering by the `pgdata` volume label ALONE isn't enough on a shared
+# server — other, unrelated compose projects can (and here, do) use the
+# same short volume name internally, which would match theirs too. Scope
+# by THIS project's name as well, discovered from an existing container
+# rather than assumed/hardcoded.
+echo "==> Determining this project's compose project name"
+PROJECT=$(docker inspect omecommerce-api-1 --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || true)
+if [ -z "$PROJECT" ]; then
+  echo "!! Could not determine the compose project name from omecommerce-api-1 — is it running?" >&2
+  exit 1
+fi
+echo "    project: $PROJECT"
 
 echo "==> Finding its data volume"
-VOL=$(docker volume ls -q --filter label=com.docker.compose.volume=pgdata)
-if [ -z "$VOL" ]; then
-  echo "!! Could not find the pgdata volume automatically. All volumes on this host:" >&2
-  docker volume ls
+VOL=$(docker volume ls -q \
+  --filter "label=com.docker.compose.project=$PROJECT" \
+  --filter "label=com.docker.compose.volume=pgdata")
+COUNT=$(echo "$VOL" | grep -c . || true)
+if [ "$COUNT" -ne 1 ]; then
+  echo "!! Expected exactly one matching volume, found $COUNT:" >&2
+  echo "$VOL" >&2
+  echo "Not deleting anything — check manually with: docker volume ls" >&2
   exit 1
 fi
 echo "    found: $VOL"
