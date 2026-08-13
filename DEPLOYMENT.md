@@ -243,10 +243,14 @@ follow-up work), and don't rely on it in the meantime.
   category/product data.
 - `dc exec api node -e "fetch('http://localhost:3000/health/ready').then(r=>r.json()).then(console.log)"`
   — should report `database`/`redis` both `ok`.
-- Optional: trigger a full search reindex so the storefront's search/PLP has
-  data — same `dc exec api node -e "..."` pattern as §7, POSTing to
+- **Not actually optional in practice** — trigger a full search reindex, or
+  every storefront page that queries search (home, PLP/category, best-
+  selling) will 500 with `index_not_found_exception`: the OpenSearch index
+  is created lazily on first write, so until something indexes into it, it
+  simply doesn't exist yet. Run `./deploy/reindex-search.sh`, or by hand:
+  same `dc exec api node -e "..."` pattern as §7, POSTing to
   `http://localhost:3000/admin/v1/search/reindex` with the token from
-  logging in, `catalog:manage` permission required.
+  logging in — needs `admin:manage` permission, not `catalog:manage`.
 
 ---
 

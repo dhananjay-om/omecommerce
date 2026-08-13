@@ -860,12 +860,17 @@ fetch('http://localhost:3000/admin/v1/auth/login', {
           should report <code>database</code>/<code>redis</code> both
           <code>ok</code>.
         </li>
-        <li>Optional: trigger a full search reindex so the storefront's
-          search/PLP has data — same <code>dc exec api node -e</code>
-          pattern as §7, POSTing to
+        <li><b>Not actually optional in practice</b> — trigger a full search
+          reindex, or every storefront page that queries search (home,
+          PLP/category, best-selling) will 500 with
+          <code>index_not_found_exception</code>: the OpenSearch index is
+          created lazily on first write, so until something indexes into
+          it, it simply doesn't exist yet. Run
+          <code>./deploy/reindex-search.sh</code>, or by hand: same
+          <code>dc exec api node -e</code> pattern as §7, POSTing to
           <code>http://localhost:3000/admin/v1/search/reindex</code> with the
-          token from logging in, <code>catalog:manage</code> permission
-          required.</li>
+          token from logging in — needs <code>admin:manage</code>
+          permission, not <code>catalog:manage</code>.</li>
       </ul>
     </section>
 
