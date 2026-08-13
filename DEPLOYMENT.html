@@ -956,14 +956,15 @@ dc exec api npm run migrate:deploy</code></pre>
         <li><code>admin</code>, <code>storefront</code>, and
           <code>minio</code> already publish to
           <code>127.0.0.1:7975</code>, <code>127.0.0.1:3001</code>, and
-          <code>127.0.0.1:9000</code> respectively (see their
+          <code>127.0.0.1:19000</code> respectively (see their
           <code>ports:</code> in <code>docker-compose.prod.yml</code>)
           specifically for this case — nothing external can reach those,
-          only processes on the same host. Admin deliberately uses 7975,
-          not 3000 — 3000 is a very common default port and easily already
-          taken by something else on a shared server; change it in
+          only processes on the same host. Neither uses its common default
+          port (3000, 9000) — both are very likely already taken by
+          something else on a shared server (confirmed true for both on a
+          real deployment); change them in
           <code>docker-compose.prod.yml</code> (and the nginx config in the
-          next step) if 7975 or 9000 collide with something on yours too.</li>
+          next step) if 7975 or 19000 collide with something on yours too.</li>
         <li>Add the <code>location /admin</code> /
           <code>location /ome-media</code> / <code>location /</code> blocks
           from <code>deploy/host-nginx-alternative.conf</code> into your

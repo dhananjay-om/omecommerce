@@ -318,13 +318,14 @@ or run `deploy/init-certbot.sh` at all. Instead:
    include them when you `docker compose up` (or `docker compose stop nginx
    certbot` if they're already up).
 2. `admin`, `storefront`, and `minio` already publish to `127.0.0.1:7975`,
-   `127.0.0.1:3001`, and `127.0.0.1:9000` respectively (see their `ports:`
+   `127.0.0.1:3001`, and `127.0.0.1:19000` respectively (see their `ports:`
    in `docker-compose.prod.yml`) specifically for this case — nothing
-   external can reach those, only processes on the same host. Admin
-   deliberately uses 7975, not 3000 — 3000 is a very common default port
-   and easily already taken by something else on a shared server; change
-   it in `docker-compose.prod.yml` (and the nginx config in the next step)
-   if 7975 or 9000 collide with something on yours too.
+   external can reach those, only processes on the same host. Neither uses
+   its common default port (3000, 9000) — both are very likely already
+   taken by something else on a shared server (confirmed true for both on
+   a real deployment); change them in `docker-compose.prod.yml` (and the
+   nginx config in the next step) if 7975 or 19000 collide with something
+   on yours too.
 3. Add the `location /admin` / `location /ome-media` / `location /` blocks
    from `deploy/host-nginx-alternative.conf` into your existing host nginx
    config, proxying to those `127.0.0.1` addresses. Keep your existing

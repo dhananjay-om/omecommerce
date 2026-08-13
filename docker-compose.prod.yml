@@ -84,8 +84,14 @@ services:
     # DEPLOYMENT.md) needs to reach minio to proxy presigned media URLs
     # through to it, and can only do that via a published localhost port,
     # since it runs outside the `ome` Docker network entirely.
+    #
+    # HOST port 19000 (not 9000) — same reasoning as admin's 7975: on a
+    # shared server, 9000 is MinIO's own common default and easily already
+    # taken by an unrelated MinIO instance (confirmed on this server's
+    # actual host). The container's own internal port stays 9000 either
+    # way; only the host-side mapping changes.
     ports:
-      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:19000:9000'
 
   api:
     build:
