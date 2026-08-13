@@ -8,7 +8,7 @@ set -uo pipefail
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
 echo "=================================================================="
-echo "1. Force-recreate admin (picks up the 127.0.0.1:3000 port mapping)"
+echo "1. Force-recreate admin (picks up the 127.0.0.1:7975 port mapping)"
 echo "=================================================================="
 $COMPOSE up -d --force-recreate admin
 

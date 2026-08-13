@@ -128,8 +128,15 @@ services:
     # to leave published even if you're using the default all-Docker path —
     # nothing on the public internet can reach 127.0.0.1. See DEPLOYMENT.md
     # "Alternative: fronting with an existing host nginx".
+    #
+    # HOST port 7975 (not 3000) — on a shared server running many other
+    # projects, 3000 is a very common default port and can already be taken
+    # by something unrelated; the container's own internal port stays 3000
+    # either way (only the host-side mapping changes), so nothing inside
+    # this app needs to know about 7975 — only the host nginx config
+    # proxying to it does.
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:7975:3000'
 
   storefront:
     build:
