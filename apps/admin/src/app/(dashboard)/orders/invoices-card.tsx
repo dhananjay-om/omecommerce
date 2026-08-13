@@ -50,7 +50,7 @@ export function InvoicesCard({ orderPublicId, invoices, currency }: { orderPubli
             </TableCell>
             <TableCell>{new Date(inv.createdAt).toLocaleDateString('en-US')}</TableCell>
             <TableCell className="flex items-center gap-1">
-              <a href={`/api/orders/${orderPublicId}/invoice/${inv.publicId}/pdf`} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
+              <a href={`/admin/api/orders/${orderPublicId}/invoice/${inv.publicId}/pdf`} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
                 Download
               </a>
               <RegenerateButton orderPublicId={orderPublicId} invoicePublicId={inv.publicId} />

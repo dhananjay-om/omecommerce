@@ -81,10 +81,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
         <div className="flex gap-2">
-          <a href={`/api/orders/export${buildQuery({ ...exportFilters, format: 'csv' })}`} className={cn(buttonVariants({ variant: 'outline' }))}>
+          <a href={`/admin/api/orders/export${buildQuery({ ...exportFilters, format: 'csv' })}`} className={cn(buttonVariants({ variant: 'outline' }))}>
             Export CSV
           </a>
-          <a href={`/api/orders/export${buildQuery({ ...exportFilters, format: 'xlsx' })}`} className={cn(buttonVariants({ variant: 'outline' }))}>
+          <a href={`/admin/api/orders/export${buildQuery({ ...exportFilters, format: 'xlsx' })}`} className={cn(buttonVariants({ variant: 'outline' }))}>
             Export Excel
           </a>
         </div>

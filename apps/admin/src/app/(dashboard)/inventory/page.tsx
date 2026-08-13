@@ -37,13 +37,13 @@ export default async function InventoryPage({
         <>
           <div className="mt-6 flex flex-wrap gap-2">
             {warehouses.map((w) => (
-              <a
+              <Link
                 key={w.code}
                 href={`/inventory?warehouse=${w.code}`}
                 className={cn(buttonVariants({ variant: w.code === selectedCode ? 'default' : 'outline', size: 'sm' }))}
               >
                 {w.name} ({w.code})
-              </a>
+              </Link>
             ))}
           </div>
 
