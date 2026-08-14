@@ -53,6 +53,25 @@ export function applyRate(amountMinor: bigint, rateMinor: bigint): bigint {
   return (amountMinor * rateMinor) / SCALE_FACTOR;
 }
 
+/**
+ * The inverse of applyRate: given an amount that already has `rateMinor`
+ * baked into it (e.g. a tax-inclusive/MRP-style catalog price), backs out
+ * the pre-tax base and the tax amount, e.g. inclusive ₹1299 at 18% GST ->
+ * { exclusiveMinor: ₹1100.85, taxMinor: ₹198.15 }. `taxMinor` is computed
+ * as a subtraction, not an independent rounding, so the two always sum back
+ * to exactly `inclusiveMinor` — no minor unit is ever gained or lost, same
+ * exact-money-math guarantee allocateProportionally gives for an N-way split
+ * (this is the 2-way case, simple enough not to need that machinery).
+ * `exclusiveMinor` floors toward zero, same truncation rule as applyRate.
+ */
+export function extractTaxExclusive(inclusiveMinor: bigint, rateMinor: bigint): { exclusiveMinor: bigint; taxMinor: bigint } {
+  if (inclusiveMinor <= 0n || rateMinor <= 0n) {
+    return { exclusiveMinor: inclusiveMinor, taxMinor: 0n };
+  }
+  const exclusiveMinor = (inclusiveMinor * SCALE_FACTOR) / (SCALE_FACTOR + rateMinor);
+  return { exclusiveMinor, taxMinor: inclusiveMinor - exclusiveMinor };
+}
+
 export function isNegative(minor: bigint): boolean {
   return minor < 0n;
 }

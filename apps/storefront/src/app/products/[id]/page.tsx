@@ -144,7 +144,12 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
 
           <div className="mt-4">
-            <ProductPurchasePanel productId={product.publicId} currency={product.currency} variants={product.variants} />
+            <ProductPurchasePanel
+              productId={product.publicId}
+              currency={product.currency}
+              variants={product.variants}
+              pricesIncludeTax={product.pricesIncludeTax}
+            />
           </div>
 
           {shortDescription ? <p className="mt-6 text-sm text-muted-foreground">{shortDescription}</p> : null}

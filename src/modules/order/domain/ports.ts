@@ -19,6 +19,17 @@ export interface TaxLineResult {
    *  about the line's total tax (e.g. rowTotal math). */
   rateMinor: bigint;
   amountMinor: bigint;
+  /**
+   * The taxable base this amountMinor was computed against — equal to the
+   * input line's lineSubtotalMinor unchanged when the website's catalog
+   * prices are tax-exclusive (today's only behavior), or the tax-extracted
+   * amount when the website has pricesIncludeTax on (the input subtotal was
+   * actually a final, tax-inclusive price and this is what's left after
+   * backing GST out of it). The caller uses this — not the original input
+   * subtotal — as the order line's real subtotal/unitPrice, so downstream
+   * totals never double-count tax.
+   */
+  taxableAmountMinor: bigint;
   /** The GST split that sums to amountMinor — 1 entry (IGST, full rate) for an
    *  inter-state line, 2 entries (CGST + SGST, each half) for intra-state.
    *  Empty when there's no tax class (amountMinor is 0 anyway). */

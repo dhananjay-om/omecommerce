@@ -240,6 +240,7 @@ export interface Website {
   name: string;
   gstin: string | null;
   originStateCode: string | null;
+  pricesIncludeTax: boolean;
 }
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';

@@ -26,4 +26,6 @@ export interface Cart {
   discountTotal: string | null;
   couponError: string | null;
   estimatedTotal: string | null;
+  /** When true, every line price/subtotal above already includes GST — the final price. */
+  pricesIncludeTax: boolean;
 }

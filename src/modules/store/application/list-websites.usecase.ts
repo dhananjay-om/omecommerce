@@ -6,6 +6,13 @@ export class ListWebsites {
 
   async execute(): Promise<WebsiteView[]> {
     const rows = await this.websites.list();
-    return rows.map((w) => ({ publicId: w.publicId, code: w.code, name: w.name, gstin: w.gstin, originStateCode: w.originStateCode }));
+    return rows.map((w) => ({
+      publicId: w.publicId,
+      code: w.code,
+      name: w.name,
+      gstin: w.gstin,
+      originStateCode: w.originStateCode,
+      pricesIncludeTax: w.pricesIncludeTax,
+    }));
   }
 }

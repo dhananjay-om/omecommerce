@@ -261,4 +261,145 @@ describe.skipIf(!process.env.INTEGRATION)('GST tax module (live DB)', () => {
     expect(res.body.data.taxTotal).toBe('18.0000'); // only the taxed line contributes
     expect(res.body.data.taxLines).toHaveLength(2); // CGST + SGST, one class only
   });
+
+  // --- Website.pricesIncludeTax: catalog price is the final price, GST is backed out ---
+
+  describe('tax-inclusive pricing (Website.pricesIncludeTax)', () => {
+    let inclusiveStoreViewId = '';
+    let inclusiveTaxClassId = '';
+
+    beforeAll(async () => {
+      const website = await prisma.website.upsert({
+        where: { code: 'gst_inclusive_retail' },
+        update: {},
+        create: { code: 'gst_inclusive_retail', name: 'GST Inclusive Retail', baseCurrency: 'INR', isDefault: false },
+      });
+      const store = await prisma.store.upsert({
+        where: { websiteId_code: { websiteId: website.id, code: 'main' } },
+        update: {},
+        create: { websiteId: website.id, code: 'main', name: 'Main' },
+      });
+      const lang = await prisma.language.upsert({
+        where: { code: 'en-IN' },
+        update: {},
+        create: { code: 'en-IN', name: 'English (India)', nativeName: 'English' },
+      });
+      const sv = await prisma.storeView.upsert({
+        where: { storeId_code: { storeId: store.id, code: 'en' } },
+        update: {},
+        create: { storeId: store.id, code: 'en', languageId: lang.id, currency: 'INR' },
+      });
+      inclusiveStoreViewId = sv.id.toString();
+
+      await admin.post('/admin/v1/warehouses').send({ code: 'GST-WH-INCL', name: 'GST Inclusive Warehouse' });
+      const warehouse = await prisma.warehouse.findFirstOrThrow({ where: { code: 'GST-WH-INCL' } });
+      await prisma.storeWarehouse.deleteMany({ where: { storeId: store.id } });
+      await prisma.storeWarehouse.create({ data: { storeId: store.id, warehouseId: warehouse.id, priority: 0 } });
+      await admin.post('/admin/v1/shipping-methods').send({ code: 'GST-STANDARD-INCL', name: 'Standard Shipping', flatRate: '0.00', currency: 'INR' });
+
+      // Maharashtra (27) registration, same as gst_retail — AND pricesIncludeTax
+      // on, so a catalog price is the final price the customer pays, not a base
+      // to add GST on top of.
+      const settings = await admin
+        .patch(`/admin/v1/websites/${website.code}/tax-settings`)
+        .send({ gstin: '27AAAAA0000A1Z5', originStateCode: '27', pricesIncludeTax: true });
+      expect(settings.status).toBe(200);
+      expect(settings.body.data.pricesIncludeTax).toBe(true);
+
+      const gst18 = await admin.post('/admin/v1/tax-classes').send({ code: 'GST18INCL', name: 'GST 18% (inclusive)', rate: '0.18' });
+      inclusiveTaxClassId = gst18.body.data.id;
+    });
+
+    async function createInclusiveVariant(sku: string, price: string): Promise<string> {
+      const created = await admin.post('/admin/v1/products').send({
+        type: 'SIMPLE',
+        sku,
+        attributeSetId,
+        status: 'ACTIVE',
+        taxClassId: inclusiveTaxClassId,
+        hsnCode: '85171200',
+      });
+      expect(created.status).toBe(201);
+      const variant = await prisma.productVariant.findFirstOrThrow({ where: { sku } });
+      await admin.post('/admin/v1/price-lists').send({ code: `GST-PL-${sku}`, name: sku, currency: 'INR', priority: 0 });
+      await admin.put(`/admin/v1/price-lists/GST-PL-${sku}/prices`).send({ variantId: variant.publicId, price });
+      await admin.post('/admin/v1/inventory/adjustments').send({ variantId: variant.publicId, warehouseCode: 'GST-WH-INCL', delta: 100, reason: 'PURCHASE' });
+      return variant.publicId;
+    }
+
+    async function checkoutInclusive(cartId: string, stateCode: string) {
+      const shippingAddress = address(stateCode);
+      return request(app)
+        .post(`/store/v1/carts/${cartId}/checkout`)
+        .send({
+          email: 'jane@example.com',
+          billingAddress: shippingAddress,
+          shippingAddress,
+          shippingMethodCode: 'GST-STANDARD-INCL',
+          paymentMethod: 'test_card',
+        });
+    }
+
+    it('same-state checkout: GST is backed out of the ₹1299 catalog price, not added on top — the customer still pays ₹1299', async () => {
+      const variantId = await createInclusiveVariant('GST-SKU-INCL-INTRA', '1299.00');
+      const cart = await request(app).post('/store/v1/carts').send({ storeViewId: inclusiveStoreViewId });
+      const cartId = cart.body.data.publicId;
+      await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+      const res = await checkoutInclusive(cartId, '27'); // Maharashtra — same as the website's registration
+      expect(res.status).toBe(201);
+      const order = res.body.data;
+
+      // Backed-out taxable base + tax sum back to exactly the catalog price —
+      // never a naive "add 18% on top" of the listed ₹1299.
+      expect(order.subtotal).toBe('1100.8474');
+      expect(order.taxTotal).toBe('198.1526');
+      expect(order.grandTotal).toBe('1299.0000'); // shipping is 0.00 on this method — grandTotal === the catalog price, unchanged by the toggle.
+
+      const taxLines: Array<{ taxType: string; rate: string; amount: string }> = order.taxLines;
+      expect(taxLines).toHaveLength(2);
+      expect(taxLines.find((t) => t.taxType === 'CGST')).toMatchObject({ rate: '0.0900', amount: '99.0763' });
+      expect(taxLines.find((t) => t.taxType === 'SGST')).toMatchObject({ rate: '0.0900', amount: '99.0763' });
+
+      expect(order.lines[0].hsnCode).toBe('85171200');
+      // rowTotal (subtotal + tax for this one-line order) is the real money check —
+      // it must equal the catalog price exactly, same guarantee as grandTotal above.
+      expect(order.lines[0].rowTotal).toBe('1299.0000');
+    });
+
+    it('different-state checkout: a single IGST line, still backed out of the same ₹1299 catalog price', async () => {
+      const variantId = await createInclusiveVariant('GST-SKU-INCL-INTER', '1299.00');
+      const cart = await request(app).post('/store/v1/carts').send({ storeViewId: inclusiveStoreViewId });
+      const cartId = cart.body.data.publicId;
+      await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+      const res = await checkoutInclusive(cartId, '07'); // Delhi — different from the website's Maharashtra (27) registration
+      expect(res.status).toBe(201);
+      const order = res.body.data;
+
+      expect(order.subtotal).toBe('1100.8474');
+      expect(order.taxTotal).toBe('198.1526');
+      expect(order.grandTotal).toBe('1299.0000');
+
+      const taxLines: Array<{ taxType: string; rate: string; amount: string }> = order.taxLines;
+      expect(taxLines).toHaveLength(1);
+      expect(taxLines[0]).toMatchObject({ taxType: 'IGST', rate: '0.1800', amount: '198.1526' });
+    });
+
+    it('a qty>2 inclusive line still sums exactly: rowTotal === unitPrice-derived subtotal + tax, never a fabricated total', async () => {
+      const variantId = await createInclusiveVariant('GST-SKU-INCL-QTY', '118.00'); // clean rate, divides evenly: 100.00 excl + 18.00 tax
+      const cart = await request(app).post('/store/v1/carts').send({ storeViewId: inclusiveStoreViewId });
+      const cartId = cart.body.data.publicId;
+      await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 3 });
+
+      const res = await checkoutInclusive(cartId, '27');
+      expect(res.status).toBe(201);
+      const order = res.body.data;
+      // 3 x 118.00 = 354.00 total catalog price -> 300.00 exclusive + 54.00 tax.
+      expect(order.subtotal).toBe('300.0000');
+      expect(order.taxTotal).toBe('54.0000');
+      expect(order.grandTotal).toBe('354.0000');
+      expect(order.lines[0].rowTotal).toBe('354.0000');
+    });
+  });
 });

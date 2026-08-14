@@ -19,7 +19,7 @@ export class PrismaStoreContextResolver implements StoreContextResolver {
         languageId: true,
         isRtl: true,
         storeId: true,
-        store: { select: { websiteId: true } },
+        store: { select: { websiteId: true, website: { select: { pricesIncludeTax: true } } } },
       },
     });
     if (!sv) return null;
@@ -31,6 +31,7 @@ export class PrismaStoreContextResolver implements StoreContextResolver {
       currency: sv.currency,
       languageId: sv.languageId,
       isRtl: sv.isRtl,
+      pricesIncludeTax: sv.store.website.pricesIncludeTax,
     };
   }
 }

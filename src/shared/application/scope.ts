@@ -18,6 +18,11 @@ export interface StoreViewContext extends ScopeChain {
   currency: string;
   languageId: bigint;
   isRtl: boolean;
+  /** This website's GST tax-inclusive-pricing setting (Website.pricesIncludeTax)
+   *  — threaded alongside currency so every scoped read that already carries
+   *  currency (PDP, cart) can show the same "(incl. of all taxes)" cue without
+   *  a separate lookup. */
+  pricesIncludeTax: boolean;
 }
 
 /** Numeric rank matching the DB `scope_rank` generated column. Higher wins. */

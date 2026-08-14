@@ -95,7 +95,7 @@ export interface TaxClassRepository {
  *  scope — see store.prisma's Website.gstin/.originStateCode doc comment). Own
  *  copy, per-module lookup convention. */
 export interface WebsiteTaxConfigLookup {
-  byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null } | null>;
+  byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null; pricesIncludeTax: boolean } | null>;
 }
 
 export interface ShippingMethodInfo {

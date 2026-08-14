@@ -1,7 +1,7 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import type { TaxCalculator, TaxLineInput, TaxLineResult, TaxContext } from '../domain/ports.js';
 import type { TaxClassLookup, WebsiteTaxConfigLookup } from '../domain/repositories.js';
-import { applyRate, toMinorUnits } from '../../../shared/domain/decimal.js';
+import { applyRate, extractTaxExclusive, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { splitGst } from '../domain/gst.js';
 
 /** Resolves a variant -> product -> tax_class (plan/00 §9: native implementation). */
@@ -27,9 +27,12 @@ export class PrismaTaxClassLookup implements TaxClassLookup {
 export class PrismaWebsiteTaxConfigLookup implements WebsiteTaxConfigLookup {
   constructor(private readonly db: Db) {}
 
-  async byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null } | null> {
-    const row = await this.db.website.findFirst({ where: { id: websiteId }, select: { gstin: true, originStateCode: true } });
-    return row ? { gstin: row.gstin, originStateCode: row.originStateCode } : null;
+  async byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null; pricesIncludeTax: boolean } | null> {
+    const row = await this.db.website.findFirst({
+      where: { id: websiteId },
+      select: { gstin: true, originStateCode: true, pricesIncludeTax: true },
+    });
+    return row ? { gstin: row.gstin, originStateCode: row.originStateCode, pricesIncludeTax: row.pricesIncludeTax } : null;
   }
 }
 
@@ -51,17 +54,40 @@ export class NativeGstTaxCalculator implements TaxCalculator {
   async calculate(lines: TaxLineInput[], context: TaxContext): Promise<TaxLineResult[]> {
     const origin = await this.websiteTaxConfig.byId(context.websiteId);
     const originStateCode = origin?.originStateCode ?? null;
+    const pricesIncludeTax = origin?.pricesIncludeTax ?? false;
 
     const results: TaxLineResult[] = [];
     for (const line of lines) {
       const taxClass = await this.taxClasses.byVariantId(line.variantId);
       if (!taxClass) {
-        results.push({ variantId: line.variantId, taxClassCode: null, rateMinor: 0n, amountMinor: 0n, breakdown: [] });
+        results.push({
+          variantId: line.variantId,
+          taxClassCode: null,
+          rateMinor: 0n,
+          amountMinor: 0n,
+          taxableAmountMinor: line.lineSubtotalMinor,
+          breakdown: [],
+        });
         continue;
       }
-      const amountMinor = applyRate(line.lineSubtotalMinor, taxClass.rateMinor);
+      // Exclusive (default): the input subtotal IS the taxable base, GST is
+      // computed on top of it (unchanged from before this setting existed).
+      // Inclusive: the input subtotal is actually a final, tax-inclusive
+      // price — back GST out of it instead, so the caller's downstream
+      // totals (which just add amountMinor on top of taxableAmountMinor)
+      // land back on the same final price the catalog listed.
+      let taxableAmountMinor: bigint;
+      let amountMinor: bigint;
+      if (pricesIncludeTax) {
+        const extracted = extractTaxExclusive(line.lineSubtotalMinor, taxClass.rateMinor);
+        taxableAmountMinor = extracted.exclusiveMinor;
+        amountMinor = extracted.taxMinor;
+      } else {
+        taxableAmountMinor = line.lineSubtotalMinor;
+        amountMinor = applyRate(line.lineSubtotalMinor, taxClass.rateMinor);
+      }
       const breakdown = splitGst(taxClass.rateMinor, amountMinor, originStateCode, context.destinationStateCode);
-      results.push({ variantId: line.variantId, taxClassCode: taxClass.code, rateMinor: taxClass.rateMinor, amountMinor, breakdown });
+      results.push({ variantId: line.variantId, taxClassCode: taxClass.code, rateMinor: taxClass.rateMinor, amountMinor, taxableAmountMinor, breakdown });
     }
     return results;
   }

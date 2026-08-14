@@ -6,9 +6,10 @@ import { MinusIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
+import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import type { CartLine } from '@/types/cart';
 
-export function CartLineRow({ line, currency }: { line: CartLine; currency: string }) {
+export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLine; currency: string; pricesIncludeTax: boolean }) {
   const [pending, setPending] = useState(false);
   const addLine = useCartStore((s) => s.addLine);
   const removeLine = useCartStore((s) => s.removeLine);
@@ -78,7 +79,10 @@ export function CartLineRow({ line, currency }: { line: CartLine; currency: stri
       </div>
 
       <div className="text-right whitespace-nowrap">
-        <div className="font-semibold">{line.lineTotal ? formatPrice(line.lineTotal, currency) : '—'}</div>
+        <div className="font-semibold">
+          {line.lineTotal ? formatPrice(line.lineTotal, currency) : '—'}
+          {line.lineTotal && pricesIncludeTax ? <TaxInclusiveNote /> : null}
+        </div>
         {line.discountAmount && Number(line.discountAmount) > 0 ? (
           <div className="text-xs text-success">-{formatPrice(line.discountAmount, currency)}</div>
         ) : null}

@@ -22,7 +22,18 @@ export class UpdateWebsiteTaxSettings {
       ]);
     }
 
-    const w = await this.websites.update(cmd.code, { gstin: cmd.gstin, originStateCode: cmd.originStateCode });
-    return { publicId: w.publicId, code: w.code, name: w.name, gstin: w.gstin, originStateCode: w.originStateCode };
+    const w = await this.websites.update(cmd.code, {
+      gstin: cmd.gstin,
+      originStateCode: cmd.originStateCode,
+      pricesIncludeTax: cmd.pricesIncludeTax,
+    });
+    return {
+      publicId: w.publicId,
+      code: w.code,
+      name: w.name,
+      gstin: w.gstin,
+      originStateCode: w.originStateCode,
+      pricesIncludeTax: w.pricesIncludeTax,
+    };
   }
 }

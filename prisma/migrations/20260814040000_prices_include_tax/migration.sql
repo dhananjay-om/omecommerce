@@ -1,0 +1,11 @@
+-- Per-website "prices include tax" toggle. When true, every catalog/price-list
+-- price on this website is the final, tax-inclusive price (GST already baked
+-- in) — the tax calculator backs GST out of it at checkout instead of adding
+-- it on top. DEFAULT false so every existing website (and every row already
+-- in the table) keeps today's tax-exclusive behavior unchanged; a plain
+-- boolean column with a default needs no CHECK constraint and therefore no
+-- NOT VALID + VALIDATE CONSTRAINT step (that pattern is only needed to avoid
+-- locking a large table while an existing CHECK is validated against
+-- possibly-nonconforming rows — there's no such risk for a single boolean
+-- default).
+ALTER TABLE "website" ADD COLUMN "prices_include_tax" BOOLEAN NOT NULL DEFAULT false;

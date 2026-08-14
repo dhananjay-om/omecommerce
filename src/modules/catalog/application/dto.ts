@@ -83,6 +83,10 @@ export interface ProductForStoreViewQuery {
 export interface ProductForStoreView extends ProductView {
   storeViewId: string;
   currency: string;
+  /** Website.pricesIncludeTax — when true, `price` below (and every variant's
+   *  price) is the final, tax-inclusive price the customer pays; GST is
+   *  backed out of it at checkout rather than added on top. */
+  pricesIncludeTax: boolean;
   attributes: Record<string, unknown>;
 }
 

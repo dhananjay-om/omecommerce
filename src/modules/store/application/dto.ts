@@ -27,10 +27,12 @@ export interface WebsiteView {
   name: string;
   gstin: string | null;
   originStateCode: string | null;
+  pricesIncludeTax: boolean;
 }
 
 export interface UpdateWebsiteTaxSettingsCommand {
   code: string;
   gstin?: string | null;
   originStateCode?: string | null;
+  pricesIncludeTax?: boolean;
 }

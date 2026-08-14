@@ -13,6 +13,7 @@ export async function updateGstSettings(_prevState: ActionState, formData: FormD
   const code = String(formData.get('code') ?? '').trim();
   const gstin = String(formData.get('gstin') ?? '').trim().toUpperCase();
   const originStateCode = String(formData.get('originStateCode') ?? '').trim();
+  const pricesIncludeTax = String(formData.get('pricesIncludeTax') ?? 'false') === 'true';
 
   if (!code) return { error: 'Missing website code.', success: false };
   // Both-or-neither — same pairing the backend's CHECK constraint enforces.
@@ -24,6 +25,7 @@ export async function updateGstSettings(_prevState: ActionState, formData: FormD
     await apiPatch<Website>(`/admin/v1/websites/${code}/tax-settings`, {
       gstin: gstin || null,
       originStateCode: originStateCode || null,
+      pricesIncludeTax,
     });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };

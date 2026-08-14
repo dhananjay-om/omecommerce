@@ -73,6 +73,7 @@ export class GetProductForStoreView {
       hsnCode: null,
       storeViewId: query.storeViewId,
       currency: ctx.currency,
+      pricesIncludeTax: ctx.pricesIncludeTax,
       attributes,
     };
   }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCartStore, countItems } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
+import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import { CartLineRow } from './cart-line-row';
 import { CouponField } from './coupon-field';
 import type { Cart } from '@/types/cart';
@@ -41,7 +42,7 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
       <div className="flex flex-col gap-8 lg:flex-row">
         <div className="flex-1 rounded-lg border p-4">
           {displayCart.lines.map((line) => (
-            <CartLineRow key={line.id} line={line} currency={displayCart.currency} />
+            <CartLineRow key={line.id} line={line} currency={displayCart.currency} pricesIncludeTax={displayCart.pricesIncludeTax} />
           ))}
         </div>
 
@@ -64,12 +65,17 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax</span>
-              <span className="text-muted-foreground">Calculated at checkout</span>
+              <span className="text-muted-foreground">
+                {displayCart.pricesIncludeTax ? 'Included in prices above' : 'Calculated at checkout'}
+              </span>
             </div>
           </div>
           <div className="flex justify-between border-t pt-3 text-base font-bold">
             <span>Estimated Total</span>
-            <span>{displayCart.estimatedTotal ? formatPrice(displayCart.estimatedTotal, displayCart.currency) : '—'}</span>
+            <span>
+              {displayCart.estimatedTotal ? formatPrice(displayCart.estimatedTotal, displayCart.currency) : '—'}
+              {displayCart.estimatedTotal && displayCart.pricesIncludeTax ? <TaxInclusiveNote /> : null}
+            </span>
           </div>
 
           <CouponField cart={displayCart} />
