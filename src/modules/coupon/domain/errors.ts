@@ -49,3 +49,13 @@ export class CouponPerCustomerLimitExceededError extends DomainError {
     super(`you have already used coupon ${code} the maximum number of times`, 'https://errors.ome/coupon-per-customer-limit', 409);
   }
 }
+
+/** Thrown by evaluate() for a targetType='ITEM' coupon when zero cart lines match its
+ *  conditions — a real, visible rejection for a manually-entered code. findBestAutoApply()
+ *  never throws this; it treats zero-matching as "not eligible" and silently skips the
+ *  candidate (the customer never typed anything to reject). */
+export class CouponNoEligibleItemsError extends DomainError {
+  constructor(code: string) {
+    super(`coupon ${code} does not apply to any items in your cart`, 'https://errors.ome/coupon-no-eligible-items', 422);
+  }
+}

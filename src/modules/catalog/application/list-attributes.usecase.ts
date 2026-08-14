@@ -1,5 +1,5 @@
-import type { AttributeInfo, AttributeRepository } from '../domain/repositories.js';
-import type { AttributeView } from './dto.js';
+import type { AttributeInfo, AttributeOptionInfo, AttributeRepository } from '../domain/repositories.js';
+import type { AttributeView, AttributeOptionView } from './dto.js';
 
 /** Shared AttributeInfo -> AttributeView mapping, reused by ListAttributes/CreateAttribute/UpdateAttribute
  *  so the reusable-attribute library, its create response, and its edit response never drift apart. */
@@ -30,5 +30,21 @@ export class ListAttributes {
   async execute(): Promise<AttributeView[]> {
     const rows = await this.attributes.list();
     return rows.map(toAttributeView);
+  }
+}
+
+function toOptionView(o: AttributeOptionInfo): AttributeOptionView {
+  return { id: o.id.toString(), value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder };
+}
+
+/** Standalone attribute-option lookup (not scoped to any one attribute set's group
+ *  assignment) — powers the coupon admin condition builder's "pick a Value" dropdown
+ *  once an ATTRIBUTE condition's attribute has been chosen. */
+export class ListAttributeOptions {
+  constructor(private readonly attributes: AttributeRepository) {}
+
+  async execute(code: string): Promise<AttributeOptionView[]> {
+    const rows = await this.attributes.listOptions(code);
+    return rows.map(toOptionView);
   }
 }

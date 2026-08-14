@@ -1,13 +1,22 @@
 // =============================================================================
-// coupon.prisma — Discount coupons (deliberately-scoped MVP, not the full
+// coupon.prisma — Discount coupons (deliberately-scoped, not the full
 // historical "Promotion" bounded context — plan/00-master-plan.md §… envisioned
 // cart rules + catalog rules + condition-tree rule builder + coupons; that was
 // never built at any stage of this project and remains out of scope here).
 //
-// SCOPE FOR THIS PASS:
-// - One coupon code = one whole-cart discount (PERCENTAGE or FIXED_AMOUNT off
-//   the cart subtotal). No per-line/per-category targeting, no BOGO, no
-//   auto-apply cart rules, no stacking multiple coupons on one order.
+// SCOPE:
+// - One coupon code = one discount (PERCENTAGE or FIXED_AMOUNT), whose base is
+//   either the whole cart subtotal (targetType=CART) or the subtotal of only
+//   the cart lines matching this coupon's CouponCondition rows
+//   (targetType=ITEM) — see condition-matcher.ts for the matching algorithm.
+//   Still no BOGO, no tiered discounts, no stacking multiple coupons on one
+//   order (CouponRedemption.orderId stays @unique).
+// - isAutoApply coupons apply themselves with no code entry — see
+//   DiscountCalculator.findBestAutoApply() and its call sites in
+//   enrich-cart-view.ts/complete-checkout.usecase.ts. A manually-entered code
+//   (Cart.couponCode set) always takes priority over auto-apply; nothing is
+//   ever persisted onto Cart for an auto-applied coupon, it's recomputed live
+//   on every read, same as the discount AMOUNT always has been.
 // - Usage tracking is the same hybrid already established by GiftCard: a
 //   guarded counter (`usageCount`, race-safe `WHERE usage_count < usage_limit`
 //   UPDATE — see prisma-giftcard-ledger.ts's identical mechanic) for the
@@ -21,8 +30,12 @@
 // - Tax is computed on the PRE-discount subtotal (TaxCalculator has no
 //   discount-allocation concept) — documented deliberate simplification, not
 //   a silent gap; redesigning that port is real scope creep for this MVP.
+// - Attribute-condition matching compares GLOBAL attribute values only (not
+//   per-store-view overrides) — deliberate simplification, user-confirmed.
 // - NOT built this pass (documented deferrals):
-//   * Catalog/cart rule engine, BOGO, tiered/condition-tree discounts.
+//   * Catalog/cart-wide rules (spend $X get free shipping), BOGO, nested
+//     AND/OR condition trees (this uses a fixed AND-across-types/OR-within-type
+//     grouping instead — see condition-matcher.ts).
 //   * Coupon stacking (one code per order).
 //   * Admin bulk code generation (one code per Coupon row, admin-typed).
 //   * Referral/loyalty auto-issuing a coupon reward (see ReferralRewardType's
@@ -51,6 +64,14 @@ model Coupon {
   /// PERCENTAGE coupon (which forbids `currency`) can't have a minSubtotal gate in
   /// this pass; only FIXED_AMOUNT coupons can.
   minSubtotal           Decimal?           @map("min_subtotal") @db.Decimal(18, 4)
+  /// CART (default): discount base = whole cart subtotal, zero conditions
+  /// allowed. ITEM: discount base = only the matching lines' subtotal,
+  /// requires >=1 CouponCondition row. CHECK-constraint enforced.
+  targetType            CouponTargetType   @default(CART) @map("target_type")
+  /// Applies itself with no code entry when eligible — see
+  /// DiscountCalculator.findBestAutoApply(). A manually-entered code always
+  /// wins over auto-apply; at most one coupon is ever active per cart either way.
+  isAutoApply           Boolean            @default(false) @map("is_auto_apply")
   usageLimit            Int?               @map("usage_limit")
   usageLimitPerCustomer Int?               @map("usage_limit_per_customer")
   /// Guarded counter — race-safe `WHERE usage_count < usage_limit` UPDATE at
@@ -67,10 +88,43 @@ model Coupon {
   deletedAt             DateTime?          @map("deleted_at") @db.Timestamptz(6)
 
   redemptions CouponRedemption[]
+  conditions  CouponCondition[]
 
   @@index([deletedAt])
   @@index([isActive])
   @@map("coupon")
+}
+
+/// Only meaningful when the parent Coupon has targetType=ITEM. Rows are
+/// grouped for matching by conditionType — see condition-matcher.ts:
+/// all PRODUCT rows OR together, all CATEGORY rows OR together
+/// (ancestor-inclusive via category_closure), ATTRIBUTE rows group BY
+/// attributeId and OR within the same attribute. A cart line is eligible iff
+/// it matches every group that has >=1 row (AND across groups).
+model CouponCondition {
+  id             BigInt              @id @default(autoincrement())
+  couponId       BigInt              @map("coupon_id")
+  conditionType  CouponConditionType @map("condition_type")
+  /// Set iff conditionType=PRODUCT. Scope scalar; FK added in raw SQL
+  /// (ON DELETE CASCADE — a condition referencing a deleted product is meaningless).
+  productId      BigInt?             @map("product_id")
+  /// Set iff conditionType=CATEGORY. Scope scalar; FK added in raw SQL (ON DELETE CASCADE).
+  categoryId     BigInt?             @map("category_id")
+  /// Set iff conditionType=ATTRIBUTE, alongside attributeValue. Scope scalar;
+  /// FK added in raw SQL (ON DELETE CASCADE).
+  attributeId    BigInt?             @map("attribute_id")
+  /// Set iff conditionType=ATTRIBUTE — the comparable value: an
+  /// AttributeOption.id (as a string) for SELECT/MULTISELECT attributes, or
+  /// the raw scalar text for TEXT/NUMBER/DECIMAL/BOOLEAN — exactly what
+  /// attribute-value.ts's fromRow() returns, GLOBAL scope only (documented
+  /// simplification, see this file's header comment).
+  attributeValue String?             @map("attribute_value")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@map("coupon_condition")
 }
 
 /// Append-only redemption ledger — one row per successfully-PLACED order (never

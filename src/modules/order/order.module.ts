@@ -118,7 +118,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const addCartLine = new AddCartLine(carts, variants, enrichCartView);
   const getCart = new GetCart(carts, enrichCartView);
   const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
-  const applyCouponToCart = new ApplyCouponToCart(carts, discountCalculator, enrichCartView);
+  const applyCouponToCart = new ApplyCouponToCart(carts, variants, discountCalculator, enrichCartView);
   const removeCouponFromCart = new RemoveCouponFromCart(carts, enrichCartView);
   const completeCheckout = new CompleteCheckout(
     carts,

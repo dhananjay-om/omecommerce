@@ -541,3 +541,24 @@ enum CouponDiscountType {
   PERCENTAGE
   FIXED_AMOUNT
 }
+
+/// coupon.prisma — CART is the original MVP behavior (discount base = whole
+/// cart subtotal, zero CouponCondition rows allowed). ITEM restricts the
+/// discount base to only the cart lines matching the coupon's conditions
+/// (requires >=1 CouponCondition row) — enforced by a CHECK constraint plus
+/// app-layer validation in create/update-coupon.usecase.ts.
+enum CouponTargetType {
+  CART
+  ITEM
+}
+
+/// coupon.prisma — which column pair on CouponCondition is populated. PRODUCT
+/// conditions on one coupon OR together (any of these products); CATEGORY
+/// conditions OR together, ancestor-inclusive; ATTRIBUTE conditions group BY
+/// attributeId and OR within the same attribute — see condition-matcher.ts
+/// for the full AND-across-groups/OR-within-group algorithm.
+enum CouponConditionType {
+  PRODUCT
+  CATEGORY
+  ATTRIBUTE
+}

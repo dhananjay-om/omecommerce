@@ -190,7 +190,12 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
                     <span>
                       {line.name} &times; {line.qty}
                     </span>
-                    <span>{line.lineTotal ? formatPrice(line.lineTotal, displayCart.currency) : '—'}</span>
+                    <span>
+                      {line.lineTotal ? formatPrice(line.lineTotal, displayCart.currency) : '—'}
+                      {line.discountAmount && Number(line.discountAmount) > 0 ? (
+                        <span className="ml-1 text-success">(-{formatPrice(line.discountAmount, displayCart.currency)})</span>
+                      ) : null}
+                    </span>
                   </div>
                 ))}
               </div>

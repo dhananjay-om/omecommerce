@@ -2,12 +2,13 @@
 
 import { useActionState, useState } from 'react';
 import { updateCoupon, type ActionState } from './actions';
-import type { Coupon, CouponDiscountType } from '@/lib/types';
+import type { Attribute, Category, Coupon, CouponDiscountType, CouponTargetType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { ConditionBuilder, conditionRowsFromView } from './condition-builder';
 
 const DISCOUNT_TYPES: CouponDiscountType[] = ['PERCENTAGE', 'FIXED_AMOUNT'];
 
@@ -18,9 +19,10 @@ function toDateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : '';
 }
 
-export function EditCouponDialog({ coupon }: { coupon: Coupon }) {
+export function EditCouponDialog({ coupon, attributes, categories }: { coupon: Coupon; attributes: Attribute[]; categories: Category[] }) {
   const [open, setOpen] = useState(false);
   const [discountType, setDiscountType] = useState<CouponDiscountType>(coupon.discountType);
+  const [targetType, setTargetType] = useState<CouponTargetType>(coupon.targetType);
   const [state, formAction, pending] = useActionState(updateCoupon, initialState);
   const [handledState, setHandledState] = useState(state);
 
@@ -34,7 +36,10 @@ export function EditCouponDialog({ coupon }: { coupon: Coupon }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setDiscountType(coupon.discountType);
+        if (!next) {
+          setDiscountType(coupon.discountType);
+          setTargetType(coupon.targetType);
+        }
       }}
     >
       <DialogTrigger render={<Button variant="outline" size="sm">Edit</Button>} />
@@ -84,6 +89,39 @@ export function EditCouponDialog({ coupon }: { coupon: Coupon }) {
               placeholder={discountType === 'FIXED_AMOUNT' ? 'Optional' : 'Only available for Fixed Amount coupons'}
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor={`epn-targetType-${coupon.code}`}>Applies to</Label>
+              <Select name="targetType" value={targetType} onValueChange={(v) => setTargetType(v as CouponTargetType)}>
+                <SelectTrigger id={`epn-targetType-${coupon.code}`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CART">Whole Cart</SelectItem>
+                  <SelectItem value="ITEM">Specific Items</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`epn-isAutoApply-${coupon.code}`}>Auto-Apply</Label>
+              <Select name="isAutoApply" defaultValue={coupon.isAutoApply ? 'true' : 'false'}>
+                <SelectTrigger id={`epn-isAutoApply-${coupon.code}`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="false">Requires a code</SelectItem>
+                  <SelectItem value="true">Applies automatically</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {targetType === 'ITEM' ? (
+            <ConditionBuilder
+              attributes={attributes}
+              categories={categories}
+              initialRows={targetType === coupon.targetType ? conditionRowsFromView(coupon.conditions) : undefined}
+            />
+          ) : null}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor={`epn-usageLimit-${coupon.code}`}>Usage limit</Label>

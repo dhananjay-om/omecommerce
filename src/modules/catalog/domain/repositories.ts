@@ -203,6 +203,11 @@ export interface AttributeRepository {
   softDelete(id: bigint): Promise<void>;
   /** True if this attribute is currently assigned into any attribute set's group — guards deletion. */
   isAssignedToAnySet(id: bigint): Promise<boolean>;
+  /** SELECT/MULTISELECT attributes' option list, standalone (not scoped to any one
+   *  attribute set's group assignment, unlike AttributeSetAttributeDetail.options) —
+   *  powers the coupon admin condition builder's "pick a Value" dropdown. Empty
+   *  array for non-option-backed data types. */
+  listOptions(code: string): Promise<AttributeOptionInfo[]>;
 }
 
 export interface AttributeSetInfo {

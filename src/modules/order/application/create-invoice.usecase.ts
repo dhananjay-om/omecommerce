@@ -32,7 +32,7 @@ export class CreateInvoice {
       }
     }
 
-    const invoiceLines: Array<{ orderLineId: bigint; qty: number; unitPriceMinor: bigint; taxAmountMinor: bigint; rowTotalMinor: bigint }> = [];
+    const invoiceLines: Array<{ orderLineId: bigint; qty: number; unitPriceMinor: bigint; taxAmountMinor: bigint; discountAmountMinor: bigint; rowTotalMinor: bigint }> = [];
     const requested: Array<{ sku: string; qty: number | null }> = cmd.lines ?? order.lines.map((l) => ({ sku: l.sku, qty: null }));
 
     for (const req of requested) {
@@ -46,9 +46,11 @@ export class CreateInvoice {
 
       const unitPriceMinor = toMinorUnits(line.unitPrice);
       const lineTaxMinor = toMinorUnits(line.taxAmount);
+      const lineDiscountMinor = toMinorUnits(line.discountAmount);
       const taxAmountMinor = (lineTaxMinor * BigInt(qty)) / BigInt(line.qty);
+      const discountAmountMinor = (lineDiscountMinor * BigInt(qty)) / BigInt(line.qty);
       const rowTotalMinor = unitPriceMinor * BigInt(qty) + taxAmountMinor;
-      invoiceLines.push({ orderLineId: line.id, qty, unitPriceMinor, taxAmountMinor, rowTotalMinor });
+      invoiceLines.push({ orderLineId: line.id, qty, unitPriceMinor, taxAmountMinor, discountAmountMinor, rowTotalMinor });
     }
 
     if (invoiceLines.length === 0) {
@@ -57,14 +59,16 @@ export class CreateInvoice {
 
     const subtotalMinor = invoiceLines.reduce((acc, l) => addMinor(acc, l.unitPriceMinor * BigInt(l.qty)), 0n);
     const taxTotalMinor = invoiceLines.reduce((acc, l) => addMinor(acc, l.taxAmountMinor), 0n);
-    // The order's total discount, allocated to this invoice proportionally by its
-    // share of the order subtotal — same technique already used for tax's
-    // per-line split above (lineTaxMinor * qty / line.qty), just applied once at
-    // the invoice level since this MVP has no per-line discount allocation
-    // (OrderLine.discountAmount stays 0 — see coupon.prisma's header comment).
-    const orderSubtotalMinor = toMinorUnits(order.subtotal);
-    const orderDiscountMinor = toMinorUnits(order.discountTotal);
-    const discountTotalMinor = orderSubtotalMinor === 0n ? 0n : (orderDiscountMinor * subtotalMinor) / orderSubtotalMinor;
+    // Each invoiced line's OWN share of the discount it actually received
+    // (OrderLine.discountAmount, populated at order-creation time — see
+    // coupon.prisma's header comment), prorated by invoiced-qty/line-qty — same
+    // technique as tax's per-line split above. This is correct regardless of
+    // whether the order's coupon was CART-target (every line got a share) or
+    // ITEM-target (only matching lines did) — a single order-wide ratio (the
+    // previous approach) would incorrectly spread an ITEM-target coupon's
+    // discount onto lines it never actually applied to when only some of the
+    // order's lines are invoiced.
+    const discountTotalMinor = invoiceLines.reduce((acc, l) => addMinor(acc, l.discountAmountMinor), 0n);
     const grandTotalMinor = subtractMinor(addMinor(subtotalMinor, taxTotalMinor), discountTotalMinor);
 
     const actor = cmd.createdBy ? await this.adminUsers.findByPublicId(cmd.createdBy) : null;

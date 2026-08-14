@@ -32,6 +32,12 @@ describe.skipIf(!process.env.INTEGRATION)('coupon API (live DB)', () => {
     return cart.body.data.publicId;
   }
 
+  async function productPublicIdFor(sku: string): Promise<string> {
+    const variant = await prisma.productVariant.findFirstOrThrow({ where: { sku } });
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: variant.productId } });
+    return product.publicId;
+  }
+
   const address = { name: 'Jane Doe', line1: '123 Main St', city: 'Springfield', postalCode: '12345', country: 'US' };
 
   async function checkout(cartId: string, overrides: Record<string, unknown> = {}) {
@@ -295,5 +301,221 @@ describe.skipIf(!process.env.INTEGRATION)('coupon API (live DB)', () => {
     const coupon = await admin.get('/admin/v1/coupons');
     const row = coupon.body.data.find((c: { code: string }) => c.code === 'RACE1');
     expect(row.usageCount).toBe(1);
+  });
+
+  // --- Admin CRUD validation: targetType/conditions pairing ---
+
+  it('rejects an ITEM-target coupon with zero conditions, and a CART-target coupon with conditions', async () => {
+    const noConditions = await admin.post('/admin/v1/coupons').send({ code: 'ITEMNOCOND', discountType: 'PERCENTAGE', value: '10', targetType: 'ITEM' });
+    expect(noConditions.status).toBe(422);
+
+    const productPublicId = await productPublicIdFor('CPN-SKU-1'); // created by an earlier test
+    const cartWithConditions = await admin.post('/admin/v1/coupons').send({
+      code: 'CARTWITHCOND',
+      discountType: 'PERCENTAGE',
+      value: '10',
+      targetType: 'CART',
+      conditions: [{ conditionType: 'PRODUCT', productId: productPublicId }],
+    });
+    expect(cartWithConditions.status).toBe(422);
+  });
+
+  // --- Item targeting: PRODUCT / CATEGORY / ATTRIBUTE conditions ---
+
+  it('an ITEM-target coupon with a PRODUCT condition discounts only the matching line', async () => {
+    const variantA = await createVariant('CPN-ITEM-A', '50.00');
+    const variantB = await createVariant('CPN-ITEM-B', '30.00');
+    const productAPublicId = await productPublicIdFor('CPN-ITEM-A');
+
+    const created = await admin.post('/admin/v1/coupons').send({
+      code: 'ITEMPROD',
+      discountType: 'PERCENTAGE',
+      value: '20',
+      targetType: 'ITEM',
+      conditions: [{ conditionType: 'PRODUCT', productId: productAPublicId }],
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.targetType).toBe('ITEM');
+    expect(created.body.data.conditions).toEqual([
+      expect.objectContaining({ conditionType: 'PRODUCT', productId: productAPublicId }),
+    ]);
+
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId: variantA, qty: 1 });
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId: variantB, qty: 1 });
+
+    const applied = await request(app).post(`/store/v1/carts/${cartId}/actions/apply-coupon`).send({ code: 'ITEMPROD' });
+    expect(applied.status).toBe(200);
+    // 20% of A's 50.00 only — not 20% of the 80.00 combined subtotal.
+    expect(applied.body.data.discountTotal).toBe('10.0000');
+    const lineA = applied.body.data.lines.find((l: { sku: string }) => l.sku === 'CPN-ITEM-A');
+    const lineB = applied.body.data.lines.find((l: { sku: string }) => l.sku === 'CPN-ITEM-B');
+    expect(lineA.discountAmount).toBe('10.0000');
+    expect(lineB.discountAmount).toBeNull(); // never matched — no allocation entry at all
+
+    const res = await checkout(cartId);
+    expect(res.status).toBe(201);
+    expect(res.body.data.discountTotal).toBe('10.0000');
+    // subtotal(80) - discount(10) + tax(0) + shipping(5)
+    expect(res.body.data.grandTotal).toBe('75.0000');
+  });
+
+  it('an ITEM-target coupon with a CATEGORY condition matches a product in a descendant category', async () => {
+    const parent = await admin.post('/admin/v1/categories').send({ nameDefault: 'Coupon Test Clothing' });
+    const child = await admin.post('/admin/v1/categories').send({ nameDefault: 'Coupon Test Shirts', parentId: parent.body.data.publicId });
+    const variantId = await createVariant('CPN-CAT-1', '40.00');
+    const productPublicId = await productPublicIdFor('CPN-CAT-1');
+    await admin.put(`/admin/v1/products/${productPublicId}/categories`).send({ categoryIds: [child.body.data.publicId] });
+
+    await admin.post('/admin/v1/coupons').send({
+      code: 'ITEMCAT',
+      discountType: 'PERCENTAGE',
+      value: '25',
+      targetType: 'ITEM',
+      conditions: [{ conditionType: 'CATEGORY', categoryId: parent.body.data.publicId }], // ancestor of the product's assigned category
+    });
+
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    const applied = await request(app).post(`/store/v1/carts/${cartId}/actions/apply-coupon`).send({ code: 'ITEMCAT' });
+    expect(applied.status).toBe(200);
+    expect(applied.body.data.discountTotal).toBe('10.0000'); // 25% of 40.00
+  });
+
+  it('an ITEM-target coupon with an ATTRIBUTE condition matches only the option it names', async () => {
+    await admin.post('/admin/v1/attributes').send({
+      code: 'coupon-test-color',
+      label: 'Color',
+      dataType: 'SELECT',
+      inputType: 'DROPDOWN',
+      options: [
+        { value: 'red', label: 'Red' },
+        { value: 'blue', label: 'Blue' },
+      ],
+    });
+    const options = await prisma.attributeOption.findMany({ where: { attribute: { code: 'coupon-test-color' } } });
+    const redOptionId = options.find((o) => o.value === 'red')!.id.toString();
+    const blueOptionId = options.find((o) => o.value === 'blue')!.id.toString();
+
+    const variantRed = await createVariant('CPN-ATTR-RED', '60.00');
+    const variantBlue = await createVariant('CPN-ATTR-BLUE', '60.00');
+    const redProductPublicId = await productPublicIdFor('CPN-ATTR-RED');
+    const blueProductPublicId = await productPublicIdFor('CPN-ATTR-BLUE');
+    await admin.put(`/admin/v1/products/${redProductPublicId}/attributes/bulk`).send({ values: [{ attributeCode: 'coupon-test-color', value: Number(redOptionId) }] });
+    await admin.put(`/admin/v1/products/${blueProductPublicId}/attributes/bulk`).send({ values: [{ attributeCode: 'coupon-test-color', value: Number(blueOptionId) }] });
+
+    await admin.post('/admin/v1/coupons').send({
+      code: 'ITEMATTR',
+      discountType: 'FIXED_AMOUNT',
+      value: '5',
+      currency: 'USD',
+      targetType: 'ITEM',
+      conditions: [{ conditionType: 'ATTRIBUTE', attributeCode: 'coupon-test-color', attributeValue: redOptionId }],
+    });
+
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId: variantRed, qty: 1 });
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId: variantBlue, qty: 1 });
+    const applied = await request(app).post(`/store/v1/carts/${cartId}/actions/apply-coupon`).send({ code: 'ITEMATTR' });
+    expect(applied.status).toBe(200);
+    expect(applied.body.data.discountTotal).toBe('5.0000');
+    const redLine = applied.body.data.lines.find((l: { sku: string }) => l.sku === 'CPN-ATTR-RED');
+    const blueLine = applied.body.data.lines.find((l: { sku: string }) => l.sku === 'CPN-ATTR-BLUE');
+    expect(redLine.discountAmount).toBe('5.0000');
+    expect(blueLine.discountAmount).toBeNull();
+  });
+
+  it('an ITEM-target coupon with zero eligible items in the cart is rejected with 422', async () => {
+    const variantBlue = await createVariant('CPN-ATTR-BLUE-2', '10.00');
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId: variantBlue, qty: 1 });
+    const applied = await request(app).post(`/store/v1/carts/${cartId}/actions/apply-coupon`).send({ code: 'ITEMATTR' }); // matches RED only
+    expect(applied.status).toBe(422);
+  });
+
+  // --- Auto-apply ---
+
+  it('an auto-apply coupon applies itself with no code entered, and shows up as such on a plain cart read', async () => {
+    await admin.post('/admin/v1/coupons').send({ code: 'AUTO15', discountType: 'PERCENTAGE', value: '15', isAutoApply: true });
+    const variantId = await createVariant('CPN-AUTO-1', '40.00');
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+    const cart = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(cart.status).toBe(200);
+    expect(cart.body.data.couponCode).toBe('AUTO15');
+    expect(cart.body.data.couponIsAutoApplied).toBe(true);
+    expect(cart.body.data.discountTotal).toBe('6.0000');
+
+    const res = await checkout(cartId);
+    expect(res.status).toBe(201);
+    expect(res.body.data.couponCode).toBe('AUTO15');
+    expect(res.body.data.discountTotal).toBe('6.0000');
+
+    const coupon = await admin.get('/admin/v1/coupons');
+    const row = coupon.body.data.find((c: { code: string }) => c.code === 'AUTO15');
+    expect(row.usageCount).toBe(1);
+  });
+
+  it('when several auto-apply coupons are eligible, the one giving the greatest discount is chosen', async () => {
+    await admin.post('/admin/v1/coupons').send({ code: 'AUTOSMALL', discountType: 'PERCENTAGE', value: '5', isAutoApply: true });
+    await admin.post('/admin/v1/coupons').send({ code: 'AUTOBIG', discountType: 'PERCENTAGE', value: '30', isAutoApply: true });
+    const variantId = await createVariant('CPN-AUTO-2', '20.00');
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+    const cart = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(cart.body.data.couponCode).toBe('AUTOBIG');
+    expect(cart.body.data.discountTotal).toBe('6.0000'); // 30% of 20.00
+  });
+
+  it('a manually-applied code always wins over an eligible auto-apply coupon', async () => {
+    await admin.post('/admin/v1/coupons').send({ code: 'AUTOWINS', discountType: 'PERCENTAGE', value: '50', isAutoApply: true });
+    await admin.post('/admin/v1/coupons').send({ code: 'MANUALWINS', discountType: 'PERCENTAGE', value: '10' });
+    const variantId = await createVariant('CPN-AUTO-3', '20.00');
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+    await request(app).post(`/store/v1/carts/${cartId}/actions/apply-coupon`).send({ code: 'MANUALWINS' });
+
+    const cart = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(cart.body.data.couponCode).toBe('MANUALWINS');
+    expect(cart.body.data.couponIsAutoApplied).toBe(false);
+    expect(cart.body.data.discountTotal).toBe('2.0000'); // 10% of 20.00, not 50%
+  });
+
+  it('a concurrent race for the last use of a limited auto-apply coupon: both checkouts succeed, only one is discounted', async () => {
+    // Deactivate every other auto-apply coupon created by earlier tests in this
+    // file (AUTO15/AUTOSMALL/AUTOBIG/AUTOWINS) so AUTORACE is the sole eligible
+    // auto-apply candidate — otherwise findBestAutoApply would pick whichever of
+    // those has the greatest value instead, defeating the point of this test.
+    for (const code of ['AUTO15', 'AUTOSMALL', 'AUTOBIG', 'AUTOWINS']) {
+      await admin.patch(`/admin/v1/coupons/${code}`).send({ isActive: false });
+    }
+    await admin.post('/admin/v1/coupons').send({ code: 'AUTORACE', discountType: 'PERCENTAGE', value: '10', isAutoApply: true, usageLimit: 1 });
+    const variantId = await createVariant('CPN-AUTO-RACE', '20.00');
+
+    const cartA = await newCart();
+    const cartB = await newCart();
+    await request(app).post(`/store/v1/carts/${cartA}/lines`).send({ variantId, qty: 1 });
+    await request(app).post(`/store/v1/carts/${cartB}/lines`).send({ variantId, qty: 1 });
+    // No apply-coupon call at all — both carts pick this up purely via auto-apply.
+
+    const [resA, resB] = await Promise.all([checkout(cartA), checkout(cartB)]);
+    // Unlike a manually-entered code losing this same race (409, whole checkout
+    // aborted), an auto-applied coupon losing it must never fail the checkout —
+    // the loser just completes at full price instead.
+    expect(resA.status).toBe(201);
+    expect(resB.status).toBe(201);
+    const discounted = [resA, resB].filter((r) => Number(r.body.data.discountTotal) > 0);
+    const fullPrice = [resA, resB].filter((r) => Number(r.body.data.discountTotal) === 0);
+    expect(discounted).toHaveLength(1);
+    expect(fullPrice).toHaveLength(1);
+    expect(discounted[0]!.body.data.couponCode).toBe('AUTORACE');
+    expect(fullPrice[0]!.body.data.couponCode).toBeNull();
+    expect(fullPrice[0]!.body.data.grandTotal).toBe('25.0000'); // 20 + 5 shipping, no discount reverted back in
+
+    const coupon = await admin.get('/admin/v1/coupons');
+    const row = coupon.body.data.find((c: { code: string }) => c.code === 'AUTORACE');
+    expect(row.usageCount).toBe(1); // exactly one redemption, even though both checkouts succeeded
   });
 });

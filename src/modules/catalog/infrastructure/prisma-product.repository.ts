@@ -19,6 +19,7 @@ import type {
   ProductListResult,
   UpdateProductInput,
   VariantStockLookup,
+  AttributeOptionInfo,
 } from '../domain/repositories.js';
 import { Prisma } from '@prisma/client';
 import { ConflictError } from '../../../shared/domain/errors.js';
@@ -391,6 +392,14 @@ export class PrismaAttributeRepository implements AttributeRepository {
 
   async update(id: bigint, input: UpdateAttributeInput): Promise<AttributeInfo> {
     return this.db.attribute.update({ where: { id }, data: input, select: ATTRIBUTE_SELECT });
+  }
+
+  async listOptions(code: string): Promise<AttributeOptionInfo[]> {
+    const rows = await this.db.attributeOption.findMany({
+      where: { attribute: { code, deletedAt: null } },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return rows.map((o) => ({ id: o.id, value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder }));
   }
 
   async isAssignedToAnySet(id: bigint): Promise<boolean> {

@@ -123,20 +123,44 @@ export class CompleteCheckout {
   ): Promise<OrderViewDto> {
     const subtotalMinor = addMinor(...pricedLines.map((l) => l.subtotalMinor));
 
+    // Resolved once, up front — needed both for the coupon's per-line context
+    // (productId per line) and for building OrderLine inputs below, so the
+    // lines-building loop further down reuses this map instead of re-querying.
+    const variantById = new Map<string, { sku: string; nameDefault: string | null; productId: bigint }>();
+    for (const line of pricedLines) {
+      const variant = await this.variants.byId(line.variantId);
+      if (!variant) throw new NotFoundError('ProductVariant', line.variantId.toString());
+      variantById.set(line.variantId.toString(), variant);
+    }
+    const discountLines = pricedLines.map((l) => ({
+      variantId: l.variantId,
+      productId: variantById.get(l.variantId.toString())!.productId,
+      subtotalMinor: l.subtotalMinor,
+    }));
+
     // Coupon evaluated (not redeemed) here — redemption is guarded and only
     // happens once the order actually exists, right before payment capture (see
     // below). Tax is intentionally computed on the PRE-discount subtotal — see
-    // coupon.prisma's header comment on this deliberate simplification.
+    // coupon.prisma's header comment on this deliberate simplification. A
+    // manually-entered code always wins; only when the cart has none do we look
+    // for an auto-apply coupon (never persisted onto Cart — always recomputed live).
+    const isAutoApplied = !cart.couponCode;
     const discount = cart.couponCode
       ? await this.discountCalculator.evaluate({
           code: cart.couponCode,
           cartCurrency: cart.currency,
-          subtotalMinor,
+          lines: discountLines,
           customerId: cart.customerId,
           asOf: new Date(),
         })
-      : null;
+      : await this.discountCalculator.findBestAutoApply({
+          cartCurrency: cart.currency,
+          lines: discountLines,
+          customerId: cart.customerId,
+          asOf: new Date(),
+        });
     const discountTotalMinor = discount?.discountAmountMinor ?? 0n;
+    const discountByVariant = new Map((discount?.lineDiscounts ?? []).map((d) => [d.variantId.toString(), d.discountAmountMinor]));
 
     const taxResults = await this.taxCalculator.calculate(
       pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
@@ -147,12 +171,11 @@ export class CompleteCheckout {
     const shipping = await this.shippingCalculator.quote(cmd.shippingMethodCode, cart.currency);
     if (!shipping) throw new NotFoundError('ShippingMethod', cmd.shippingMethodCode);
 
-    const grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor, shipping.amountMinor, -discountTotalMinor);
+    let grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor, shipping.amountMinor, -discountTotalMinor);
 
     const lines = [];
     for (const line of pricedLines) {
-      const variant = await this.variants.byId(line.variantId);
-      if (!variant) throw new NotFoundError('ProductVariant', line.variantId.toString());
+      const variant = variantById.get(line.variantId.toString())!;
       const tax = taxByVariant.get(line.variantId.toString())!;
       lines.push({
         variantId: line.variantId,
@@ -161,6 +184,7 @@ export class CompleteCheckout {
         qty: line.qty,
         unitPriceMinor: line.unitPriceMinor,
         taxAmountMinor: tax.amountMinor,
+        discountAmountMinor: discountByVariant.get(line.variantId.toString()) ?? 0n,
         rowTotalMinor: addMinor(line.subtotalMinor, tax.amountMinor),
         taxClassCode: tax.taxClassCode,
       });
@@ -212,19 +236,34 @@ export class CompleteCheckout {
     );
 
     // Coupon usage is only committed once the order actually exists — the guarded
-    // usage-count UPDATE inside redeem() is the authoritative race guard (evaluate()
-    // above was only an optimistic pre-check). Any throw here (limit hit by a
-    // concurrent checkout in between) propagates to execute()'s existing
-    // catch { releaseAll(reservations); throw }, rejecting this checkout before
-    // payment is ever attempted — same failure path as any other mid-saga error.
+    // usage-count UPDATE inside redeem() is the authoritative race guard (evaluate()/
+    // findBestAutoApply() above were only an optimistic pre-check).
     if (discount) {
-      await this.discountCalculator.redeem({
-        couponId: discount.couponId,
-        orderId: order.id,
-        customerId: cart.customerId,
-        currency: cart.currency,
-        discountAmountMinor: discount.discountAmountMinor,
-      });
+      try {
+        await this.discountCalculator.redeem({
+          couponId: discount.couponId,
+          orderId: order.id,
+          customerId: cart.customerId,
+          currency: cart.currency,
+          discountAmountMinor: discount.discountAmountMinor,
+        });
+      } catch (err) {
+        if (!isAutoApplied) {
+          // A manually-entered code losing the race (limit hit by a concurrent
+          // checkout in between) propagates to execute()'s existing
+          // catch { releaseAll(reservations); throw }, rejecting this checkout
+          // before payment is ever attempted — the customer explicitly chose
+          // this code, so this is the one case that should hard-fail.
+          throw err;
+        }
+        // An auto-applied coupon losing the same race is invisible to the
+        // customer — they never chose it — so revert the discount already
+        // baked into the just-created order/lines and proceed to charge full
+        // price, rather than aborting the whole checkout (releasing inventory,
+        // declining payment) over a discount nobody explicitly asked for.
+        const reverted = await this.orders.revertDiscount(order.id);
+        grandTotalMinor = reverted.grandTotalMinor;
+      }
     }
 
     // Step 5: attempt payment.

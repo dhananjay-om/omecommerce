@@ -54,11 +54,20 @@ export class RefundOrder {
       if (!line) throw new NotFoundError('OrderLine', requested.sku);
 
       // Proportional refund: unit price * qty, plus a proportional share of the
-      // line's snapshotted tax (BigInt division truncates — documented rounding
-      // rule, same as shared/domain/decimal.ts applyRate).
+      // line's snapshotted tax, minus a proportional share of any coupon
+      // discount this line received (BigInt division truncates — documented
+      // rounding rule, same as shared/domain/decimal.ts applyRate). Without the
+      // discount subtraction, a customer who used a coupon and later got a
+      // partial refund would be refunded MORE than they actually paid for
+      // those units — a real pre-existing bug, fixed alongside the coupon
+      // item-targeting work that finally makes OrderLine.discountAmount non-zero.
       const unitPriceMinor = toMinorUnits(line.unitPrice);
       const lineTaxMinor = toMinorUnits(line.taxAmount);
-      const refundAmountMinor = unitPriceMinor * BigInt(requested.qty) + (lineTaxMinor * BigInt(requested.qty)) / BigInt(line.qty);
+      const lineDiscountMinor = toMinorUnits(line.discountAmount);
+      const refundAmountMinor =
+        unitPriceMinor * BigInt(requested.qty) +
+        (lineTaxMinor * BigInt(requested.qty)) / BigInt(line.qty) -
+        (lineDiscountMinor * BigInt(requested.qty)) / BigInt(line.qty);
       refundTotalMinor = addMinor(refundTotalMinor, refundAmountMinor);
 
       await this.orders.incrementRefundedQty(line.id, requested.qty);

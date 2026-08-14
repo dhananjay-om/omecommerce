@@ -154,7 +154,17 @@ describe.skipIf(!process.env.INTEGRATION)('order API (live DB)', () => {
     const added = await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
     expect(added.status).toBe(200);
     expect(added.body.data.lines).toEqual([
-      { id: expect.any(String), variantId, qty: 1, sku: 'ORD-SKU-CART', name: 'ORD-SKU-CART', price: expect.any(String), imageUrl: null, lineTotal: expect.any(String) },
+      {
+        id: expect.any(String),
+        variantId,
+        qty: 1,
+        sku: 'ORD-SKU-CART',
+        name: 'ORD-SKU-CART',
+        price: expect.any(String),
+        imageUrl: null,
+        lineTotal: expect.any(String),
+        discountAmount: null,
+      },
     ]);
     expect(Number(added.body.data.lines[0].price)).toBe(10);
     expect(Number(added.body.data.lines[0].lineTotal)).toBe(10);

@@ -77,8 +77,11 @@ export function CartLineRow({ line, currency }: { line: CartLine; currency: stri
         </div>
       </div>
 
-      <div className="text-right font-semibold whitespace-nowrap">
-        {line.lineTotal ? formatPrice(line.lineTotal, currency) : '—'}
+      <div className="text-right whitespace-nowrap">
+        <div className="font-semibold">{line.lineTotal ? formatPrice(line.lineTotal, currency) : '—'}</div>
+        {line.discountAmount && Number(line.discountAmount) > 0 ? (
+          <div className="text-xs text-success">-{formatPrice(line.discountAmount, currency)}</div>
+        ) : null}
       </div>
     </div>
   );

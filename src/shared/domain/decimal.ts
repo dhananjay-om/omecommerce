@@ -56,3 +56,44 @@ export function applyRate(amountMinor: bigint, rateMinor: bigint): bigint {
 export function isNegative(minor: bigint): boolean {
   return minor < 0n;
 }
+
+/**
+ * Splits `totalMinor` across `bases` proportionally by each entry's own share of
+ * the summed base, using the largest-remainder method so the split sums back to
+ * exactly `totalMinor` (a naive floor-division split can lose minor units to
+ * rounding — this doesn't). Used to allocate a coupon's total discount across
+ * the order lines it applies to, and to allocate order-line-level amounts to a
+ * partial invoice (create-invoice.usecase.ts). Entries with baseMinor <= 0
+ * always get 0; if every base is 0 (or the list is empty), returns an all-zero
+ * map rather than dividing by zero. Assumes totalMinor and every baseMinor are
+ * non-negative (true for every money amount in this domain).
+ */
+export function allocateProportionally<K>(totalMinor: bigint, bases: Array<{ key: K; baseMinor: bigint }>): Map<K, bigint> {
+  const result = new Map<K, bigint>();
+  const totalBase = bases.reduce((sum, b) => sum + (b.baseMinor > 0n ? b.baseMinor : 0n), 0n);
+  if (totalBase <= 0n || totalMinor <= 0n) {
+    for (const b of bases) result.set(b.key, 0n);
+    return result;
+  }
+  let allocated = 0n;
+  const remainders: Array<{ key: K; remainder: bigint }> = [];
+  for (const b of bases) {
+    const base = b.baseMinor > 0n ? b.baseMinor : 0n;
+    const share = (totalMinor * base) / totalBase;
+    const remainder = (totalMinor * base) % totalBase;
+    result.set(b.key, share);
+    allocated += share;
+    remainders.push({ key: b.key, remainder });
+  }
+  // Distribute the leftover (lost to floor division) one minor unit at a time to
+  // the entries with the largest fractional remainder — deterministic, no bias
+  // toward any particular line, and guarantees sum(result) === totalMinor.
+  let leftover = totalMinor - allocated;
+  remainders.sort((a, b) => (b.remainder > a.remainder ? 1 : b.remainder < a.remainder ? -1 : 0));
+  for (const { key } of remainders) {
+    if (leftover <= 0n) break;
+    result.set(key, (result.get(key) ?? 0n) + 1n);
+    leftover -= 1n;
+  }
+  return result;
+}

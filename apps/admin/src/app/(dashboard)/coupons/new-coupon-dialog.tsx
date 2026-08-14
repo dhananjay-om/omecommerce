@@ -2,26 +2,37 @@
 
 import { useActionState, useState } from 'react';
 import { createCoupon, type ActionState } from './actions';
-import type { CouponDiscountType } from '@/lib/types';
+import type { Attribute, Category, CouponDiscountType, CouponTargetType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { ConditionBuilder } from './condition-builder';
 
 const DISCOUNT_TYPES: CouponDiscountType[] = ['PERCENTAGE', 'FIXED_AMOUNT'];
 
 const initialState: ActionState = { error: null, success: false };
 
-export function NewCouponDialog() {
+export function NewCouponDialog({ attributes, categories }: { attributes: Attribute[]; categories: Category[] }) {
   const [open, setOpen] = useState(false);
   const [discountType, setDiscountType] = useState<CouponDiscountType>('PERCENTAGE');
+  const [targetType, setTargetType] = useState<CouponTargetType>('CART');
   const [state, formAction, pending] = useActionState(createCoupon, initialState);
   const [handledState, setHandledState] = useState(state);
 
   if (state !== handledState) {
     setHandledState(state);
-    if (state.success) setOpen(false);
+    if (state.success) {
+      // Dialog's onOpenChange only fires from the dialog's OWN close triggers
+      // (Escape, backdrop, its close button) — not when we flip `open`
+      // ourselves here, so the local field state must be reset explicitly too,
+      // or the next "New Coupon" click would silently reopen still showing the
+      // just-created coupon's discountType/targetType.
+      setOpen(false);
+      setDiscountType('PERCENTAGE');
+      setTargetType('CART');
+    }
   }
 
   return (
@@ -29,7 +40,10 @@ export function NewCouponDialog() {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setDiscountType('PERCENTAGE');
+        if (!next) {
+          setDiscountType('PERCENTAGE');
+          setTargetType('CART');
+        }
       }}
     >
       <DialogTrigger render={<Button>New Coupon</Button>} />
@@ -80,6 +94,33 @@ export function NewCouponDialog() {
               placeholder={discountType === 'FIXED_AMOUNT' ? 'Optional' : 'Only available for Fixed Amount coupons'}
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cpn-targetType">Applies to</Label>
+              <Select name="targetType" value={targetType} onValueChange={(v) => setTargetType(v as CouponTargetType)}>
+                <SelectTrigger id="cpn-targetType" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CART">Whole Cart</SelectItem>
+                  <SelectItem value="ITEM">Specific Items</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cpn-isAutoApply">Auto-Apply</Label>
+              <Select name="isAutoApply" defaultValue="false">
+                <SelectTrigger id="cpn-isAutoApply" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="false">Requires a code</SelectItem>
+                  <SelectItem value="true">Applies automatically</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {targetType === 'ITEM' ? <ConditionBuilder attributes={attributes} categories={categories} /> : null}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cpn-usageLimit">Usage limit</Label>
