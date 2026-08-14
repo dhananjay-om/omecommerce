@@ -47,6 +47,10 @@ export class PrismaCartRepository implements CartRepository {
       throw new CartNotActiveError(cart?.publicId ?? String(cartId));
     }
   }
+
+  async setCouponCode(cartId: bigint, code: string | null): Promise<void> {
+    await this.db.cart.update({ where: { id: cartId }, data: { couponCode: code } });
+  }
 }
 
 /** Joins the variant's publicId alongside the internal FK — checkout needs the internal id, the storefront cart response needs the public one (plan/14 Phase 0d). */
@@ -61,6 +65,7 @@ interface CartRow {
   customerId: bigint | null;
   customerGroupId: bigint | null;
   status: CartView['status'];
+  couponCode: string | null;
   lines: Array<{ id: bigint; variantId: bigint; qty: number; variant: { publicId: string } }>;
 }
 
@@ -74,6 +79,7 @@ function toView(row: CartRow): CartView {
     customerId: row.customerId,
     customerGroupId: row.customerGroupId,
     status: row.status,
+    couponCode: row.couponCode,
     lines: row.lines.map((l) => ({ id: l.id, variantId: l.variantId, variantPublicId: l.variant.publicId, qty: l.qty })),
   };
 }

@@ -1,15 +1,19 @@
 import type { VariantLookup, CartProductMediaLookup, CartLineView } from '../domain/repositories.js';
 import type { MediaUrlResolver } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
-import { addMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
+import type { DiscountCalculator } from '../../coupon/domain/repositories.js';
+import { DomainError } from '../../../shared/domain/errors.js';
+import { addMinor, subtractMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
 import type { CartLineDto, CartView } from './dto.js';
 
 interface EnrichableCart {
   publicId: string;
   currency: string;
   websiteId: bigint;
+  customerId: bigint | null;
   customerGroupId: bigint | null;
   status: string;
+  couponCode: string | null;
   lines: CartLineView[];
 }
 
@@ -28,6 +32,7 @@ export class EnrichCartView {
     private readonly priceResolver: PriceResolver,
     private readonly productMedia: CartProductMediaLookup,
     private readonly mediaUrls: MediaUrlResolver,
+    private readonly discountCalculator: DiscountCalculator,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -38,7 +43,39 @@ export class EnrichCartView {
     const priced = lines.map((l) => l.lineTotal).filter((v): v is string => v !== null);
     const subtotal = priced.length > 0 ? fromMinorUnits(addMinor(...priced.map(toMinorUnits))) : null;
 
-    return { publicId: cart.publicId, currency: cart.currency, status: cart.status, lines, subtotal };
+    let discountTotal: string | null = null;
+    let couponError: string | null = null;
+    if (cart.couponCode && subtotal !== null) {
+      try {
+        const evaluation = await this.discountCalculator.evaluate({
+          code: cart.couponCode,
+          cartCurrency: cart.currency,
+          subtotalMinor: toMinorUnits(subtotal),
+          customerId: cart.customerId,
+          asOf: new Date(),
+        });
+        discountTotal = fromMinorUnits(evaluation.discountAmountMinor);
+      } catch (err) {
+        // A coupon that's since become invalid (expired, hit its usage limit, an
+        // admin deactivated it) must never break a plain cart read — surface it
+        // as couponError instead. Checkout re-validates for real and hard-fails.
+        couponError = err instanceof DomainError ? err.message : 'coupon is no longer valid';
+      }
+    }
+    const estimatedTotal =
+      subtotal !== null && discountTotal !== null ? fromMinorUnits(subtractMinor(toMinorUnits(subtotal), toMinorUnits(discountTotal))) : subtotal;
+
+    return {
+      publicId: cart.publicId,
+      currency: cart.currency,
+      status: cart.status,
+      lines,
+      subtotal,
+      couponCode: cart.couponCode,
+      discountTotal,
+      couponError,
+      estimatedTotal,
+    };
   }
 
   private async enrichLine(line: CartLineView, cart: EnrichableCart): Promise<CartLineDto> {

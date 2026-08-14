@@ -34,6 +34,7 @@ export function toOrderDto(order: OrderView): OrderViewDto {
     shippingTotal: order.shippingTotal,
     grandTotal: order.grandTotal,
     shippingMethodCode: order.shippingMethodCode,
+    couponCode: order.couponCode,
     customerIp: order.customerIp,
     placedAt: order.placedAt.toISOString(),
     closedAt: order.closedAt ? order.closedAt.toISOString() : null,

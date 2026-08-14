@@ -2,7 +2,7 @@ import type { OrderRepository, AdminUserLookup } from '../domain/repositories.js
 import type { PdfRenderer, PdfStorage } from '../domain/ports.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError, InvoiceExceedsQtyError } from '../domain/errors.js';
-import { addMinor, toMinorUnits } from '../../../shared/domain/decimal.js';
+import { addMinor, subtractMinor, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { buildInvoiceHtml } from '../infrastructure/invoice-template.js';
 import type { CreateInvoiceCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
@@ -57,7 +57,15 @@ export class CreateInvoice {
 
     const subtotalMinor = invoiceLines.reduce((acc, l) => addMinor(acc, l.unitPriceMinor * BigInt(l.qty)), 0n);
     const taxTotalMinor = invoiceLines.reduce((acc, l) => addMinor(acc, l.taxAmountMinor), 0n);
-    const grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor);
+    // The order's total discount, allocated to this invoice proportionally by its
+    // share of the order subtotal — same technique already used for tax's
+    // per-line split above (lineTaxMinor * qty / line.qty), just applied once at
+    // the invoice level since this MVP has no per-line discount allocation
+    // (OrderLine.discountAmount stays 0 — see coupon.prisma's header comment).
+    const orderSubtotalMinor = toMinorUnits(order.subtotal);
+    const orderDiscountMinor = toMinorUnits(order.discountTotal);
+    const discountTotalMinor = orderSubtotalMinor === 0n ? 0n : (orderDiscountMinor * subtotalMinor) / orderSubtotalMinor;
+    const grandTotalMinor = subtractMinor(addMinor(subtotalMinor, taxTotalMinor), discountTotalMinor);
 
     const actor = cmd.createdBy ? await this.adminUsers.findByPublicId(cmd.createdBy) : null;
     const invoiceNumber = await this.orders.nextInvoiceNumber(order.websiteId);
@@ -66,7 +74,7 @@ export class CreateInvoice {
       orderId: order.id,
       invoiceNumber,
       subtotalMinor,
-      discountTotalMinor: 0n,
+      discountTotalMinor,
       taxTotalMinor,
       grandTotalMinor,
       createdBy: actor?.id ?? null,

@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { getCart, addLine as addLineRequest, removeLine as removeLineRequest } from '@/services/cart.service';
+import {
+  getCart,
+  addLine as addLineRequest,
+  removeLine as removeLineRequest,
+  applyCoupon as applyCouponRequest,
+  removeCoupon as removeCouponRequest,
+} from '@/services/cart.service';
 import type { Cart } from '@/types/cart';
 
 interface CartState {
@@ -9,6 +15,8 @@ interface CartState {
   hydrate: () => Promise<void>;
   addLine: (variantId: string, qty: number) => Promise<void>;
   removeLine: (variantId: string) => Promise<void>;
+  applyCoupon: (code: string) => Promise<void>;
+  removeCoupon: () => Promise<void>;
 }
 
 export function countItems(cart: Cart | null): number {
@@ -30,6 +38,14 @@ export const useCartStore = create<CartState>((set) => ({
   },
   removeLine: async (variantId) => {
     const cart = await removeLineRequest(variantId);
+    set({ cart, itemCount: countItems(cart) });
+  },
+  applyCoupon: async (code) => {
+    const cart = await applyCouponRequest(code);
+    set({ cart, itemCount: countItems(cart) });
+  },
+  removeCoupon: async () => {
+    const cart = await removeCouponRequest();
     set({ cart, itemCount: countItems(cart) });
   },
 }));

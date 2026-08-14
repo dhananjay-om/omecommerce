@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { completeCheckout } from '@/services/checkout.service';
-import { useCartStore } from '@/store/cart-store';
+import { useCartStore, countItems } from '@/store/cart-store';
 import { CheckoutSteps } from './checkout-steps';
 import { AddressFields } from './address-fields';
 import { checkoutSchema, STEP_FIELDS, type CheckoutFormValues } from './checkout-schema';
 import { formatPrice } from '@/lib/format-price';
+import { CouponField } from '@/components/cart/coupon-field';
 import type { Cart } from '@/types/cart';
 import type { ShippingMethod } from '@/types/order';
 
@@ -23,6 +24,8 @@ const TOTAL_STEPS = 5;
 export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; shippingMethods: ShippingMethod[] }) {
   const router = useRouter();
   const hydrateCart = useCartStore((s) => s.hydrate);
+  const storeCart = useCartStore((s) => s.cart);
+  const hydrated = useCartStore((s) => s.hydrated);
   const [step, setStep] = useState(1);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
@@ -44,6 +47,17 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
       testScenario: 'approve',
     },
   });
+
+  useEffect(() => {
+    if (!hydrated) {
+      useCartStore.setState({ cart, itemCount: countItems(cart), hydrated: true });
+    }
+    // Seed once from the server-rendered cart prop; afterwards the store is the
+    // single source of truth (same pattern as CartPageClient) — needed so
+    // CouponField's apply/remove actions are reflected here too.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const displayCart = storeCart ?? cart;
 
   const sameAsShipping = watch('sameAsShipping');
   const selectedShippingMethodCode = watch('shippingMethodCode');
@@ -171,12 +185,12 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             <div className="flex flex-col gap-4">
               <h2 className="font-semibold">Review</h2>
               <div className="flex flex-col gap-1 text-sm">
-                {cart.lines.map((line) => (
+                {displayCart.lines.map((line) => (
                   <div key={line.id} className="flex justify-between">
                     <span>
                       {line.name} &times; {line.qty}
                     </span>
-                    <span>{line.lineTotal ? formatPrice(line.lineTotal, cart.currency) : '—'}</span>
+                    <span>{line.lineTotal ? formatPrice(line.lineTotal, displayCart.currency) : '—'}</span>
                   </div>
                 ))}
               </div>
@@ -217,8 +231,14 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>{cart.subtotal ? formatPrice(cart.subtotal, cart.currency) : '—'}</span>
+              <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
             </div>
+            {displayCart.discountTotal ? (
+              <div className="flex justify-between text-success">
+                <span>Discount{displayCart.couponCode ? ` (${displayCart.couponCode})` : ''}</span>
+                <span>-{formatPrice(displayCart.discountTotal, displayCart.currency)}</span>
+              </div>
+            ) : null}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
               <span>{selectedShippingMethod ? formatPrice(selectedShippingMethod.flatRate, selectedShippingMethod.currency) : '—'}</span>
@@ -228,6 +248,7 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
               <span className="text-muted-foreground">Calculated at order placement</span>
             </div>
           </div>
+          <CouponField cart={displayCart} />
         </div>
       </div>
     </div>

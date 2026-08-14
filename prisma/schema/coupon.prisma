@@ -1,0 +1,106 @@
+// =============================================================================
+// coupon.prisma — Discount coupons (deliberately-scoped MVP, not the full
+// historical "Promotion" bounded context — plan/00-master-plan.md §… envisioned
+// cart rules + catalog rules + condition-tree rule builder + coupons; that was
+// never built at any stage of this project and remains out of scope here).
+//
+// SCOPE FOR THIS PASS:
+// - One coupon code = one whole-cart discount (PERCENTAGE or FIXED_AMOUNT off
+//   the cart subtotal). No per-line/per-category targeting, no BOGO, no
+//   auto-apply cart rules, no stacking multiple coupons on one order.
+// - Usage tracking is the same hybrid already established by GiftCard: a
+//   guarded counter (`usageCount`, race-safe `WHERE usage_count < usage_limit`
+//   UPDATE — see prisma-giftcard-ledger.ts's identical mechanic) for the
+//   race-critical global limit, PLUS an append-only CouponRedemption ledger
+//   for the per-customer limit (a counter alone can't answer "how many times
+//   did *this* customer use this code") and for admin audit visibility.
+// - Cart.couponCode / Order.couponCode (order.prisma) hold the applied code —
+//   no FK from either, same reasoning as Order.shippingMethodCode ("snapshot,
+//   not FK"). The discount AMOUNT is never persisted on Cart, only recomputed
+//   live (EnrichCartView) — matches how Cart never persists subtotal either.
+// - Tax is computed on the PRE-discount subtotal (TaxCalculator has no
+//   discount-allocation concept) — documented deliberate simplification, not
+//   a silent gap; redesigning that port is real scope creep for this MVP.
+// - NOT built this pass (documented deferrals):
+//   * Catalog/cart rule engine, BOGO, tiered/condition-tree discounts.
+//   * Coupon stacking (one code per order).
+//   * Admin bulk code generation (one code per Coupon row, admin-typed).
+//   * Referral/loyalty auto-issuing a coupon reward (see ReferralRewardType's
+//     doc comment in _base.prisma) — separate future work.
+// =============================================================================
+
+/// A single whole-cart discount code. CouponDiscountType (_base.prisma) decides
+/// how `value`/`currency` are interpreted — see the CHECK constraints in this
+/// migration enforcing that pairing, not just app-layer validation.
+model Coupon {
+  id                    BigInt             @id @default(autoincrement())
+  publicId              String             @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  /// Case-insensitive — a customer typing "save10" should match "SAVE10".
+  code                  String             @unique @db.Citext
+  description           String?
+  discountType          CouponDiscountType @map("discount_type")
+  /// PERCENTAGE: 0-100 (e.g. 10.0000 = 10% off). FIXED_AMOUNT: an amount in `currency`.
+  value                 Decimal            @db.Decimal(18, 4)
+  /// NULL for PERCENTAGE (currency-agnostic); required for FIXED_AMOUNT (an amount
+  /// is inherently currency-specific) — enforced by CHECK constraints (raw SQL).
+  /// Scope scalar, not a Prisma relation — FK added in raw SQL, same convention as
+  /// every other currency column in this schema (PriceList.currency etc.).
+  currency              String?            @db.Char(3)
+  /// Requires `currency` to be set too (same CHECK-constraint pairing as `value`) —
+  /// a bare number has no meaning without a unit. Deliberate MVP scope-cut: a
+  /// PERCENTAGE coupon (which forbids `currency`) can't have a minSubtotal gate in
+  /// this pass; only FIXED_AMOUNT coupons can.
+  minSubtotal           Decimal?           @map("min_subtotal") @db.Decimal(18, 4)
+  usageLimit            Int?               @map("usage_limit")
+  usageLimitPerCustomer Int?               @map("usage_limit_per_customer")
+  /// Guarded counter — race-safe `WHERE usage_count < usage_limit` UPDATE at
+  /// redemption time, same discipline as GiftCard.balance (storedvalue.prisma).
+  usageCount            Int                @default(0) @map("usage_count")
+  startsAt              DateTime?          @map("starts_at") @db.Timestamptz(6)
+  endsAt                DateTime?          @map("ends_at") @db.Timestamptz(6)
+  isActive              Boolean            @default(true) @map("is_active")
+  version               Int                @default(0)
+  createdBy             BigInt?            @map("created_by")
+  updatedBy             BigInt?            @map("updated_by")
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  redemptions CouponRedemption[]
+
+  @@index([deletedAt])
+  @@index([isActive])
+  @@map("coupon")
+}
+
+/// Append-only redemption ledger — one row per successfully-PLACED order (never
+/// inserted for a mere cart-preview ApplyCouponToCart call). The only way to
+/// enforce usageLimitPerCustomer, and the admin audit trail for a coupon's
+/// actual usage history.
+model CouponRedemption {
+  id             BigInt   @id @default(autoincrement())
+  couponId       BigInt   @map("coupon_id")
+  orderId        BigInt   @unique @map("order_id")
+  /// NULL for guest checkout. FK -> customer(id) ON DELETE SET NULL (raw SQL,
+  /// same as gift_card_purchaser_customer_fk) — a customer being erased shouldn't
+  /// take this audit/usage-limit row down with it. Guest carts are exempt from
+  /// usageLimitPerCustomer (only the global usageLimit applies to them),
+  /// documented explicitly at the DiscountCalculator.evaluate() call site.
+  customerId     BigInt?  @map("customer_id")
+  /// Snapshotted alongside the amount — every sibling ledger row (WalletTransaction,
+  /// GiftCardTransaction) does the same, so a currency-mixing SUM() is impossible.
+  currency       String   @db.Char(3)
+  discountAmount Decimal  @map("discount_amount") @db.Decimal(18, 4)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  // RESTRICT, not CASCADE — orders are never hard-deleted (plan/00 §4, "cancel,
+  // don't delete"), but this ledger is the audit trail + usageLimitPerCustomer
+  // source of truth, same permanence expectation as every other ledger table; a
+  // silent CASCADE would be the one path that could quietly lose it.
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([couponId, customerId])
+  @@index([couponId, createdAt])
+  @@map("coupon_redemption")
+}

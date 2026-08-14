@@ -56,6 +56,9 @@ import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
 import { PrismaCustomerContextLookup } from '../wallet/infrastructure/prisma-customer-context-lookup.js';
 import { CreditWallet } from '../wallet/application/credit-wallet.usecase.js';
+import { PrismaCouponRepository } from '../coupon/infrastructure/prisma-coupon.repository.js';
+import { ApplyCouponToCart } from './application/apply-coupon-to-cart.usecase.js';
+import { RemoveCouponFromCart } from './application/remove-coupon-from-cart.usecase.js';
 import {
   createCartSchema,
   addCartLineSchema,
@@ -71,6 +74,7 @@ import {
   listOrdersQuerySchema,
   exportOrdersQuerySchema,
 } from './interface/http/schemas.js';
+import { applyCouponSchema } from '../coupon/interface/http/schemas.js';
 
 export interface OrderRouters {
   admin: Router;
@@ -103,12 +107,19 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const outbox = new OutboxWriter(db);
   const cartProductMedia = new PrismaCartProductMediaLookup(db);
   const mediaUrlResolver = new S3MediaUrlResolver();
-  const enrichCartView = new EnrichCartView(variants, priceResolver, cartProductMedia, mediaUrlResolver);
+  // Own instance, same reasoning as the wallet ledger above — Order composes
+  // coupon's infrastructure directly rather than importing coupon.module.ts's
+  // factory (that factory also wires coupon's admin HTTP routes, which Order
+  // has no business constructing).
+  const discountCalculator = new PrismaCouponRepository(db);
+  const enrichCartView = new EnrichCartView(variants, priceResolver, cartProductMedia, mediaUrlResolver, discountCalculator);
 
   const createCart = new CreateCart(carts, storeContext, customerGroups, customers, enrichCartView);
   const addCartLine = new AddCartLine(carts, variants, enrichCartView);
   const getCart = new GetCart(carts, enrichCartView);
   const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
+  const applyCouponToCart = new ApplyCouponToCart(carts, discountCalculator, enrichCartView);
+  const removeCouponFromCart = new RemoveCouponFromCart(carts, enrichCartView);
   const completeCheckout = new CompleteCheckout(
     carts,
     orders,
@@ -121,6 +132,7 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     shippingCalculator,
     paymentGateway,
     outbox,
+    discountCalculator,
   );
   const getOrder = new GetOrder(orders);
   const listOrders = new ListOrders(orders);
@@ -334,6 +346,19 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     '/carts/:publicId/lines/:variantId',
     asyncHandler(async (req, res) => {
       res.json({ data: await removeCartLine.execute({ cartPublicId: req.params.publicId!, variantId: req.params.variantId! }) });
+    }),
+  );
+  store.post(
+    '/carts/:publicId/actions/apply-coupon',
+    asyncHandler(async (req, res) => {
+      const body = parse(applyCouponSchema, req.body);
+      res.json({ data: await applyCouponToCart.execute({ cartPublicId: req.params.publicId!, code: body.code }) });
+    }),
+  );
+  store.post(
+    '/carts/:publicId/actions/remove-coupon',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await removeCouponFromCart.execute({ cartPublicId: req.params.publicId! }) });
     }),
   );
   store.post(

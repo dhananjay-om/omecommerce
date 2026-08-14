@@ -89,6 +89,7 @@ export interface OrderView {
   fulfillmentStatus: string;
   subtotal: string;
   discountTotal: string;
+  couponCode: string | null;
   taxTotal: string;
   shippingTotal: string;
   grandTotal: string;
