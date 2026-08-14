@@ -48,6 +48,7 @@ export interface WebsiteInfo {
   name: string;
   gstin: string | null;
   originStateCode: string | null;
+  pricesIncludeTax: boolean;
 }
 
 /** Website/Store View management is still a deliberate later addition (see
@@ -56,5 +57,5 @@ export interface WebsiteInfo {
  *  not full Website CRUD. */
 export interface WebsiteRepository {
   list(): Promise<WebsiteInfo[]>;
-  update(code: string, input: { gstin?: string | null; originStateCode?: string | null }): Promise<WebsiteInfo>;
+  update(code: string, input: { gstin?: string | null; originStateCode?: string | null; pricesIncludeTax?: boolean }): Promise<WebsiteInfo>;
 }

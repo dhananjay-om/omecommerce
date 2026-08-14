@@ -49,26 +49,32 @@ model Theme {
 }
 
 model Website {
-  id              BigInt    @id @default(autoincrement())
-  publicId        String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
-  code            String    @unique @db.Citext // e.g. "us_retail"
-  name            String
-  baseCurrency    String    @map("base_currency") @db.Char(3)
-  defaultStoreId  BigInt?   @map("default_store_id") // FK added via raw SQL (deferred cycle)
-  isDefault       Boolean   @default(false) @map("is_default")
+  id               BigInt    @id @default(autoincrement())
+  publicId         String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code             String    @unique @db.Citext // e.g. "us_retail"
+  name             String
+  baseCurrency     String    @map("base_currency") @db.Char(3)
+  defaultStoreId   BigInt?   @map("default_store_id") // FK added via raw SQL (deferred cycle)
+  isDefault        Boolean   @default(false) @map("is_default")
   /// This website's own GST registration — single-registration/single-state
   /// scope (a seller registered in multiple states would need this per
   /// warehouse instead; not built, see gst.ts's header comment).
-  gstin           String?   @db.VarChar(15)
+  gstin            String?   @db.VarChar(15)
   /// 2-digit CBIC GST state/UT code this website is registered in — compared
   /// against an order's shipping OrderAddress.stateCode to decide CGST+SGST
   /// (match) vs IGST (no match).
-  originStateCode String?   @map("origin_state_code") @db.Char(2)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  createdBy       BigInt?   @map("created_by")
-  updatedBy       BigInt?   @map("updated_by")
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  originStateCode  String?   @map("origin_state_code") @db.Char(2)
+  /// When true, every catalog/price-list price on this website is the FINAL
+  /// price the customer pays (GST already baked in, MRP-style) — tax is
+  /// backed out of it at checkout instead of added on top. When false
+  /// (default, matches every website created before this column existed),
+  /// prices are tax-exclusive and GST is added on top, unchanged behavior.
+  pricesIncludeTax Boolean   @default(false) @map("prices_include_tax")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy        BigInt?   @map("created_by")
+  updatedBy        BigInt?   @map("updated_by")
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   currency Currency @relation("WebsiteBaseCurrency", fields: [baseCurrency], references: [code])
   stores   Store[]

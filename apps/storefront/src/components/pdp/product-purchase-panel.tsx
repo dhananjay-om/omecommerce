@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ProductActions } from './product-actions';
 import { formatPrice } from '@/lib/format-price';
+import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import type { ProductVariant } from '@/types/product';
 
 interface VariantAxis {
@@ -47,10 +48,12 @@ export function ProductPurchasePanel({
   productId,
   currency,
   variants,
+  pricesIncludeTax,
 }: {
   productId: string;
   currency: string;
   variants: ProductVariant[];
+  pricesIncludeTax: boolean;
 }) {
   const axes = useMemo(() => buildAxes(variants), [variants]);
   const [selection, setSelection] = useState<Record<string, string>>(() => selectionOf(variants[0], axes));
@@ -67,7 +70,10 @@ export function ProductPurchasePanel({
 
   return (
     <div>
-      <p className="text-3xl font-bold">{priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}</p>
+      <p className="text-3xl font-bold">
+        {priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}
+        {priceNumber !== null && pricesIncludeTax ? <TaxInclusiveNote /> : null}
+      </p>
       <p className={`mt-1 text-sm font-medium ${selectedVariant ? (inStock ? 'text-success' : 'text-destructive') : 'text-muted-foreground'}`}>
         {selectedVariant ? (inStock ? 'In Stock' : 'Out of Stock') : 'Select options to see availability'}
       </p>

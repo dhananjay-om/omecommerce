@@ -45,6 +45,23 @@ export function GstSettingsForm({ website }: { website: Website }) {
         </Select>
         <p className="text-xs text-muted-foreground">Must match the GSTIN&apos;s first 2 digits.</p>
       </div>
+      <div className="space-y-2">
+        <Label htmlFor={`gst-pricesIncludeTax-${website.code}`}>Prices include tax</Label>
+        <Select name="pricesIncludeTax" defaultValue={website.pricesIncludeTax ? 'true' : 'false'}>
+          <SelectTrigger id={`gst-pricesIncludeTax-${website.code}`} className="w-full">
+            <SelectValue>{(value: string) => (value === 'true' ? 'Yes — catalog prices are final (GST included)' : 'No — GST is added on top at checkout')}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="false">No — GST is added on top at checkout</SelectItem>
+            <SelectItem value="true">Yes — catalog prices are final (GST included)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          When on, every product/price-list price on this website is treated as the final, tax-inclusive price
+          (MRP-style) — GST is backed out of it instead of added at checkout, so the price shown to shoppers is the
+          price they pay.
+        </p>
+      </div>
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
       {state.success ? <p className="text-sm text-success">Saved.</p> : null}
       <Button type="submit" disabled={pending}>

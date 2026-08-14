@@ -15,6 +15,7 @@ import { CheckoutSteps } from './checkout-steps';
 import { AddressFields } from './address-fields';
 import { checkoutSchema, STEP_FIELDS, type CheckoutFormValues } from './checkout-schema';
 import { formatPrice } from '@/lib/format-price';
+import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import { CouponField } from '@/components/cart/coupon-field';
 import type { Cart } from '@/types/cart';
 import type { ShippingMethod } from '@/types/order';
@@ -251,7 +252,10 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
+              <span>
+                {displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}
+                {displayCart.subtotal && displayCart.pricesIncludeTax ? <TaxInclusiveNote /> : null}
+              </span>
             </div>
             {displayCart.discountTotal ? (
               <div className="flex justify-between text-success">
@@ -265,7 +269,9 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax</span>
-              <span className="text-muted-foreground">Calculated at order placement</span>
+              <span className="text-muted-foreground">
+                {displayCart.pricesIncludeTax ? 'Included in prices above' : 'Calculated at order placement'}
+              </span>
             </div>
           </div>
           <CouponField cart={displayCart} />

@@ -1,4 +1,4 @@
-import type { VariantLookup, CartProductMediaLookup, CartLineView } from '../domain/repositories.js';
+import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup } from '../domain/repositories.js';
 import type { MediaUrlResolver } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { DiscountCalculator, DiscountLineInput } from '../../coupon/domain/repositories.js';
@@ -35,6 +35,7 @@ export class EnrichCartView {
     private readonly productMedia: CartProductMediaLookup,
     private readonly mediaUrls: MediaUrlResolver,
     private readonly discountCalculator: DiscountCalculator,
+    private readonly websiteTaxConfig: WebsiteTaxConfigLookup,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -108,6 +109,9 @@ export class EnrichCartView {
       return { ...l, discountAmount: amount !== undefined ? fromMinorUnits(amount) : null };
     });
 
+    // Resolved live, not frozen at cart creation — see CartView.pricesIncludeTax's doc comment.
+    const websiteTaxConfig = await this.websiteTaxConfig.byId(cart.websiteId);
+
     return {
       publicId: cart.publicId,
       currency: cart.currency,
@@ -119,6 +123,7 @@ export class EnrichCartView {
       discountTotal,
       couponError,
       estimatedTotal,
+      pricesIncludeTax: websiteTaxConfig?.pricesIncludeTax ?? false,
     };
   }
 

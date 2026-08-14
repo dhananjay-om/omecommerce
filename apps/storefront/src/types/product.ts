@@ -34,6 +34,8 @@ export interface ProductDetail {
   weight: string | null;
   storeViewId: string;
   currency: string;
+  /** When true, `price` (and every variant's price) already includes GST — the final price. */
+  pricesIncludeTax: boolean;
   attributes: Record<string, unknown>;
   price: string | null;
   inStock: boolean;

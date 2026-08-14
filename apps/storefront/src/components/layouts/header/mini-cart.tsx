@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetTrigger } from '@/components/ui/sheet';
 import { useCartStore } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
+import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 
 export function MiniCart() {
   const { cart, itemCount, hydrated, hydrate, removeLine } = useCartStore();
@@ -65,7 +66,10 @@ export function MiniCart() {
         {cart && cart.subtotal ? (
           <div className="flex items-center justify-between border-t px-4 pt-4 text-sm font-semibold">
             <span>Subtotal</span>
-            <span>{formatPrice(cart.subtotal, cart.currency)}</span>
+            <span>
+              {formatPrice(cart.subtotal, cart.currency)}
+              {cart.pricesIncludeTax ? <TaxInclusiveNote /> : null}
+            </span>
           </div>
         ) : null}
         <SheetFooter>

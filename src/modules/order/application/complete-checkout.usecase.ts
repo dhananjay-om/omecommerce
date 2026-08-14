@@ -121,18 +121,46 @@ export class CompleteCheckout {
     pricedLines: PricedLine[],
     reservations: ReservationHandle[],
   ): Promise<OrderViewDto> {
-    const subtotalMinor = addMinor(...pricedLines.map((l) => l.subtotalMinor));
+    // GST split (CGST+SGST vs IGST) depends on the shipping state vs this
+    // website's registered origin state — resolved inside the calculator
+    // (NativeGstTaxCalculator), this call site only has to supply both state
+    // codes, not the comparison itself. Called FIRST, before subtotal/discount
+    // are computed: when this website's catalog prices are tax-inclusive
+    // (Website.pricesIncludeTax), each result's taxableAmountMinor is the
+    // REAL line subtotal (tax backed out of the catalog price) — computing
+    // subtotal from the raw catalog price first would double-count tax once
+    // it's added to grandTotal below. When prices are tax-exclusive (default,
+    // unchanged from before this setting existed), taxableAmountMinor is
+    // just the input subtotal passed straight through.
+    const taxResults = await this.taxCalculator.calculate(
+      pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
+      { websiteId: ctx.websiteId, destinationStateCode: cmd.shippingAddress.stateCode ?? null },
+    );
+    const taxByVariant = new Map(taxResults.map((t) => [t.variantId.toString(), t]));
+    const taxTotalMinor = addMinor(...taxResults.map((t) => t.amountMinor));
+
+    // Corrected lines: subtotalMinor becomes each line's real (always
+    // tax-exclusive) taxable base per taxByVariant above. unitPriceMinor is
+    // re-derived from it for display only — not summed into any total
+    // (rowTotalMinor below is subtotal+tax directly) — so a qty>1 line's
+    // floor-division remainder here is a cosmetic display approximation,
+    // never a money-correctness issue.
+    const correctedLines: PricedLine[] = pricedLines.map((l) => {
+      const tax = taxByVariant.get(l.variantId.toString())!;
+      return { ...l, subtotalMinor: tax.taxableAmountMinor, unitPriceMinor: tax.taxableAmountMinor / BigInt(l.qty) };
+    });
+    const subtotalMinor = addMinor(...correctedLines.map((l) => l.subtotalMinor));
 
     // Resolved once, up front — needed both for the coupon's per-line context
     // (productId per line) and for building OrderLine inputs below, so the
     // lines-building loop further down reuses this map instead of re-querying.
     const variantById = new Map<string, { sku: string; nameDefault: string | null; productId: bigint; hsnCode: string | null }>();
-    for (const line of pricedLines) {
+    for (const line of correctedLines) {
       const variant = await this.variants.byId(line.variantId);
       if (!variant) throw new NotFoundError('ProductVariant', line.variantId.toString());
       variantById.set(line.variantId.toString(), variant);
     }
-    const discountLines = pricedLines.map((l) => ({
+    const discountLines = correctedLines.map((l) => ({
       variantId: l.variantId,
       productId: variantById.get(l.variantId.toString())!.productId,
       subtotalMinor: l.subtotalMinor,
@@ -162,24 +190,13 @@ export class CompleteCheckout {
     const discountTotalMinor = discount?.discountAmountMinor ?? 0n;
     const discountByVariant = new Map((discount?.lineDiscounts ?? []).map((d) => [d.variantId.toString(), d.discountAmountMinor]));
 
-    // GST split (CGST+SGST vs IGST) depends on the shipping state vs this
-    // website's registered origin state — resolved inside the calculator
-    // (NativeGstTaxCalculator), this call site only has to supply both state
-    // codes, not the comparison itself.
-    const taxResults = await this.taxCalculator.calculate(
-      pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
-      { websiteId: ctx.websiteId, destinationStateCode: cmd.shippingAddress.stateCode ?? null },
-    );
-    const taxByVariant = new Map(taxResults.map((t) => [t.variantId.toString(), t]));
-    const taxTotalMinor = addMinor(...taxResults.map((t) => t.amountMinor));
-
     const shipping = await this.shippingCalculator.quote(cmd.shippingMethodCode, cart.currency);
     if (!shipping) throw new NotFoundError('ShippingMethod', cmd.shippingMethodCode);
 
     let grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor, shipping.amountMinor, -discountTotalMinor);
 
     const lines = [];
-    for (const line of pricedLines) {
+    for (const line of correctedLines) {
       const variant = variantById.get(line.variantId.toString())!;
       const tax = taxByVariant.get(line.variantId.toString())!;
       lines.push({

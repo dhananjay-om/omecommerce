@@ -50,6 +50,11 @@ export interface CartView {
   /** subtotal - discountTotal, or subtotal unchanged when no valid discount applies. Excludes
    *  tax/shipping (only known at checkout) — same "estimated" framing the cart page already uses. */
   estimatedTotal: string | null;
+  /** Website.pricesIncludeTax, resolved live on every read (not frozen at cart
+   *  creation) — a later admin change to the setting should be reflected the
+   *  next time this cart is read, same "always recomputed live" philosophy
+   *  the coupon evaluation above already has. */
+  pricesIncludeTax: boolean;
 }
 
 export interface AddCartLineCommand {
