@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
 import { resolveProductBySkuCascade } from '@/lib/resolve-product-by-sku';
 import type { Coupon, CouponDiscountType, CouponTargetType } from '@/lib/types';
@@ -91,8 +92,11 @@ export async function createCoupon(_prevState: ActionState, formData: FormData):
     throw err;
   }
 
+  // Outside the try/catch on purpose — redirect() works by throwing a special
+  // Next.js-internal signal, which the catch block above would otherwise
+  // swallow and misreport as "Could not apply that coupon"-style form error.
   revalidatePath('/coupons');
-  return { error: null, success: true };
+  redirect('/coupons');
 }
 
 export async function updateCoupon(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -137,7 +141,7 @@ export async function updateCoupon(_prevState: ActionState, formData: FormData):
   }
 
   revalidatePath('/coupons');
-  return { error: null, success: true };
+  redirect('/coupons');
 }
 
 export async function deleteCoupon(_prevState: ActionState, formData: FormData): Promise<ActionState> {
