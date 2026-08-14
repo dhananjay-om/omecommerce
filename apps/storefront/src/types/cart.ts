@@ -7,6 +7,9 @@ export interface CartLine {
   price: string | null;
   imageUrl: string | null;
   lineTotal: string | null;
+  /** This line's share of the applied coupon's discount — null when no coupon is
+   *  applied, or when an item-targeted coupon's conditions didn't match this line. */
+  discountAmount: string | null;
 }
 
 export interface Cart {
@@ -16,6 +19,10 @@ export interface Cart {
   lines: CartLine[];
   subtotal: string | null;
   couponCode: string | null;
+  /** True when couponCode came from an eligible auto-apply coupon rather than a
+   *  code the customer typed — no code was ever entered, so there's nothing to
+   *  "remove" (see CouponField). */
+  couponIsAutoApplied: boolean;
   discountTotal: string | null;
   couponError: string | null;
   estimatedTotal: string | null;

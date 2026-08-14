@@ -87,6 +87,7 @@ export class PrismaOrderRepository implements OrderRepository {
               qty: l.qty,
               unitPrice: fromMinorUnits(l.unitPriceMinor),
               taxAmount: fromMinorUnits(l.taxAmountMinor),
+              discountAmount: fromMinorUnits(l.discountAmountMinor),
               rowTotal: fromMinorUnits(l.rowTotalMinor),
               taxClassCode: l.taxClassCode,
             },
@@ -206,6 +207,20 @@ export class PrismaOrderRepository implements OrderRepository {
 
   async setFinancialStatus(orderId: bigint, status: FinancialStatus): Promise<void> {
     await this.db.order.update({ where: { id: orderId }, data: { financialStatus: status } });
+  }
+
+  async revertDiscount(orderId: bigint): Promise<{ grandTotalMinor: bigint }> {
+    return this.db.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ grand_total: string }>>`
+        UPDATE "order"
+           SET grand_total = grand_total + discount_total,
+               discount_total = 0,
+               coupon_code = NULL
+         WHERE id = ${orderId}
+         RETURNING grand_total::text AS grand_total`;
+      await tx.$executeRaw`UPDATE order_line SET discount_amount = 0 WHERE order_id = ${orderId}`;
+      return { grandTotalMinor: toMinorUnits(rows[0]!.grand_total) };
+    });
   }
 
   async setOrderStatus(orderId: bigint, status: OrderStatus): Promise<void> {

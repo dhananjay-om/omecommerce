@@ -1,5 +1,5 @@
 import { apiGet } from '@/lib/api-client';
-import type { Coupon } from '@/lib/types';
+import type { Attribute, Category, Coupon } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { NewCouponDialog } from './new-coupon-dialog';
@@ -18,7 +18,11 @@ function formatWindow(c: Coupon): string {
 }
 
 export default async function CouponsPage() {
-  const coupons = await apiGet<Coupon[]>('/admin/v1/coupons');
+  const [coupons, attributes, categories] = await Promise.all([
+    apiGet<Coupon[]>('/admin/v1/coupons'),
+    apiGet<Attribute[]>('/admin/v1/attributes'),
+    apiGet<Category[]>('/admin/v1/categories'),
+  ]);
 
   return (
     <div>
@@ -26,10 +30,10 @@ export default async function CouponsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Coupons</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One code = one whole-cart discount. Customers apply a code in the cart or checkout.
+            Discount codes for the whole cart or specific matching items — manually entered or applied automatically.
           </p>
         </div>
-        <NewCouponDialog />
+        <NewCouponDialog attributes={attributes} categories={categories} />
       </div>
 
       <div className="mt-6 rounded-md border">
@@ -38,6 +42,7 @@ export default async function CouponsPage() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Discount</TableHead>
+              <TableHead>Applies To</TableHead>
               <TableHead>Min Subtotal</TableHead>
               <TableHead>Usage</TableHead>
               <TableHead>Window</TableHead>
@@ -48,7 +53,7 @@ export default async function CouponsPage() {
           <TableBody>
             {coupons.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   No coupons yet.
                 </TableCell>
               </TableRow>
@@ -57,6 +62,12 @@ export default async function CouponsPage() {
                 <TableRow key={c.code}>
                   <TableCell className="font-medium">{c.code}</TableCell>
                   <TableCell>{formatValue(c)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge variant="outline">{c.targetType === 'ITEM' ? `Items (${c.conditions.length})` : 'Whole Cart'}</Badge>
+                      {c.isAutoApply ? <Badge variant="secondary">Auto-Apply</Badge> : null}
+                    </div>
+                  </TableCell>
                   <TableCell>{c.minSubtotal ? `${c.currency} ${c.minSubtotal}` : '—'}</TableCell>
                   <TableCell>
                     {c.usageCount} / {c.usageLimit ?? '∞'}
@@ -68,7 +79,7 @@ export default async function CouponsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <EditCouponDialog coupon={c} />
+                      <EditCouponDialog coupon={c} attributes={attributes} categories={categories} />
                       <DeleteCouponDialog code={c.code} />
                     </div>
                   </TableCell>

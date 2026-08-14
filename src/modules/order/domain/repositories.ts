@@ -136,6 +136,11 @@ export interface OrderLineInput {
   qty: number;
   unitPriceMinor: bigint;
   taxAmountMinor: bigint;
+  /** This line's share of the order's coupon discount (allocateProportionally,
+   *  shared/domain/decimal.ts) — 0 for lines a coupon didn't apply to, or when no
+   *  coupon was used at all. Informational only: NOT netted into rowTotalMinor
+   *  below (rowTotal has never included discount, only Order.grandTotal does). */
+  discountAmountMinor: bigint;
   rowTotalMinor: bigint;
   taxClassCode: string | null;
 }
@@ -428,6 +433,14 @@ export interface OrderRepository {
   findByPublicId(publicId: string): Promise<OrderView | null>;
   list(filter: ListOrdersFilter): Promise<OrderListResult>;
   setFinancialStatus(orderId: bigint, status: FinancialStatus): Promise<void>;
+  /** Only called when an auto-applied (not manually-entered) coupon loses its
+   *  redeem() race after the order/lines were already created with the discount
+   *  baked in — zeroes discount_total/coupon_code/each OrderLine.discount_amount
+   *  and adds discount_total back onto grand_total, atomically, in one UPDATE
+   *  per table (no app-side arithmetic needed to stay consistent with whatever
+   *  was actually persisted at creation time). Returns the corrected grand
+   *  total so the caller can charge the SAME amount it just persisted. */
+  revertDiscount(orderId: bigint): Promise<{ grandTotalMinor: bigint }>;
   setOrderStatus(orderId: bigint, status: OrderStatus): Promise<void>;
   setFulfillmentStatus(orderId: bigint, status: FulfillmentStatus): Promise<void>;
   setClosedAt(orderId: bigint, closedAt: Date): Promise<void>;

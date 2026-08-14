@@ -222,6 +222,20 @@ export interface Currency {
 }
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+export type CouponTargetType = 'CART' | 'ITEM';
+export type CouponConditionType = 'PRODUCT' | 'CATEGORY' | 'ATTRIBUTE';
+
+export interface CouponConditionView {
+  conditionType: CouponConditionType;
+  productId: string | null;
+  productName: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  attributeCode: string | null;
+  attributeLabel: string | null;
+  attributeValue: string | null;
+  attributeValueLabel: string | null;
+}
 
 export interface Coupon {
   publicId: string;
@@ -231,6 +245,9 @@ export interface Coupon {
   value: string;
   currency: string | null;
   minSubtotal: string | null;
+  targetType: CouponTargetType;
+  isAutoApply: boolean;
+  conditions: CouponConditionView[];
   usageLimit: number | null;
   usageLimitPerCustomer: number | null;
   usageCount: number;

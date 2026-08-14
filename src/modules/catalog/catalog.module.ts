@@ -43,7 +43,7 @@ import { DeleteProductVariant } from './application/delete-product-variant.useca
 import { ListProducts } from './application/list-products.usecase.js';
 import { GetProductDetail } from './application/get-product-detail.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
-import { ListAttributes } from './application/list-attributes.usecase.js';
+import { ListAttributes, ListAttributeOptions } from './application/list-attributes.usecase.js';
 import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
 import { CreateCategory } from './application/create-category.usecase.js';
 import { ListCategories } from './application/list-categories.usecase.js';
@@ -146,6 +146,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
   const listAttributes = new ListAttributes(attributes);
+  const listAttributeOptions = new ListAttributeOptions(attributes);
   const createCategory = new CreateCategory(categories);
   const listCategories = new ListCategories(categories);
   const updateCategory = new UpdateCategory(categories);
@@ -303,6 +304,12 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/attributes',
     asyncHandler(async (req, res) => {
       res.json({ data: await listAttributes.execute() });
+    }),
+  );
+  admin.get(
+    '/attributes/:code/options',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listAttributeOptions.execute(req.params.code!) });
     }),
   );
   admin.post(

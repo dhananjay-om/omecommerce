@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaCouponRepository } from './infrastructure/prisma-coupon.repository.js';
+import { PrismaProductLookup, PrismaCategoryLookup, PrismaAttributeLookup } from './infrastructure/prisma-lookups.js';
 import { CreateCoupon } from './application/create-coupon.usecase.js';
 import { UpdateCoupon } from './application/update-coupon.usecase.js';
 import { ListCoupons } from './application/list-coupons.usecase.js';
@@ -19,10 +20,13 @@ export interface CouponRouters {
  *  DiscountCalculator) to power those routes and the checkout saga. */
 export function createCouponModule(db: Db, authorize: (permission: string) => RequestHandler): CouponRouters {
   const coupons = new PrismaCouponRepository(db);
+  const products = new PrismaProductLookup(db);
+  const categories = new PrismaCategoryLookup(db);
+  const attributes = new PrismaAttributeLookup(db);
 
-  const createCoupon = new CreateCoupon(coupons);
-  const updateCoupon = new UpdateCoupon(coupons);
-  const listCoupons = new ListCoupons(coupons);
+  const createCoupon = new CreateCoupon(coupons, products, categories, attributes);
+  const updateCoupon = new UpdateCoupon(coupons, products, categories, attributes);
+  const listCoupons = new ListCoupons(coupons, products, categories, attributes);
   const deleteCoupon = new DeleteCoupon(coupons);
 
   const admin = Router();

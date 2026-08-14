@@ -20,6 +20,10 @@ export interface CartLineDto {
   imageUrl: string | null;
   /** `price * qty`, or null when price is null (no price configured for this variant). */
   lineTotal: string | null;
+  /** This line's share of the applied coupon's discount (allocateProportionally),
+   *  live-computed same as CartView.discountTotal — null when no coupon is applied,
+   *  or 0 for a line an ITEM-target coupon's conditions didn't match. */
+  discountAmount: string | null;
 }
 
 export interface CartView {
@@ -29,9 +33,14 @@ export interface CartView {
   lines: CartLineDto[];
   /** Sum of every line's `lineTotal` that resolved to a real price; null if the cart has no priced lines yet. */
   subtotal: string | null;
-  /** Applied coupon code, if any (Cart.couponCode) — present even if it's since become
-   *  invalid (see couponError). */
+  /** Applied coupon code, if any — either Cart.couponCode (manually entered) or, when
+   *  that's unset, the code of a live-matched auto-apply coupon (see couponIsAutoApplied).
+   *  Present even if a manually-entered one has since become invalid (see couponError). */
   couponCode: string | null;
+  /** True when couponCode came from DiscountCalculator.findBestAutoApply() rather than
+   *  Cart.couponCode — the customer never typed this code, so the UI should not offer
+   *  a "Remove" action for it (there's nothing persisted to remove). */
+  couponIsAutoApplied: boolean;
   /** Live-evaluated, never persisted — null when no coupon is applied or it's invalid. */
   discountTotal: string | null;
   /** Set instead of throwing when an applied coupon is no longer valid (expired, hit its
