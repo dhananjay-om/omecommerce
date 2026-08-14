@@ -66,7 +66,9 @@ function AttributeValueField({
     return (
       <Select value={row.attributeValue} onValueChange={(v) => onChange(v ?? '')}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder={options === null ? 'Loading…' : 'Select a value'} />
+          <SelectValue placeholder={options === null ? 'Loading…' : 'Select a value'}>
+            {(value: string | null) => (options ?? []).find((o) => o.id === value)?.label ?? (options === null ? 'Loading…' : 'Select a value')}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {(options ?? []).map((o) => (
@@ -111,7 +113,11 @@ export function ConditionBuilder({
             <Label className="text-xs">Match</Label>
             <Select value={row.conditionType} onValueChange={(v) => updateRow(i, { conditionType: v as CouponConditionType })}>
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(value: CouponConditionType) =>
+                    value === 'PRODUCT' ? 'Product (SKU)' : value === 'CATEGORY' ? 'Category' : 'Attribute'
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PRODUCT">Product (SKU)</SelectItem>
@@ -131,7 +137,9 @@ export function ConditionBuilder({
               <Label className="text-xs">Category</Label>
               <Select value={row.categoryId} onValueChange={(v) => updateRow(i, { categoryId: v ?? '' })}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder="Select a category">
+                    {(value: string | null) => categories.find((c) => c.publicId === value)?.nameDefault ?? categories.find((c) => c.publicId === value)?.publicId ?? 'Select a category'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
@@ -148,7 +156,9 @@ export function ConditionBuilder({
                 <Label className="text-xs">Attribute</Label>
                 <Select value={row.attributeCode} onValueChange={(v) => updateRow(i, { attributeCode: v ?? '', attributeValue: '' })}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select an attribute" />
+                    <SelectValue placeholder="Select an attribute">
+                      {(value: string | null) => attributes.find((a) => a.code === value)?.label ?? 'Select an attribute'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {attributes.map((a) => (

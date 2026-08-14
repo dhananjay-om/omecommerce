@@ -83,7 +83,7 @@ export function EditPriceListDialog({ priceList }: { priceList: PriceList }) {
             <Label htmlFor={`epl-active-${priceList.code}`}>Status</Label>
             <Select name="isActive" defaultValue={priceList.isActive ? 'true' : 'false'}>
               <SelectTrigger id={`epl-active-${priceList.code}`} className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: string) => (value === 'true' ? 'Active' : 'Inactive')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="true">Active</SelectItem>

@@ -38,7 +38,7 @@ export function EditVariantDialog({ productPublicId, variant }: { productPublicI
             <Label htmlFor={`variant-status-${variant.publicId}`}>Status</Label>
             <Select name="status" defaultValue={variant.status}>
               <SelectTrigger id={`variant-status-${variant.publicId}`} className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: string) => (value === 'ACTIVE' ? 'Active' : 'Inactive')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ACTIVE">Active</SelectItem>

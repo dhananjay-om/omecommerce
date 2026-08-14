@@ -31,7 +31,9 @@ export function GstSettingsForm({ website }: { website: Website }) {
         <Label htmlFor={`gst-state-${website.code}`}>Origin state</Label>
         <Select name="originStateCode" defaultValue={website.originStateCode ?? ''}>
           <SelectTrigger id={`gst-state-${website.code}`} className="w-full">
-            <SelectValue placeholder="Not set" />
+            <SelectValue placeholder="Not set">
+              {(value: string | null) => GST_STATES.find((s) => s.code === value)?.name ?? 'Not set'}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {GST_STATES.map((s) => (

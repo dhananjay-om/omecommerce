@@ -73,7 +73,7 @@ export function EditWarehouseDialog({ warehouse }: { warehouse: Warehouse }) {
             <Label htmlFor={`ewh-active-${warehouse.code}`}>Status</Label>
             <Select name="isActive" defaultValue={warehouse.isActive ? 'true' : 'false'}>
               <SelectTrigger id={`ewh-active-${warehouse.code}`} className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: string) => (value === 'true' ? 'Active' : 'Inactive')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="true">Active</SelectItem>

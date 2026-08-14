@@ -49,7 +49,7 @@ export function EditTaxClassDialog({ taxClass }: { taxClass: TaxClass }) {
             <Label htmlFor="edit-tc-active">Status</Label>
             <Select name="isActive" defaultValue={taxClass.isActive ? 'true' : 'false'}>
               <SelectTrigger id="edit-tc-active" className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: string) => (value === 'true' ? 'Active' : 'Inactive')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="true">Active</SelectItem>

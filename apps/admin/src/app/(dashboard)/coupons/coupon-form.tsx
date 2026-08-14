@@ -77,7 +77,7 @@ export function CouponForm({
             <Label htmlFor="cpn-discountType">Discount Type</Label>
             <Select name="discountType" value={discountType} onValueChange={(v) => setDiscountType(v as CouponDiscountType)}>
               <SelectTrigger id="cpn-discountType" className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: CouponDiscountType) => (value === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {DISCOUNT_TYPES.map((t) => (
@@ -124,7 +124,7 @@ export function CouponForm({
             <Label htmlFor="cpn-targetType">Applies to</Label>
             <Select name="targetType" value={targetType} onValueChange={(v) => setTargetType(v as CouponTargetType)}>
               <SelectTrigger id="cpn-targetType" className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: CouponTargetType) => (value === 'CART' ? 'Whole Cart' : 'Specific Items')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="CART">Whole Cart</SelectItem>
@@ -136,7 +136,7 @@ export function CouponForm({
             <Label htmlFor="cpn-isAutoApply">Auto-Apply</Label>
             <Select name="isAutoApply" defaultValue={coupon?.isAutoApply ? 'true' : 'false'}>
               <SelectTrigger id="cpn-isAutoApply" className="w-full">
-                <SelectValue />
+                <SelectValue>{(value: string) => (value === 'true' ? 'Applies automatically' : 'Requires a code')}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="false">Requires a code</SelectItem>
@@ -188,7 +188,7 @@ export function CouponForm({
           <Label htmlFor="cpn-isActive">Status</Label>
           <Select name="isActive" defaultValue={coupon ? (coupon.isActive ? 'true' : 'false') : 'true'}>
             <SelectTrigger id="cpn-isActive" className="w-full">
-              <SelectValue />
+              <SelectValue>{(value: string) => (value === 'true' ? 'Active' : 'Inactive')}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="true">Active</SelectItem>
