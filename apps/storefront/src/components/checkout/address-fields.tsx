@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GST_STATES } from '@/lib/gst-states';
 import type { CheckoutFormValues } from './checkout-schema';
 
 export function AddressFields({
@@ -52,10 +53,31 @@ export function AddressFields({
           {fieldErrors?.postalCode ? <p className="text-xs text-destructive">{fieldErrors.postalCode.message}</p> : null}
         </div>
       </div>
-      <div className="flex flex-col gap-1.5 sm:w-40">
-        <Label htmlFor={`${prefix}.country`}>Country code</Label>
-        <Input id={`${prefix}.country`} placeholder="US" maxLength={2} {...register(`${prefix}.country`)} />
-        {fieldErrors?.country ? <p className="text-xs text-destructive">{fieldErrors.country.message}</p> : null}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5 sm:w-40">
+          <Label htmlFor={`${prefix}.country`}>Country code</Label>
+          <Input id={`${prefix}.country`} placeholder="US" maxLength={2} {...register(`${prefix}.country`)} />
+          {fieldErrors?.country ? <p className="text-xs text-destructive">{fieldErrors.country.message}</p> : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${prefix}.stateCode`}>GST state (India orders)</Label>
+          <select
+            id={`${prefix}.stateCode`}
+            {...register(`${prefix}.stateCode`)}
+            className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+          >
+            <option value="">Not applicable</option>
+            {GST_STATES.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${prefix}.gstin`}>GSTIN (optional, for a business invoice)</Label>
+        <Input id={`${prefix}.gstin`} placeholder="e.g. 27AAAAA0000A1Z5" maxLength={15} {...register(`${prefix}.gstin`)} />
       </div>
     </div>
   );

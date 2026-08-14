@@ -13,6 +13,8 @@ export interface OrderLineView {
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;
+  taxClassCode: string | null;
+  hsnCode: string | null;
   fulfilledQty: number;
   refundedQty: number;
 }
@@ -25,9 +27,18 @@ export interface OrderAddress {
   line2: string | null;
   city: string;
   region: string | null;
+  stateCode: string | null;
+  gstin: string | null;
   postalCode: string;
   country: string;
   phone: string | null;
+}
+
+export interface OrderTaxLine {
+  taxClassCode: string;
+  taxType: 'CGST' | 'SGST' | 'IGST' | null;
+  rate: string;
+  amount: string;
 }
 
 export interface OrderPayment {
@@ -97,6 +108,7 @@ export interface OrderView {
   closedAt: string | null;
   lines: OrderLineView[];
   addresses: OrderAddress[];
+  taxLines: OrderTaxLine[];
   payments: OrderPayment[];
   fulfillments: OrderFulfillment[];
   notes: OrderNote[];

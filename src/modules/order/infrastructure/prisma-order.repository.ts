@@ -8,6 +8,7 @@ import type {
   ListOrdersFilter,
   OrderListResult,
   OrderAddressView,
+  OrderTaxLineView,
   RecordOrderHistoryInput,
   OrderHistoryView,
   AddOrderNoteInput,
@@ -36,6 +37,7 @@ function formatDecimal(value: { toString(): string }): string {
 const ORDER_DETAIL_INCLUDE = {
   lines: true,
   addresses: true,
+  taxLines: true,
   payments: { orderBy: { createdAt: 'asc' as const } },
   fulfillments: { include: { lines: true, tracking: true }, orderBy: { createdAt: 'asc' as const } },
   returns: { include: { lines: true }, orderBy: { createdAt: 'asc' as const } },
@@ -90,6 +92,7 @@ export class PrismaOrderRepository implements OrderRepository {
               discountAmount: fromMinorUnits(l.discountAmountMinor),
               rowTotal: fromMinorUnits(l.rowTotalMinor),
               taxClassCode: l.taxClassCode,
+              hsnCode: l.hsnCode,
             },
           }),
         ),
@@ -102,6 +105,7 @@ export class PrismaOrderRepository implements OrderRepository {
           data: input.taxLines.map((t) => ({
             orderId: order.id,
             taxClassCode: t.taxClassCode,
+            taxType: t.taxType,
             rate: fromMinorUnits(t.rateMinor),
             amount: fromMinorUnits(t.amountMinor),
           })),
@@ -416,7 +420,20 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 }
 
-function toAddressView(a: { type: string; name: string; company: string | null; line1: string; line2: string | null; city: string; region: string | null; postalCode: string; country: string; phone: string | null }): OrderAddressView {
+function toAddressView(a: {
+  type: string;
+  name: string;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  stateCode: string | null;
+  gstin: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+}): OrderAddressView {
   return {
     type: a.type as OrderAddressView['type'],
     name: a.name,
@@ -425,9 +442,20 @@ function toAddressView(a: { type: string; name: string; company: string | null; 
     line2: a.line2,
     city: a.city,
     region: a.region,
+    stateCode: a.stateCode,
+    gstin: a.gstin,
     postalCode: a.postalCode,
     country: a.country,
     phone: a.phone,
+  };
+}
+
+function toTaxLineView(t: { taxClassCode: string; taxType: string | null; rate: { toString(): string }; amount: { toString(): string } }): OrderTaxLineView {
+  return {
+    taxClassCode: t.taxClassCode,
+    taxType: t.taxType as OrderTaxLineView['taxType'],
+    rate: formatDecimal(t.rate),
+    amount: formatDecimal(t.amount),
   };
 }
 
@@ -465,11 +493,14 @@ function toView(order: OrderDetailRow): OrderView {
       taxAmount: formatDecimal(l.taxAmount),
       discountAmount: formatDecimal(l.discountAmount),
       rowTotal: formatDecimal(l.rowTotal),
+      taxClassCode: l.taxClassCode,
+      hsnCode: l.hsnCode,
       fulfilledQty: l.fulfilledQty,
       refundedQty: l.refundedQty,
       version: l.version,
     })),
     addresses: order.addresses.map(toAddressView),
+    taxLines: order.taxLines.map(toTaxLineView),
     payments: order.payments.map((p) => ({
       id: p.id,
       method: p.method,

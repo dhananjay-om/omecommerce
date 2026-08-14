@@ -57,6 +57,8 @@ export async function createProduct(_prevState: CreateProductFormState, formData
   const nameDefault = String(formData.get('nameDefault') ?? '').trim();
   const status = String(formData.get('status') ?? '');
   const weight = String(formData.get('weight') ?? '').trim();
+  const taxClassId = String(formData.get('taxClassId') ?? '').trim();
+  const hsnCode = String(formData.get('hsnCode') ?? '').trim();
 
   if (!type || !sku || !attributeSetId) {
     return { error: 'Type, SKU, and attribute set are required.' };
@@ -71,6 +73,8 @@ export async function createProduct(_prevState: CreateProductFormState, formData
       status: status || undefined,
       nameDefault: nameDefault || undefined,
       weight: weight || undefined,
+      taxClassId: taxClassId || undefined,
+      hsnCode: hsnCode || undefined,
     });
     await saveAttributeValues(created.publicId, formData);
     await saveCategoryIds(created.publicId, formData);
@@ -98,6 +102,8 @@ export async function updateProduct(
   const status = String(formData.get('status') ?? '');
   const visibility = String(formData.get('visibility') ?? '');
   const weight = String(formData.get('weight') ?? '').trim();
+  const taxClassId = String(formData.get('taxClassId') ?? '').trim();
+  const hsnCode = String(formData.get('hsnCode') ?? '').trim();
 
   if (!attributeSetId) {
     return { error: 'Attribute set is required.' };
@@ -110,6 +116,8 @@ export async function updateProduct(
       status: status || undefined,
       visibility: visibility || undefined,
       weight: weight || null,
+      taxClassId: taxClassId || null,
+      hsnCode: hsnCode || null,
     });
     await saveAttributeValues(productPublicId, formData);
     await saveCategoryIds(productPublicId, formData);

@@ -22,6 +22,8 @@ export const createProductSchema = z.object({
   visibility: z.nativeEnum(ProductVisibility).optional(),
   nameDefault: z.string().max(512).nullish(),
   weight: decimalString.nullish(),
+  taxClassId: z.string().regex(/^\d+$/, 'expected numeric id').nullish(),
+  hsnCode: z.string().max(8).nullish(),
 });
 
 const variantAxisSchema = z.object({
@@ -45,6 +47,8 @@ export const updateProductSchema = z.object({
   weight: decimalString.nullish(),
   attributeSetId: z.string().regex(/^\d+$/, 'expected numeric id').optional(),
   brandId: z.string().uuid().nullish(),
+  taxClassId: z.string().regex(/^\d+$/, 'expected numeric id').nullish(),
+  hsnCode: z.string().max(8).nullish(),
 });
 
 export const assignAttributeValueSchema = z.object({

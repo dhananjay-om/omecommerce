@@ -117,6 +117,7 @@ export function ProductsTable({
               <TableHead>Type</TableHead>
               <TableHead>Quantity</TableHead>
               <TableHead>Salable Qty</TableHead>
+              <TableHead>Tax</TableHead>
               <SortableHeader
                 label="Status"
                 sortKey="status"
@@ -137,7 +138,7 @@ export function ProductsTable({
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
+                <TableCell colSpan={11} className="text-center text-muted-foreground">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -172,6 +173,15 @@ export function ProductsTable({
                   <TableCell>{p.type}</TableCell>
                   <TableCell>{p.quantity}</TableCell>
                   <TableCell>{p.salableQuantity}</TableCell>
+                  <TableCell>
+                    {p.hasTaxClass ? (
+                      <Badge variant="success">GST</Badge>
+                    ) : (
+                      <Badge variant="secondary" title="No tax class assigned — charged 0 GST at checkout">
+                        None
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={statusBadgeVariant(p.status)}>{p.status}</Badge>
                   </TableCell>

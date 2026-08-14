@@ -19,6 +19,10 @@ export interface CreateProductCommand {
   visibility?: ProductVisibility;
   nameDefault?: string | null;
   weight?: string | null;
+  /** Tax class's internal id, as a string (same "publicId or numeric string"
+   *  convention as attributeSetId above). */
+  taxClassId?: string | null;
+  hsnCode?: string | null;
 }
 
 export interface UpdateProductCommand {
@@ -30,6 +34,9 @@ export interface UpdateProductCommand {
   attributeSetId?: string;
   /** Brand's publicId; `null` clears it (plan/14 Phase 0b). */
   brandId?: string | null;
+  /** Tax class's internal id, as a string; `null` clears it (same undefined-vs-null pairing as brandId). */
+  taxClassId?: string | null;
+  hsnCode?: string | null;
 }
 
 export interface ProductView {
@@ -40,6 +47,8 @@ export interface ProductView {
   visibility: ProductVisibility;
   name: string | null;
   weight: string | null;
+  taxClassId: string | null;
+  hsnCode: string | null;
 }
 
 export interface AssignAttributeValueCommand {
@@ -126,6 +135,7 @@ export interface ProductListItemView {
   quantity: number;
   salableQuantity: number;
   thumbnailUrl: string | null;
+  hasTaxClass: boolean;
 }
 
 export interface ProductListView {

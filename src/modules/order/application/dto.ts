@@ -70,6 +70,11 @@ export interface AddressInput {
   line2?: string | null;
   city: string;
   region?: string | null;
+  /** 2-digit CBIC GST state code — feeds the CGST/SGST-vs-IGST determination
+   *  (see complete-checkout.usecase.ts's TaxContext build). */
+  stateCode?: string | null;
+  /** Buyer GSTIN, optional B2B capture. */
+  gstin?: string | null;
   postalCode: string;
   country: string;
   phone?: string | null;
@@ -95,6 +100,8 @@ export interface OrderLineViewDto {
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;
+  taxClassCode: string | null;
+  hsnCode: string | null;
   fulfilledQty: number;
   refundedQty: number;
 }
@@ -107,9 +114,18 @@ export interface OrderAddressDto {
   line2: string | null;
   city: string;
   region: string | null;
+  stateCode: string | null;
+  gstin: string | null;
   postalCode: string;
   country: string;
   phone: string | null;
+}
+
+export interface OrderTaxLineDto {
+  taxClassCode: string;
+  taxType: 'CGST' | 'SGST' | 'IGST' | null;
+  rate: string;
+  amount: string;
 }
 
 export interface PaymentTransactionDto {
@@ -205,6 +221,7 @@ export interface OrderViewDto {
   closedAt: string | null;
   lines: OrderLineViewDto[];
   addresses: OrderAddressDto[];
+  taxLines: OrderTaxLineDto[];
   payments: PaymentTransactionDto[];
   fulfillments: FulfillmentDto[];
   returns: OrderReturnDto[];

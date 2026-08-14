@@ -1,5 +1,5 @@
 import { apiGet } from '@/lib/api-client';
-import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, Variant, VariantPrice, VariantStock } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass, Variant, VariantPrice, VariantStock } from '@/lib/types';
 import { EditProductForm } from './edit-product-form';
 
 export interface VariantPricingEntry {
@@ -10,10 +10,11 @@ export interface VariantPricingEntry {
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, attributeSets, categories] = await Promise.all([
+  const [product, attributeSets, categories, taxClasses] = await Promise.all([
     apiGet<ProductDetail>(`/admin/v1/products/${id}`),
     apiGet<AttributeSet[]>('/admin/v1/attribute-sets'),
     apiGet<Category[]>('/admin/v1/categories'),
+    apiGet<TaxClass[]>('/admin/v1/tax-classes'),
   ]);
   const details = await Promise.all(
     attributeSets.map((s) => apiGet<AttributeSetDetail>(`/admin/v1/attribute-sets/${s.id}`)),
@@ -44,6 +45,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           attributeSets={attributeSets}
           attributeSetDetails={attributeSetDetails}
           categories={categories}
+          taxClasses={taxClasses}
           variantPricing={variantPricing}
         />
       </div>

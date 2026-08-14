@@ -6,6 +6,9 @@ const requiredAddressSchema = z.object({
   line2: z.string().optional(),
   city: z.string().min(1, 'City is required.'),
   region: z.string().optional(),
+  /** GST state — feeds the CGST/SGST-vs-IGST determination at checkout. */
+  stateCode: z.string().optional(),
+  gstin: z.string().optional(),
   postalCode: z.string().min(1, 'Postal code is required.'),
   country: z.string().length(2, 'Use a 2-letter country code (e.g. US).'),
   phone: z.string().optional(),
@@ -18,6 +21,8 @@ const optionalAddressSchema = z.object({
   line2: z.string().optional(),
   city: z.string().optional(),
   region: z.string().optional(),
+  stateCode: z.string().optional(),
+  gstin: z.string().optional(),
   postalCode: z.string().optional(),
   country: z.string().optional(),
   phone: z.string().optional(),

@@ -67,6 +67,10 @@ export class GetProductForStoreView {
       visibility: p.visibility,
       name: p.nameDefault,
       weight: p.weight,
+      // Admin-only fields (inherited from ProductView for reuse, never actually
+      // shown to a customer) — GST tax class/HSN aren't storefront-relevant.
+      taxClassId: null,
+      hsnCode: null,
       storeViewId: query.storeViewId,
       currency: ctx.currency,
       attributes,

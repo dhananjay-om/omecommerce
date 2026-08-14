@@ -12,6 +12,7 @@ export interface ProductListItem {
   quantity: number;
   salableQuantity: number;
   thumbnailUrl: string | null;
+  hasTaxClass: boolean;
 }
 
 export interface ProductList {
@@ -54,6 +55,8 @@ export interface ProductDetail {
   name: string | null;
   weight: string | null;
   attributeSetId: string;
+  taxClassId: string | null;
+  hsnCode: string | null;
   variants: Variant[];
   attributes: Record<string, unknown>;
   categoryIds: string[];
@@ -221,6 +224,24 @@ export interface Currency {
   isDefault: boolean;
 }
 
+export interface TaxClass {
+  id: string;
+  publicId: string;
+  code: string;
+  name: string;
+  /** Combined GST rate as a fraction string, e.g. "0.1800" for 18%. */
+  rate: string;
+  isActive: boolean;
+}
+
+export interface Website {
+  publicId: string;
+  code: string;
+  name: string;
+  gstin: string | null;
+  originStateCode: string | null;
+}
+
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 export type CouponTargetType = 'CART' | 'ITEM';
 export type CouponConditionType = 'PRODUCT' | 'CATEGORY' | 'ATTRIBUTE';
@@ -300,6 +321,8 @@ export interface OrderLine {
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;
+  taxClassCode: string | null;
+  hsnCode: string | null;
   fulfilledQty: number;
   refundedQty: number;
 }
@@ -312,9 +335,18 @@ export interface OrderAddress {
   line2: string | null;
   city: string;
   region: string | null;
+  stateCode: string | null;
+  gstin: string | null;
   postalCode: string;
   country: string;
   phone: string | null;
+}
+
+export interface OrderTaxLine {
+  taxClassCode: string;
+  taxType: 'CGST' | 'SGST' | 'IGST' | null;
+  rate: string;
+  amount: string;
 }
 
 export interface OrderPayment {
@@ -429,6 +461,7 @@ export interface OrderDetail {
   closedAt: string | null;
   lines: OrderLine[];
   addresses: OrderAddress[];
+  taxLines: OrderTaxLine[];
   payments: OrderPayment[];
   fulfillments: OrderFulfillment[];
   returns: OrderReturn[];

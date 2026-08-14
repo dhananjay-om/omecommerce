@@ -58,6 +58,7 @@ export class ListProducts {
         quantity: p.quantity,
         salableQuantity: p.salableQuantity,
         thumbnailUrl: thumbnailUrls.get(p.id.toString()) ?? null,
+        hasTaxClass: p.hasTaxClass,
       })),
     };
   }

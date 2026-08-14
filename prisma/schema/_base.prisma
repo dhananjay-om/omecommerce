@@ -562,3 +562,15 @@ enum CouponConditionType {
   CATEGORY
   ATTRIBUTE
 }
+
+/// order.prisma's OrderTaxLine — India GST split. CGST+SGST (each half the
+/// combined TaxClass.rate) for an intra-state sale (customer's state == the
+/// selling Website's originStateCode), IGST (the full rate) for inter-state.
+/// Union Territories without their own legislature are labeled SGST here too
+/// (documented simplification — the rate math is identical, only the invoice
+/// label differs; see native-tax-calculator.ts's header comment).
+enum GstTaxType {
+  CGST
+  SGST
+  IGST
+}

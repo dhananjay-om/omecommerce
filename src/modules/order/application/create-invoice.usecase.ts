@@ -1,4 +1,4 @@
-import type { OrderRepository, AdminUserLookup } from '../domain/repositories.js';
+import type { OrderRepository, AdminUserLookup, WebsiteTaxConfigLookup } from '../domain/repositories.js';
 import type { PdfRenderer, PdfStorage } from '../domain/ports.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError, InvoiceExceedsQtyError } from '../domain/errors.js';
@@ -16,6 +16,7 @@ export class CreateInvoice {
     private readonly adminUsers: AdminUserLookup,
     private readonly pdfRenderer: PdfRenderer,
     private readonly pdfStorage: PdfStorage,
+    private readonly websiteTaxConfig: WebsiteTaxConfigLookup,
   ) {}
 
   async execute(cmd: CreateInvoiceCommand): Promise<OrderViewDto> {
@@ -85,7 +86,8 @@ export class CreateInvoice {
       lines: invoiceLines,
     });
 
-    const html = buildInvoiceHtml(order, invoice);
+    const sellerConfig = await this.websiteTaxConfig.byId(order.websiteId);
+    const html = buildInvoiceHtml(order, invoice, sellerConfig?.gstin ?? null);
     const pdf = await this.pdfRenderer.render(html);
     const key = `invoices/${order.publicId}/${invoice.publicId}.pdf`;
     await this.pdfStorage.store(key, pdf);

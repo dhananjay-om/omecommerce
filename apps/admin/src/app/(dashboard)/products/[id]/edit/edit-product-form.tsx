@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { updateProduct, type UpdateProductFormState } from '../../actions';
-import type { AttributeSet, AttributeSetDetail, Category, ProductDetail } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass } from '@/lib/types';
 import { AttributeFieldsSection } from '../../attribute-fields-section';
 import { DEFAULT_ATTRIBUTE_GROUPS } from '../../default-attribute-groups';
 import { CategoryPicker } from '../../category-picker';
@@ -38,12 +38,14 @@ export function EditProductForm({
   attributeSets,
   attributeSetDetails,
   categories,
+  taxClasses,
   variantPricing,
 }: {
   product: ProductDetail;
   attributeSets: AttributeSet[];
   attributeSetDetails: Record<string, AttributeSetDetail>;
   categories: Category[];
+  taxClasses: TaxClass[];
   variantPricing: VariantPricingEntry[];
 }) {
   const action = updateProduct.bind(null, product.publicId);
@@ -124,6 +126,32 @@ export function EditProductForm({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Tax">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="taxClassId">Tax Class</Label>
+              <Select name="taxClassId" defaultValue={product.taxClassId ?? ''}>
+                <SelectTrigger id="taxClassId" className="w-full">
+                  <SelectValue placeholder="None (0% GST)">
+                    {(value: string | null) => taxClasses.find((tc) => tc.id === value)?.name ?? 'None (0% GST)'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {taxClasses.map((tc) => (
+                    <SelectItem key={tc.id} value={tc.id}>
+                      {tc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hsnCode">HSN/SAC Code</Label>
+              <Input id="hsnCode" name="hsnCode" maxLength={8} defaultValue={product.hsnCode ?? ''} placeholder="e.g. 61091000" />
             </div>
           </div>
         </SectionCard>

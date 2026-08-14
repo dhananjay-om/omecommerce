@@ -19,6 +19,12 @@ const addressSchema = z.object({
   line2: z.string().nullish(),
   city: z.string().min(1),
   region: z.string().nullish(),
+  /** 2-digit CBIC GST state code — feeds the CGST/SGST-vs-IGST determination. */
+  stateCode: z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish(),
+  gstin: z
+    .string()
+    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'expected a valid 15-character GSTIN')
+    .nullish(),
   postalCode: z.string().min(1),
   country: z.string().length(2),
   phone: z.string().nullish(),
@@ -77,7 +83,13 @@ export const sendOrderEmailSchema = z.object({
 export const createTaxClassSchema = z.object({
   code: z.string().min(1).max(64),
   name: z.string().min(1).max(256),
-  rate: z.string().regex(/^0\.\d{1,4}$|^0$/, 'expected a fraction like "0.0825"'),
+  rate: z.string().regex(/^0\.\d{1,4}$|^0$/, 'expected a fraction like "0.18" for 18% GST'),
+});
+
+export const updateTaxClassSchema = z.object({
+  name: z.string().min(1).max(256).optional(),
+  rate: z.string().regex(/^0\.\d{1,4}$|^0$/, 'expected a fraction like "0.18" for 18% GST').optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const createShippingMethodSchema = z.object({

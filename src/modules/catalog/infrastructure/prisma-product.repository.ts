@@ -38,6 +38,8 @@ function toDomainProps(row: PrismaProductRow) {
     weight: row.weight?.toString() ?? null,
     isDigital: row.isDigital,
     isVirtual: row.isVirtual,
+    taxClassId: row.taxClassId,
+    hsnCode: row.hsnCode,
   };
 }
 
@@ -72,6 +74,8 @@ export class PrismaProductRepository implements ProductRepository {
             weight: p.weight,
             isDigital: p.isDigital,
             isVirtual: p.isVirtual,
+            taxClassId: p.taxClassId,
+            hsnCode: p.hsnCode,
           },
         });
         if (IMPLICIT_VARIANT_TYPES.has(created.type)) {
@@ -125,6 +129,8 @@ export class PrismaProductRepository implements ProductRepository {
         weight: input.weight,
         attributeSetId: input.attributeSetId,
         brandId: input.brandId,
+        taxClassId: input.taxClassId,
+        hsnCode: input.hsnCode,
       },
     });
     return Product.fromPersistence(toDomainProps(row));
@@ -145,7 +151,7 @@ export class PrismaProductRepository implements ProductRepository {
       this.db.product.count({ where }),
       this.db.product.findMany({
         where,
-        select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, createdAt: true },
+        select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, createdAt: true, taxClassId: true },
         orderBy: { [filter.sortBy ?? 'createdAt']: filter.sortDir ?? 'desc' },
         skip: (filter.page - 1) * filter.pageSize,
         take: filter.pageSize,
@@ -170,6 +176,7 @@ export class PrismaProductRepository implements ProductRepository {
           createdAt: r.createdAt,
           quantity: stock.onHand,
           salableQuantity: stock.available,
+          hasTaxClass: r.taxClassId !== null,
         };
       }),
     };
