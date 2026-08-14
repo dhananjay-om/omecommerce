@@ -18,8 +18,11 @@ import type {
 
 export interface VariantLookup {
   byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null>;
-  /** `status` added for plan/15 Phase 11 (Reorder) — must skip variants that no longer exist or are INACTIVE; every existing caller ignores the extra field. */
-  byId(id: bigint): Promise<{ sku: string; nameDefault: string | null; productId: bigint; status: 'ACTIVE' | 'INACTIVE' } | null>;
+  /** `status` added for plan/15 Phase 11 (Reorder) — must skip variants that no longer exist or are INACTIVE; every existing caller ignores the extra field.
+   *  `hsnCode` added for the GST module — snapshotted onto OrderLine.hsnCode at order-creation time; every existing caller ignores it too. */
+  byId(
+    id: bigint,
+  ): Promise<{ sku: string; nameDefault: string | null; productId: bigint; status: 'ACTIVE' | 'INACTIVE'; hsnCode: string | null } | null>;
 }
 
 /** The lowest-position media asset's storage KEY for a product (plan/14 Phase 5a) — own copy of the same lookup search's IndexProduct uses; not a URL, see MediaUrlResolver's doc comment for why. */
@@ -63,9 +66,36 @@ export interface WarehouseResolver {
   resolveForOrderLine(orderLineId: bigint): Promise<{ id: bigint; code: string } | null>;
 }
 
+export interface TaxClassAdminInfo {
+  /** Internal id, as a string — this is what Product.taxClassId keys off (same
+   *  "numeric id as string" convention as AttributeSetInfo/AttributeInfo). */
+  id: string;
+  publicId: string;
+  code: string;
+  name: string;
+  /** The combined GST rate as a fraction string (e.g. "0.1800" for 18%) — the
+   *  checkout-facing NativeGstTaxCalculator splits this into CGST+SGST or IGST
+   *  at calculation time; nothing about the split is stored here. */
+  rate: string;
+  isActive: boolean;
+}
+
 export interface TaxClassRepository {
-  create(input: { code: string; name: string; rate: string }): Promise<{ publicId: string; code: string }>;
-  findByCode(code: string): Promise<{ id: bigint; code: string } | null>;
+  create(input: { code: string; name: string; rate: string }): Promise<TaxClassAdminInfo>;
+  findByCode(code: string): Promise<TaxClassAdminInfo | null>;
+  /** Admin browse — the product-edit Tax Class picker and the standalone Tax Classes screen. */
+  list(): Promise<TaxClassAdminInfo[]>;
+  update(code: string, input: { name?: string; rate?: string; isActive?: boolean }): Promise<TaxClassAdminInfo>;
+  /** Soft-delete only — a deleted class simply stops resolving in TaxClassLookup
+   *  (same reasoning as Coupon's soft-delete: no FK-driven reason to block it). */
+  softDelete(code: string): Promise<void>;
+}
+
+/** This selling Website's own GST registration (single-registration/single-state
+ *  scope — see store.prisma's Website.gstin/.originStateCode doc comment). Own
+ *  copy, per-module lookup convention. */
+export interface WebsiteTaxConfigLookup {
+  byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null } | null>;
 }
 
 export interface ShippingMethodInfo {
@@ -143,6 +173,9 @@ export interface OrderLineInput {
   discountAmountMinor: bigint;
   rowTotalMinor: bigint;
   taxClassCode: string | null;
+  /** Snapshot of Product.hsnCode as of order creation — never live-looked-up
+   *  again afterward, same reasoning as sku/name/unitPrice on this row. */
+  hsnCode: string | null;
 }
 
 export interface OrderAddressInput {
@@ -153,6 +186,10 @@ export interface OrderAddressInput {
   line2?: string | null;
   city: string;
   region?: string | null;
+  /** 2-digit CBIC GST state code — see OrderAddress.stateCode's schema doc comment. */
+  stateCode?: string | null;
+  /** Buyer GSTIN, optional B2B capture. */
+  gstin?: string | null;
   postalCode: string;
   country: string;
   phone?: string | null;
@@ -160,6 +197,7 @@ export interface OrderAddressInput {
 
 export interface OrderTaxLineInput {
   taxClassCode: string;
+  taxType: 'CGST' | 'SGST' | 'IGST';
   rateMinor: bigint;
   amountMinor: bigint;
 }
@@ -196,6 +234,8 @@ export interface OrderLineView {
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;
+  taxClassCode: string | null;
+  hsnCode: string | null;
   fulfilledQty: number;
   refundedQty: number;
   version: number;
@@ -209,9 +249,18 @@ export interface OrderAddressView {
   line2: string | null;
   city: string;
   region: string | null;
+  stateCode: string | null;
+  gstin: string | null;
   postalCode: string;
   country: string;
   phone: string | null;
+}
+
+export interface OrderTaxLineView {
+  taxClassCode: string;
+  taxType: 'CGST' | 'SGST' | 'IGST' | null;
+  rate: string;
+  amount: string;
 }
 
 export interface PaymentTransactionView {
@@ -380,6 +429,7 @@ export interface OrderView {
   closedAt: Date | null;
   lines: OrderLineView[];
   addresses: OrderAddressView[];
+  taxLines: OrderTaxLineView[];
   payments: PaymentTransactionView[];
   fulfillments: FulfillmentView[];
   returns: OrderReturnView[];

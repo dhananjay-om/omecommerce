@@ -10,15 +10,30 @@ export interface TaxLineInput {
   lineSubtotalMinor: bigint;
 }
 
+export type GstTaxType = 'CGST' | 'SGST' | 'IGST';
+
 export interface TaxLineResult {
   variantId: bigint;
   taxClassCode: string | null;
+  /** Combined rate/amount — unchanged shape for any reader that only cares
+   *  about the line's total tax (e.g. rowTotal math). */
   rateMinor: bigint;
   amountMinor: bigint;
+  /** The GST split that sums to amountMinor — 1 entry (IGST, full rate) for an
+   *  inter-state line, 2 entries (CGST + SGST, each half) for intra-state.
+   *  Empty when there's no tax class (amountMinor is 0 anyway). */
+  breakdown: Array<{ type: GstTaxType; rateMinor: bigint; amountMinor: bigint }>;
+}
+
+export interface TaxContext {
+  websiteId: bigint;
+  /** The shipping address's 2-digit CBIC state code — null when unknown/not
+   *  yet collected, treated as inter-state (see gst.ts's documented default). */
+  destinationStateCode: string | null;
 }
 
 export interface TaxCalculator {
-  calculate(lines: TaxLineInput[]): Promise<TaxLineResult[]>;
+  calculate(lines: TaxLineInput[], context: TaxContext): Promise<TaxLineResult[]>;
 }
 
 export interface ShippingQuote {

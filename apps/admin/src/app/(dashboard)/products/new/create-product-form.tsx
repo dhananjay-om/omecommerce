@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { createProduct, type CreateProductFormState } from '../actions';
-import type { AttributeSet, AttributeSetDetail, Category } from '@/lib/types';
+import type { AttributeSet, AttributeSetDetail, Category, TaxClass } from '@/lib/types';
 import { AttributeFieldsSection } from '../attribute-fields-section';
 import { DEFAULT_ATTRIBUTE_GROUPS } from '../default-attribute-groups';
 import { CategoryPicker } from '../category-picker';
@@ -32,10 +32,12 @@ export function CreateProductForm({
   attributeSets,
   attributeSetDetails,
   categories,
+  taxClasses,
 }: {
   attributeSets: AttributeSet[];
   attributeSetDetails: Record<string, AttributeSetDetail>;
   categories: Category[];
+  taxClasses: TaxClass[];
 }) {
   const [state, formAction, pending] = useActionState(createProduct, initialState);
   const defaultAttributeSetId = attributeSets.find((s) => s.isDefault)?.id ?? attributeSets[0]?.id ?? '';
@@ -115,6 +117,30 @@ export function CreateProductForm({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Tax">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="taxClassId">Tax Class</Label>
+            <Select name="taxClassId" defaultValue="">
+              <SelectTrigger id="taxClassId" className="w-full">
+                <SelectValue placeholder="None (0% GST)" />
+              </SelectTrigger>
+              <SelectContent>
+                {taxClasses.map((tc) => (
+                  <SelectItem key={tc.id} value={tc.id}>
+                    {tc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hsnCode">HSN/SAC Code</Label>
+            <Input id="hsnCode" name="hsnCode" maxLength={8} placeholder="e.g. 61091000" />
           </div>
         </div>
       </SectionCard>

@@ -15,7 +15,7 @@ import {
   PrismaAdminUserLookup,
 } from './infrastructure/prisma-lookups.js';
 import { PrismaCustomerLookup } from './infrastructure/prisma-customer-lookup.js';
-import { PrismaTaxClassLookup, NativeTaxCalculator } from './infrastructure/native-tax-calculator.js';
+import { PrismaTaxClassLookup, PrismaWebsiteTaxConfigLookup, NativeGstTaxCalculator } from './infrastructure/native-tax-calculator.js';
 import { NativeShippingCalculator } from './infrastructure/native-shipping-calculator.js';
 import { TestPaymentGateway } from './infrastructure/test-payment-gateway.js';
 import { PrismaTaxClassRepository, PrismaShippingMethodRepository } from './infrastructure/prisma-setup.repository.js';
@@ -32,7 +32,7 @@ import { ListOrders } from './application/list-orders.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
-import { CreateTaxClass, CreateShippingMethod } from './application/setup.usecases.js';
+import { CreateTaxClass, ListTaxClasses, UpdateTaxClass, DeleteTaxClass, CreateShippingMethod } from './application/setup.usecases.js';
 import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
 import { GetOrderHistory } from './application/get-order-history.usecase.js';
 import { AddOrderNote } from './application/add-order-note.usecase.js';
@@ -70,6 +70,7 @@ import {
   createInvoiceSchema,
   sendOrderEmailSchema,
   createTaxClassSchema,
+  updateTaxClassSchema,
   createShippingMethodSchema,
   listOrdersQuerySchema,
   exportOrdersQuerySchema,
@@ -99,7 +100,8 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const customers = new PrismaCustomerLookup(db);
   const adminUsers = new PrismaAdminUserLookup(db);
   const taxClassLookup = new PrismaTaxClassLookup(db);
-  const taxCalculator = new NativeTaxCalculator(taxClassLookup);
+  const websiteTaxConfigLookup = new PrismaWebsiteTaxConfigLookup(db);
+  const taxCalculator = new NativeGstTaxCalculator(taxClassLookup, websiteTaxConfigLookup);
   const shippingCalculator = new NativeShippingCalculator(db);
   const paymentGateway = new TestPaymentGateway();
   const taxClasses = new PrismaTaxClassRepository(db);
@@ -153,14 +155,17 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
+  const listTaxClasses = new ListTaxClasses(taxClasses);
+  const updateTaxClass = new UpdateTaxClass(taxClasses);
+  const deleteTaxClass = new DeleteTaxClass(taxClasses);
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
   const getOrderHistory = new GetOrderHistory(orders);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
-  const createInvoice = new CreateInvoice(orders, adminUsers, pdfRenderer, pdfStorage);
+  const createInvoice = new CreateInvoice(orders, adminUsers, pdfRenderer, pdfStorage, websiteTaxConfigLookup);
   const listInvoices = new ListInvoices(orders);
   const getInvoice = new GetInvoice(orders);
   const getInvoicePdfUrl = new GetInvoicePdfUrl(orders, mediaUrlResolver);
-  const regenerateInvoice = new RegenerateInvoice(orders, pdfRenderer, pdfStorage);
+  const regenerateInvoice = new RegenerateInvoice(orders, pdfRenderer, pdfStorage, websiteTaxConfigLookup);
   const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
   const emailSender = new SimulatedEmailSender();
   const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
@@ -178,6 +183,26 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     asyncHandler(async (req, res) => {
       const body = parse(createTaxClassSchema, req.body);
       res.status(201).json({ data: await createTaxClass.execute(body) });
+    }),
+  );
+  admin.get(
+    '/tax-classes',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listTaxClasses.execute() });
+    }),
+  );
+  admin.patch(
+    '/tax-classes/:code',
+    asyncHandler(async (req, res) => {
+      const body = parse(updateTaxClassSchema, req.body);
+      res.json({ data: await updateTaxClass.execute(req.params.code!, body) });
+    }),
+  );
+  admin.delete(
+    '/tax-classes/:code',
+    asyncHandler(async (req, res) => {
+      await deleteTaxClass.execute(req.params.code!);
+      res.status(204).send();
     }),
   );
   admin.post(

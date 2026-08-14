@@ -48,6 +48,7 @@ function AddressBlock({ label, address }: { label: string; address: OrderDetail[
           </div>
           <div>{address.country}</div>
           {address.phone ? <div>T: {address.phone}</div> : null}
+          {address.gstin ? <div className="mt-1 text-xs text-muted-foreground">GSTIN: {address.gstin}</div> : null}
         </div>
       ) : (
         <div className="mt-2 text-sm text-muted-foreground">—</div>
@@ -124,12 +125,14 @@ export default async function OrderInformationPage({ params }: { params: Promise
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
+                <TableHead>HSN/SAC</TableHead>
                 <TableHead>Unit Price</TableHead>
                 <TableHead>Ordered</TableHead>
                 <TableHead>Invoiced</TableHead>
                 <TableHead>Shipped</TableHead>
                 <TableHead>Refunded</TableHead>
                 <TableHead>Discount</TableHead>
+                <TableHead>Tax</TableHead>
                 <TableHead className="text-right">Subtotal</TableHead>
               </TableRow>
             </TableHeader>
@@ -140,6 +143,7 @@ export default async function OrderInformationPage({ params }: { params: Promise
                     <div className="font-medium">{line.name}</div>
                     <div className="text-xs text-muted-foreground">SKU: {line.sku}</div>
                   </TableCell>
+                  <TableCell className="text-muted-foreground">{line.hsnCode ?? '—'}</TableCell>
                   <TableCell>
                     {order.currency} {line.unitPrice}
                   </TableCell>
@@ -149,6 +153,9 @@ export default async function OrderInformationPage({ params }: { params: Promise
                   <TableCell>{line.refundedQty}</TableCell>
                   <TableCell>
                     {order.currency} {line.discountAmount}
+                  </TableCell>
+                  <TableCell>
+                    {order.currency} {line.taxAmount}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {order.currency} {line.rowTotal}
@@ -187,7 +194,17 @@ export default async function OrderInformationPage({ params }: { params: Promise
             <InfoRow label="Subtotal" value={`${order.currency} ${order.subtotal}`} />
             <InfoRow label={order.couponCode ? `Discount (${order.couponCode})` : 'Discount'} value={`-${order.currency} ${order.discountTotal}`} />
             <InfoRow label="Shipping & Handling" value={`${order.currency} ${order.shippingTotal}`} />
-            <InfoRow label="Tax" value={`${order.currency} ${order.taxTotal}`} />
+            {order.taxLines.length > 0 ? (
+              order.taxLines.map((t, i) => (
+                <InfoRow
+                  key={`${t.taxClassCode}-${t.taxType}-${i}`}
+                  label={`${t.taxType ?? 'Tax'} @ ${(Number(t.rate) * 100).toFixed(2)}% (${t.taxClassCode})`}
+                  value={`${order.currency} ${t.amount}`}
+                />
+              ))
+            ) : (
+              <InfoRow label="Tax" value={`${order.currency} ${order.taxTotal}`} />
+            )}
             <InfoRow label={<span className="font-semibold">Grand Total</span>} value={<span className="font-bold">{order.currency} {order.grandTotal}</span>} />
             <InfoRow label="Total Paid" value={`${order.currency} ${paidTotal.toFixed(4)}`} />
             <InfoRow label="Total Refunded" value={`${order.currency} ${refundedTotal.toFixed(4)}`} />

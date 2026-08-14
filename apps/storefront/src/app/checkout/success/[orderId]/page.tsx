@@ -58,10 +58,19 @@ export default async function CheckoutSuccessPage({ params }: Props) {
             <span>Shipping</span>
             <span>{formatPrice(order.shippingTotal, order.currency)}</span>
           </div>
-          <div className="flex justify-between text-muted-foreground">
-            <span>Tax</span>
-            <span>{formatPrice(order.taxTotal, order.currency)}</span>
-          </div>
+          {order.taxLines.length > 0 ? (
+            order.taxLines.map((t, i) => (
+              <div key={`${t.taxClassCode}-${t.taxType}-${i}`} className="flex justify-between text-muted-foreground">
+                <span>{t.taxType ?? 'Tax'} ({(Number(t.rate) * 100).toFixed(2)}%)</span>
+                <span>{formatPrice(t.amount, order.currency)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-between text-muted-foreground">
+              <span>Tax</span>
+              <span>{formatPrice(order.taxTotal, order.currency)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base font-bold">
             <span>Total</span>
             <span>{formatPrice(order.grandTotal, order.currency)}</span>

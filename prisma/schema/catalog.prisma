@@ -140,7 +140,11 @@ model Product {
   attributeSetId BigInt            @map("attribute_set_id")
   status         ProductStatus     @default(DRAFT)
   visibility     ProductVisibility @default(BOTH)
-  taxClassId     BigInt?           @map("tax_class_id") // FK -> tax_class (later phase)
+  taxClassId     BigInt?           @map("tax_class_id") // FK -> tax_class
+  /// HSN (goods) or SAC (services) code — India GST invoice requirement,
+  /// independent of taxClassId (many different HSN chapters can share one
+  /// rate slab). Snapshotted onto OrderLine.hsnCode at order-creation time.
+  hsnCode        String?           @map("hsn_code") @db.VarChar(8)
   weight         Decimal?          @db.Decimal(12, 4)
   isDigital      Boolean           @default(false) @map("is_digital")
   isVirtual      Boolean           @default(false) @map("is_virtual")

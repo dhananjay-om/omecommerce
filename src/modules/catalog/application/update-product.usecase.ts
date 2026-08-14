@@ -3,9 +3,9 @@ import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js
 import { toView } from './create-product.usecase.js';
 import type { UpdateProductCommand, ProductView } from './dto.js';
 
-function parseAttributeSetId(value: string): bigint {
+function parseNumericId(value: string, field: string): bigint {
   if (!/^\d+$/.test(value)) {
-    throw new ValidationError('invalid attributeSetId', [{ path: 'attributeSetId', message: 'expected numeric id' }]);
+    throw new ValidationError(`invalid ${field}`, [{ path: field, message: 'expected numeric id' }]);
   }
   return BigInt(value);
 }
@@ -42,8 +42,10 @@ export class UpdateProduct {
       status: cmd.status,
       visibility: cmd.visibility,
       weight: cmd.weight,
-      attributeSetId: cmd.attributeSetId !== undefined ? parseAttributeSetId(cmd.attributeSetId) : undefined,
+      attributeSetId: cmd.attributeSetId !== undefined ? parseNumericId(cmd.attributeSetId, 'attributeSetId') : undefined,
       brandId,
+      taxClassId: cmd.taxClassId !== undefined ? (cmd.taxClassId === null ? null : parseNumericId(cmd.taxClassId, 'taxClassId')) : undefined,
+      hsnCode: cmd.hsnCode,
     });
     return toView(updated);
   }

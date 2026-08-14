@@ -8,6 +8,9 @@ export interface CheckoutAddress {
   line2?: string | null;
   city: string;
   region?: string | null;
+  /** 2-digit CBIC GST state code — feeds the CGST/SGST-vs-IGST determination. */
+  stateCode?: string | null;
+  gstin?: string | null;
   postalCode: string;
   country: string;
   phone?: string | null;

@@ -20,3 +20,17 @@ export interface CurrencyView {
   minorUnits: number;
   isDefault: boolean;
 }
+
+export interface WebsiteView {
+  publicId: string;
+  code: string;
+  name: string;
+  gstin: string | null;
+  originStateCode: string | null;
+}
+
+export interface UpdateWebsiteTaxSettingsCommand {
+  code: string;
+  gstin?: string | null;
+  originStateCode?: string | null;
+}

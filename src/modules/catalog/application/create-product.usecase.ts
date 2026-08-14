@@ -29,6 +29,8 @@ export class CreateProduct {
       visibility: cmd.visibility,
       nameDefault: cmd.nameDefault ?? null,
       weight: cmd.weight ?? null,
+      taxClassId: cmd.taxClassId ? parseId(cmd.taxClassId, 'taxClassId') : null,
+      hsnCode: cmd.hsnCode ?? null,
     });
     const saved = await this.products.create(product);
     // Catalog's first outbox event (Stage 4) — consumed by the search indexer.
@@ -56,5 +58,7 @@ export function toView(product: Product): ProductView {
     visibility: p.visibility,
     name: p.nameDefault,
     weight: p.weight,
+    taxClassId: p.taxClassId?.toString() ?? null,
+    hsnCode: p.hsnCode,
   };
 }

@@ -1,4 +1,4 @@
-import type { OrderRepository } from '../domain/repositories.js';
+import type { OrderRepository, WebsiteTaxConfigLookup } from '../domain/repositories.js';
 import type { PdfRenderer, PdfStorage } from '../domain/ports.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { buildInvoiceHtml } from '../infrastructure/invoice-template.js';
@@ -11,6 +11,7 @@ export class RegenerateInvoice {
     private readonly orders: OrderRepository,
     private readonly pdfRenderer: PdfRenderer,
     private readonly pdfStorage: PdfStorage,
+    private readonly websiteTaxConfig: WebsiteTaxConfigLookup,
   ) {}
 
   async execute(orderPublicId: string, invoicePublicId: string): Promise<OrderViewDto> {
@@ -19,7 +20,8 @@ export class RegenerateInvoice {
     const invoice = order.invoices.find((inv) => inv.publicId === invoicePublicId);
     if (!invoice) throw new NotFoundError('Invoice', invoicePublicId);
 
-    const html = buildInvoiceHtml(order, invoice);
+    const sellerConfig = await this.websiteTaxConfig.byId(order.websiteId);
+    const html = buildInvoiceHtml(order, invoice, sellerConfig?.gstin ?? null);
     const pdf = await this.pdfRenderer.render(html);
     const key = invoice.pdfStorageKey ?? `invoices/${order.publicId}/${invoice.publicId}.pdf`;
     await this.pdfStorage.store(key, pdf);

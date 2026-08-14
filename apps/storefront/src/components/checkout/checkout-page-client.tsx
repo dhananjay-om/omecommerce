@@ -21,6 +21,11 @@ import type { ShippingMethod } from '@/types/order';
 
 const TOTAL_STEPS = 5;
 
+/** An untouched optional field is '' (react-hook-form's default), which the backend's format regex would reject — only a real value or "not sent" is valid. */
+function blankToUndefined(value: string | undefined): string | undefined {
+  return value ? value : undefined;
+}
+
 export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; shippingMethods: ShippingMethod[] }) {
   const router = useRouter();
   const hydrateCart = useCartStore((s) => s.hydrate);
@@ -39,9 +44,9 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       email: '',
-      shippingAddress: { name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: '', phone: '' },
+      shippingAddress: { name: '', line1: '', line2: '', city: '', region: '', stateCode: '', gstin: '', postalCode: '', country: '', phone: '' },
       sameAsShipping: true,
-      billingAddress: { name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: '', phone: '' },
+      billingAddress: { name: '', line1: '', line2: '', city: '', region: '', stateCode: '', gstin: '', postalCode: '', country: '', phone: '' },
       shippingMethodCode: shippingMethods[0]?.code ?? '',
       paymentMethod: 'test_card',
       testScenario: 'approve',
@@ -79,7 +84,15 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     try {
-      const shippingAddress = { ...values.shippingAddress, country: values.shippingAddress.country.toUpperCase() };
+      // stateCode/gstin are optional but format-validated server-side (2-digit
+      // code / real GSTIN pattern) — an untouched form field is '' (react-hook-form's
+      // default), which fails that regex, so a blank must become undefined, not ''.
+      const shippingAddress = {
+        ...values.shippingAddress,
+        country: values.shippingAddress.country.toUpperCase(),
+        stateCode: blankToUndefined(values.shippingAddress.stateCode),
+        gstin: blankToUndefined(values.shippingAddress.gstin),
+      };
       const billingAddress = values.sameAsShipping
         ? shippingAddress
         : {
@@ -88,6 +101,8 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             line2: values.billingAddress.line2,
             city: values.billingAddress.city ?? '',
             region: values.billingAddress.region,
+            stateCode: blankToUndefined(values.billingAddress.stateCode),
+            gstin: blankToUndefined(values.billingAddress.gstin),
             postalCode: values.billingAddress.postalCode ?? '',
             country: (values.billingAddress.country ?? '').toUpperCase(),
             phone: values.billingAddress.phone,

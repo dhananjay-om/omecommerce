@@ -41,3 +41,20 @@ export interface CurrencyRepository {
    *  ConflictError — the database is already the single source of truth for "is this in use". */
   delete(code: string): Promise<void>;
 }
+
+export interface WebsiteInfo {
+  publicId: string;
+  code: string;
+  name: string;
+  gstin: string | null;
+  originStateCode: string | null;
+}
+
+/** Website/Store View management is still a deliberate later addition (see
+ *  store.module.ts) — this is scoped to exactly the GST registration fields
+ *  (list to pick which website, update to set its gstin/originStateCode),
+ *  not full Website CRUD. */
+export interface WebsiteRepository {
+  list(): Promise<WebsiteInfo[]>;
+  update(code: string, input: { gstin?: string | null; originStateCode?: string | null }): Promise<WebsiteInfo>;
+}

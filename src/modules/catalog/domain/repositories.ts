@@ -26,6 +26,11 @@ export interface ProductListItem {
   quantity: number;
   /** Sum of available (on_hand - reserved) stock across all variants/warehouses. */
   salableQuantity: number;
+  /** Whether a GST tax class is assigned — surfaced on the admin product list so
+   *  gaps are visible (a missing tax class means this product is silently
+   *  charged 0 GST at checkout, see native-tax-calculator.ts's documented
+   *  behavior). Not the class itself, just presence — keeping the list query cheap. */
+  hasTaxClass: boolean;
 }
 
 export type ListProductsSortBy = 'sku' | 'nameDefault' | 'createdAt' | 'status';
@@ -58,6 +63,9 @@ export interface UpdateProductInput {
   attributeSetId?: bigint;
   /** `undefined` leaves it untouched; `null` clears it (plan/14 Phase 0b). */
   brandId?: bigint | null;
+  /** `undefined` leaves it untouched; `null` clears it (same pairing convention as brandId). */
+  taxClassId?: bigint | null;
+  hsnCode?: string | null;
 }
 
 /** Persistence port for the Product aggregate (implemented in infrastructure). */

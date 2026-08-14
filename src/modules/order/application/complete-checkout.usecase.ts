@@ -126,7 +126,7 @@ export class CompleteCheckout {
     // Resolved once, up front — needed both for the coupon's per-line context
     // (productId per line) and for building OrderLine inputs below, so the
     // lines-building loop further down reuses this map instead of re-querying.
-    const variantById = new Map<string, { sku: string; nameDefault: string | null; productId: bigint }>();
+    const variantById = new Map<string, { sku: string; nameDefault: string | null; productId: bigint; hsnCode: string | null }>();
     for (const line of pricedLines) {
       const variant = await this.variants.byId(line.variantId);
       if (!variant) throw new NotFoundError('ProductVariant', line.variantId.toString());
@@ -162,8 +162,13 @@ export class CompleteCheckout {
     const discountTotalMinor = discount?.discountAmountMinor ?? 0n;
     const discountByVariant = new Map((discount?.lineDiscounts ?? []).map((d) => [d.variantId.toString(), d.discountAmountMinor]));
 
+    // GST split (CGST+SGST vs IGST) depends on the shipping state vs this
+    // website's registered origin state — resolved inside the calculator
+    // (NativeGstTaxCalculator), this call site only has to supply both state
+    // codes, not the comparison itself.
     const taxResults = await this.taxCalculator.calculate(
       pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
+      { websiteId: ctx.websiteId, destinationStateCode: cmd.shippingAddress.stateCode ?? null },
     );
     const taxByVariant = new Map(taxResults.map((t) => [t.variantId.toString(), t]));
     const taxTotalMinor = addMinor(...taxResults.map((t) => t.amountMinor));
@@ -187,17 +192,26 @@ export class CompleteCheckout {
         discountAmountMinor: discountByVariant.get(line.variantId.toString()) ?? 0n,
         rowTotalMinor: addMinor(line.subtotalMinor, tax.amountMinor),
         taxClassCode: tax.taxClassCode,
+        hsnCode: variant.hsnCode,
       });
     }
 
-    const taxLinesByClass = new Map<string, { rateMinor: bigint; amountMinor: bigint }>();
+    // Grouped by (taxClassCode, taxType) — not just taxClassCode — so an
+    // intra-state order writes 2 OrderTaxLine rows per class (CGST + SGST,
+    // each half the rate) and an inter-state one writes 1 (IGST, full rate).
+    const taxLinesByClass = new Map<string, { taxClassCode: string; taxType: 'CGST' | 'SGST' | 'IGST'; rateMinor: bigint; amountMinor: bigint }>();
     for (const t of taxResults) {
       if (!t.taxClassCode) continue;
-      const existing = taxLinesByClass.get(t.taxClassCode);
-      taxLinesByClass.set(t.taxClassCode, {
-        rateMinor: t.rateMinor,
-        amountMinor: (existing?.amountMinor ?? 0n) + t.amountMinor,
-      });
+      for (const b of t.breakdown) {
+        const key = `${t.taxClassCode}:${b.type}`;
+        const existing = taxLinesByClass.get(key);
+        taxLinesByClass.set(key, {
+          taxClassCode: t.taxClassCode,
+          taxType: b.type,
+          rateMinor: b.rateMinor,
+          amountMinor: (existing?.amountMinor ?? 0n) + b.amountMinor,
+        });
+      }
     }
 
     const orderNumber = await this.orders.nextOrderNumber(ctx.websiteId);
@@ -226,8 +240,9 @@ export class CompleteCheckout {
           { type: 'BILLING', ...cmd.billingAddress },
           { type: 'SHIPPING', ...cmd.shippingAddress },
         ],
-        taxLines: Array.from(taxLinesByClass.entries()).map(([taxClassCode, v]) => ({
-          taxClassCode,
+        taxLines: Array.from(taxLinesByClass.values()).map((v) => ({
+          taxClassCode: v.taxClassCode,
+          taxType: v.taxType,
           rateMinor: v.rateMinor,
           amountMinor: v.amountMinor,
         })),

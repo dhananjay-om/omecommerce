@@ -13,6 +13,14 @@ export interface ProductProps {
   weight: string | null;
   isDigital: boolean;
   isVirtual: boolean;
+  /** GST rate class (src/modules/order's TaxClass, cross-aggregate scalar FK —
+   *  same "scope scalar, FK added in raw SQL" convention as every other
+   *  cross-module reference in this schema). Null = no GST charged (e.g.
+   *  exempt goods) — see native-tax-calculator.ts's documented silent-zero behavior. */
+  taxClassId: bigint | null;
+  /** HSN (goods) / SAC (services) code — independent of taxClassId, a legal
+   *  India GST invoice requirement. Snapshotted onto OrderLine at checkout. */
+  hsnCode: string | null;
 }
 
 export interface CreateProductInput {
@@ -23,6 +31,8 @@ export interface CreateProductInput {
   visibility?: ProductVisibility;
   nameDefault?: string | null;
   weight?: string | null;
+  taxClassId?: bigint | null;
+  hsnCode?: string | null;
 }
 
 /**
@@ -54,6 +64,8 @@ export class Product {
       weight: input.weight ?? null,
       isDigital: input.type === ProductType.DIGITAL,
       isVirtual: input.type === ProductType.VIRTUAL,
+      taxClassId: input.taxClassId ?? null,
+      hsnCode: input.hsnCode ?? null,
     });
   }
 
