@@ -29,6 +29,18 @@ export interface CartView {
   lines: CartLineDto[];
   /** Sum of every line's `lineTotal` that resolved to a real price; null if the cart has no priced lines yet. */
   subtotal: string | null;
+  /** Applied coupon code, if any (Cart.couponCode) — present even if it's since become
+   *  invalid (see couponError). */
+  couponCode: string | null;
+  /** Live-evaluated, never persisted — null when no coupon is applied or it's invalid. */
+  discountTotal: string | null;
+  /** Set instead of throwing when an applied coupon is no longer valid (expired, hit its
+   *  usage limit, etc. since it was applied) — a cart read must never break because of
+   *  this; checkout re-validates for real and hard-fails there instead. */
+  couponError: string | null;
+  /** subtotal - discountTotal, or subtotal unchanged when no valid discount applies. Excludes
+   *  tax/shipping (only known at checkout) — same "estimated" framing the cart page already uses. */
+  estimatedTotal: string | null;
 }
 
 export interface AddCartLineCommand {
@@ -178,6 +190,7 @@ export interface OrderViewDto {
   shippingTotal: string;
   grandTotal: string;
   shippingMethodCode: string | null;
+  couponCode: string | null;
   customerIp: string | null;
   placedAt: string;
   closedAt: string | null;

@@ -3,6 +3,7 @@ import type { TaxCalculator, ShippingCalculator, PaymentGateway } from '../domai
 import type { StoreContextResolver, StoreViewContext } from '../../../shared/application/scope.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { StockLedger, ReservationHandle } from '../../inventory/domain/repositories.js';
+import type { DiscountCalculator } from '../../coupon/domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import { PaymentDeclinedError } from '../domain/errors.js';
 import { addMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
@@ -50,6 +51,7 @@ export class CompleteCheckout {
     private readonly shippingCalculator: ShippingCalculator,
     private readonly paymentGateway: PaymentGateway,
     private readonly outbox: OutboxWriter,
+    private readonly discountCalculator: DiscountCalculator,
   ) {}
 
   async execute(cmd: CompleteCheckoutCommand): Promise<OrderViewDto> {
@@ -114,12 +116,27 @@ export class CompleteCheckout {
 
   private async priceAndPlace(
     cmd: CompleteCheckoutCommand,
-    cart: { id: bigint; currency: string; customerId: bigint | null; customerGroupId: bigint | null },
+    cart: { id: bigint; currency: string; customerId: bigint | null; customerGroupId: bigint | null; couponCode: string | null },
     ctx: StoreViewContext,
     pricedLines: PricedLine[],
     reservations: ReservationHandle[],
   ): Promise<OrderViewDto> {
     const subtotalMinor = addMinor(...pricedLines.map((l) => l.subtotalMinor));
+
+    // Coupon evaluated (not redeemed) here — redemption is guarded and only
+    // happens once the order actually exists, right before payment capture (see
+    // below). Tax is intentionally computed on the PRE-discount subtotal — see
+    // coupon.prisma's header comment on this deliberate simplification.
+    const discount = cart.couponCode
+      ? await this.discountCalculator.evaluate({
+          code: cart.couponCode,
+          cartCurrency: cart.currency,
+          subtotalMinor,
+          customerId: cart.customerId,
+          asOf: new Date(),
+        })
+      : null;
+    const discountTotalMinor = discount?.discountAmountMinor ?? 0n;
 
     const taxResults = await this.taxCalculator.calculate(
       pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
@@ -130,7 +147,7 @@ export class CompleteCheckout {
     const shipping = await this.shippingCalculator.quote(cmd.shippingMethodCode, cart.currency);
     if (!shipping) throw new NotFoundError('ShippingMethod', cmd.shippingMethodCode);
 
-    const grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor, shipping.amountMinor);
+    const grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor, shipping.amountMinor, -discountTotalMinor);
 
     const lines = [];
     for (const line of pricedLines) {
@@ -174,10 +191,12 @@ export class CompleteCheckout {
         currency: cart.currency,
         customerIp: cmd.customerIp,
         subtotalMinor,
+        discountTotalMinor,
         taxTotalMinor,
         shippingTotalMinor: shipping.amountMinor,
         grandTotalMinor,
         shippingMethodCode: shipping.methodCode,
+        couponCode: discount?.code ?? null,
         lines,
         addresses: [
           { type: 'BILLING', ...cmd.billingAddress },
@@ -191,6 +210,22 @@ export class CompleteCheckout {
       },
       orderNumber,
     );
+
+    // Coupon usage is only committed once the order actually exists — the guarded
+    // usage-count UPDATE inside redeem() is the authoritative race guard (evaluate()
+    // above was only an optimistic pre-check). Any throw here (limit hit by a
+    // concurrent checkout in between) propagates to execute()'s existing
+    // catch { releaseAll(reservations); throw }, rejecting this checkout before
+    // payment is ever attempted — same failure path as any other mid-saga error.
+    if (discount) {
+      await this.discountCalculator.redeem({
+        couponId: discount.couponId,
+        orderId: order.id,
+        customerId: cart.customerId,
+        currency: cart.currency,
+        discountAmountMinor: discount.discountAmountMinor,
+      });
+    }
 
     // Step 5: attempt payment.
     const payment = await this.paymentGateway.capture({

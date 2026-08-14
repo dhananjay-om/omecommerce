@@ -221,6 +221,24 @@ export interface Currency {
   isDefault: boolean;
 }
 
+export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+
+export interface Coupon {
+  publicId: string;
+  code: string;
+  description: string | null;
+  discountType: CouponDiscountType;
+  value: string;
+  currency: string | null;
+  minSubtotal: string | null;
+  usageLimit: number | null;
+  usageLimitPerCustomer: number | null;
+  usageCount: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  isActive: boolean;
+}
+
 /** One warehouse's stock for a single variant — every active warehouse appears, zeroed if never stocked. */
 export interface VariantStock {
   warehouseCode: string;
@@ -388,6 +406,7 @@ export interface OrderDetail {
   shippingTotal: string;
   grandTotal: string;
   shippingMethodCode: string | null;
+  couponCode: string | null;
   customerIp: string | null;
   placedAt: string;
   closedAt: string | null;

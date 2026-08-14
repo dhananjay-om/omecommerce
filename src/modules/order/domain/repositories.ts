@@ -102,6 +102,8 @@ export interface CartView {
   customerId: bigint | null;
   customerGroupId: bigint | null;
   status: CartStatus;
+  /** Applied coupon code, if any — no FK, revalidated live on every read/checkout. */
+  couponCode: string | null;
   lines: CartLineView[];
 }
 
@@ -120,6 +122,9 @@ export interface CartRepository {
   upsertLine(cartId: bigint, variantId: bigint, qty: number): Promise<void>;
   /** Guarded ACTIVE -> CONVERTED transition; throws if the cart isn't ACTIVE. */
   claimForCheckout(cartId: bigint): Promise<void>;
+  /** null clears the applied coupon. Not itself validated here — callers (ApplyCouponToCart)
+   *  validate via DiscountCalculator.evaluate() first. */
+  setCouponCode(cartId: bigint, code: string | null): Promise<void>;
 }
 
 // --- Order ---
@@ -165,10 +170,12 @@ export interface CreateOrderInput {
   currency: string;
   customerIp?: string | null;
   subtotalMinor: bigint;
+  discountTotalMinor: bigint;
   taxTotalMinor: bigint;
   shippingTotalMinor: bigint;
   grandTotalMinor: bigint;
   shippingMethodCode: string;
+  couponCode: string | null;
   lines: OrderLineInput[];
   addresses: OrderAddressInput[];
   taxLines: OrderTaxLineInput[];
@@ -362,6 +369,7 @@ export interface OrderView {
   shippingTotal: string;
   grandTotal: string;
   shippingMethodCode: string | null;
+  couponCode: string | null;
   customerIp: string | null;
   placedAt: Date;
   closedAt: Date | null;

@@ -185,7 +185,7 @@ export default async function OrderInformationPage({ params }: { params: Promise
         <SectionCard title="Order Totals">
           <div className="overflow-hidden rounded-lg border">
             <InfoRow label="Subtotal" value={`${order.currency} ${order.subtotal}`} />
-            <InfoRow label="Discount" value={`-${order.currency} ${order.discountTotal}`} />
+            <InfoRow label={order.couponCode ? `Discount (${order.couponCode})` : 'Discount'} value={`-${order.currency} ${order.discountTotal}`} />
             <InfoRow label="Shipping & Handling" value={`${order.currency} ${order.shippingTotal}`} />
             <InfoRow label="Tax" value={`${order.currency} ${order.taxTotal}`} />
             <InfoRow label={<span className="font-semibold">Grand Total</span>} value={<span className="font-bold">{order.currency} {order.grandTotal}</span>} />

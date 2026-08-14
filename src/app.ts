@@ -11,6 +11,7 @@ import { createCatalogModule } from './modules/catalog/catalog.module.js';
 import { createStoreModule } from './modules/store/store.module.js';
 import { createInventoryModule } from './modules/inventory/inventory.module.js';
 import { createPricingModule } from './modules/pricing/pricing.module.js';
+import { createCouponModule } from './modules/coupon/coupon.module.js';
 import { createOrderModule } from './modules/order/order.module.js';
 import { createAuthModule } from './modules/auth/auth.module.js';
 import { createSearchModule } from './modules/search/search.module.js';
@@ -59,6 +60,9 @@ export function createApp(): Express {
 
   const pricing = createPricingModule(prisma);
   app.use('/admin/v1', pricing.admin);
+
+  const coupon = createCouponModule(prisma, auth.authorize);
+  app.use('/admin/v1', coupon.admin);
 
   const customer = createCustomerModule(prisma);
   app.use('/admin/v1', customer.admin);

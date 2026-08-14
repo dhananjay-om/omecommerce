@@ -20,3 +20,13 @@ export async function removeLine(variantId: string): Promise<Cart> {
   const res = await api.delete<Cart>(`/cart/lines/${variantId}`);
   return res.data;
 }
+
+export async function applyCoupon(code: string): Promise<Cart> {
+  const res = await api.post<Cart>('/cart/coupon', { code });
+  return res.data;
+}
+
+export async function removeCoupon(): Promise<Cart> {
+  const res = await api.delete<Cart>('/cart/coupon');
+  return res.data;
+}

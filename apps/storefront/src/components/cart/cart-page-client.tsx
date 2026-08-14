@@ -1,33 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useCartStore, countItems } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
 import { CartLineRow } from './cart-line-row';
+import { CouponField } from './coupon-field';
 import type { Cart } from '@/types/cart';
-
-/** Coupon field is present but non-functional — no promotion engine exists (plan/14 Phase 5 decision). */
-function CouponField() {
-  const [code, setCode] = useState('');
-  return (
-    <form
-      className="flex gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (code.trim()) toast.info('Coupons are not available yet.');
-      }}
-    >
-      <Input placeholder="Coupon code" value={code} onChange={(e) => setCode(e.target.value)} />
-      <Button type="submit" variant="outline">
-        Apply
-      </Button>
-    </form>
-  );
-}
 
 export function CartPageClient({ initialCart }: { initialCart: Cart }) {
   const cart = useCartStore((s) => s.cart);
@@ -72,6 +52,12 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
               <span className="text-muted-foreground">Subtotal</span>
               <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
             </div>
+            {displayCart.discountTotal ? (
+              <div className="flex justify-between text-success">
+                <span>Discount{displayCart.couponCode ? ` (${displayCart.couponCode})` : ''}</span>
+                <span>-{formatPrice(displayCart.discountTotal, displayCart.currency)}</span>
+              </div>
+            ) : null}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
               <span className="text-muted-foreground">Calculated at checkout</span>
@@ -83,10 +69,10 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
           </div>
           <div className="flex justify-between border-t pt-3 text-base font-bold">
             <span>Estimated Total</span>
-            <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
+            <span>{displayCart.estimatedTotal ? formatPrice(displayCart.estimatedTotal, displayCart.currency) : '—'}</span>
           </div>
 
-          <CouponField />
+          <CouponField cart={displayCart} />
 
           <Button variant="cta" size="lg" render={<Link href="/checkout" />} nativeButton={false}>
             Proceed to Checkout

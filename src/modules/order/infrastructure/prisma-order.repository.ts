@@ -68,10 +68,12 @@ export class PrismaOrderRepository implements OrderRepository {
           currency: input.currency,
           customerIp: input.customerIp ?? null,
           subtotal: fromMinorUnits(input.subtotalMinor),
+          discountTotal: fromMinorUnits(input.discountTotalMinor),
           taxTotal: fromMinorUnits(input.taxTotalMinor),
           shippingTotal: fromMinorUnits(input.shippingTotalMinor),
           grandTotal: fromMinorUnits(input.grandTotalMinor),
           shippingMethodCode: input.shippingMethodCode,
+          couponCode: input.couponCode,
         },
       });
       await Promise.all(
@@ -434,6 +436,7 @@ function toView(order: OrderDetailRow): OrderView {
     shippingTotal: formatDecimal(order.shippingTotal),
     grandTotal: formatDecimal(order.grandTotal),
     shippingMethodCode: order.shippingMethodCode,
+    couponCode: order.couponCode,
     customerIp: order.customerIp,
     placedAt: order.placedAt,
     closedAt: order.closedAt,

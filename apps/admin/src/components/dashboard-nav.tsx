@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   FolderTree,
   Coins,
+  Percent,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
     items: [
       { href: '/orders', label: 'Orders', icon: ShoppingCart },
       { href: '/customers', label: 'Customers', icon: Users },
+      { href: '/coupons', label: 'Coupons', icon: Percent },
     ],
   },
   {

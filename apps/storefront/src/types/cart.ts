@@ -15,4 +15,8 @@ export interface Cart {
   status: string;
   lines: CartLine[];
   subtotal: string | null;
+  couponCode: string | null;
+  discountTotal: string | null;
+  couponError: string | null;
+  estimatedTotal: string | null;
 }
