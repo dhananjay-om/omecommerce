@@ -1,9 +1,10 @@
+import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
-import type { Attribute, Category, Coupon } from '@/lib/types';
+import type { Coupon } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { NewCouponDialog } from './new-coupon-dialog';
-import { EditCouponDialog } from './edit-coupon-dialog';
+import { cn } from '@/lib/utils';
 import { DeleteCouponDialog } from './delete-coupon-dialog';
 
 function formatValue(c: Coupon): string {
@@ -18,11 +19,7 @@ function formatWindow(c: Coupon): string {
 }
 
 export default async function CouponsPage() {
-  const [coupons, attributes, categories] = await Promise.all([
-    apiGet<Coupon[]>('/admin/v1/coupons'),
-    apiGet<Attribute[]>('/admin/v1/attributes'),
-    apiGet<Category[]>('/admin/v1/categories'),
-  ]);
+  const coupons = await apiGet<Coupon[]>('/admin/v1/coupons');
 
   return (
     <div>
@@ -33,7 +30,9 @@ export default async function CouponsPage() {
             Discount codes for the whole cart or specific matching items — manually entered or applied automatically.
           </p>
         </div>
-        <NewCouponDialog attributes={attributes} categories={categories} />
+        <Link href="/coupons/new" className={cn(buttonVariants())}>
+          New Coupon
+        </Link>
       </div>
 
       <div className="mt-6 rounded-md border">
@@ -79,7 +78,9 @@ export default async function CouponsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <EditCouponDialog coupon={c} attributes={attributes} categories={categories} />
+                      <Link href={`/coupons/${c.code}/edit`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+                        Edit
+                      </Link>
                       <DeleteCouponDialog code={c.code} />
                     </div>
                   </TableCell>
