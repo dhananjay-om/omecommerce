@@ -14,6 +14,14 @@ import {
 
 const decimalString = z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount, e.g. "2.5"');
 
+/** Normalizes a whitespace-only or blank string to undefined before the real
+ *  schema sees it — an untouched optional field can arrive as '' or ' ', which
+ *  would otherwise be persisted as a blank string instead of "not provided."
+ *  Own-copy per module, same convention as the order/store modules' copies. */
+function blankToUndefined(schema: z.ZodTypeAny) {
+  return z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), schema);
+}
+
 export const createProductSchema = z.object({
   type: z.nativeEnum(ProductType),
   sku: z.string().min(1).max(128),
@@ -166,16 +174,33 @@ export const createCategorySchema = z.object({
   type: z.nativeEnum(CategoryType).optional(),
   sortMode: z.nativeEnum(CategorySortMode).optional(),
   position: z.number().int().optional(),
+  description: blankToUndefined(z.string().max(10_000).nullish()),
+  imageMediaKey: blankToUndefined(z.string().max(500).nullish()),
+  metaTitle: blankToUndefined(z.string().max(255).nullish()),
+  metaDescription: blankToUndefined(z.string().max(2000).nullish()),
+  metaKeywords: blankToUndefined(z.string().max(255).nullish()),
+  includeInMenu: z.boolean().optional(),
 });
 
 export const updateCategorySchema = z.object({
   nameDefault: z.string().max(512).nullish(),
   sortMode: z.nativeEnum(CategorySortMode).optional(),
   position: z.number().int().optional(),
+  description: blankToUndefined(z.string().max(10_000).nullish()),
+  imageMediaKey: blankToUndefined(z.string().max(500).nullish()),
+  metaTitle: blankToUndefined(z.string().max(255).nullish()),
+  metaDescription: blankToUndefined(z.string().max(2000).nullish()),
+  metaKeywords: blankToUndefined(z.string().max(255).nullish()),
+  includeInMenu: z.boolean().optional(),
 });
 
 export const reparentCategorySchema = z.object({
   newParentId: z.string().uuid().nullable(),
+});
+
+export const requestCategoryImageUploadSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(128),
 });
 
 export const setProductCategoriesSchema = z.object({

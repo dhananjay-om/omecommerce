@@ -52,6 +52,7 @@ import { ReparentCategory } from './application/reparent-category.usecase.js';
 import { DeleteCategory } from './application/delete-category.usecase.js';
 import { SetProductCategories } from './application/set-product-categories.usecase.js';
 import { GetCategoryBySlug } from './application/get-category-by-slug.usecase.js';
+import { RequestCategoryImageUpload } from './application/request-category-image-upload.usecase.js';
 import { CreateBrand } from './application/create-brand.usecase.js';
 import { ListBrands } from './application/list-brands.usecase.js';
 import { UpdateBrand } from './application/update-brand.usecase.js';
@@ -80,6 +81,7 @@ import {
   createCategorySchema,
   updateCategorySchema,
   reparentCategorySchema,
+  requestCategoryImageUploadSchema,
   setProductCategoriesSchema,
   createBrandSchema,
   updateBrandSchema,
@@ -154,6 +156,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const deleteCategory = new DeleteCategory(categories);
   const getCategoryBySlug = new GetCategoryBySlug(categories);
   const setProductCategories = new SetProductCategories(products, categories, productCategories);
+  const requestCategoryImageUpload = new RequestCategoryImageUpload(categories);
   const createBrand = new CreateBrand(brands);
   const listBrands = new ListBrands(brands);
   const updateBrand = new UpdateBrand(brands);
@@ -381,6 +384,15 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     asyncHandler(async (req, res) => {
       await deleteCategory.execute(req.params.publicId!);
       res.status(204).send();
+    }),
+  );
+  admin.post(
+    '/categories/:publicId/image-upload-url',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(requestCategoryImageUploadSchema, req.body);
+      const result = await requestCategoryImageUpload.execute({ publicId: req.params.publicId!, ...body });
+      res.status(201).json({ data: result });
     }),
   );
   admin.put(

@@ -14,6 +14,7 @@ export function PlpShell({
   result,
   brands,
   breadcrumb,
+  banner,
 }: {
   basePath: string;
   params: PlpParams;
@@ -21,6 +22,10 @@ export function PlpShell({
   result: SearchResult;
   brands: Brand[];
   breadcrumb?: Category[];
+  /** Optional category image + description shown above the grid — only
+   *  collections pages pass this today; other PlpShell callers (search,
+   *  brand pages) omit it and the layout is unchanged for them. */
+  banner?: { imageUrl: string | null; description: string | null };
 }) {
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
 
@@ -40,6 +45,16 @@ export function PlpShell({
             </span>
           ))}
         </nav>
+      ) : null}
+
+      {banner && (banner.imageUrl || banner.description) ? (
+        <div className="mb-6 overflow-hidden rounded-lg border">
+          {banner.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
+            <img src={banner.imageUrl} alt={heading} className="h-48 w-full object-cover sm:h-64" />
+          ) : null}
+          {banner.description ? <p className="whitespace-pre-line px-4 py-3 text-sm text-muted-foreground">{banner.description}</p> : null}
+        </div>
       ) : null}
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">

@@ -69,10 +69,18 @@ export type CategorySortMode = 'POSITION' | 'NAME' | 'PRICE' | 'NEWEST';
 export interface Category {
   publicId: string;
   parentId: string | null;
+  slug: string;
   type: CategoryType;
   sortMode: CategorySortMode;
   position: number;
   nameDefault: string | null;
+  description: string | null;
+  imageMediaKey: string | null;
+  imageUrl: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  includeInMenu: boolean;
   createdAt: string;
 }
 

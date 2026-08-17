@@ -12,9 +12,7 @@ export class GetCategoryBySlug {
     if (!category) throw new NotFoundError('category', slug);
 
     const ancestors = await this.categories.getAncestors(category.id);
-    return {
-      category: toCategoryView(category),
-      breadcrumb: ancestors.map(toCategoryView),
-    };
+    const [categoryView, breadcrumb] = await Promise.all([toCategoryView(category), Promise.all(ancestors.map(toCategoryView))]);
+    return { category: categoryView, breadcrumb };
   }
 }

@@ -12,7 +12,14 @@ import { MiniCart } from './mini-cart';
 import { MobileMenu } from './mobile-menu';
 
 export function MainHeader({ categories }: { categories: Category[] }) {
-  const tree = buildCategoryTree(categories);
+  // Nav-only visibility filter — excluding a category here also drops its
+  // whole subtree, since buildCategoryTree groups children by parentId and a
+  // hidden parent's children simply won't match anything in the filtered
+  // list. Filtering lives only at this call site: sitemap.ts, the homepage's
+  // featured categories, and the PDP breadcrumb all call listCategories()
+  // directly and must keep seeing every category regardless of menu visibility.
+  const menuCategories = categories.filter((c) => c.includeInMenu);
+  const tree = buildCategoryTree(menuCategories);
 
   return (
     <div className="border-b bg-background">

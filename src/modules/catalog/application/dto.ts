@@ -345,6 +345,12 @@ export interface CreateCategoryCommand {
   type?: CategoryType;
   sortMode?: CategorySortMode;
   position?: number;
+  description?: string | null;
+  imageMediaKey?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  metaKeywords?: string | null;
+  includeInMenu?: boolean;
 }
 
 export interface UpdateCategoryCommand {
@@ -352,6 +358,12 @@ export interface UpdateCategoryCommand {
   nameDefault?: string | null;
   sortMode?: CategorySortMode;
   position?: number;
+  description?: string | null;
+  imageMediaKey?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  metaKeywords?: string | null;
+  includeInMenu?: boolean;
 }
 
 export interface ReparentCategoryCommand {
@@ -368,7 +380,27 @@ export interface CategoryView {
   sortMode: CategorySortMode;
   position: number;
   nameDefault: string | null;
+  description: string | null;
+  imageMediaKey: string | null;
+  /** Presigned GET URL for imageMediaKey, resolved live on every read (15-minute
+   *  expiry, same as every other presigned URL in this codebase) — null when no image is set. */
+  imageUrl: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  includeInMenu: boolean;
   createdAt: string;
+}
+
+export interface RequestCategoryImageUploadCommand {
+  publicId: string;
+  filename: string;
+  mimeType: string;
+}
+
+export interface CategoryImageUploadUrl {
+  uploadUrl: string;
+  imageMediaKey: string;
 }
 
 export interface CategoryBreadcrumbView {
