@@ -8,7 +8,6 @@ import 'swiper/css/pagination';
 import { Button } from '@/components/ui/button';
 
 interface Slide {
-  id: string;
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -17,15 +16,12 @@ interface Slide {
   gradient: string;
 }
 
-/**
- * Static content for v1 (plan/14 Phase 2) — there's no banner/slide schema
- * in the backend, and CMS blocks are unstructured strings, not a fit. Wiring
- * this to a real CMS-managed banner entity is a clean, separately-scoped
- * future upgrade.
- */
-const SLIDES: Slide[] = [
+/** Default slides, shown when the admin hasn't set anything under Content >
+ *  Home Page (or the block is missing/unpublished/malformed) — see
+ *  apps/storefront/src/app/page.tsx and lib/home-sections.ts for how the
+ *  CMS-managed override is resolved and validated. */
+const DEFAULT_SLIDES: Slide[] = [
   {
-    id: 'new-season',
     eyebrow: 'New Season',
     title: 'Upgrade Your Everyday',
     subtitle: 'Fresh electronics, apparel, and home essentials — all in one place.',
@@ -34,7 +30,6 @@ const SLIDES: Slide[] = [
     gradient: 'from-primary to-blue-700',
   },
   {
-    id: 'tech-sale',
     eyebrow: 'Limited Time',
     title: 'Up to 30% Off Electronics',
     subtitle: 'Laptops, phones, and audio — priced to move.',
@@ -43,7 +38,6 @@ const SLIDES: Slide[] = [
     gradient: 'from-indigo-600 to-violet-700',
   },
   {
-    id: 'fashion-week',
     eyebrow: 'Just Landed',
     title: 'Fashion for Every Season',
     subtitle: 'New arrivals across men’s and women’s collections.',
@@ -53,7 +47,8 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export function HeroBanner() {
+export function HeroBanner({ slides }: { slides?: Slide[] }) {
+  const activeSlides = slides && slides.length > 0 ? slides : DEFAULT_SLIDES;
   return (
     <Swiper
       modules={[Autoplay, Pagination]}
@@ -62,8 +57,8 @@ export function HeroBanner() {
       loop
       className="hero-banner-swiper"
     >
-      {SLIDES.map((slide) => (
-        <SwiperSlide key={slide.id}>
+      {activeSlides.map((slide, i) => (
+        <SwiperSlide key={i}>
           <div className={`bg-gradient-to-br ${slide.gradient} px-6 py-20 text-white sm:py-28`}>
             <div className="mx-auto flex max-w-7xl flex-col items-start gap-4">
               <span className="text-sm font-semibold tracking-wide uppercase text-white/80">{slide.eyebrow}</span>

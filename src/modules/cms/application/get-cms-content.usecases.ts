@@ -18,7 +18,15 @@ export class GetCmsPage {
     if (!page || page.status !== 'PUBLISHED') {
       throw new NotFoundError('CMS page', handle);
     }
-    return { publicId: page.publicId, handle: page.handle, title: page.title, body: page.body, status: page.status, publishedAt: page.publishedAt?.toISOString() ?? null };
+    return {
+      publicId: page.publicId,
+      handle: page.handle,
+      title: page.title,
+      body: page.body,
+      status: page.status,
+      publishedAt: page.publishedAt?.toISOString() ?? null,
+      updatedAt: page.updatedAt.toISOString(),
+    };
   }
 }
 
@@ -30,6 +38,6 @@ export class GetCmsBlock {
     if (!block || block.status !== 'PUBLISHED') {
       throw new NotFoundError('CMS block', code);
     }
-    return { publicId: block.publicId, code: block.code, body: block.body, status: block.status };
+    return { publicId: block.publicId, code: block.code, body: block.body, status: block.status, updatedAt: block.updatedAt.toISOString() };
   }
 }

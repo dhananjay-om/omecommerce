@@ -119,4 +119,63 @@ describe.skipIf(!process.env.INTEGRATION)('CMS API (live DB)', () => {
     const res = await request(app).post('/admin/v1/cms/pages').send({ handle: 'no-auth', title: 'x', body: 'x' });
     expect(res.status).toBe(401);
   });
+
+  it('admin: lists pages and gets one by publicId', async () => {
+    const list = await admin.get('/admin/v1/cms/pages');
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((p: { handle: string }) => p.handle === 'about-us')).toBe(true);
+
+    const created = list.body.data.find((p: { handle: string }) => p.handle === 'about-us');
+    const single = await admin.get(`/admin/v1/cms/pages/${created.publicId}`);
+    expect(single.status).toBe(200);
+    expect(single.body.data.handle).toBe('about-us');
+  });
+
+  it('admin: soft-deletes a page — disappears from list/get, handle becomes reusable, storefront 404s', async () => {
+    const create = await admin.post('/admin/v1/cms/pages').send({ handle: 'deletable-page', title: 'Deletable', body: 'x' });
+    await admin.put(`/admin/v1/cms/pages/${create.body.data.publicId}`).send({ status: 'PUBLISHED' });
+
+    const del = await admin.delete(`/admin/v1/cms/pages/${create.body.data.publicId}`);
+    expect(del.status).toBe(204);
+
+    const getDeleted = await admin.get(`/admin/v1/cms/pages/${create.body.data.publicId}`);
+    expect(getDeleted.status).toBe(404);
+
+    const list = await admin.get('/admin/v1/cms/pages');
+    expect(list.body.data.some((p: { publicId: string }) => p.publicId === create.body.data.publicId)).toBe(false);
+
+    const storefront = await request(app).get('/store/v1/content/pages/deletable-page').query({ storeViewId });
+    expect(storefront.status).toBe(404);
+
+    // The handle is free again for a new page.
+    const recreate = await admin.post('/admin/v1/cms/pages').send({ handle: 'deletable-page', title: 'Reborn', body: 'y' });
+    expect(recreate.status).toBe(201);
+  });
+
+  it('404s deleting a non-existent page', async () => {
+    const res = await admin.delete('/admin/v1/cms/pages/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b');
+    expect(res.status).toBe(404);
+  });
+
+  it('admin: lists blocks, gets one by publicId, and soft-deletes it', async () => {
+    const create = await admin.post('/admin/v1/cms/blocks').send({ code: 'deletable-block', body: '<p>x</p>' });
+    expect(create.status).toBe(201);
+
+    const list = await admin.get('/admin/v1/cms/blocks');
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((b: { code: string }) => b.code === 'deletable-block')).toBe(true);
+
+    const single = await admin.get(`/admin/v1/cms/blocks/${create.body.data.publicId}`);
+    expect(single.status).toBe(200);
+    expect(single.body.data.code).toBe('deletable-block');
+
+    const del = await admin.delete(`/admin/v1/cms/blocks/${create.body.data.publicId}`);
+    expect(del.status).toBe(204);
+
+    const getDeleted = await admin.get(`/admin/v1/cms/blocks/${create.body.data.publicId}`);
+    expect(getDeleted.status).toBe(404);
+
+    const listAfter = await admin.get('/admin/v1/cms/blocks');
+    expect(listAfter.body.data.some((b: { publicId: string }) => b.publicId === create.body.data.publicId)).toBe(false);
+  });
 });

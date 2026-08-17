@@ -28,6 +28,11 @@
 //   scheduled pointer swap. A documented, deliberate simplification for this
 //   pass, same spirit as every other "not yet, not silently dropped" note in
 //   this codebase.
+// - Soft delete: uq_cms_page_store_view_handle/uq_cms_block_store_view_code
+//   are re-scoped to `WHERE deleted_at IS NULL` (20260817080000_cms_soft_delete_reuse)
+//   so a deleted row's handle/code can be reused — see that migration's
+//   comment for why the original 0008_cms_raw.sql indexes didn't do this
+//   already (soft-delete wasn't wired to any repository method until then).
 // =============================================================================
 
 model CmsPage {
