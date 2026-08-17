@@ -3,8 +3,8 @@ import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaCmsPageRepository } from './infrastructure/prisma-cms-page.repository.js';
 import { PrismaCmsBlockRepository } from './infrastructure/prisma-cms-block.repository.js';
-import { CreateCmsPage, UpdateCmsPage } from './application/cms-page.usecases.js';
-import { CreateCmsBlock, UpdateCmsBlock } from './application/cms-block.usecases.js';
+import { CreateCmsPage, UpdateCmsPage, ListCmsPages, GetCmsPageByPublicId, DeleteCmsPage } from './application/cms-page.usecases.js';
+import { CreateCmsBlock, UpdateCmsBlock, ListCmsBlocks, GetCmsBlockByPublicId, DeleteCmsBlock } from './application/cms-block.usecases.js';
 import { GetCmsPage, GetCmsBlock } from './application/get-cms-content.usecases.js';
 import {
   createCmsPageSchema,
@@ -26,12 +26,32 @@ export function createCmsModule(db: Db, authorize: (permission: string) => Reque
 
   const createCmsPage = new CreateCmsPage(pages);
   const updateCmsPage = new UpdateCmsPage(pages);
+  const listCmsPages = new ListCmsPages(pages);
+  const getCmsPageByPublicId = new GetCmsPageByPublicId(pages);
+  const deleteCmsPage = new DeleteCmsPage(pages);
   const createCmsBlock = new CreateCmsBlock(blocks);
   const updateCmsBlock = new UpdateCmsBlock(blocks);
+  const listCmsBlocks = new ListCmsBlocks(blocks);
+  const getCmsBlockByPublicId = new GetCmsBlockByPublicId(blocks);
+  const deleteCmsBlock = new DeleteCmsBlock(blocks);
   const getCmsPage = new GetCmsPage(pages);
   const getCmsBlock = new GetCmsBlock(blocks);
 
   const admin = Router();
+  admin.get(
+    '/cms/pages',
+    authorize('cms:manage'),
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listCmsPages.execute() });
+    }),
+  );
+  admin.get(
+    '/cms/pages/:publicId',
+    authorize('cms:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCmsPageByPublicId.execute(req.params.publicId!) });
+    }),
+  );
   admin.post(
     '/cms/pages',
     authorize('cms:manage'),
@@ -48,6 +68,28 @@ export function createCmsModule(db: Db, authorize: (permission: string) => Reque
       res.json({ data: await updateCmsPage.execute(req.params.publicId!, body) });
     }),
   );
+  admin.delete(
+    '/cms/pages/:publicId',
+    authorize('cms:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteCmsPage.execute(req.params.publicId!);
+      res.status(204).send();
+    }),
+  );
+  admin.get(
+    '/cms/blocks',
+    authorize('cms:manage'),
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listCmsBlocks.execute() });
+    }),
+  );
+  admin.get(
+    '/cms/blocks/:publicId',
+    authorize('cms:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCmsBlockByPublicId.execute(req.params.publicId!) });
+    }),
+  );
   admin.post(
     '/cms/blocks',
     authorize('cms:manage'),
@@ -62,6 +104,14 @@ export function createCmsModule(db: Db, authorize: (permission: string) => Reque
     asyncHandler(async (req, res) => {
       const body = parse(updateCmsBlockSchema, req.body);
       res.json({ data: await updateCmsBlock.execute(req.params.publicId!, body) });
+    }),
+  );
+  admin.delete(
+    '/cms/blocks/:publicId',
+    authorize('cms:manage'),
+    asyncHandler(async (req, res) => {
+      await deleteCmsBlock.execute(req.params.publicId!);
+      res.status(204).send();
     }),
   );
 

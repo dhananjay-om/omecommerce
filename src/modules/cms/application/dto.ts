@@ -20,6 +20,7 @@ export interface CmsPageView {
   body: string;
   status: CmsStatus;
   publishedAt: string | null;
+  updatedAt: string;
 }
 
 export interface CreateCmsBlockCommand {
@@ -38,4 +39,5 @@ export interface CmsBlockView {
   code: string;
   body: string;
   status: CmsStatus;
+  updatedAt: string;
 }

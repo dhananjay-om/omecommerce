@@ -10,8 +10,24 @@ function parseStoreViewId(value: string | null | undefined): bigint | null {
   return BigInt(value);
 }
 
-function toView(p: { publicId: string; handle: string; title: string; body: string; status: CmsPageView['status']; publishedAt: Date | null }): CmsPageView {
-  return { publicId: p.publicId, handle: p.handle, title: p.title, body: p.body, status: p.status, publishedAt: p.publishedAt?.toISOString() ?? null };
+function toView(p: {
+  publicId: string;
+  handle: string;
+  title: string;
+  body: string;
+  status: CmsPageView['status'];
+  publishedAt: Date | null;
+  updatedAt: Date;
+}): CmsPageView {
+  return {
+    publicId: p.publicId,
+    handle: p.handle,
+    title: p.title,
+    body: p.body,
+    status: p.status,
+    publishedAt: p.publishedAt?.toISOString() ?? null,
+    updatedAt: p.updatedAt.toISOString(),
+  };
 }
 
 export class CreateCmsPage {
@@ -37,5 +53,36 @@ export class UpdateCmsPage {
     }
     const page = await this.pages.update(publicId, cmd);
     return toView(page);
+  }
+}
+
+/** Admin browse (Content > Pages). */
+export class ListCmsPages {
+  constructor(private readonly pages: CmsPageRepository) {}
+
+  async execute(): Promise<CmsPageView[]> {
+    const rows = await this.pages.list();
+    return rows.map(toView);
+  }
+}
+
+export class GetCmsPageByPublicId {
+  constructor(private readonly pages: CmsPageRepository) {}
+
+  async execute(publicId: string): Promise<CmsPageView> {
+    const page = await this.pages.findByPublicId(publicId);
+    if (!page) throw new NotFoundError('CMS page', publicId);
+    return toView(page);
+  }
+}
+
+export class DeleteCmsPage {
+  constructor(private readonly pages: CmsPageRepository) {}
+
+  async execute(publicId: string): Promise<void> {
+    if (!(await this.pages.findByPublicId(publicId))) {
+      throw new NotFoundError('CMS page', publicId);
+    }
+    await this.pages.softDelete(publicId);
   }
 }

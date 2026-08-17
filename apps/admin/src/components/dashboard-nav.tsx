@@ -18,6 +18,9 @@ import {
   Receipt,
   Landmark,
   Store,
+  FileText,
+  LayoutTemplate,
+  Home,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -48,6 +51,14 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/orders', label: 'Orders', icon: ShoppingCart },
       { href: '/customers', label: 'Customers', icon: Users },
       { href: '/coupons', label: 'Coupons', icon: Percent },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { href: '/content/home-page', label: 'Home Page', icon: Home },
+      { href: '/content/pages', label: 'Pages', icon: FileText },
+      { href: '/content/blocks', label: 'Blocks', icon: LayoutTemplate },
     ],
   },
   {

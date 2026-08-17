@@ -10,8 +10,8 @@ function parseStoreViewId(value: string | null | undefined): bigint | null {
   return BigInt(value);
 }
 
-function toView(b: { publicId: string; code: string; body: string; status: CmsBlockView['status'] }): CmsBlockView {
-  return { publicId: b.publicId, code: b.code, body: b.body, status: b.status };
+function toView(b: { publicId: string; code: string; body: string; status: CmsBlockView['status']; updatedAt: Date }): CmsBlockView {
+  return { publicId: b.publicId, code: b.code, body: b.body, status: b.status, updatedAt: b.updatedAt.toISOString() };
 }
 
 export class CreateCmsBlock {
@@ -37,5 +37,36 @@ export class UpdateCmsBlock {
     }
     const block = await this.blocks.update(publicId, cmd);
     return toView(block);
+  }
+}
+
+/** Admin browse (Content > Blocks). */
+export class ListCmsBlocks {
+  constructor(private readonly blocks: CmsBlockRepository) {}
+
+  async execute(): Promise<CmsBlockView[]> {
+    const rows = await this.blocks.list();
+    return rows.map(toView);
+  }
+}
+
+export class GetCmsBlockByPublicId {
+  constructor(private readonly blocks: CmsBlockRepository) {}
+
+  async execute(publicId: string): Promise<CmsBlockView> {
+    const block = await this.blocks.findByPublicId(publicId);
+    if (!block) throw new NotFoundError('CMS block', publicId);
+    return toView(block);
+  }
+}
+
+export class DeleteCmsBlock {
+  constructor(private readonly blocks: CmsBlockRepository) {}
+
+  async execute(publicId: string): Promise<void> {
+    if (!(await this.blocks.findByPublicId(publicId))) {
+      throw new NotFoundError('CMS block', publicId);
+    }
+    await this.blocks.softDelete(publicId);
   }
 }

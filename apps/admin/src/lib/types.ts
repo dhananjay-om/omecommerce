@@ -522,3 +522,23 @@ export interface CustomerDetail {
   createdAt: string;
   addresses: CustomerAddress[];
 }
+
+export type CmsStatus = 'DRAFT' | 'PUBLISHED';
+
+export interface CmsPage {
+  publicId: string;
+  handle: string;
+  title: string;
+  body: string;
+  status: CmsStatus;
+  publishedAt: string | null;
+  updatedAt: string;
+}
+
+export interface CmsBlock {
+  publicId: string;
+  code: string;
+  body: string;
+  status: CmsStatus;
+  updatedAt: string;
+}
