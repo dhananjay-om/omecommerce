@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MoreHorizontal } from 'lucide-react';
 import type { OrderListItem } from '@/lib/types';
+import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -92,9 +93,7 @@ export function OrdersTable({
                 <TableCell>
                   <Badge variant={statusBadgeVariant(o.fulfillmentStatus)}>{o.fulfillmentStatus}</Badge>
                 </TableCell>
-                <TableCell>
-                  {o.currency} {o.grandTotal}
-                </TableCell>
+                <TableCell>{formatPrice(o.grandTotal, o.currency)}</TableCell>
                 <TableCell>{new Date(o.createdAt).toLocaleDateString('en-US')}</TableCell>
                 <TableCell>
                   <DropdownMenu>

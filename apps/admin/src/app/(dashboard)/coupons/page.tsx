@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
 import type { Coupon } from '@/lib/types';
+import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +9,9 @@ import { cn } from '@/lib/utils';
 import { DeleteCouponDialog } from './delete-coupon-dialog';
 
 function formatValue(c: Coupon): string {
-  return c.discountType === 'PERCENTAGE' ? `${Number(c.value)}% off` : `${c.currency} ${c.value} off`;
+  // currency is only ever null for a PERCENTAGE coupon (not needed there) —
+  // a FIXED_AMOUNT coupon always has one, enforced at creation.
+  return c.discountType === 'PERCENTAGE' ? `${Number(c.value)}% off` : `${formatPrice(c.value, c.currency!)} off`;
 }
 
 function formatWindow(c: Coupon): string {
@@ -67,7 +70,7 @@ export default async function CouponsPage() {
                       {c.isAutoApply ? <Badge variant="secondary">Auto-Apply</Badge> : null}
                     </div>
                   </TableCell>
-                  <TableCell>{c.minSubtotal ? `${c.currency} ${c.minSubtotal}` : '—'}</TableCell>
+                  <TableCell>{c.minSubtotal ? formatPrice(c.minSubtotal, c.currency!) : '—'}</TableCell>
                   <TableCell>
                     {c.usageCount} / {c.usageLimit ?? '∞'}
                     {c.usageLimitPerCustomer ? ` (max ${c.usageLimitPerCustomer}/customer)` : ''}

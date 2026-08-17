@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { regenerateInvoice, type ActionState } from './actions';
 import type { OrderInvoice } from '@/lib/types';
+import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -45,9 +46,7 @@ export function InvoicesCard({ orderPublicId, invoices, currency }: { orderPubli
             <TableCell>
               <Badge variant="secondary">{inv.status}</Badge>
             </TableCell>
-            <TableCell>
-              {currency} {inv.grandTotal}
-            </TableCell>
+            <TableCell>{formatPrice(inv.grandTotal, currency)}</TableCell>
             <TableCell>{new Date(inv.createdAt).toLocaleDateString('en-US')}</TableCell>
             <TableCell className="flex items-center gap-1">
               <a href={`/admin/api/orders/${orderPublicId}/invoice/${inv.publicId}/pdf`} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">

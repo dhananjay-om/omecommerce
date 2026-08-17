@@ -5,11 +5,9 @@
  * built-in, for any real ISO-4217 code, no static symbol table to maintain.
  * INR specifically uses 'en-IN' so amounts group by the Indian lakh/crore
  * convention (₹1,50,000.00) rather than the international ₹150,000.00 —
- * everything else uses 'en-US' grouping (thousands every 3 digits), a
- * reasonable default until this store sells in more locales.
- *
- * Never use this for schema.org/JSON-LD `priceCurrency` or any machine-read
- * field — those need the raw ISO code, not a formatted/symbol string.
+ * everything else uses 'en-US' grouping (thousands every 3 digits). Own copy
+ * of the storefront's identical helper — this project's established
+ * convention is each app keeps its own copy rather than a shared package.
  */
 const INDIAN_GROUPING_CURRENCIES = new Set(['INR']);
 

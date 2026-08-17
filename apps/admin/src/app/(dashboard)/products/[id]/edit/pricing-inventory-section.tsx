@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { setVariantPrice, adjustVariantStock, type ActionState } from './pricing-inventory-actions';
 import type { VariantPrice, VariantStock } from '@/lib/types';
+import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -224,7 +225,7 @@ export function PricingInventorySection({
                   <TableCell>{row.priceListName}</TableCell>
                   <TableCell>{row.currency}</TableCell>
                   <TableCell>
-                    {row.price ?? <span className="text-muted-foreground">Not set</span>}
+                    {row.price ? formatPrice(row.price, row.currency) : <span className="text-muted-foreground">Not set</span>}
                   </TableCell>
                   <TableCell className="text-right">
                     <SetPriceRowDialog productPublicId={productPublicId} variantId={variantId} row={row} />

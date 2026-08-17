@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
 import type { ProductList, OrderList, CustomerList } from '@/lib/types';
+import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { statusBadgeVariant } from '@/lib/status-badge';
@@ -92,9 +93,7 @@ export default async function DashboardPage() {
                     <TableCell>
                       <Badge variant={statusBadgeVariant(o.status)}>{o.status}</Badge>
                     </TableCell>
-                    <TableCell>
-                      {o.currency} {o.grandTotal}
-                    </TableCell>
+                    <TableCell>{formatPrice(o.grandTotal, o.currency)}</TableCell>
                     <TableCell>{new Date(o.createdAt).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))

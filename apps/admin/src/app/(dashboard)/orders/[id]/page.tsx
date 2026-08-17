@@ -1,5 +1,6 @@
 import { apiGet } from '@/lib/api-client';
 import type { OrderDetail } from '@/lib/types';
+import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -111,9 +112,7 @@ export default async function OrderInformationPage({ params }: { params: Promise
             <div className="text-sm font-semibold">Shipping & Handling Information</div>
             <div className="mt-2 text-sm">
               <div>{order.shippingMethodCode ?? '—'}</div>
-              <div className="text-muted-foreground">
-                {order.currency} {order.shippingTotal}
-              </div>
+              <div className="text-muted-foreground">{formatPrice(order.shippingTotal, order.currency)}</div>
             </div>
           </div>
         </div>
@@ -144,22 +143,14 @@ export default async function OrderInformationPage({ params }: { params: Promise
                     <div className="text-xs text-muted-foreground">SKU: {line.sku}</div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{line.hsnCode ?? '—'}</TableCell>
-                  <TableCell>
-                    {order.currency} {line.unitPrice}
-                  </TableCell>
+                  <TableCell>{formatPrice(line.unitPrice, order.currency)}</TableCell>
                   <TableCell>{line.qty}</TableCell>
                   <TableCell>{invoicedQty(order, line.sku)}</TableCell>
                   <TableCell>{line.fulfilledQty}</TableCell>
                   <TableCell>{line.refundedQty}</TableCell>
-                  <TableCell>
-                    {order.currency} {line.discountAmount}
-                  </TableCell>
-                  <TableCell>
-                    {order.currency} {line.taxAmount}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {order.currency} {line.rowTotal}
-                  </TableCell>
+                  <TableCell>{formatPrice(line.discountAmount, order.currency)}</TableCell>
+                  <TableCell>{formatPrice(line.taxAmount, order.currency)}</TableCell>
+                  <TableCell className="text-right font-medium">{formatPrice(line.rowTotal, order.currency)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -191,24 +182,33 @@ export default async function OrderInformationPage({ params }: { params: Promise
 
         <SectionCard title="Order Totals">
           <div className="overflow-hidden rounded-lg border">
-            <InfoRow label="Subtotal" value={`${order.currency} ${order.subtotal}`} />
-            <InfoRow label={order.couponCode ? `Discount (${order.couponCode})` : 'Discount'} value={`-${order.currency} ${order.discountTotal}`} />
-            <InfoRow label="Shipping & Handling" value={`${order.currency} ${order.shippingTotal}`} />
+            <InfoRow label="Subtotal" value={formatPrice(order.subtotal, order.currency)} />
+            <InfoRow
+              label={order.couponCode ? `Discount (${order.couponCode})` : 'Discount'}
+              value={`-${formatPrice(order.discountTotal, order.currency)}`}
+            />
+            <InfoRow label="Shipping & Handling" value={formatPrice(order.shippingTotal, order.currency)} />
             {order.taxLines.length > 0 ? (
               order.taxLines.map((t, i) => (
                 <InfoRow
                   key={`${t.taxClassCode}-${t.taxType}-${i}`}
                   label={`${t.taxType ?? 'Tax'} @ ${(Number(t.rate) * 100).toFixed(2)}% (${t.taxClassCode})`}
-                  value={`${order.currency} ${t.amount}`}
+                  value={formatPrice(t.amount, order.currency)}
                 />
               ))
             ) : (
-              <InfoRow label="Tax" value={`${order.currency} ${order.taxTotal}`} />
+              <InfoRow label="Tax" value={formatPrice(order.taxTotal, order.currency)} />
             )}
-            <InfoRow label={<span className="font-semibold">Grand Total</span>} value={<span className="font-bold">{order.currency} {order.grandTotal}</span>} />
-            <InfoRow label="Total Paid" value={`${order.currency} ${paidTotal.toFixed(4)}`} />
-            <InfoRow label="Total Refunded" value={`${order.currency} ${refundedTotal.toFixed(4)}`} />
-            <InfoRow label={<span className="font-semibold">Total Due</span>} value={<span className="font-bold">{order.currency} {remaining.toFixed(4)}</span>} />
+            <InfoRow
+              label={<span className="font-semibold">Grand Total</span>}
+              value={<span className="font-bold">{formatPrice(order.grandTotal, order.currency)}</span>}
+            />
+            <InfoRow label="Total Paid" value={formatPrice(paidTotal, order.currency)} />
+            <InfoRow label="Total Refunded" value={formatPrice(refundedTotal, order.currency)} />
+            <InfoRow
+              label={<span className="font-semibold">Total Due</span>}
+              value={<span className="font-bold">{formatPrice(remaining, order.currency)}</span>}
+            />
           </div>
         </SectionCard>
       </div>
