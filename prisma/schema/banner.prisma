@@ -1,0 +1,49 @@
+// =============================================================================
+// banner.prisma — Placeable marketing banners (hero slider + promo grid).
+//
+// A real entity (image + order + enable/disable), not JSON stuffed into a
+// CmsBlock body — the storefront-facing counterpart to a WidgetInstance of
+// type HERO_BANNER_SLIDER/PROMO_BANNER_GRID (widget.prisma), which pulls
+// active rows of the matching `group`, ordered by `position`. One table for
+// both groups (not two separate tables) since the shape is identical and the
+// group is just a filter — same "one table, a discriminating column" choice
+// already made for CmsPage/CmsBlock's shared shape.
+//
+// No storeViewId scope column — same v1 decision as cms.prisma: no admin UI
+// anywhere in this app manages StoreView rows yet, so there's nothing to
+// scope by. Nothing here blocks adding one later.
+// =============================================================================
+
+enum BannerGroup {
+  HERO
+  PROMO
+}
+
+model Banner {
+  id            BigInt      @id @default(autoincrement())
+  publicId      String      @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  group         BannerGroup
+  title         String
+  subtitle      String?
+  /// S3 object key — same single-scalar-column pattern as Category.imageMediaKey/
+  /// Website.logoMediaKey (one image per banner, not a gallery).
+  imageMediaKey String?     @map("image_media_key")
+  ctaLabel      String?     @map("cta_label")
+  ctaHref       String?     @map("cta_href")
+  position      Int         @default(0)
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy     BigInt?     @map("created_by")
+  updatedBy     BigInt?     @map("updated_by")
+  deletedAt     DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  /// Real index is a partial one (`WHERE deleted_at IS NULL`, see the
+  /// migration's ix_banner_active) — Prisma can't express a partial WHERE
+  /// clause natively, so this declares the same shape/name for its own
+  /// bookkeeping while the raw-SQL migration is what actually creates it.
+  /// Same pattern as CmsPage/CmsBlock's @@unique + partial-index override.
+  @@index([group, isActive, position], map: "ix_banner_active")
+  @@index([deletedAt])
+  @@map("banner")
+}

@@ -112,6 +112,8 @@ async function main() {
     { code: 'inventory:adjust', description: 'Adjust warehouse stock levels' },
     { code: 'catalog:manage', description: 'Manage attribute sets, attributes, and bulk product import' },
     { code: 'cms:manage', description: 'Manage CMS pages and blocks' },
+    { code: 'banner:manage', description: 'Manage marketing banners (hero slider, promo grid)' },
+    { code: 'widget:manage', description: 'Manage placeable content widgets and their layout placement' },
     { code: 'wallet:manage', description: 'Manage customer wallets, store credit, and gift cards' },
     { code: 'loyalty:manage', description: 'Manage loyalty programs, tiers, and customer point balances' },
     { code: 'referral:manage', description: 'Manage referral programs' },
@@ -137,6 +139,52 @@ async function main() {
     const passwordHash = await hasher.hash(DEV_ADMIN_PASSWORD);
     const admin = await prisma.adminUser.create({ data: { email: DEV_ADMIN_EMAIL, passwordHash } });
     await prisma.adminUserRole.create({ data: { adminUserId: admin.id, roleId: superAdminRole.id } });
+  }
+
+  // Default home-page widget placement — matches today's hardcoded storefront
+  // section order exactly, so a freshly-seeded install's Content > Widgets
+  // screen already reflects live reality instead of looking empty, and the
+  // home page looks identical to before this feature existed. No natural
+  // unique key to upsert against (multiple widgets of the same type are a
+  // legitimate future scenario), so this is a one-time "seed only if page
+  // 'home' has nothing yet" guard rather than a per-row upsert.
+  const hasHomeWidgets = (await prisma.widgetInstance.count({ where: { page: 'home' } })) > 0;
+  if (!hasHomeWidgets) {
+    await prisma.widgetInstance.createMany({
+      data: [
+        { type: 'HERO_BANNER_SLIDER', page: 'home', section: 'TOP', position: 0, config: {} },
+        { type: 'CATEGORY_GRID', page: 'home', section: 'MIDDLE', position: 0, title: 'Shop by Category', config: {} },
+        { type: 'PROMO_BANNER_GRID', page: 'home', section: 'MIDDLE', position: 1, config: {} },
+        { type: 'BRAND_GRID', page: 'home', section: 'MIDDLE', position: 2, title: 'Top Brands', config: {} },
+        {
+          type: 'WHY_CHOOSE_US_LIST',
+          page: 'home',
+          section: 'MIDDLE',
+          position: 3,
+          config: {
+            features: [
+              { icon: 'truck', title: 'Free Shipping', description: 'On all orders over $50' },
+              { icon: 'shield', title: 'Secure Payment', description: '100% secure checkout' },
+              { icon: 'refresh', title: 'Easy Returns', description: '30-day return policy' },
+              { icon: 'chat', title: '24/7 Support', description: 'Dedicated customer care' },
+            ],
+          },
+        },
+        {
+          type: 'TESTIMONIAL_LIST',
+          page: 'home',
+          section: 'MIDDLE',
+          position: 4,
+          config: {
+            testimonials: [
+              { name: 'Amara K.', quote: 'Fast shipping and the quality is exactly as described. My new go-to store.' },
+              { name: 'Daniel R.', quote: 'Customer support helped me swap a size within minutes. Great experience.' },
+              { name: 'Priya S.', quote: 'Love the selection — found things here I couldn’t find anywhere else.' },
+            ],
+          },
+        },
+      ],
+    });
   }
 
   console.log('Seed complete: website=%s store=%s product=%s', website.code, store.code, product.sku);

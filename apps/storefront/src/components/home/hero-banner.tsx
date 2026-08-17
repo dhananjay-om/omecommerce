@@ -13,13 +13,15 @@ interface Slide {
   subtitle: string;
   ctaLabel: string;
   ctaHref: string;
+  /** A real uploaded banner image (Content > Banners) takes priority when set; `gradient` is the backdrop otherwise. */
+  imageUrl?: string | null;
   gradient: string;
 }
 
-/** Default slides, shown when the admin hasn't set anything under Content >
- *  Home Page (or the block is missing/unpublished/malformed) — see
- *  apps/storefront/src/app/page.tsx and lib/home-sections.ts for how the
- *  CMS-managed override is resolved and validated. */
+/** Default slides, shown when no HERO_BANNER_SLIDER widget has any active
+ *  Banner rows yet (Content > Widgets / Content > Banners) — see
+ *  apps/storefront/src/components/widgets/widget-renderer.tsx for how the
+ *  real Banner-backed slides are built. */
 const DEFAULT_SLIDES: Slide[] = [
   {
     eyebrow: 'New Season',
@@ -59,7 +61,10 @@ export function HeroBanner({ slides }: { slides?: Slide[] }) {
     >
       {activeSlides.map((slide, i) => (
         <SwiperSlide key={i}>
-          <div className={`bg-gradient-to-br ${slide.gradient} px-6 py-20 text-white sm:py-28`}>
+          <div
+            className={`bg-cover bg-center px-6 py-20 text-white sm:py-28 ${slide.imageUrl ? '' : `bg-gradient-to-br ${slide.gradient}`}`}
+            style={slide.imageUrl ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${slide.imageUrl})` } : undefined}
+          >
             <div className="mx-auto flex max-w-7xl flex-col items-start gap-4">
               <span className="text-sm font-semibold tracking-wide uppercase text-white/80">{slide.eyebrow}</span>
               <h1 className="max-w-xl text-3xl font-bold sm:text-5xl">{slide.title}</h1>
