@@ -4,8 +4,12 @@ import type { UpdateWebsiteTaxSettingsCommand, WebsiteView } from './dto.js';
 
 /** GST Settings admin page (single-registration/single-state scope — see
  *  store.prisma's Website.gstin/.originStateCode doc comment). Defense in
- *  depth alongside the DB's website_gstin_state_code_paired CHECK: both
- *  fields must be set or cleared together, never half-configured. */
+ *  depth alongside two DB CHECKs: website_gstin_state_code_paired (both
+ *  fields must be set or cleared together, never half-configured) and
+ *  website_gstin_state_match (the GSTIN's first 2 digits must equal
+ *  originStateCode — a GSTIN is state-specific by construction). Without
+ *  this pre-check, a mismatch here would hit the raw Postgres CHECK and
+ *  surface as an unhandled 500 instead of a clean validation error. */
 export class UpdateWebsiteTaxSettings {
   constructor(private readonly websites: WebsiteRepository) {}
 
@@ -19,6 +23,11 @@ export class UpdateWebsiteTaxSettings {
     if ((gstin === null) !== (originStateCode === null)) {
       throw new ValidationError('GSTIN and origin state code must be set or cleared together', [
         { path: 'gstin', message: 'must be paired with originStateCode' },
+      ]);
+    }
+    if (gstin !== null && originStateCode !== null && gstin.slice(0, 2) !== originStateCode) {
+      throw new ValidationError("origin state code must match the GSTIN's first 2 digits", [
+        { path: 'originStateCode', message: `expected "${gstin.slice(0, 2)}" to match GSTIN ${gstin}` },
       ]);
     }
 
