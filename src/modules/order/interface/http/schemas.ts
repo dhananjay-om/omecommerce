@@ -1,6 +1,16 @@
 import { z } from 'zod';
 import { OrderStatus, FinancialStatus, FulfillmentStatus } from '@prisma/client';
 
+/** Normalizes a whitespace-only or blank string to undefined before the real
+ *  schema sees it — an untouched optional field can arrive as '' or ' ' (a
+ *  stray space, browser autofill, etc.), neither of which a format regex
+ *  would ever match, so without this an optional field silently becomes a
+ *  hard validation failure. Defense in depth: the storefront already tries
+ *  to do this client-side, but this is the layer every caller goes through. */
+function blankToUndefined(schema: z.ZodTypeAny) {
+  return z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), schema);
+}
+
 export const createCartSchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'expected numeric id'),
   customerPublicId: z.string().uuid().nullish(),
@@ -21,11 +31,13 @@ const addressSchema = z
     city: z.string().min(1),
     region: z.string().nullish(),
     /** 2-digit CBIC GST state code — feeds the CGST/SGST-vs-IGST determination. */
-    stateCode: z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish(),
-    gstin: z
-      .string()
-      .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'expected a valid 15-character GSTIN')
-      .nullish(),
+    stateCode: blankToUndefined(z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish()),
+    gstin: blankToUndefined(
+      z
+        .string()
+        .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'expected a valid 15-character GSTIN')
+        .nullish(),
+    ),
     postalCode: z.string().min(1),
     country: z.string().length(2),
     phone: z.string().nullish(),

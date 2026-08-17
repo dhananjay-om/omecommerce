@@ -22,9 +22,15 @@ import type { ShippingMethod } from '@/types/order';
 
 const TOTAL_STEPS = 5;
 
-/** An untouched optional field is '' (react-hook-form's default), which the backend's format regex would reject — only a real value or "not sent" is valid. */
+/** An untouched optional field is '' (react-hook-form's default), and a stray
+ *  space (accidental keystroke, browser autofill) is just as blank in intent
+ *  — neither is a real value the backend's format regex would ever match, so
+ *  both must become "not sent," not a hard validation failure. The backend
+ *  schema normalizes the same way independently — this just avoids a round
+ *  trip for the common case. */
 function blankToUndefined(value: string | undefined): string | undefined {
-  return value ? value : undefined;
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; shippingMethods: ShippingMethod[] }) {
