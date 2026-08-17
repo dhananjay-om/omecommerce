@@ -114,7 +114,15 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   // factory (that factory also wires coupon's admin HTTP routes, which Order
   // has no business constructing).
   const discountCalculator = new PrismaCouponRepository(db);
-  const enrichCartView = new EnrichCartView(variants, priceResolver, cartProductMedia, mediaUrlResolver, discountCalculator, websiteTaxConfigLookup);
+  const enrichCartView = new EnrichCartView(
+    variants,
+    priceResolver,
+    cartProductMedia,
+    mediaUrlResolver,
+    discountCalculator,
+    websiteTaxConfigLookup,
+    taxClassLookup,
+  );
 
   const createCart = new CreateCart(carts, storeContext, customerGroups, customers, enrichCartView);
   const addCartLine = new AddCartLine(carts, variants, enrichCartView);

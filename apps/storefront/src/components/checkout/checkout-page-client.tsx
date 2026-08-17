@@ -69,6 +69,17 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
   const selectedShippingMethodCode = watch('shippingMethodCode');
   const selectedShippingMethod = shippingMethods.find((m) => m.code === selectedShippingMethodCode);
 
+  // Display-only preview — the authoritative total (exact bigint math, tax
+  // finalized against the real shipping state) is computed server-side when
+  // the order is actually placed; this just gives the customer an honest
+  // number to check before they get there, same shape estimatedTotal already
+  // has (subtotal - discount, + tax when exclusive), plus shipping once a
+  // method is picked.
+  const estimatedGrandTotal =
+    displayCart.estimatedTotal !== null
+      ? Number(displayCart.estimatedTotal) + (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0)
+      : null;
+
   async function goNext() {
     // Step 2's billing fields are only required (and only rendered) when
     // "same as shipping" is unchecked — validating them while hidden would
@@ -268,10 +279,20 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
               <span>{selectedShippingMethod ? formatPrice(selectedShippingMethod.flatRate, selectedShippingMethod.currency) : '—'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span className="text-muted-foreground">
-                {displayCart.pricesIncludeTax ? 'Included in prices above' : 'Calculated at order placement'}
+              <span className="text-muted-foreground">Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}</span>
+              <span className={displayCart.pricesIncludeTax ? 'text-muted-foreground' : undefined}>
+                {displayCart.taxTotal
+                  ? displayCart.pricesIncludeTax
+                    ? `${formatPrice(displayCart.taxTotal, displayCart.currency)} included above`
+                    : formatPrice(displayCart.taxTotal, displayCart.currency)
+                  : displayCart.pricesIncludeTax
+                    ? 'Included in prices above'
+                    : 'Calculated at order placement'}
               </span>
+            </div>
+            <div className="flex justify-between border-t pt-1.5 text-base font-bold">
+              <span>Estimated Total</span>
+              <span>{estimatedGrandTotal !== null ? formatPrice(estimatedGrandTotal, displayCart.currency) : '—'}</span>
             </div>
           </div>
           <CouponField cart={displayCart} />

@@ -64,9 +64,15 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
               <span className="text-muted-foreground">Calculated at checkout</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span className="text-muted-foreground">
-                {displayCart.pricesIncludeTax ? 'Included in prices above' : 'Calculated at checkout'}
+              <span className="text-muted-foreground">Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}</span>
+              <span className={displayCart.pricesIncludeTax ? 'text-muted-foreground' : undefined}>
+                {displayCart.taxTotal
+                  ? displayCart.pricesIncludeTax
+                    ? `${formatPrice(displayCart.taxTotal, displayCart.currency)} included above`
+                    : formatPrice(displayCart.taxTotal, displayCart.currency)
+                  : displayCart.pricesIncludeTax
+                    ? 'Included in prices above'
+                    : 'Calculated at checkout'}
               </span>
             </div>
           </div>

@@ -28,4 +28,8 @@ export interface Cart {
   estimatedTotal: string | null;
   /** When true, every line price/subtotal above already includes GST — the final price. */
   pricesIncludeTax: boolean;
+  /** Estimated GST across the cart — the real amount, just without the final
+   *  CGST/SGST-vs-IGST split/labels checkout shows once the shipping state is
+   *  known. Null when the cart has no priced lines yet. */
+  taxTotal: string | null;
 }

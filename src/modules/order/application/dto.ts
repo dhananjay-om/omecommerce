@@ -47,14 +47,22 @@ export interface CartView {
    *  usage limit, etc. since it was applied) — a cart read must never break because of
    *  this; checkout re-validates for real and hard-fails there instead. */
   couponError: string | null;
-  /** subtotal - discountTotal, or subtotal unchanged when no valid discount applies. Excludes
-   *  tax/shipping (only known at checkout) — same "estimated" framing the cart page already uses. */
+  /** subtotal - discountTotal (+ taxTotal when prices are tax-exclusive), or subtotal
+   *  unchanged when no valid discount applies. Excludes shipping (only known at
+   *  checkout) — same "estimated" framing the cart page already uses. */
   estimatedTotal: string | null;
   /** Website.pricesIncludeTax, resolved live on every read (not frozen at cart
    *  creation) — a later admin change to the setting should be reflected the
    *  next time this cart is read, same "always recomputed live" philosophy
    *  the coupon evaluation above already has. */
   pricesIncludeTax: boolean;
+  /** Estimated GST across every priced line, pre-discount — the real amount,
+   *  just without the final CGST/SGST-vs-IGST split/labels checkout shows
+   *  once the shipping state is known (the combined rate, and so the total,
+   *  is identical either way — only the label differs). Null when the cart
+   *  has no priced lines yet, same convention as subtotal above. "0.0000"
+   *  (not null) when priced lines exist but none carry a tax class. */
+  taxTotal: string | null;
 }
 
 export interface AddCartLineCommand {

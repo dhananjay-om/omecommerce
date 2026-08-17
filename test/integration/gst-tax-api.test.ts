@@ -262,6 +262,43 @@ describe.skipIf(!process.env.INTEGRATION)('GST tax module (live DB)', () => {
     expect(res.body.data.taxLines).toHaveLength(2); // CGST + SGST, one class only
   });
 
+  // --- Cart-level tax estimate (pre-checkout, no shipping address needed —
+  // the combined rate/total is state-independent, only the CGST/SGST-vs-IGST
+  // LABEL needs the destination state) ---
+
+  it('a cart read shows a real tax estimate before any address is entered, and estimatedTotal includes it (exclusive)', async () => {
+    const gst18 = await admin.post('/admin/v1/tax-classes').send({ code: 'GST18CART', name: 'GST 18%', rate: '0.18' });
+    const variantId = await createVariant('GST-SKU-CART-ESTIMATE', '100.00', { taxClassId: gst18.body.data.id });
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+    const cart = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(cart.status).toBe(200);
+    expect(cart.body.data.subtotal).toBe('100.0000');
+    expect(cart.body.data.taxTotal).toBe('18.0000'); // no address yet, still the real amount
+    expect(cart.body.data.pricesIncludeTax).toBe(false);
+    // Exclusive: tax is added on top of subtotal, matching what checkout will charge.
+    expect(cart.body.data.estimatedTotal).toBe('118.0000');
+  });
+
+  it('a cart with no taxed lines shows taxTotal 0.0000, not null, once it has a priced line', async () => {
+    const variantId = await createVariant('GST-SKU-CART-NOTAX', '50.00'); // no taxClassId
+    const cartId = await newCart();
+    await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+    const cart = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(cart.status).toBe(200);
+    expect(cart.body.data.taxTotal).toBe('0.0000');
+    expect(cart.body.data.estimatedTotal).toBe('50.0000');
+  });
+
+  it('an empty cart (no priced lines) has a null tax estimate, not 0.0000', async () => {
+    const cartId = await newCart();
+    const cart = await request(app).get(`/store/v1/carts/${cartId}`);
+    expect(cart.status).toBe(200);
+    expect(cart.body.data.taxTotal).toBeNull();
+  });
+
   // --- Website.pricesIncludeTax: catalog price is the final price, GST is backed out ---
 
   describe('tax-inclusive pricing (Website.pricesIncludeTax)', () => {
@@ -365,6 +402,21 @@ describe.skipIf(!process.env.INTEGRATION)('GST tax module (live DB)', () => {
       // rowTotal (subtotal + tax for this one-line order) is the real money check —
       // it must equal the catalog price exactly, same guarantee as grandTotal above.
       expect(order.lines[0].rowTotal).toBe('1299.0000');
+    });
+
+    it('a cart read (before checkout) shows the same backed-out tax estimate, and estimatedTotal stays the catalog price — not catalog + tax', async () => {
+      const variantId = await createInclusiveVariant('GST-SKU-INCL-CART-ESTIMATE', '1299.00');
+      const cart = await request(app).post('/store/v1/carts').send({ storeViewId: inclusiveStoreViewId });
+      const cartId = cart.body.data.publicId;
+      await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty: 1 });
+
+      const read = await request(app).get(`/store/v1/carts/${cartId}`);
+      expect(read.status).toBe(200);
+      expect(read.body.data.subtotal).toBe('1299.0000'); // catalog/listed price, unchanged — the extraction only happens at checkout
+      expect(read.body.data.taxTotal).toBe('198.1526'); // same backed-out amount checkout will charge, shown as informational
+      expect(read.body.data.pricesIncludeTax).toBe(true);
+      // Inclusive: tax is already inside the listed price — NOT added again.
+      expect(read.body.data.estimatedTotal).toBe('1299.0000');
     });
 
     it('different-state checkout: a single IGST line, still backed out of the same ₹1299 catalog price', async () => {

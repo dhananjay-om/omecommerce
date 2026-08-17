@@ -1,9 +1,9 @@
-import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup } from '../domain/repositories.js';
+import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup, TaxClassLookup } from '../domain/repositories.js';
 import type { MediaUrlResolver } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { DiscountCalculator, DiscountLineInput } from '../../coupon/domain/repositories.js';
 import { DomainError } from '../../../shared/domain/errors.js';
-import { addMinor, subtractMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
+import { addMinor, subtractMinor, multiplyByQty, applyRate, extractTaxExclusive, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
 import type { CartLineDto, CartView } from './dto.js';
 
 interface EnrichableCart {
@@ -36,6 +36,7 @@ export class EnrichCartView {
     private readonly mediaUrls: MediaUrlResolver,
     private readonly discountCalculator: DiscountCalculator,
     private readonly websiteTaxConfig: WebsiteTaxConfigLookup,
+    private readonly taxClasses: TaxClassLookup,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -45,8 +46,35 @@ export class EnrichCartView {
     const variantRefs = await Promise.all(cart.lines.map((line) => this.variants.byId(line.variantId)));
     const lines: CartLineDto[] = await Promise.all(cart.lines.map((line, i) => this.enrichLine(line, cart, variantRefs[i]!)));
 
+    // Not frozen at cart creation — see CartView.pricesIncludeTax's doc comment.
+    const websiteTaxConfig = await this.websiteTaxConfig.byId(cart.websiteId);
+    const pricesIncludeTax = websiteTaxConfig?.pricesIncludeTax ?? false;
+
     const priced = lines.map((l) => l.lineTotal).filter((v): v is string => v !== null);
     const subtotal = priced.length > 0 ? fromMinorUnits(addMinor(...priced.map(toMinorUnits))) : null;
+
+    // An estimate shown pre-checkout (cart/checkout pages, before a shipping
+    // state is known) — the CGST+SGST-vs-IGST split needs the destination
+    // state, but the total tax AMOUNT doesn't: 18% is 18% whether it's shown
+    // as 9%+9% or a flat 18%, only the label differs. So this is already the
+    // real number, just without the final split/labels checkout will show.
+    // Same pre-discount-subtotal basis the real order-level calculation uses
+    // (see complete-checkout.usecase.ts's comment on that).
+    let taxTotalMinor: bigint | null = null;
+    if (priced.length > 0) {
+      const perLineTax = await Promise.all(
+        cart.lines.map(async (line, i) => {
+          const lineTotal = lines[i]!.lineTotal;
+          if (lineTotal === null) return 0n;
+          const taxClass = await this.taxClasses.byVariantId(line.variantId);
+          if (!taxClass) return 0n;
+          const lineTotalMinor = toMinorUnits(lineTotal);
+          return pricesIncludeTax ? extractTaxExclusive(lineTotalMinor, taxClass.rateMinor).taxMinor : applyRate(lineTotalMinor, taxClass.rateMinor);
+        }),
+      );
+      taxTotalMinor = addMinor(...perLineTax);
+    }
+    const taxTotal = taxTotalMinor !== null ? fromMinorUnits(taxTotalMinor) : null;
 
     const discountLines: DiscountLineInput[] = [];
     for (let i = 0; i < cart.lines.length; i++) {
@@ -101,16 +129,23 @@ export class EnrichCartView {
       }
     }
 
-    const estimatedTotal =
-      subtotal !== null && discountTotal !== null ? fromMinorUnits(subtractMinor(toMinorUnits(subtotal), toMinorUnits(discountTotal))) : subtotal;
+    // Exclusive: tax isn't inside subtotal yet, so it's added on top, same as
+    // grandTotal = subtotal + tax - discount at real checkout (minus shipping,
+    // not yet known here). Inclusive: tax is already inside subtotal — adding
+    // it again would double-count, so the formula is unchanged from before
+    // this estimate existed.
+    let estimatedTotal = subtotal;
+    if (estimatedTotal !== null && discountTotal !== null) {
+      estimatedTotal = fromMinorUnits(subtractMinor(toMinorUnits(estimatedTotal), toMinorUnits(discountTotal)));
+    }
+    if (estimatedTotal !== null && !pricesIncludeTax && taxTotal !== null) {
+      estimatedTotal = fromMinorUnits(addMinor(toMinorUnits(estimatedTotal), toMinorUnits(taxTotal)));
+    }
 
     const linesWithDiscount = lines.map((l, i) => {
       const amount = lineDiscountByVariant.get(cart.lines[i]!.variantId.toString());
       return { ...l, discountAmount: amount !== undefined ? fromMinorUnits(amount) : null };
     });
-
-    // Resolved live, not frozen at cart creation — see CartView.pricesIncludeTax's doc comment.
-    const websiteTaxConfig = await this.websiteTaxConfig.byId(cart.websiteId);
 
     return {
       publicId: cart.publicId,
@@ -123,7 +158,8 @@ export class EnrichCartView {
       discountTotal,
       couponError,
       estimatedTotal,
-      pricesIncludeTax: websiteTaxConfig?.pricesIncludeTax ?? false,
+      pricesIncludeTax,
+      taxTotal,
     };
   }
 
