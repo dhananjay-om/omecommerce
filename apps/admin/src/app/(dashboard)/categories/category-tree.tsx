@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Category } from '@/lib/types';
 import { deleteCategory } from './actions';
-import { Button } from '@/components/ui/button';
-import { EditCategoryDialog } from './edit-category-dialog';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface TreeNode {
   category: Category;
@@ -32,9 +33,20 @@ function TreeRow({ node, depth, onDelete, deleting }: { node: TreeNode; depth: n
   return (
     <>
       <div className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-muted/50" style={{ paddingLeft: `${depth * 24 + 12}px` }}>
-        <span className="text-sm">{node.category.nameDefault ?? '(untitled)'}</span>
+        <div className="flex items-center gap-2">
+          {node.category.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
+            <img src={node.category.imageUrl} alt="" className="h-6 w-6 rounded object-cover" />
+          ) : null}
+          <span className="text-sm">{node.category.nameDefault ?? '(untitled)'}</span>
+          {!node.category.includeInMenu ? (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Hidden from menu</span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1">
-          <EditCategoryDialog category={node.category} />
+          <Link href={`/categories/${node.category.publicId}/edit`} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
+            Edit
+          </Link>
           <Button
             type="button"
             variant="ghost"

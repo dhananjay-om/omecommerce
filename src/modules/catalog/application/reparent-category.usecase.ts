@@ -32,7 +32,7 @@ export class ReparentCategory {
     }
 
     const moved = await this.categories.reparent(category.id, newParentId);
-    return toCategoryView(moved);
+    return await toCategoryView(moved);
   }
 
   /** Walks up from `candidateId` via parentId to see if it passes through `ancestorId`. Admin-scale tree, so an in-memory walk over the flat list is simpler than a recursive SQL query and just as correct. */

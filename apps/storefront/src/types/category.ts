@@ -6,6 +6,13 @@ export interface Category {
   sortMode: string;
   position: number;
   nameDefault: string | null;
+  description: string | null;
+  imageMediaKey: string | null;
+  imageUrl: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  includeInMenu: boolean;
   createdAt: string;
 }
 

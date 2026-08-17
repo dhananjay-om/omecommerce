@@ -349,6 +349,13 @@ export interface CategoryInfo {
   sortMode: CategorySortMode;
   position: number;
   nameDefault: string | null;
+  description: string | null;
+  /** S3 object key — see catalog.prisma's Category.imageMediaKey doc comment. Use CategoryRepository.presignImageUrl (via the application-layer mapper) to turn this into something displayable. */
+  imageMediaKey: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  includeInMenu: boolean;
   createdAt: Date;
 }
 
@@ -360,12 +367,24 @@ export interface CreateCategoryInput {
   type?: CategoryType;
   sortMode?: CategorySortMode;
   position?: number;
+  description?: string | null;
+  imageMediaKey?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  metaKeywords?: string | null;
+  includeInMenu?: boolean;
 }
 
 export interface UpdateCategoryInput {
   nameDefault?: string | null;
   sortMode?: CategorySortMode;
   position?: number;
+  description?: string | null;
+  imageMediaKey?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  metaKeywords?: string | null;
+  includeInMenu?: boolean;
 }
 
 /**

@@ -22,6 +22,12 @@ export class CreateCategory {
       type: cmd.type,
       sortMode: cmd.sortMode,
       position: cmd.position,
+      description: cmd.description,
+      imageMediaKey: cmd.imageMediaKey,
+      metaTitle: cmd.metaTitle,
+      metaDescription: cmd.metaDescription,
+      metaKeywords: cmd.metaKeywords,
+      includeInMenu: cmd.includeInMenu,
     });
     return toCategoryView(created);
   }

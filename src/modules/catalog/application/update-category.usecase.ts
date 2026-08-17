@@ -3,7 +3,8 @@ import { NotFoundError } from '../../../shared/domain/errors.js';
 import { toCategoryView } from './category-view.js';
 import type { UpdateCategoryCommand, CategoryView } from './dto.js';
 
-/** Scalar-field updates only (name/sortMode/position) — moving a category through the tree goes through ReparentCategory. */
+/** Scalar-field updates only (name/sortMode/position/description/image/SEO/
+ *  includeInMenu) — moving a category through the tree goes through ReparentCategory. */
 export class UpdateCategory {
   constructor(private readonly categories: CategoryRepository) {}
 
@@ -14,6 +15,12 @@ export class UpdateCategory {
       nameDefault: cmd.nameDefault,
       sortMode: cmd.sortMode,
       position: cmd.position,
+      description: cmd.description,
+      imageMediaKey: cmd.imageMediaKey,
+      metaTitle: cmd.metaTitle,
+      metaDescription: cmd.metaDescription,
+      metaKeywords: cmd.metaKeywords,
+      includeInMenu: cmd.includeInMenu,
     });
     return toCategoryView(updated);
   }

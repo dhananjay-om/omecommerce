@@ -17,7 +17,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const { category } = await getCategory(slug);
-    return { title: category.nameDefault ?? category.slug };
+    const fallbackTitle = category.nameDefault ?? category.slug;
+    const title = category.metaTitle ?? fallbackTitle;
+    const description = category.metaDescription ?? category.description ?? undefined;
+    const keywords = category.metaKeywords
+      ? category.metaKeywords.split(',').map((k) => k.trim()).filter(Boolean)
+      : undefined;
+    const image = category.imageUrl ?? undefined;
+    return {
+      title,
+      description,
+      keywords,
+      openGraph: {
+        title,
+        description,
+        type: 'website',
+        images: image ? [{ url: image }] : undefined,
+      },
+      twitter: {
+        card: image ? 'summary_large_image' : 'summary',
+        title,
+        description,
+        images: image ? [image] : undefined,
+      },
+    };
   } catch {
     return {};
   }
@@ -49,6 +72,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
       result={result}
       brands={brands}
       breadcrumb={breadcrumb}
+      banner={{ imageUrl: category.imageUrl, description: category.description }}
     />
   );
 }

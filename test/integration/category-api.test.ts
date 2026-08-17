@@ -45,6 +45,13 @@ describe.skipIf(!process.env.INTEGRATION)('category API (live DB)', () => {
       sortMode: 'POSITION',
       position: 0,
       nameDefault: 'Electronics',
+      description: null,
+      imageMediaKey: null,
+      imageUrl: null,
+      metaTitle: null,
+      metaDescription: null,
+      metaKeywords: null,
+      includeInMenu: true,
       createdAt: expect.any(String),
     });
   });
@@ -79,6 +86,52 @@ describe.skipIf(!process.env.INTEGRATION)('category API (live DB)', () => {
       .send({ nameDefault: 'Smartphones', sortMode: 'NAME', position: 5 });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ nameDefault: 'Smartphones', sortMode: 'NAME', position: 5 });
+  });
+
+  it('updates description/image/SEO fields and the includeInMenu toggle', async () => {
+    const created = await admin.post('/admin/v1/categories').send({ nameDefault: 'Shoes' });
+    const res = await admin.patch(`/admin/v1/categories/${created.body.data.publicId}`).send({
+      description: 'Great shoes.',
+      imageMediaKey: 'category-images/shoes-test.jpg',
+      metaTitle: 'Shoes | OMEShop',
+      metaDescription: 'Shop our shoes.',
+      metaKeywords: 'shoes, footwear',
+      includeInMenu: false,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      description: 'Great shoes.',
+      imageMediaKey: 'category-images/shoes-test.jpg',
+      metaTitle: 'Shoes | OMEShop',
+      metaDescription: 'Shop our shoes.',
+      metaKeywords: 'shoes, footwear',
+      includeInMenu: false,
+    });
+    expect(typeof res.body.data.imageUrl).toBe('string');
+  });
+
+  it('treats whitespace-only SEO fields as not provided (blankToUndefined)', async () => {
+    const created = await admin.post('/admin/v1/categories').send({ nameDefault: 'Bags' });
+    const res = await admin.patch(`/admin/v1/categories/${created.body.data.publicId}`).send({ metaTitle: '   ' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.metaTitle).toBeNull();
+  });
+
+  it('mints a presigned upload URL for a category image', async () => {
+    const created = await admin.post('/admin/v1/categories').send({ nameDefault: 'Watches' });
+    const res = await admin
+      .post(`/admin/v1/categories/${created.body.data.publicId}/image-upload-url`)
+      .send({ filename: 'watch.jpg', mimeType: 'image/jpeg' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.uploadUrl).toEqual(expect.any(String));
+    expect(res.body.data.imageMediaKey).toContain('category-images/watches-');
+  });
+
+  it('404s minting an image upload URL for a non-existent category', async () => {
+    const res = await admin
+      .post('/admin/v1/categories/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b/image-upload-url')
+      .send({ filename: 'x.jpg', mimeType: 'image/jpeg' });
+    expect(res.status).toBe(404);
   });
 
   it('reparents a category to a new parent', async () => {

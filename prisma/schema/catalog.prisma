@@ -333,6 +333,25 @@ model Category {
   nameDefault      String?               @map("name_default")
   /// URL-safe identifier for storefront routes (/collections/:slug). Backfilled from nameDefault for pre-existing rows.
   slug             String                @unique
+  /// Storefront-facing body copy — shown on the category's own collections
+  /// page (above the product grid), not used anywhere else.
+  description      String?               @db.Text
+  /// S3 object key for the category's listing image — single scalar column,
+  /// same convention as Website.logoMediaKey, not a gallery (one image per
+  /// category, unlike ProductMedia's multi-image relation).
+  imageMediaKey    String?               @map("image_media_key")
+  /// SEO fields for the collections page's <title>/meta tags — plain columns
+  /// (not the EAV Attribute/ProductAttributeValue mechanism Product's
+  /// meta_title/etc. use) since Category has no attribute-set concept to
+  /// hang EAV values off of.
+  metaTitle        String?               @map("meta_title") @db.VarChar(255)
+  metaDescription  String?               @map("meta_description") @db.Text
+  metaKeywords     String?               @map("meta_keywords") @db.VarChar(255)
+  /// Whether this category (and, transitively, its whole subtree — a hidden
+  /// parent hides its children from the nav too) appears in the storefront
+  /// navigation menu. Defaults true so every pre-existing category keeps
+  /// showing up unchanged.
+  includeInMenu    Boolean               @default(true) @map("include_in_menu")
   createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        BigInt?               @map("created_by")

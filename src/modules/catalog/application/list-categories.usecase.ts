@@ -8,6 +8,6 @@ export class ListCategories {
 
   async execute(): Promise<CategoryView[]> {
     const rows = await this.categories.list();
-    return rows.map(toCategoryView);
+    return Promise.all(rows.map(toCategoryView));
   }
 }

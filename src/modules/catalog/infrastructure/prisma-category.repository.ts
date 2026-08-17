@@ -16,6 +16,12 @@ const CATEGORY_SELECT = {
   sortMode: true,
   position: true,
   nameDefault: true,
+  description: true,
+  imageMediaKey: true,
+  metaTitle: true,
+  metaDescription: true,
+  metaKeywords: true,
+  includeInMenu: true,
   createdAt: true,
   parent: { select: { publicId: true } },
 } as const;
@@ -29,6 +35,12 @@ type CategoryRow = {
   sortMode: CategoryInfo['sortMode'];
   position: number;
   nameDefault: string | null;
+  description: string | null;
+  imageMediaKey: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  includeInMenu: boolean;
   createdAt: Date;
   parent: { publicId: string } | null;
 };
@@ -44,6 +56,12 @@ function mapRow(row: CategoryRow): CategoryInfo {
     sortMode: row.sortMode,
     position: row.position,
     nameDefault: row.nameDefault,
+    description: row.description,
+    imageMediaKey: row.imageMediaKey,
+    metaTitle: row.metaTitle,
+    metaDescription: row.metaDescription,
+    metaKeywords: row.metaKeywords,
+    includeInMenu: row.includeInMenu,
     createdAt: row.createdAt,
   };
 }
@@ -61,6 +79,12 @@ export class PrismaCategoryRepository implements CategoryRepository {
         type: input.type,
         sortMode: input.sortMode,
         position: input.position,
+        description: input.description,
+        imageMediaKey: input.imageMediaKey,
+        metaTitle: input.metaTitle,
+        metaDescription: input.metaDescription,
+        metaKeywords: input.metaKeywords,
+        includeInMenu: input.includeInMenu,
       },
       select: CATEGORY_SELECT,
     });
@@ -107,7 +131,17 @@ export class PrismaCategoryRepository implements CategoryRepository {
   async update(id: bigint, input: UpdateCategoryInput): Promise<CategoryInfo> {
     const row = await this.db.category.update({
       where: { id },
-      data: { nameDefault: input.nameDefault, sortMode: input.sortMode, position: input.position },
+      data: {
+        nameDefault: input.nameDefault,
+        sortMode: input.sortMode,
+        position: input.position,
+        description: input.description,
+        imageMediaKey: input.imageMediaKey,
+        metaTitle: input.metaTitle,
+        metaDescription: input.metaDescription,
+        metaKeywords: input.metaKeywords,
+        includeInMenu: input.includeInMenu,
+      },
       select: CATEGORY_SELECT,
     });
     return mapRow(row);
