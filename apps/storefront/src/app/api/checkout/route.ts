@@ -17,7 +17,15 @@ export async function POST(request: Request) {
     await clearCartId();
     return NextResponse.json(order, { status: 201 });
   } catch (err) {
-    if (err instanceof ApiError) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err instanceof ApiError) {
+      // err.message is the RFC7807 `title`, which for a Zod-schema validation
+      // failure is always the generic "Validation failed" — the actually
+      // useful, field-specific reason (e.g. "expected a valid 15-character
+      // GSTIN") lives in `errors[]` instead. Prefer that when present so the
+      // customer sees what's actually wrong, not a dead-end generic message.
+      const message = err.errors?.[0]?.message ?? err.message;
+      return NextResponse.json({ error: message }, { status: err.status });
+    }
     throw err;
   }
 }

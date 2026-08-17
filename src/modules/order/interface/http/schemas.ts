@@ -12,23 +12,33 @@ export const addCartLineSchema = z.object({
   qty: z.number().int().positive(),
 });
 
-const addressSchema = z.object({
-  name: z.string().min(1),
-  company: z.string().nullish(),
-  line1: z.string().min(1),
-  line2: z.string().nullish(),
-  city: z.string().min(1),
-  region: z.string().nullish(),
-  /** 2-digit CBIC GST state code — feeds the CGST/SGST-vs-IGST determination. */
-  stateCode: z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish(),
-  gstin: z
-    .string()
-    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'expected a valid 15-character GSTIN')
-    .nullish(),
-  postalCode: z.string().min(1),
-  country: z.string().length(2),
-  phone: z.string().nullish(),
-});
+const addressSchema = z
+  .object({
+    name: z.string().min(1),
+    company: z.string().nullish(),
+    line1: z.string().min(1),
+    line2: z.string().nullish(),
+    city: z.string().min(1),
+    region: z.string().nullish(),
+    /** 2-digit CBIC GST state code — feeds the CGST/SGST-vs-IGST determination. */
+    stateCode: z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish(),
+    gstin: z
+      .string()
+      .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'expected a valid 15-character GSTIN')
+      .nullish(),
+    postalCode: z.string().min(1),
+    country: z.string().length(2),
+    phone: z.string().nullish(),
+  })
+  // Defense in depth alongside the DB's order_address_gstin_state_match CHECK
+  // (a GSTIN's first 2 digits are its state by construction) — without this,
+  // a mismatch here hits the raw Postgres CHECK and surfaces as an unhandled
+  // 500 instead of a clean validation error, the same class of gap already
+  // fixed for the admin GST Settings form.
+  .refine((addr) => !addr.gstin || !addr.stateCode || addr.gstin.slice(0, 2) === addr.stateCode, {
+    message: "GST state must match the GSTIN's first 2 digits",
+    path: ['stateCode'],
+  });
 
 export const completeCheckoutSchema = z.object({
   email: z.string().email(),
