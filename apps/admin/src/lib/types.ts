@@ -542,3 +542,42 @@ export interface CmsBlock {
   status: CmsStatus;
   updatedAt: string;
 }
+
+export type BannerGroup = 'HERO' | 'PROMO';
+
+export interface Banner {
+  publicId: string;
+  group: BannerGroup;
+  title: string;
+  subtitle: string | null;
+  imageMediaKey: string | null;
+  imageUrl: string | null;
+  ctaLabel: string | null;
+  ctaHref: string | null;
+  position: number;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export type WidgetType =
+  | 'CMS_BLOCK'
+  | 'HERO_BANNER_SLIDER'
+  | 'PROMO_BANNER_GRID'
+  | 'CATEGORY_GRID'
+  | 'BRAND_GRID'
+  | 'WHY_CHOOSE_US_LIST'
+  | 'TESTIMONIAL_LIST';
+
+export type WidgetSection = 'TOP' | 'MIDDLE' | 'FOOTER';
+
+export interface WidgetInstance {
+  publicId: string;
+  type: WidgetType;
+  page: string;
+  section: WidgetSection;
+  position: number;
+  title: string | null;
+  isActive: boolean;
+  config: Record<string, unknown>;
+  updatedAt: string;
+}

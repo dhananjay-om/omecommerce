@@ -20,7 +20,8 @@ import {
   Store,
   FileText,
   LayoutTemplate,
-  Home,
+  Image,
+  LayoutGrid,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -56,9 +57,10 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
   {
     label: 'Content',
     items: [
-      { href: '/content/home-page', label: 'Home Page', icon: Home },
       { href: '/content/pages', label: 'Pages', icon: FileText },
       { href: '/content/blocks', label: 'Blocks', icon: LayoutTemplate },
+      { href: '/content/banners', label: 'Banners', icon: Image },
+      { href: '/content/widgets', label: 'Widgets', icon: LayoutGrid },
     ],
   },
   {

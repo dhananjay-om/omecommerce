@@ -1,0 +1,66 @@
+// =============================================================================
+// widget.prisma — Placeable content widgets, Magento "Widget Instance" style.
+//
+// Rather than a layout-XML engine, placement is plain DB rows: each row says
+// "on this page, in this zone, at this position, render a widget of this
+// type, configured like this." `page` is a plain string (not an enum) so
+// adding a page beyond "home" later needs no migration; only `page: "home"`
+// is actually wired up on the storefront this pass.
+//
+// `config` is a type-specific JSONB blob (validated by a discriminated Zod
+// union in the widget module's interface/http/schemas.ts, not just an
+// unstructured record) — same Json + @db.JsonB convention already used by
+// Theme.config/metafield.prisma's `value`, not CmsBlock.body's
+// String-plus-manual-JSON.parse pattern (that one predates this and stores
+// raw HTML, a genuinely different shape).
+//
+// Shapes by type:
+//   CMS_BLOCK           { code: string }                              — an existing CmsBlock, picked by code
+//   HERO_BANNER_SLIDER  { limit?: number }                             — active Banner rows, group=HERO
+//   PROMO_BANNER_GRID   { limit?: number }                             — active Banner rows, group=PROMO
+//   CATEGORY_GRID       { limit?: number }                             — root categories
+//   BRAND_GRID          { limit?: number }                             — brands
+//   WHY_CHOOSE_US_LIST  { features: [{ icon, title, description }] }   — icon is a fixed allowlist key, not a component
+//   TESTIMONIAL_LIST    { testimonials: [{ name, quote }] }
+// =============================================================================
+
+enum WidgetType {
+  CMS_BLOCK
+  HERO_BANNER_SLIDER
+  PROMO_BANNER_GRID
+  CATEGORY_GRID
+  BRAND_GRID
+  WHY_CHOOSE_US_LIST
+  TESTIMONIAL_LIST
+}
+
+enum WidgetSection {
+  TOP
+  MIDDLE
+  FOOTER
+}
+
+model WidgetInstance {
+  id        BigInt        @id @default(autoincrement())
+  publicId  String        @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  type      WidgetType
+  page      String        @default("home")
+  section   WidgetSection
+  position  Int           @default(0)
+  /// Optional heading rendered above the widget on the storefront (e.g. "Shop by Category").
+  title     String?
+  isActive  Boolean       @default(true) @map("is_active")
+  config    Json          @default("{}") @db.JsonB
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?       @map("created_by")
+  updatedBy BigInt?       @map("updated_by")
+  deletedAt DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  /// Real index is a partial one (`WHERE deleted_at IS NULL`, see the
+  /// migration's ix_widget_instance_active) — same override pattern as
+  /// banner.prisma's ix_banner_active / CmsPage's ix_cms_page_active.
+  @@index([page, section, isActive, position], map: "ix_widget_instance_active")
+  @@index([deletedAt])
+  @@map("widget_instance")
+}
