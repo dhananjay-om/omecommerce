@@ -10,6 +10,7 @@ const SELECT = {
   pricesIncludeTax: true,
   address: true,
   logoMediaKey: true,
+  supportEmail: true,
 } as const;
 
 export class PrismaWebsiteRepository implements WebsiteRepository {
@@ -28,6 +29,7 @@ export class PrismaWebsiteRepository implements WebsiteRepository {
       pricesIncludeTax?: boolean;
       address?: string | null;
       logoMediaKey?: string | null;
+      supportEmail?: string | null;
     },
   ): Promise<WebsiteInfo> {
     const row = await this.db.website.update({
@@ -38,6 +40,7 @@ export class PrismaWebsiteRepository implements WebsiteRepository {
         pricesIncludeTax: input.pricesIncludeTax,
         address: input.address,
         logoMediaKey: input.logoMediaKey,
+        supportEmail: input.supportEmail,
       },
       select: SELECT,
     });

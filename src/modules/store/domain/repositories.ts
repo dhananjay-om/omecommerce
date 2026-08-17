@@ -54,12 +54,18 @@ export interface WebsiteInfo {
   /** S3 object key for the invoice-letterhead logo — see store.prisma's doc comment. Use
    *  WebsiteRepository.presignLogoUrl to turn this into something displayable. */
   logoMediaKey: string | null;
+  /** Store contact email — see store.prisma's doc comment. */
+  supportEmail: string | null;
 }
 
 /** Website/Store View management is still a deliberate later addition (see
- *  store.module.ts) — this is scoped to exactly the GST registration fields
- *  (list to pick which website, update to set its gstin/originStateCode) plus
- *  invoice-letterhead branding (address/logo), not full Website CRUD. */
+ *  store.module.ts) — this is scoped to exactly two admin-facing settings
+ *  groups: GST registration (gstin/originStateCode/pricesIncludeTax) and
+ *  general store branding (address/logoMediaKey/supportEmail) — deliberately
+ *  split into two update() call shapes even though both write the same
+ *  Website row, mirroring the two separate admin pages/endpoints (General
+ *  Settings vs GST Settings) rather than one grab-bag "tax settings" update
+ *  that also happened to carry unrelated branding fields. Not full Website CRUD. */
 export interface WebsiteRepository {
   list(): Promise<WebsiteInfo[]>;
   update(
@@ -70,6 +76,7 @@ export interface WebsiteRepository {
       pricesIncludeTax?: boolean;
       address?: string | null;
       logoMediaKey?: string | null;
+      supportEmail?: string | null;
     },
   ): Promise<WebsiteInfo>;
 }
