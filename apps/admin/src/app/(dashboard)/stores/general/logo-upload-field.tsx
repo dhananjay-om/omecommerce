@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { ImageIcon } from 'lucide-react';
 import { requestLogoUpload } from './actions';
 import { Label } from '@/components/ui/label';
+import { FileUploadButton } from '@/components/ui/file-upload-button';
 
 /**
  * Direct-to-storage upload (step 1-2 of the same pattern
@@ -49,14 +51,27 @@ export function LogoUploadField({ code, initialLogoUrl }: { code: string; initia
     <div className="space-y-2">
       <Label htmlFor={`general-logo-${code}`}>Store Logo</Label>
       <input type="hidden" name="logoMediaKey" value={logoMediaKey} />
-      {previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL (or a local object URL right after upload), both per-request/dynamic
-        <img src={previewUrl} alt="Store logo" className="h-16 w-auto rounded-md border object-contain p-1" />
-      ) : null}
-      <input id={`general-logo-${code}`} type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="text-sm" />
-      {uploading ? <p className="text-sm text-muted-foreground">Uploading…</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <p className="text-xs text-muted-foreground">Shown on the invoice letterhead. Uploads immediately; takes effect once you Save below.</p>
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL (or a local object URL right after upload), both per-request/dynamic
+            <img src={previewUrl} alt="Store logo" className="size-full object-contain p-1" />
+          ) : (
+            <ImageIcon className="size-5 text-muted-foreground/50" />
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <FileUploadButton
+            id={`general-logo-${code}`}
+            accept="image/*"
+            onChange={handleFileChange}
+            disabled={uploading}
+            label={uploading ? 'Uploading…' : previewUrl ? 'Change Logo' : 'Choose Logo'}
+          />
+          <p className="text-xs text-muted-foreground">Shown on the invoice letterhead. Uploads immediately; takes effect once you Save below.</p>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+      </div>
     </div>
   );
 }

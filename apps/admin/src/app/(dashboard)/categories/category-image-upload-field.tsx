@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { ImageIcon } from 'lucide-react';
 import { requestCategoryImageUpload } from './actions';
 import { Label } from '@/components/ui/label';
+import { FileUploadButton } from '@/components/ui/file-upload-button';
 
 /**
  * Direct-to-storage upload (same presign-PUT pattern as
@@ -51,14 +53,27 @@ export function CategoryImageUploadField({ publicId, initialImageUrl, initialIma
     <div className="space-y-2">
       <Label htmlFor={`cat-image-${publicId}`}>Category Image</Label>
       <input type="hidden" name="imageMediaKey" value={imageMediaKey} />
-      {previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL (or a local object URL right after upload), both per-request/dynamic
-        <img src={previewUrl} alt="Category" className="h-24 w-auto rounded-md border object-contain p-1" />
-      ) : null}
-      <input id={`cat-image-${publicId}`} type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="text-sm" />
-      {uploading ? <p className="text-sm text-muted-foreground">Uploading…</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <p className="text-xs text-muted-foreground">Shown on the category&apos;s storefront listing page. Uploads immediately; takes effect once you Save below.</p>
+      <div className="flex items-center gap-4">
+        <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL (or a local object URL right after upload), both per-request/dynamic
+            <img src={previewUrl} alt="Category" className="size-full object-cover" />
+          ) : (
+            <ImageIcon className="size-6 text-muted-foreground/50" />
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <FileUploadButton
+            id={`cat-image-${publicId}`}
+            accept="image/*"
+            onChange={handleFileChange}
+            disabled={uploading}
+            label={uploading ? 'Uploading…' : previewUrl ? 'Change Image' : 'Choose Image'}
+          />
+          <p className="text-xs text-muted-foreground">Shown on the category&apos;s storefront listing page. Uploads immediately; takes effect once you Save below.</p>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+      </div>
     </div>
   );
 }

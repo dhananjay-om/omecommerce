@@ -8,6 +8,7 @@ import { requestUploadUrl, confirmMediaUpload, detachMedia, setThumbnail } from 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { FileUploadButton } from '@/components/ui/file-upload-button';
 import { cn } from '@/lib/utils';
 
 function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -169,8 +170,13 @@ export function ImageUploadField({ productPublicId, media }: { productPublicId: 
           })}
         </div>
       ) : null}
-      <input type="file" accept="image/*" multiple onChange={handleFileChange} disabled={uploading} className="text-sm" />
-      {uploading ? <p className="text-sm text-muted-foreground">Uploading…</p> : null}
+      <FileUploadButton
+        accept="image/*"
+        multiple
+        onChange={handleFileChange}
+        disabled={uploading}
+        label={uploading ? 'Uploading…' : 'Add Images'}
+      />
     </div>
   );
 }
