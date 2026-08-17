@@ -10,9 +10,9 @@ import { Label } from '@/components/ui/label';
  * PUTs straight to S3/MinIO, never proxied through this server) — simplified
  * since a logo has no gallery/MediaAsset row to manage. Deliberately does
  * NOT confirm/persist on its own: it just fills a hidden `logoMediaKey`
- * input on the parent GST Settings form, so the new logo only actually takes
- * effect when the admin clicks "Save GST Settings" along with everything
- * else on that page — consistent with every other field there.
+ * input on the parent General Settings form, so the new logo only actually
+ * takes effect when the admin clicks "Save General Settings" along with
+ * everything else on that page — consistent with every other field there.
  */
 export function LogoUploadField({ code, initialLogoUrl }: { code: string; initialLogoUrl: string | null }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialLogoUrl);
@@ -47,13 +47,13 @@ export function LogoUploadField({ code, initialLogoUrl }: { code: string; initia
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={`gst-logo-${code}`}>Store Logo</Label>
+      <Label htmlFor={`general-logo-${code}`}>Store Logo</Label>
       <input type="hidden" name="logoMediaKey" value={logoMediaKey} />
       {previewUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL (or a local object URL right after upload), both per-request/dynamic
         <img src={previewUrl} alt="Store logo" className="h-16 w-auto rounded-md border object-contain p-1" />
       ) : null}
-      <input id={`gst-logo-${code}`} type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="text-sm" />
+      <input id={`general-logo-${code}`} type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="text-sm" />
       {uploading ? <p className="text-sm text-muted-foreground">Uploading…</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <p className="text-xs text-muted-foreground">Shown on the invoice letterhead. Uploads immediately; takes effect once you Save below.</p>

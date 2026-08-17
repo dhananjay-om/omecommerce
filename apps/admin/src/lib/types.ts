@@ -244,6 +244,7 @@ export interface Website {
   address: string | null;
   logoMediaKey: string | null;
   logoUrl: string | null;
+  supportEmail: string | null;
 }
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';

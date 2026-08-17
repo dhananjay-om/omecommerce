@@ -80,6 +80,10 @@ model Website {
   /// invoice HTML at generation time (see invoice-branding.ts); Puppeteer's
   /// PDF renderer has no network path to fetch an external image URL.
   logoMediaKey     String?   @map("logo_media_key")
+  /// Store contact email, shown in admin "General" settings — not the
+  /// transactional "from" address (that's a deploy-time env var, unrelated),
+  /// just a store-facing contact/support address, print-only like address.
+  supportEmail     String?   @map("support_email") @db.VarChar(255)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        BigInt?   @map("created_by")

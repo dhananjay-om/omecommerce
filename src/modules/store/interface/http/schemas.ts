@@ -32,8 +32,12 @@ export const updateWebsiteTaxSettingsSchema = z.object({
   ),
   originStateCode: blankToUndefined(z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish()),
   pricesIncludeTax: z.boolean().optional(),
+});
+
+export const updateWebsiteGeneralSettingsSchema = z.object({
   address: blankToUndefined(z.string().max(500).nullish()),
   logoMediaKey: blankToUndefined(z.string().max(500).nullish()),
+  supportEmail: blankToUndefined(z.string().email('expected a valid email address').max(255).nullish()),
 });
 
 export const requestLogoUploadSchema = z.object({

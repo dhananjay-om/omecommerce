@@ -9,16 +9,24 @@ import { ListCurrencies } from './application/list-currencies.usecase.js';
 import { DeleteCurrency } from './application/delete-currency.usecase.js';
 import { ListWebsites } from './application/list-websites.usecase.js';
 import { UpdateWebsiteTaxSettings } from './application/update-website-tax-settings.usecase.js';
+import { UpdateWebsiteGeneralSettings } from './application/update-website-general-settings.usecase.js';
 import { RequestWebsiteLogoUpload } from './application/request-logo-upload.usecase.js';
-import { createCurrencySchema, updateCurrencySchema, updateWebsiteTaxSettingsSchema, requestLogoUploadSchema } from './interface/http/schemas.js';
+import {
+  createCurrencySchema,
+  updateCurrencySchema,
+  updateWebsiteTaxSettingsSchema,
+  updateWebsiteGeneralSettingsSchema,
+  requestLogoUploadSchema,
+} from './interface/http/schemas.js';
 
 export interface StoreRouters {
   admin: Router;
 }
 
-/** Composition root for the Store module ("Stores" nav section — Currency Setup
- *  and GST Settings today; full Website/Store View management is a deliberate
- *  later addition, not built here). */
+/** Composition root for the Store module ("Stores" nav section — General
+ *  Settings, Currency Setup, Tax Classes, and GST Settings today; full
+ *  Website/Store View management is a deliberate later addition, not built
+ *  here). */
 export function createStoreModule(db: Db): StoreRouters {
   const currencies = new PrismaCurrencyRepository(db);
   const websites = new PrismaWebsiteRepository(db);
@@ -29,6 +37,7 @@ export function createStoreModule(db: Db): StoreRouters {
   const deleteCurrency = new DeleteCurrency(currencies);
   const listWebsites = new ListWebsites(websites);
   const updateWebsiteTaxSettings = new UpdateWebsiteTaxSettings(websites);
+  const updateWebsiteGeneralSettings = new UpdateWebsiteGeneralSettings(websites);
   const requestWebsiteLogoUpload = new RequestWebsiteLogoUpload(websites);
 
   const admin = Router();
@@ -78,6 +87,15 @@ export function createStoreModule(db: Db): StoreRouters {
     asyncHandler(async (req, res) => {
       const body = parse(updateWebsiteTaxSettingsSchema, req.body);
       const view = await updateWebsiteTaxSettings.execute({ code: req.params.code!, ...body });
+      res.json({ data: view });
+    }),
+  );
+
+  admin.patch(
+    '/websites/:code/general-settings',
+    asyncHandler(async (req, res) => {
+      const body = parse(updateWebsiteGeneralSettingsSchema, req.body);
+      const view = await updateWebsiteGeneralSettings.execute({ code: req.params.code!, ...body });
       res.json({ data: view });
     }),
   );

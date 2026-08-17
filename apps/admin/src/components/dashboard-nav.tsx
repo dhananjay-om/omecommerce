@@ -17,6 +17,7 @@ import {
   Percent,
   Receipt,
   Landmark,
+  Store,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -52,6 +53,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
   {
     label: 'Stores',
     items: [
+      { href: '/stores/general', label: 'General', icon: Store },
       { href: '/stores/currencies', label: 'Currency Setup', icon: Coins },
       { href: '/stores/tax-classes', label: 'Tax Classes', icon: Receipt },
       { href: '/stores/gst-settings', label: 'GST Settings', icon: Landmark },
