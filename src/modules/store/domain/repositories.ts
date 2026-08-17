@@ -49,13 +49,27 @@ export interface WebsiteInfo {
   gstin: string | null;
   originStateCode: string | null;
   pricesIncludeTax: boolean;
+  /** Freeform, print-only mailing address for the invoice letterhead — see store.prisma's doc comment. */
+  address: string | null;
+  /** S3 object key for the invoice-letterhead logo — see store.prisma's doc comment. Use
+   *  WebsiteRepository.presignLogoUrl to turn this into something displayable. */
+  logoMediaKey: string | null;
 }
 
 /** Website/Store View management is still a deliberate later addition (see
  *  store.module.ts) — this is scoped to exactly the GST registration fields
- *  (list to pick which website, update to set its gstin/originStateCode),
- *  not full Website CRUD. */
+ *  (list to pick which website, update to set its gstin/originStateCode) plus
+ *  invoice-letterhead branding (address/logo), not full Website CRUD. */
 export interface WebsiteRepository {
   list(): Promise<WebsiteInfo[]>;
-  update(code: string, input: { gstin?: string | null; originStateCode?: string | null; pricesIncludeTax?: boolean }): Promise<WebsiteInfo>;
+  update(
+    code: string,
+    input: {
+      gstin?: string | null;
+      originStateCode?: string | null;
+      pricesIncludeTax?: boolean;
+      address?: string | null;
+      logoMediaKey?: string | null;
+    },
+  ): Promise<WebsiteInfo>;
 }

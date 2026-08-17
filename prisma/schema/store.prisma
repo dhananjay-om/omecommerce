@@ -70,6 +70,16 @@ model Website {
   /// (default, matches every website created before this column existed),
   /// prices are tax-exclusive and GST is added on top, unchanged behavior.
   pricesIncludeTax Boolean   @default(false) @map("prices_include_tax")
+  /// Freeform, print-only mailing address shown on the invoice letterhead —
+  /// deliberately not structured (unlike OrderAddress/CustomerAddress), since
+  /// nothing computes against it; it's never compared to a customer's state
+  /// or used for tax logic, which already has originStateCode for that.
+  address          String?   @db.Text
+  /// S3 object key for the invoice-letterhead logo (same key convention as
+  /// MediaAsset.storageKey) — resolved to bytes and base64-embedded into the
+  /// invoice HTML at generation time (see invoice-branding.ts); Puppeteer's
+  /// PDF renderer has no network path to fetch an external image URL.
+  logoMediaKey     String?   @map("logo_media_key")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        BigInt?   @map("created_by")

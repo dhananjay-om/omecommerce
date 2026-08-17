@@ -2,11 +2,13 @@
 
 import { useActionState } from 'react';
 import { updateGstSettings, type ActionState } from './actions';
+import { LogoUploadField } from './logo-upload-field';
 import type { Website } from '@/lib/types';
 import { GST_STATES } from '@/lib/gst-states';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const initialState: ActionState = { error: null, success: false };
@@ -61,6 +63,21 @@ export function GstSettingsForm({ website }: { website: Website }) {
           (MRP-style) — GST is backed out of it instead of added at checkout, so the price shown to shoppers is the
           price they pay.
         </p>
+      </div>
+      <div className="space-y-4 border-t pt-4">
+        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Invoice Letterhead</p>
+        <div className="space-y-2">
+          <Label htmlFor={`gst-address-${website.code}`}>Store Address</Label>
+          <Textarea
+            id={`gst-address-${website.code}`}
+            name="address"
+            rows={3}
+            defaultValue={website.address ?? ''}
+            placeholder={'123 Business Park\nAndheri East, Mumbai, Maharashtra 400069\nIndia'}
+          />
+          <p className="text-xs text-muted-foreground">Printed on the invoice — one line per address line, not used for tax calculation.</p>
+        </div>
+        <LogoUploadField code={website.code} initialLogoUrl={website.logoUrl} />
       </div>
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
       {state.success ? <p className="text-sm text-success">Saved.</p> : null}

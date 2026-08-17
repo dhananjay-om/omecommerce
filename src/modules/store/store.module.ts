@@ -9,7 +9,8 @@ import { ListCurrencies } from './application/list-currencies.usecase.js';
 import { DeleteCurrency } from './application/delete-currency.usecase.js';
 import { ListWebsites } from './application/list-websites.usecase.js';
 import { UpdateWebsiteTaxSettings } from './application/update-website-tax-settings.usecase.js';
-import { createCurrencySchema, updateCurrencySchema, updateWebsiteTaxSettingsSchema } from './interface/http/schemas.js';
+import { RequestWebsiteLogoUpload } from './application/request-logo-upload.usecase.js';
+import { createCurrencySchema, updateCurrencySchema, updateWebsiteTaxSettingsSchema, requestLogoUploadSchema } from './interface/http/schemas.js';
 
 export interface StoreRouters {
   admin: Router;
@@ -28,6 +29,7 @@ export function createStoreModule(db: Db): StoreRouters {
   const deleteCurrency = new DeleteCurrency(currencies);
   const listWebsites = new ListWebsites(websites);
   const updateWebsiteTaxSettings = new UpdateWebsiteTaxSettings(websites);
+  const requestWebsiteLogoUpload = new RequestWebsiteLogoUpload(websites);
 
   const admin = Router();
 
@@ -77,6 +79,15 @@ export function createStoreModule(db: Db): StoreRouters {
       const body = parse(updateWebsiteTaxSettingsSchema, req.body);
       const view = await updateWebsiteTaxSettings.execute({ code: req.params.code!, ...body });
       res.json({ data: view });
+    }),
+  );
+
+  admin.post(
+    '/websites/:code/logo-upload-url',
+    asyncHandler(async (req, res) => {
+      const body = parse(requestLogoUploadSchema, req.body);
+      const result = await requestWebsiteLogoUpload.execute({ code: req.params.code!, ...body });
+      res.status(201).json({ data: result });
     }),
   );
 

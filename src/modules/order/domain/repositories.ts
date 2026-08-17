@@ -95,7 +95,16 @@ export interface TaxClassRepository {
  *  scope — see store.prisma's Website.gstin/.originStateCode doc comment). Own
  *  copy, per-module lookup convention. */
 export interface WebsiteTaxConfigLookup {
-  byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null; pricesIncludeTax: boolean } | null>;
+  byId(websiteId: bigint): Promise<{
+    name: string;
+    gstin: string | null;
+    originStateCode: string | null;
+    pricesIncludeTax: boolean;
+    /** Freeform print-only address for the invoice letterhead — see store.prisma's Website.address doc comment. */
+    address: string | null;
+    /** S3 key for the invoice-letterhead logo — see store.prisma's Website.logoMediaKey doc comment. */
+    logoMediaKey: string | null;
+  } | null>;
 }
 
 export interface ShippingMethodInfo {

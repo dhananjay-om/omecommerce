@@ -2,6 +2,7 @@ import type { OrderRepository, WebsiteTaxConfigLookup } from '../domain/reposito
 import type { PdfRenderer, PdfStorage } from '../domain/ports.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { buildInvoiceHtml } from '../infrastructure/invoice-template.js';
+import { resolveInvoiceBranding } from '../infrastructure/invoice-branding.js';
 import type { OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
@@ -21,7 +22,8 @@ export class RegenerateInvoice {
     if (!invoice) throw new NotFoundError('Invoice', invoicePublicId);
 
     const sellerConfig = await this.websiteTaxConfig.byId(order.websiteId);
-    const html = buildInvoiceHtml(order, invoice, sellerConfig?.gstin ?? null);
+    const branding = await resolveInvoiceBranding(sellerConfig ?? { name: 'Store', gstin: null, address: null, logoMediaKey: null });
+    const html = await buildInvoiceHtml(order, invoice, branding);
     const pdf = await this.pdfRenderer.render(html);
     const key = invoice.pdfStorageKey ?? `invoices/${order.publicId}/${invoice.publicId}.pdf`;
     await this.pdfStorage.store(key, pdf);
