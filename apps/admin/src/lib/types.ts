@@ -241,6 +241,9 @@ export interface Website {
   gstin: string | null;
   originStateCode: string | null;
   pricesIncludeTax: boolean;
+  address: string | null;
+  logoMediaKey: string | null;
+  logoUrl: string | null;
 }
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';

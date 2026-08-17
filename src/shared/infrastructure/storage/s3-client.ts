@@ -95,3 +95,20 @@ export async function putObject(key: string, body: Buffer, contentType: string):
   const { client, bucket } = getClient();
   await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }));
 }
+
+/**
+ * Server-side direct read — the counterpart to putObject, for the rare case
+ * where the backend needs an object's actual bytes in memory rather than a
+ * URL to hand to a browser. First use: base64-embedding a website's logo
+ * into invoice HTML before it's handed to Puppeteer, which renders from a
+ * bare HTML string with no network path to resolve an external image URL
+ * (see invoice-branding.ts). Throws if the key doesn't exist — callers that
+ * treat a missing/deleted object as "no logo" rather than a hard failure
+ * catch this themselves.
+ */
+export async function getObjectBytes(key: string): Promise<Buffer> {
+  const { client, bucket } = getClient();
+  const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const bytes = await result.Body!.transformToByteArray();
+  return Buffer.from(bytes);
+}

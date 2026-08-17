@@ -27,12 +27,20 @@ export class PrismaTaxClassLookup implements TaxClassLookup {
 export class PrismaWebsiteTaxConfigLookup implements WebsiteTaxConfigLookup {
   constructor(private readonly db: Db) {}
 
-  async byId(websiteId: bigint): Promise<{ gstin: string | null; originStateCode: string | null; pricesIncludeTax: boolean } | null> {
+  async byId(websiteId: bigint) {
     const row = await this.db.website.findFirst({
       where: { id: websiteId },
-      select: { gstin: true, originStateCode: true, pricesIncludeTax: true },
+      select: { name: true, gstin: true, originStateCode: true, pricesIncludeTax: true, address: true, logoMediaKey: true },
     });
-    return row ? { gstin: row.gstin, originStateCode: row.originStateCode, pricesIncludeTax: row.pricesIncludeTax } : null;
+    if (!row) return null;
+    return {
+      name: row.name,
+      gstin: row.gstin,
+      originStateCode: row.originStateCode,
+      pricesIncludeTax: row.pricesIncludeTax,
+      address: row.address,
+      logoMediaKey: row.logoMediaKey,
+    };
   }
 }
 

@@ -1,5 +1,6 @@
 import type { WebsiteRepository } from '../domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+import { presignGetUrl } from '../../../shared/infrastructure/storage/s3-client.js';
 import type { UpdateWebsiteTaxSettingsCommand, WebsiteView } from './dto.js';
 
 /** GST Settings admin page (single-registration/single-state scope — see
@@ -35,6 +36,8 @@ export class UpdateWebsiteTaxSettings {
       gstin: cmd.gstin,
       originStateCode: cmd.originStateCode,
       pricesIncludeTax: cmd.pricesIncludeTax,
+      address: cmd.address,
+      logoMediaKey: cmd.logoMediaKey,
     });
     return {
       publicId: w.publicId,
@@ -43,6 +46,9 @@ export class UpdateWebsiteTaxSettings {
       gstin: w.gstin,
       originStateCode: w.originStateCode,
       pricesIncludeTax: w.pricesIncludeTax,
+      address: w.address,
+      logoMediaKey: w.logoMediaKey,
+      logoUrl: w.logoMediaKey ? await presignGetUrl(w.logoMediaKey) : null,
     };
   }
 }

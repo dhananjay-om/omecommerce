@@ -29,6 +29,7 @@
     "@opensearch-project/opensearch": "^2.13.0",
     "@prisma/client": "^5.19.0",
     "bullmq": "^5.12.0",
+    "bwip-js": "^4.11.2",
     "csv-stringify": "^6.8.1",
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",

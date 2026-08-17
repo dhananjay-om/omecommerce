@@ -4,6 +4,7 @@ import { NotFoundError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError, InvoiceExceedsQtyError } from '../domain/errors.js';
 import { addMinor, subtractMinor, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { buildInvoiceHtml } from '../infrastructure/invoice-template.js';
+import { resolveInvoiceBranding } from '../infrastructure/invoice-branding.js';
 import type { CreateInvoiceCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
@@ -87,7 +88,8 @@ export class CreateInvoice {
     });
 
     const sellerConfig = await this.websiteTaxConfig.byId(order.websiteId);
-    const html = buildInvoiceHtml(order, invoice, sellerConfig?.gstin ?? null);
+    const branding = await resolveInvoiceBranding(sellerConfig ?? { name: 'Store', gstin: null, address: null, logoMediaKey: null });
+    const html = await buildInvoiceHtml(order, invoice, branding);
     const pdf = await this.pdfRenderer.render(html);
     const key = `invoices/${order.publicId}/${invoice.publicId}.pdf`;
     await this.pdfStorage.store(key, pdf);
