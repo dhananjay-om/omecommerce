@@ -16,6 +16,10 @@ export interface Cart {
   publicId: string;
   currency: string;
   status: string;
+  /** Resolved CustomerGroup display name when the cart has one (company membership,
+   *  the customer's own group, or the website default), null for guests/base pricing
+   *  — drives the "your company pricing is applied" summary line. */
+  customerGroupName: string | null;
   lines: CartLine[];
   subtotal: string | null;
   couponCode: string | null;

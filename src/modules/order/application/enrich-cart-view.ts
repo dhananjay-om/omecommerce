@@ -1,4 +1,4 @@
-import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup, TaxClassLookup, CartTenderView } from '../domain/repositories.js';
+import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup, TaxClassLookup, CartTenderView, CustomerGroupLookup } from '../domain/repositories.js';
 import type { MediaUrlResolver } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { DiscountCalculator, DiscountLineInput } from '../../coupon/domain/repositories.js';
@@ -42,6 +42,7 @@ export class EnrichCartView {
     private readonly taxClasses: TaxClassLookup,
     private readonly wallets: WalletLedger,
     private readonly giftCards: GiftCardLedger,
+    private readonly customerGroups: CustomerGroupLookup,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -153,11 +154,13 @@ export class EnrichCartView {
     });
 
     const { tenders, amountDue, tenderError } = await this.resolveTenders(cart, estimatedTotal);
+    const customerGroup = cart.customerGroupId ? await this.customerGroups.byId(cart.customerGroupId) : null;
 
     return {
       publicId: cart.publicId,
       currency: cart.currency,
       status: cart.status,
+      customerGroupName: customerGroup?.name ?? null,
       lines: linesWithDiscount,
       subtotal,
       couponCode,

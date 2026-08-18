@@ -25,6 +25,7 @@ import {
   CreditCard,
   Award,
   Share2,
+  Building2,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,10 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/loyalty', label: 'Loyalty Program', icon: Award },
       { href: '/referrals', label: 'Referrals', icon: Share2 },
     ],
+  },
+  {
+    label: 'B2B',
+    items: [{ href: '/companies', label: 'Companies', icon: Building2 }],
   },
   {
     label: 'Content',

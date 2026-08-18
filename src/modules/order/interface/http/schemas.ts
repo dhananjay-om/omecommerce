@@ -11,10 +11,13 @@ function blankToUndefined(schema: z.ZodTypeAny) {
   return z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), schema);
 }
 
+// plan/15 Phase 6 — customerGroupCode is intentionally gone: a plain
+// z.object() (not .strict()) silently strips any unknown field a stale
+// client still sends, rather than erroring — the group is always
+// server-derived now regardless of what the request body contains.
 export const createCartSchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'expected numeric id'),
   customerPublicId: z.string().uuid().nullish(),
-  customerGroupCode: z.string().min(1).nullish(),
 });
 
 export const addCartLineSchema = z.object({
@@ -69,6 +72,7 @@ export const completeCheckoutSchema = z.object({
   // present whenever anything is still due after wallet/gift-card tenders.
   paymentMethod: z.string().min(1).optional(),
   testScenario: z.enum(['approve', 'decline']).optional(),
+  poNumber: z.string().max(64).nullish(),
 });
 
 export const fulfillOrderSchema = z.object({

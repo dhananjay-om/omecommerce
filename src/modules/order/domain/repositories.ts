@@ -36,6 +36,10 @@ export interface CartProductMediaLookup {
  * module's domain/repositories.ts directly. */
 export interface CustomerGroupLookup {
   byCode(code: string): Promise<{ id: bigint } | null>;
+  /** plan/15 Phase 6 — the fallback tier of resolveCustomerGroupId()'s precedence chain (company -> customer's own group -> default group -> null), backed by pricing.prisma's `uq_one_default_customer_group` partial unique index, so at most one row can ever match. */
+  findDefault(): Promise<{ id: bigint } | null>;
+  /** plan/15 Phase 6 — EnrichCartView's "your company pricing is applied" cart-summary line needs the resolved group's display name. */
+  byId(id: bigint): Promise<{ name: string } | null>;
 }
 
 /** Resolves a logged-in customer's publicId to their internal id, so a cart (and the order it becomes) can carry it (own trivial copy, per-module convention). */
@@ -43,6 +47,25 @@ export interface CustomerLookup {
   findIdByPublicId(customerPublicId: string): Promise<bigint | null>;
   /** Reverse direction — plan/15 Phase 0e needs it to credit a wallet (keyed by publicId) from an order's internal customerId. */
   findPublicIdById(customerId: bigint): Promise<string | null>;
+  /** plan/15 Phase 6 — the middle tier of resolveCustomerGroupId()'s precedence chain: a registered customer's own (pre-B2B) group assignment, used when they have no active company membership. */
+  findGroupIdByCustomerId(customerId: bigint): Promise<bigint | null>;
+}
+
+/**
+ * plan/15 Phase 6 — read-only cross-module lookup into the Company module's
+ * tables (own copy, per-module convention — not company module's own
+ * repository). Only ever returns an ACTIVE company's membership: a
+ * PENDING/SUSPENDED/REJECTED company must not grant its pricing/tax terms,
+ * so those simply resolve as "no membership" here rather than the caller
+ * having to re-check status itself.
+ */
+export interface CompanyMembershipLookup {
+  findActiveByCustomerId(customerId: bigint): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean } | null>;
+}
+
+/** plan/15 Phase 6 — admin/storefront order-detail "company" badge/link (own copy, not company module's own repository). */
+export interface CompanyLookup {
+  byId(companyId: bigint): Promise<{ publicId: string; name: string } | null>;
 }
 
 /** plan/15 Phase 0b — resolves the acting admin (from the JWT's adminUserPublicId claim) to an id + display name for order_status_history/order_note's actor columns. Own copy, per-module convention — AdminUser has no `name` column, so email is the display name. */
@@ -182,6 +205,15 @@ export interface CartRepository {
   addTender(cartId: bigint, tenderType: TenderType, giftCardId: bigint | null): Promise<void>;
   /** No-op if the tender isn't present. */
   removeTender(cartId: bigint, tenderType: TenderType, giftCardId: bigint | null): Promise<void>;
+
+  /**
+   * plan/15 Phase 6 — claims a guest cart for a just-logged-in customer and
+   * re-derives its pricing group (today, the group is only ever set at cart
+   * *creation*, so filling a cart before logging in silently kept retail
+   * pricing forever). Only ever called on a cart that has no customer yet —
+   * AttachCustomerToCart enforces that, this method trusts its caller.
+   */
+  attachCustomer(cartId: bigint, customerId: bigint, customerGroupId: bigint | null): Promise<void>;
 }
 
 // --- Order ---
@@ -236,6 +268,13 @@ export interface CreateOrderInput {
   storeViewId: bigint;
   customerId: bigint | null;
   customerGroupId: bigint | null;
+  /** plan/15 Phase 6 — resolved FRESH at checkout time from the buyer's
+   *  company membership (not inherited from Cart, unlike customerGroupId
+   *  above) and then snapshotted — a company's status/taxExempt flag
+   *  changing later must never retroactively alter an already-placed order. */
+  companyId: bigint | null;
+  taxExempt: boolean;
+  poNumber: string | null;
   email: string;
   currency: string;
   customerIp?: string | null;
@@ -445,6 +484,10 @@ export interface OrderView {
   /** plan/15 Phase 11 — Reorder needs the original store view to create the new cart in the same scope. */
   storeViewId: bigint;
   customerId: bigint | null;
+  /** plan/15 Phase 6 — snapshotted at checkout, see CreateOrderInput's identical field for why these aren't derived from Cart. */
+  companyId: bigint | null;
+  taxExempt: boolean;
+  poNumber: string | null;
   email: string;
   currency: string;
   status: string;

@@ -1,15 +1,23 @@
-import type { CartRepository, CustomerGroupLookup, CustomerLookup } from '../domain/repositories.js';
+import type { CartRepository, CustomerGroupLookup, CustomerLookup, CompanyMembershipLookup } from '../domain/repositories.js';
 import type { StoreContextResolver } from '../../../shared/application/scope.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import type { CreateCartCommand, CartView } from './dto.js';
 import type { EnrichCartView } from './enrich-cart-view.js';
+import { resolveCustomerGroupId } from './resolve-customer-group.js';
 
+/**
+ * plan/15 Phase 6 — no longer accepts a client-supplied group; the pricing
+ * group is always server-derived via resolveCustomerGroupId() (company
+ * membership -> customer's own group -> website default -> null for
+ * guests). See that function's doc comment for the full rationale.
+ */
 export class CreateCart {
   constructor(
     private readonly carts: CartRepository,
     private readonly storeContext: StoreContextResolver,
     private readonly customerGroups: CustomerGroupLookup,
     private readonly customers: CustomerLookup,
+    private readonly companyMemberships: CompanyMembershipLookup,
     private readonly enrichCartView: EnrichCartView,
   ) {}
 
@@ -20,18 +28,13 @@ export class CreateCart {
     const ctx = await this.storeContext.byStoreViewId(BigInt(cmd.storeViewId));
     if (!ctx) throw new NotFoundError('StoreView', cmd.storeViewId);
 
-    let customerGroupId: bigint | null = null;
-    if (cmd.customerGroupCode) {
-      const group = await this.customerGroups.byCode(cmd.customerGroupCode);
-      if (!group) throw new NotFoundError('CustomerGroup', cmd.customerGroupCode);
-      customerGroupId = group.id;
-    }
-
     let customerId: bigint | null = null;
     if (cmd.customerPublicId) {
       customerId = await this.customers.findIdByPublicId(cmd.customerPublicId);
       if (!customerId) throw new NotFoundError('customer', cmd.customerPublicId);
     }
+
+    const customerGroupId = await resolveCustomerGroupId(customerId, this.companyMemberships, this.customers, this.customerGroups);
 
     const cart = await this.carts.create({
       websiteId: ctx.websiteId,

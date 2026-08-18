@@ -94,6 +94,13 @@ export class NativeGstTaxCalculator implements TaxCalculator {
         taxableAmountMinor = line.lineSubtotalMinor;
         amountMinor = applyRate(line.lineSubtotalMinor, taxClass.rateMinor);
       }
+      // plan/15 Phase 6 — a tax-exempt B2B buyer still gets tax correctly
+      // backed OUT of a tax-inclusive price above (taxableAmountMinor is
+      // computed identically either way, so they pay the ex-tax price, not
+      // the same sticker price as retail); only the amount actually
+      // collected is zeroed. splitGst() already no-ops on a zero amount, so
+      // this naturally yields an empty breakdown -> zero OrderTaxLine rows.
+      if (context.taxExempt) amountMinor = 0n;
       const breakdown = splitGst(taxClass.rateMinor, amountMinor, originStateCode, context.destinationStateCode);
       results.push({ variantId: line.variantId, taxClassCode: taxClass.code, rateMinor: taxClass.rateMinor, amountMinor, taxableAmountMinor, breakdown });
     }

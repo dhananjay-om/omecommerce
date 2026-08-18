@@ -86,6 +86,12 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
             </span>
           </div>
 
+          {displayCart.customerGroupName ? (
+            <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+              Your <span className="font-medium text-foreground">{displayCart.customerGroupName}</span> pricing is applied to this order.
+            </p>
+          ) : null}
+
           <CouponField cart={displayCart} />
           <GiftCardField cart={displayCart} />
           <WalletToggle cart={displayCart} />

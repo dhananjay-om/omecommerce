@@ -1,0 +1,99 @@
+// =============================================================================
+// company.prisma — B2B company accounts (plan/15 Phase 6).
+//
+// SCOPE FOR THIS PASS: company accounts + multi-user membership + group-scoped
+// pricing + tax exemption. Explicitly NOT built this pass (documented
+// deferrals): quotes/RFQ, spending-approval chains, Net-30 credit terms
+// (plan/15 Phase 7 — CompanyCreditAccount hangs off Company but doesn't exist
+// yet), multi-company buyers (CompanyCustomer.customerId is unique — one
+// buyer belongs to at most one company, by design, not an oversight).
+//
+// - Company.customerGroupId is a REAL Prisma relation (mirrors
+//   PriceList.customerGroup exactly) — a company IS an assignment into the
+//   existing group-scoped pricing machinery, not a scope discriminator, so
+//   it gets the same relation treatment PriceList already established.
+// - Company.websiteId is a bare scalar + raw-SQL FK (ON DELETE RESTRICT) —
+//   the project-wide scope-FK convention (see storedvalue.prisma's identical
+//   websiteId fields) — avoids a noisy Website.companies[] back-relation.
+// - CompanyCustomer.customerId is UNIQUE and a real Prisma relation
+//   (mirrors Wallet.customer exactly) — one buyer belongs to at most one
+//   company, keeping group/tax-exemption resolution a single indexed lookup
+//   from a customerId, no ambiguity about "which of several companies".
+// - Soft-deletable (deletedAt), matching every other business/master-data
+//   table in this schema (Customer, GiftCard, CustomerGroup, PriceList) —
+//   status (PENDING/ACTIVE/SUSPENDED/REJECTED) covers "not currently usable"
+//   states; deletedAt covers "this record shouldn't exist at all" (created
+//   by mistake), a genuinely separate concern.
+// =============================================================================
+
+model Company {
+  id                  BigInt        @id @default(autoincrement())
+  publicId            String        @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  websiteId           BigInt        @map("website_id") // scope scalar; FK added in raw SQL
+  /// Unique per website (not globally) — matches Customer.email's
+  /// [websiteId, email] scoping, since a multi-website deployment can
+  /// legitimately reuse the same company code on two separate storefronts.
+  code                String        @db.Citext
+  name                String
+  status              CompanyStatus @default(PENDING)
+  /// Nullable — a company can exist before an admin assigns it a price list
+  /// scope (falls back to default/retail pricing for its members until then).
+  customerGroupId     BigInt?       @map("customer_group_id")
+  taxExempt           Boolean       @default(false) @map("tax_exempt")
+  /// Freeform exemption certificate/reference number — print-only, not
+  /// itself validated (matches GstSettingsForm's gstin field precedent:
+  /// application-layer format checks, not a DB CHECK, for freeform
+  /// compliance text that varies by jurisdiction).
+  taxExemptionRef     String?       @map("tax_exemption_ref")
+  /// The company's own billing GSTIN — distinct from the selling website's
+  /// own GSTIN (Website.gstin) and from any individual order's captured
+  /// billing-address GSTIN (OrderAddress.gstin); this is the company's
+  /// permanent, on-file registration number.
+  gstin               String?       @db.VarChar(15)
+  billingContactName  String?       @map("billing_contact_name")
+  billingContactEmail String?       @map("billing_contact_email")
+  billingContactPhone String?       @map("billing_contact_phone")
+  version             Int           @default(0)
+  createdBy           BigInt?       @map("created_by")
+  updatedBy           BigInt?       @map("updated_by")
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  customerGroup CustomerGroup?    @relation(fields: [customerGroupId], references: [id])
+  members       CompanyCustomer[]
+
+  @@unique([websiteId, code], map: "uq_company_website_code")
+  @@index([deletedAt])
+  @@index([websiteId, status])
+  @@index([customerGroupId])
+  @@map("company")
+}
+
+/// Membership row: which customer belongs to which company, and with what
+/// role. ADMIN can manage the company's own buyer list (storefront
+/// /account/company member management); BUYER can only shop under the
+/// company's pricing/tax-exemption. No spending-approval chain this pass —
+/// both roles can place orders freely once the company itself is ACTIVE.
+// No createdBy/updatedBy here (unlike Company): a membership row can be
+// created either by an admin (admin_user.id) or by the company's own
+// ADMIN-role buyer self-service (customer.id) — two different id spaces
+// that a single unconstrained BigInt? actor column would conflate. Not
+// pure self-service like CustomerAddress either, but the same "who did
+// this" concern is already covered at the Company level for anything that
+// matters for audit (approval/suspension); per-member actor attribution
+// is deferred rather than half-modeled.
+model CompanyCustomer {
+  id         BigInt            @id @default(autoincrement())
+  companyId  BigInt            @map("company_id")
+  customerId BigInt            @unique @map("customer_id")
+  role       CompanyMemberRole @default(BUYER)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_customer")
+}

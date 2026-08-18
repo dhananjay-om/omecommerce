@@ -480,6 +480,11 @@ export interface OrderDetail {
   customerIp: string | null;
   placedAt: string;
   closedAt: string | null;
+  /** plan/reflective-prancing-sonnet Phase 6 (B2B) — tax-exempt orders (company purchase orders). */
+  taxExempt: boolean;
+  poNumber: string | null;
+  companyPublicId: string | null;
+  companyName: string | null;
   lines: OrderLine[];
   addresses: OrderAddress[];
   taxLines: OrderTaxLine[];
@@ -771,4 +776,48 @@ export interface AdminReferralList {
   page: number;
   pageSize: number;
   referrals: AdminReferralListItem[];
+}
+
+/** plan/reflective-prancing-sonnet Phase 6 — B2B Company support. */
+export type CompanyStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED';
+export type CompanyMemberRole = 'ADMIN' | 'BUYER';
+
+export interface Company {
+  publicId: string;
+  websiteCode: string;
+  code: string;
+  name: string;
+  status: CompanyStatus;
+  customerGroupCode: string | null;
+  customerGroupName: string | null;
+  taxExempt: boolean;
+  taxExemptionRef: string | null;
+  gstin: string | null;
+  billingContactName: string | null;
+  billingContactEmail: string | null;
+  billingContactPhone: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyListItem {
+  publicId: string;
+  code: string;
+  name: string;
+  status: CompanyStatus;
+  createdAt: string;
+}
+
+export interface CompanyList {
+  total: number;
+  page: number;
+  pageSize: number;
+  companies: CompanyListItem[];
+}
+
+export interface CompanyMember {
+  customerPublicId: string;
+  email: string;
+  role: CompanyMemberRole;
+  createdAt: string;
 }

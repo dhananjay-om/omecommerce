@@ -190,6 +190,15 @@ model Order {
   cartId             BigInt?           @unique @map("cart_id")
   customerId         BigInt?           @map("customer_id") // FK -> customer(id) ON DELETE RESTRICT, added in prisma/sql/0006_customer_raw.sql; NULL = guest
   customerGroupId    BigInt?           @map("customer_group_id")
+  // companyId/taxExempt/poNumber (plan/15 Phase 6) are resolved FRESH at
+  // checkout time from the buyer's company membership (not inherited from
+  // Cart, unlike customerGroupId) and then SNAPSHOTTED here — a company's
+  // status/taxExempt flag changing later must never retroactively alter an
+  // already-placed order. FK -> company(id) ON DELETE RESTRICT, added in
+  // prisma/sql/0013_company_raw.sql; NULL = not a B2B order.
+  companyId          BigInt?           @map("company_id")
+  taxExempt          Boolean           @default(false) @map("tax_exempt")
+  poNumber           String?           @map("po_number")
   email              String
   currency           String            @db.Char(3)
   status             OrderStatus       @default(PENDING)
@@ -230,6 +239,7 @@ model Order {
   @@index([storeId])
   @@index([storeViewId])
   @@index([customerGroupId])
+  @@index([companyId, createdAt])
   @@index([email])
   @@index([status])
   @@index([createdAt])

@@ -1,4 +1,4 @@
-import type { OrderRepository, CustomerLookup } from '../domain/repositories.js';
+import type { OrderRepository, CustomerLookup, CompanyLookup } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import type { OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
@@ -14,6 +14,7 @@ export class GetCustomerOrder {
   constructor(
     private readonly orders: OrderRepository,
     private readonly customers: CustomerLookup,
+    private readonly companies: CompanyLookup,
   ) {}
 
   async execute(customerPublicId: string, orderPublicId: string): Promise<OrderViewDto> {
@@ -24,6 +25,12 @@ export class GetCustomerOrder {
     if (!order || order.customerId !== customerId) throw new NotFoundError('Order', orderPublicId);
 
     const dto = toOrderDto(order);
-    return { ...dto, notes: dto.notes.filter((n) => n.type === 'CUSTOMER') };
+    const company = order.companyId ? await this.companies.byId(order.companyId) : null;
+    return {
+      ...dto,
+      notes: dto.notes.filter((n) => n.type === 'CUSTOMER'),
+      companyPublicId: company?.publicId ?? null,
+      companyName: company?.name ?? null,
+    };
   }
 }
