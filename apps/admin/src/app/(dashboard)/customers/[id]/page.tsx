@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
 import type { CustomerDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 
+/** The "Overview" tab — name/email/status chrome now lives in the shared [id]/layout.tsx. */
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const customer = await apiGet<CustomerDetail>(`/admin/v1/customers/${id}`);
@@ -12,17 +12,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <Link href="/customers" className="text-sm text-muted-foreground hover:underline">
-          ← Back to Customers
-        </Link>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">{name || customer.email}</h1>
-          <Badge variant={customer.isActive ? 'success' : 'secondary'}>{customer.isActive ? 'Active' : 'Inactive'}</Badge>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">{customer.email}</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>

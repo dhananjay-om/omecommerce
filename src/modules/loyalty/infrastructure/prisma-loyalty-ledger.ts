@@ -1,4 +1,4 @@
-import type { LoyaltySource, LoyaltyTxnType } from '@prisma/client';
+import { Prisma, type LoyaltySource, type LoyaltyTxnType } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import type {
   LoyaltyLedger,
@@ -73,12 +73,24 @@ export class PrismaLoyaltyLedger implements LoyaltyLedger {
   constructor(private readonly db: Db) {}
 
   async getOrCreateAccount(customerId: bigint, programId: bigint): Promise<{ id: bigint; publicId: string }> {
-    const account = await this.db.loyaltyAccount.upsert({
-      where: { customerId_programId: { customerId, programId } },
-      update: {},
-      create: { customerId, programId },
-    });
-    return { id: account.id, publicId: account.publicId };
+    try {
+      const account = await this.db.loyaltyAccount.upsert({
+        where: { customerId_programId: { customerId, programId } },
+        update: {},
+        create: { customerId, programId },
+      });
+      return { id: account.id, publicId: account.publicId };
+    } catch (err) {
+      // Same concurrent-lazy-create race as Wallet's getOrCreateWallet (see
+      // its identical comment) — two callers racing to lazy-create the same
+      // brand-new customer's account can both lose upsert()'s own conflict
+      // resolution; the loser just re-reads what the winner created.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const account = await this.db.loyaltyAccount.findFirstOrThrow({ where: { customerId, programId } });
+        return { id: account.id, publicId: account.publicId };
+      }
+      throw err;
+    }
   }
 
   async findByPublicId(publicId: string): Promise<LoyaltyAccountSnapshot | null> {

@@ -255,6 +255,22 @@ describe.skipIf(!process.env.INTEGRATION)('referral API (live DB)', () => {
     expect(res.body.data.referrals).toEqual([]);
   });
 
+  it('two concurrent first-time reads for the same brand-new customer both lazy-create one code cleanly (no 500)', async () => {
+    // Same regression class as wallet-api.test.ts's identical test, but for
+    // PrismaReferralCodeRepository.create()'s uq_referral_code_program_customer
+    // race specifically — two concurrent GET /me/referrals for the same
+    // never-before-seen customer both find no code and both try to create
+    // one; the loser must resolve to the winner's code, not 500.
+    const referrer = await registerAndLogin('referral-race-lazy-create@example.com');
+    const [res1, res2] = await Promise.all([
+      request(app).get('/store/v1/me/referrals').set('Authorization', `Bearer ${referrer.token}`),
+      request(app).get('/store/v1/me/referrals').set('Authorization', `Bearer ${referrer.token}`),
+    ]);
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(res1.body.data.code).toBe(res2.body.data.code);
+  });
+
   it('attaches a referral code and issues the referee reward immediately', async () => {
     const referrer = await registerAndLogin('referrer1@example.com');
     const codeRes = await request(app).get('/store/v1/me/referrals').set('Authorization', `Bearer ${referrer.token}`);

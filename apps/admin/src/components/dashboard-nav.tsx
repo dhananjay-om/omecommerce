@@ -22,6 +22,7 @@ import {
   LayoutTemplate,
   Image,
   LayoutGrid,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,11 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/customers', label: 'Customers', icon: Users },
       { href: '/coupons', label: 'Coupons', icon: Percent },
     ],
+  },
+  {
+    // Phase 3 appends Loyalty Program (/loyalty) and Referrals (/referrals) here.
+    label: 'Loyalty & Rewards',
+    items: [{ href: '/gift-cards', label: 'Gift Cards', icon: CreditCard }],
   },
   {
     label: 'Content',
