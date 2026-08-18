@@ -1,10 +1,12 @@
-import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup, TaxClassLookup } from '../domain/repositories.js';
+import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup, TaxClassLookup, CartTenderView } from '../domain/repositories.js';
 import type { MediaUrlResolver } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { DiscountCalculator, DiscountLineInput } from '../../coupon/domain/repositories.js';
+import type { WalletLedger } from '../../wallet/domain/repositories.js';
+import type { GiftCardLedger } from '../../giftcard/domain/repositories.js';
 import { DomainError } from '../../../shared/domain/errors.js';
 import { addMinor, subtractMinor, multiplyByQty, applyRate, extractTaxExclusive, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
-import type { CartLineDto, CartView } from './dto.js';
+import type { CartLineDto, CartView, CartTenderDto } from './dto.js';
 
 interface EnrichableCart {
   publicId: string;
@@ -15,6 +17,7 @@ interface EnrichableCart {
   status: string;
   couponCode: string | null;
   lines: CartLineView[];
+  tenders: CartTenderView[];
 }
 
 type VariantRef = { sku: string; nameDefault: string | null; productId: bigint } | null;
@@ -37,6 +40,8 @@ export class EnrichCartView {
     private readonly discountCalculator: DiscountCalculator,
     private readonly websiteTaxConfig: WebsiteTaxConfigLookup,
     private readonly taxClasses: TaxClassLookup,
+    private readonly wallets: WalletLedger,
+    private readonly giftCards: GiftCardLedger,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -147,6 +152,8 @@ export class EnrichCartView {
       return { ...l, discountAmount: amount !== undefined ? fromMinorUnits(amount) : null };
     });
 
+    const { tenders, amountDue, tenderError } = await this.resolveTenders(cart, estimatedTotal);
+
     return {
       publicId: cart.publicId,
       currency: cart.currency,
@@ -160,7 +167,76 @@ export class EnrichCartView {
       estimatedTotal,
       pricesIncludeTax,
       taxTotal,
+      tenders,
+      amountDue,
+      tenderError,
     };
+  }
+
+  /**
+   * Live-computed, never persisted — same philosophy as the coupon discount
+   * above. Gift card tenders drain first (in the order applied), then
+   * wallet, capping each at what's still due — the exact resolution order
+   * CompleteCheckout's real hold-placement loop uses, so a cart preview
+   * shows the true amount each tender will actually cover. Any resolution
+   * failure (a since-disabled gift card, a since-frozen wallet, a currency
+   * mismatch) is caught into tenderError instead of thrown — a plain cart
+   * read must never break because of it; checkout re-validates for real.
+   */
+  private async resolveTenders(
+    cart: EnrichableCart,
+    estimatedTotal: string | null,
+  ): Promise<{ tenders: CartTenderDto[]; amountDue: string | null; tenderError: string | null }> {
+    if (cart.tenders.length === 0) {
+      return { tenders: [], amountDue: estimatedTotal, tenderError: null };
+    }
+    if (estimatedTotal === null) {
+      return { tenders: [], amountDue: null, tenderError: null };
+    }
+
+    const sorted = [...cart.tenders].sort((a, b) => {
+      if (a.tenderType !== b.tenderType) return a.tenderType === 'GIFT_CARD' ? -1 : 1;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+
+    const tenders: CartTenderDto[] = [];
+    let remainingMinor = toMinorUnits(estimatedTotal);
+    let tenderError: string | null = null;
+
+    for (const tender of sorted) {
+      try {
+        if (tender.tenderType === 'GIFT_CARD') {
+          const giftCard = await this.giftCards.findById(tender.giftCardId!);
+          if (!giftCard) throw new DomainError('applied gift card no longer exists', 'https://errors.ome/gift-card-not-found', 404);
+          if (giftCard.status !== 'ACTIVE') throw new DomainError('applied gift card is no longer active', 'https://errors.ome/gift-card-not-active', 409);
+          if (giftCard.currency !== cart.currency) throw new DomainError('applied gift card currency no longer matches the cart', 'https://errors.ome/currency-mismatch', 409);
+          const availableMinor = subtractMinor(toMinorUnits(giftCard.balance), toMinorUnits(giftCard.heldBalance));
+          const appliedMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
+          const appliedAmount = appliedMinor > 0n ? fromMinorUnits(appliedMinor) : '0.0000';
+          tenders.push({ tenderType: 'GIFT_CARD', giftCardLast4: giftCard.codeLast4, giftCardPublicId: giftCard.publicId, appliedAmount });
+          remainingMinor = subtractMinor(remainingMinor, appliedMinor > 0n ? appliedMinor : 0n);
+        } else {
+          if (!cart.customerId) throw new DomainError('a wallet tender requires a signed-in customer', 'https://errors.ome/wallet-requires-customer', 409);
+          const wallet = await this.wallets.getOrCreateWallet(cart.customerId, cart.websiteId, cart.currency);
+          const snapshot = await this.wallets.findByPublicId(wallet.publicId);
+          if (!snapshot) throw new DomainError('wallet no longer exists', 'https://errors.ome/wallet-not-found', 404);
+          if (snapshot.status !== 'ACTIVE') throw new DomainError('wallet is frozen', 'https://errors.ome/wallet-frozen', 409);
+          const availableMinor = subtractMinor(toMinorUnits(snapshot.balance), toMinorUnits(snapshot.heldBalance));
+          const appliedMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
+          const appliedAmount = appliedMinor > 0n ? fromMinorUnits(appliedMinor) : '0.0000';
+          tenders.push({ tenderType: 'WALLET', giftCardLast4: null, giftCardPublicId: null, appliedAmount });
+          remainingMinor = subtractMinor(remainingMinor, appliedMinor > 0n ? appliedMinor : 0n);
+        }
+      } catch (err) {
+        // Same soft-fail-on-read shape as couponError — surface it, but keep
+        // showing every OTHER tender's real contribution rather than
+        // aborting the whole preview over one bad tender.
+        tenderError = err instanceof DomainError ? err.message : 'one of the applied tenders is no longer valid';
+        tenders.push({ tenderType: tender.tenderType, giftCardLast4: null, giftCardPublicId: null, appliedAmount: '0.0000' });
+      }
+    }
+
+    return { tenders, amountDue: fromMinorUnits(remainingMinor), tenderError };
   }
 
   private async enrichLine(line: CartLineView, cart: EnrichableCart, variant: VariantRef): Promise<CartLineDto> {

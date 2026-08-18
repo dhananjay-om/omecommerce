@@ -350,8 +350,12 @@ enum WalletBucket {
   LOYALTY_CONVERSION
 }
 
-/// HOLD/RELEASE deferred — no checkout tender integration yet (this pass's
-/// documented scope cut), so nothing places a hold on a wallet.
+/// No HOLD/RELEASE value — checkout tender holds (plan/15 Phase 5,
+/// StoredValueHold) move no balance while HELD, so placing/releasing one
+/// never writes a wallet_transaction row at all (StoredValueHold's own
+/// status is the audit trail for that, same as StockReservation is for
+/// inventory holds). Only a captured hold writes a real ledger row, and it's
+/// an ordinary DEBIT (source ORDER, below) — no new type needed for it.
 enum WalletTxnType {
   CREDIT
   DEBIT
@@ -370,6 +374,28 @@ enum WalletSource {
   PROMO
   ADMIN_ADJUST
   REFERRAL
+  /// A checkout-tender hold captured against a paid order (plan/15 Phase 5) —
+  /// appended, not inserted, per this enum's append-only convention.
+  ORDER
+}
+
+/// Checkout tender instrument (plan/15 Phase 5, CartTender/StoredValueHold).
+/// Written to accept a third value additively in a later phase (Net-30
+/// credit terms) — not built this pass.
+enum TenderType {
+  WALLET
+  GIFT_CARD
+}
+
+/// Same 4-state shape as ReservationStatus (inventory.prisma) — HELD is the
+/// StockReservation ACTIVE equivalent, deliberately named differently so
+/// "a stored-value hold is HELD" reads naturally next to "on_hand -
+/// reserved" elsewhere, without implying it's the exact same concept.
+enum StoredValueHoldStatus {
+  HELD
+  CAPTURED
+  RELEASED
+  EXPIRED
 }
 
 enum GiftCardStatus {

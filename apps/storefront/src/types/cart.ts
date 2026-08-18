@@ -32,4 +32,29 @@ export interface Cart {
    *  CGST/SGST-vs-IGST split/labels checkout shows once the shipping state is
    *  known. Null when the cart has no priced lines yet. */
   taxTotal: string | null;
+  /** Live-computed wallet/gift-card tenders — never a persisted amount, same
+   *  "computed, not stored" shape as discountTotal. */
+  tenders: CartTender[];
+  /** estimatedTotal minus every tender's appliedAmount — what's still due
+   *  before shipping (only known at checkout). Equals estimatedTotal when
+   *  there are no tenders; null when estimatedTotal itself is null. */
+  amountDue: string | null;
+  /** Set instead of throwing when an applied tender is no longer valid (a
+   *  disabled gift card, a frozen wallet) — same soft-fail-on-read shape as
+   *  couponError; checkout re-validates for real and hard-fails there. */
+  tenderError: string | null;
+}
+
+export type TenderType = 'WALLET' | 'GIFT_CARD';
+
+export interface CartTender {
+  tenderType: TenderType;
+  /** Only for GIFT_CARD tenders — the applied card's last 4 digits, for display. */
+  giftCardLast4: string | null;
+  /** Only for GIFT_CARD tenders — the card's own publicId, the removal target
+   *  (not the raw code, which is never retained past the moment it was
+   *  typed to apply it). */
+  giftCardPublicId: string | null;
+  /** How much of amountDue this tender actually covers right now. */
+  appliedAmount: string;
 }

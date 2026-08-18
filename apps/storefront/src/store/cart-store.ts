@@ -5,6 +5,10 @@ import {
   removeLine as removeLineRequest,
   applyCoupon as applyCouponRequest,
   removeCoupon as removeCouponRequest,
+  applyGiftCard as applyGiftCardRequest,
+  removeGiftCard as removeGiftCardRequest,
+  applyWallet as applyWalletRequest,
+  removeWallet as removeWalletRequest,
 } from '@/services/cart.service';
 import type { Cart } from '@/types/cart';
 
@@ -17,6 +21,10 @@ interface CartState {
   removeLine: (variantId: string) => Promise<void>;
   applyCoupon: (code: string) => Promise<void>;
   removeCoupon: () => Promise<void>;
+  applyGiftCard: (code: string) => Promise<void>;
+  removeGiftCard: (giftCardPublicId: string) => Promise<void>;
+  applyWallet: () => Promise<void>;
+  removeWallet: () => Promise<void>;
 }
 
 export function countItems(cart: Cart | null): number {
@@ -46,6 +54,22 @@ export const useCartStore = create<CartState>((set) => ({
   },
   removeCoupon: async () => {
     const cart = await removeCouponRequest();
+    set({ cart, itemCount: countItems(cart) });
+  },
+  applyGiftCard: async (code) => {
+    const cart = await applyGiftCardRequest(code);
+    set({ cart, itemCount: countItems(cart) });
+  },
+  removeGiftCard: async (giftCardPublicId) => {
+    const cart = await removeGiftCardRequest(giftCardPublicId);
+    set({ cart, itemCount: countItems(cart) });
+  },
+  applyWallet: async () => {
+    const cart = await applyWalletRequest();
+    set({ cart, itemCount: countItems(cart) });
+  },
+  removeWallet: async () => {
+    const cart = await removeWalletRequest();
     set({ cart, itemCount: countItems(cart) });
   },
 }));

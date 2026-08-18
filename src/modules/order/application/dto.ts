@@ -1,4 +1,4 @@
-import type { OrderStatus, FinancialStatus, FulfillmentStatus } from '@prisma/client';
+import type { OrderStatus, FinancialStatus, FulfillmentStatus, TenderType } from '@prisma/client';
 
 export interface CreateCartCommand {
   storeViewId: string;
@@ -63,6 +63,34 @@ export interface CartView {
    *  has no priced lines yet, same convention as subtotal above. "0.0000"
    *  (not null) when priced lines exist but none carry a tax class. */
   taxTotal: string | null;
+  /** Live-computed checkout tenders (plan/15 Phase 5) — wallet/gift-card
+   *  instruments this cart intends to pay with, in the order they'll be
+   *  drained at checkout (gift cards first, then wallet). Never a persisted
+   *  amount, same "computed, not stored" philosophy as discountTotal. */
+  tenders: CartTenderDto[];
+  /** estimatedTotal minus the sum of every tender's appliedAmount — what's
+   *  still due after stored-value tenders, before shipping (only known at
+   *  checkout). Equals estimatedTotal when there are no tenders. Null when
+   *  estimatedTotal itself is null (no priced lines yet). */
+  amountDue: string | null;
+  /** Set instead of throwing when a tender can no longer be resolved (e.g. a
+   *  gift card was disabled/expired, or a wallet frozen, since being
+   *  applied) — same soft-fail-on-read philosophy as couponError; checkout
+   *  re-validates for real and hard-fails there instead. */
+  tenderError: string | null;
+}
+
+export interface CartTenderDto {
+  tenderType: TenderType;
+  /** Only for GIFT_CARD tenders — the applied card's last 4 digits, so the UI can show which card without ever re-exposing the full code. */
+  giftCardLast4: string | null;
+  /** Only for GIFT_CARD tenders — the card's own publicId, safe to expose (not the raw redeemable code, not the internal bigint). This is what RemoveGiftCardFromCart targets: unlike apply (which needs bearer-code proof of possession), removal needs no such proof — "forget this tender from my cart" doesn't require re-proving the code, and the storefront never retains the full code past the moment it was typed to apply it. */
+  giftCardPublicId: string | null;
+  /** How much of amountDue this tender would actually cover right now, capped
+   *  by its own live available balance and by what's still due after every
+   *  tender applied before it. "0.0000" (not null) when the instrument has
+   *  no available balance left to apply. */
+  appliedAmount: string;
 }
 
 export interface AddCartLineCommand {
@@ -99,7 +127,10 @@ export interface CompleteCheckoutCommand {
   billingAddress: AddressInput;
   shippingAddress: AddressInput;
   shippingMethodCode: string;
-  paymentMethod: string;
+  /** Optional (plan/15 Phase 5) — omitted/unused when applied wallet/gift-card
+   *  tenders cover the full total; CompleteCheckout validates it's present
+   *  whenever anything is still due after tenders are resolved. */
+  paymentMethod?: string;
   testScenario?: 'approve' | 'decline';
   /** req.ip, captured at the HTTP layer — plan/15 Phase 0a, shown on the admin Order Information section. */
   customerIp?: string | null;

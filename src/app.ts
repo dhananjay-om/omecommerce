@@ -74,7 +74,7 @@ export function createApp(): Express {
   // new /me/orders/:id, /invoice, /tracking, /reorder routes (same
   // cross-module auth-middleware-sharing pattern wishlist/wallet/giftcard/
   // loyalty/referral already use below), so Customer must be constructed first.
-  const order = createOrderModule(prisma, auth.authorize, customer.authenticateCustomer);
+  const order = createOrderModule(prisma, auth.authorize, customer.authenticateCustomer, env.GIFT_CARD_HMAC_SECRET);
   app.use('/admin/v1', order.admin);
   app.use('/store/v1', order.store);
 

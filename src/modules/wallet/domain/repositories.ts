@@ -1,4 +1,4 @@
-import type { WalletBucket, WalletSource, WalletStatus, WalletTxnType } from '@prisma/client';
+import type { WalletBucket, WalletSource, WalletStatus, WalletTxnType, ReservationRefType } from '@prisma/client';
 
 export interface CustomerContext {
   customerId: bigint;
@@ -15,6 +15,8 @@ export interface WalletSnapshot {
   id: bigint;
   publicId: string;
   balance: string;
+  /** Sum of this wallet's HELD checkout holds — `balance - heldBalance` is what a new hold is guarded against (plan/15 Phase 5). */
+  heldBalance: string;
   currency: string;
   status: WalletStatus;
 }
@@ -39,6 +41,20 @@ export interface LedgerWriteOptions {
   reason?: string;
 }
 
+/** A checkout-tender hold (plan/15 Phase 5) — structurally parallel to inventory's ReservationHandle. */
+export interface StoredValueHoldHandle {
+  id: bigint;
+  publicId: string;
+  amount: string;
+  currency: string;
+  expiresAt: Date | null;
+}
+
+/** A CAPTURED hold funding a settled order — RefundOrder's split-tender lookup. */
+export interface CapturedWalletHold extends StoredValueHoldHandle {
+  walletId: bigint;
+}
+
 /**
  * The wallet ledger (plan/10 §2/§5). Every mutation is a guarded UPDATE + an
  * append-only wallet_transaction row, executed atomically — the same
@@ -60,4 +76,30 @@ export interface WalletLedger {
   unfreeze(walletId: bigint): Promise<void>;
 
   listTransactions(walletId: bigint): Promise<WalletTransactionInfo[]>;
+
+  /**
+   * Checkout tender holds (plan/15 Phase 5) — a real two-phase hold, not
+   * optimistic-debit-then-compensate, structurally identical to
+   * StockLedger.reserve/commitReservation/releaseReservation. A HELD hold
+   * moves no balance (only heldBalance), so hold() and releaseHold() never
+   * write a wallet_transaction row — only captureHold() does, an ordinary
+   * DEBIT (source ORDER).
+   */
+
+  /** Race-safe: throws InsufficientAvailableBalanceError if (balance - heldBalance) < amount or status != ACTIVE. */
+  hold(walletId: bigint, amount: string, refType: ReservationRefType, refId: bigint, ttlSeconds?: number): Promise<StoredValueHoldHandle>;
+
+  /** HELD -> CAPTURED: writes a real DEBIT wallet_transaction row (bucket STORE_CREDIT, source ORDER) and decrements both balance and heldBalance. */
+  captureHold(holdPublicId: string): Promise<WalletSnapshot>;
+
+  /** HELD -> RELEASED: heldBalance -= amount only; balance unchanged. */
+  releaseHold(holdPublicId: string): Promise<void>;
+
+  /** Sweeps HELD holds past expiresAt to EXPIRED. Returns count released. */
+  releaseExpiredHolds(now: Date): Promise<number>;
+
+  findHoldByPublicId(publicId: string): Promise<StoredValueHoldHandle | null>;
+
+  /** Every CAPTURED wallet hold funding a given ref (e.g. an Order's originating Cart) — RefundOrder's split-tender lookup. */
+  findCapturedHoldsByRef(refType: ReservationRefType, refId: bigint): Promise<CapturedWalletHold[]>;
 }
