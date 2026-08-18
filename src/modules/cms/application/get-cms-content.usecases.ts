@@ -1,5 +1,6 @@
 import type { CmsPageRepository, CmsBlockRepository } from '../domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+import { resolveInlineImages } from './resolve-inline-images.js';
 import type { CmsPageView, CmsBlockView } from './dto.js';
 
 function parseStoreViewId(value: string): bigint {
@@ -22,7 +23,7 @@ export class GetCmsPage {
       publicId: page.publicId,
       handle: page.handle,
       title: page.title,
-      body: page.body,
+      body: await resolveInlineImages(page.body),
       status: page.status,
       publishedAt: page.publishedAt?.toISOString() ?? null,
       updatedAt: page.updatedAt.toISOString(),
@@ -38,6 +39,12 @@ export class GetCmsBlock {
     if (!block || block.status !== 'PUBLISHED') {
       throw new NotFoundError('CMS block', code);
     }
-    return { publicId: block.publicId, code: block.code, body: block.body, status: block.status, updatedAt: block.updatedAt.toISOString() };
+    return {
+      publicId: block.publicId,
+      code: block.code,
+      body: await resolveInlineImages(block.body),
+      status: block.status,
+      updatedAt: block.updatedAt.toISOString(),
+    };
   }
 }

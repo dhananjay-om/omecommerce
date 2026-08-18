@@ -41,3 +41,13 @@ export interface CmsBlockView {
   status: CmsStatus;
   updatedAt: string;
 }
+
+export interface RequestCmsImageUploadCommand {
+  filename: string;
+  mimeType: string;
+}
+
+export interface CmsImageUploadUrl {
+  uploadUrl: string;
+  imageMediaKey: string;
+}

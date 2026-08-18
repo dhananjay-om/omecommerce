@@ -9,6 +9,18 @@ function blankToUndefined(schema: z.ZodTypeAny) {
 
 const cmsBlockConfigSchema = z.object({ code: z.string().min(1).max(255) });
 const limitConfigSchema = z.object({ limit: z.number().int().positive().max(100).optional() });
+/** `categoryIds`/`brandIds` present + non-empty ⇒ exactly those, in that
+ *  order (an admin-controlled curation, not raw table order); empty/unset
+ *  ⇒ today's fallback (all root categories/brands, optionally capped by
+ *  `limit`) — see widget-renderer.tsx on the storefront side. */
+const categoryGridConfigSchema = z.object({
+  categoryIds: z.array(z.string().uuid()).max(24).optional(),
+  limit: z.number().int().positive().max(100).optional(),
+});
+const brandGridConfigSchema = z.object({
+  brandIds: z.array(z.string().uuid()).max(24).optional(),
+  limit: z.number().int().positive().max(100).optional(),
+});
 const featureSchema = z.object({ icon: z.string().min(1), title: z.string().min(1), description: z.string().min(1) });
 const whyChooseUsConfigSchema = z.object({ features: z.array(featureSchema).min(1).max(12) });
 const testimonialSchema = z.object({ name: z.string().min(1), quote: z.string().min(1) });
@@ -30,8 +42,8 @@ export const createWidgetInstanceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('CMS_BLOCK'), config: cmsBlockConfigSchema, ...baseFields }),
   z.object({ type: z.literal('HERO_BANNER_SLIDER'), config: limitConfigSchema, ...baseFields }),
   z.object({ type: z.literal('PROMO_BANNER_GRID'), config: limitConfigSchema, ...baseFields }),
-  z.object({ type: z.literal('CATEGORY_GRID'), config: limitConfigSchema, ...baseFields }),
-  z.object({ type: z.literal('BRAND_GRID'), config: limitConfigSchema, ...baseFields }),
+  z.object({ type: z.literal('CATEGORY_GRID'), config: categoryGridConfigSchema, ...baseFields }),
+  z.object({ type: z.literal('BRAND_GRID'), config: brandGridConfigSchema, ...baseFields }),
   z.object({ type: z.literal('WHY_CHOOSE_US_LIST'), config: whyChooseUsConfigSchema, ...baseFields }),
   z.object({ type: z.literal('TESTIMONIAL_LIST'), config: testimonialListConfigSchema, ...baseFields }),
 ]);

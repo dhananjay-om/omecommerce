@@ -1,5 +1,6 @@
 import type { CmsPageRepository } from '../domain/repositories.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+import { resolveInlineImages } from './resolve-inline-images.js';
 import type { CreateCmsPageCommand, UpdateCmsPageCommand, CmsPageView } from './dto.js';
 
 function parseStoreViewId(value: string | null | undefined): bigint | null {
@@ -10,7 +11,9 @@ function parseStoreViewId(value: string | null | undefined): bigint | null {
   return BigInt(value);
 }
 
-function toView(p: {
+/** Async since it resolves any inline `data-media-key` images in `body`
+ *  to fresh presigned URLs — see resolve-inline-images.ts. */
+async function toView(p: {
   publicId: string;
   handle: string;
   title: string;
@@ -18,12 +21,12 @@ function toView(p: {
   status: CmsPageView['status'];
   publishedAt: Date | null;
   updatedAt: Date;
-}): CmsPageView {
+}): Promise<CmsPageView> {
   return {
     publicId: p.publicId,
     handle: p.handle,
     title: p.title,
-    body: p.body,
+    body: await resolveInlineImages(p.body),
     status: p.status,
     publishedAt: p.publishedAt?.toISOString() ?? null,
     updatedAt: p.updatedAt.toISOString(),
@@ -62,7 +65,7 @@ export class ListCmsPages {
 
   async execute(): Promise<CmsPageView[]> {
     const rows = await this.pages.list();
-    return rows.map(toView);
+    return Promise.all(rows.map(toView));
   }
 }
 

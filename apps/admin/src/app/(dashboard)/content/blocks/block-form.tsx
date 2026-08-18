@@ -1,13 +1,13 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import { createBlock, updateBlock, type ActionState } from './actions';
 import type { CmsBlock } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { BodyEditor } from '@/components/ui/body-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -18,50 +18,6 @@ function SectionCard({ title, children }: { title: string; children: React.React
       </CardHeader>
       <CardContent className="space-y-4 pt-2">{children}</CardContent>
     </Card>
-  );
-}
-
-/** Edit/Preview toggle for the raw-HTML body — own copy of content/pages/page-form.tsx's
- *  BodyEditor (screen-local, tiny, same convention as this app's other per-screen dupes). */
-function BodyEditor({ id, name, defaultValue }: { id: string; name: string; defaultValue: string }) {
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
-  const [body, setBody] = useState(defaultValue);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label htmlFor={id}>Body (HTML)</Label>
-        <div className="flex gap-1">
-          <Button type="button" size="xs" variant={mode === 'edit' ? 'secondary' : 'ghost'} onClick={() => setMode('edit')}>
-            Edit
-          </Button>
-          <Button type="button" size="xs" variant={mode === 'preview' ? 'secondary' : 'ghost'} onClick={() => setMode('preview')}>
-            Preview
-          </Button>
-        </div>
-      </div>
-      {mode === 'edit' ? (
-        <Textarea
-          id={id}
-          name={name}
-          rows={12}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          className="font-mono text-xs"
-          placeholder="<p>(c) 2026 OMEShop</p>"
-          required
-        />
-      ) : (
-        <>
-          <input type="hidden" name={name} value={body} />
-          <div
-            className="min-h-16 rounded-lg border bg-muted/20 p-4 [&_a]:text-primary [&_a]:underline [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:text-xl [&_h2]:font-bold [&_p]:my-2"
-            // admin-authored content only — same trust boundary as the storefront's eventual render of this same body
-            dangerouslySetInnerHTML={{ __html: body || '<p class="text-muted-foreground">Nothing to preview yet.</p>' }}
-          />
-        </>
-      )}
-    </div>
   );
 }
 
