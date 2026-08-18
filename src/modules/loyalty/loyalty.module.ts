@@ -46,9 +46,9 @@ export function createLoyaltyModule(db: Db, authorize: (permission: string) => R
   const adminUsers = new PrismaAdminUserLookup(db);
 
   const createLoyaltyProgram = new CreateLoyaltyProgram(programs, websites);
-  const listLoyaltyPrograms = new ListLoyaltyPrograms(programs);
-  const getLoyaltyProgram = new GetLoyaltyProgram(programs);
-  const updateLoyaltyProgram = new UpdateLoyaltyProgram(programs);
+  const listLoyaltyPrograms = new ListLoyaltyPrograms(programs, websites);
+  const getLoyaltyProgram = new GetLoyaltyProgram(programs, websites);
+  const updateLoyaltyProgram = new UpdateLoyaltyProgram(programs, websites);
   const createLoyaltyTier = new CreateLoyaltyTier(programs, tiers);
   const listLoyaltyTiers = new ListLoyaltyTiers(programs, tiers);
   const updateLoyaltyTier = new UpdateLoyaltyTier(programs, tiers);

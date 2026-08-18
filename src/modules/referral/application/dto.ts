@@ -32,6 +32,7 @@ export interface UpdateReferralProgramCommand {
 
 export interface ReferralProgramView {
   publicId: string;
+  websiteCode: string;
   name: string;
   status: LoyaltyProgramStatus;
   qualifyingEvent: ReferralQualifyingEvent;

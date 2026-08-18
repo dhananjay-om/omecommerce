@@ -1,25 +1,36 @@
-import type { ReferralProgramRepository, LoyaltyProgramLookup } from '../domain/repositories.js';
+import type { ReferralProgramRepository, ReferralProgramInfo, LoyaltyProgramLookup } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { validateRewardShape } from './validate-reward-shape.js';
-import { toReferralProgramView } from './create-referral-program.usecase.js';
+import { toReferralProgramView, type WebsiteLookup } from './create-referral-program.usecase.js';
 import type { ReferralProgramView, UpdateReferralProgramCommand } from './dto.js';
 
+async function toViewWithWebsiteCode(program: ReferralProgramInfo, websites: WebsiteLookup): Promise<ReferralProgramView> {
+  const website = await websites.byId(program.websiteId);
+  return toReferralProgramView(program, website?.code ?? '');
+}
+
 export class ListReferralPrograms {
-  constructor(private readonly programs: ReferralProgramRepository) {}
+  constructor(
+    private readonly programs: ReferralProgramRepository,
+    private readonly websites: WebsiteLookup,
+  ) {}
 
   async execute(): Promise<ReferralProgramView[]> {
     const rows = await this.programs.list();
-    return rows.map(toReferralProgramView);
+    return Promise.all(rows.map((r) => toViewWithWebsiteCode(r, this.websites)));
   }
 }
 
 export class GetReferralProgram {
-  constructor(private readonly programs: ReferralProgramRepository) {}
+  constructor(
+    private readonly programs: ReferralProgramRepository,
+    private readonly websites: WebsiteLookup,
+  ) {}
 
   async execute(publicId: string): Promise<ReferralProgramView> {
     const program = await this.programs.findByPublicId(publicId);
     if (!program) throw new NotFoundError('referral program', publicId);
-    return toReferralProgramView(program);
+    return toViewWithWebsiteCode(program, this.websites);
   }
 }
 
@@ -33,6 +44,7 @@ export class UpdateReferralProgram {
   constructor(
     private readonly programs: ReferralProgramRepository,
     private readonly loyaltyPrograms: LoyaltyProgramLookup,
+    private readonly websites: WebsiteLookup,
   ) {}
 
   async execute(publicId: string, cmd: UpdateReferralProgramCommand): Promise<ReferralProgramView> {
@@ -72,6 +84,6 @@ export class UpdateReferralProgram {
       maxReferralsPerCustomer: cmd.maxReferralsPerCustomer,
       attributionWindowDays: cmd.attributionWindowDays,
     });
-    return toReferralProgramView(updated);
+    return toViewWithWebsiteCode(updated, this.websites);
   }
 }

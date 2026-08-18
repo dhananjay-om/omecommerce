@@ -4,6 +4,7 @@ import type { CreateLoyaltyProgramCommand, LoyaltyProgramView } from './dto.js';
 
 export interface WebsiteLookup {
   byCode(code: string): Promise<{ id: bigint } | null>;
+  byId(id: bigint): Promise<{ code: string } | null>;
 }
 
 export class CreateLoyaltyProgram {
@@ -31,6 +32,7 @@ export class CreateLoyaltyProgram {
     });
     return {
       publicId: program.publicId,
+      websiteCode: cmd.websiteCode,
       name: program.name,
       status: program.status,
       pointsPerCurrencyUnit: program.pointsPerCurrencyUnit,

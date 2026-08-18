@@ -670,3 +670,105 @@ export interface GiftCardTransaction {
   reason: string | null;
   createdAt: string;
 }
+
+export type LoyaltyProgramStatus = 'ACTIVE' | 'PAUSED' | 'ENDED';
+export type LoyaltyTxnType = 'EARN' | 'REDEEM' | 'EXPIRE' | 'ADJUST' | 'REVERSE';
+export type LoyaltySource = 'ORDER' | 'ADMIN' | 'CUSTOMER' | 'EXPIRE' | 'REVERSAL' | 'REFERRAL';
+
+export interface LoyaltyProgram {
+  publicId: string;
+  websiteCode: string;
+  name: string;
+  status: LoyaltyProgramStatus;
+  pointsPerCurrencyUnit: string;
+  pointValue: string;
+  redeemMinPoints: number;
+  pointsExpiryMonths: number | null;
+}
+
+export interface LoyaltyTier {
+  id: string;
+  name: string;
+  thresholdPoints: string;
+  earnMultiplier: string;
+  sortOrder: number;
+}
+
+export interface LoyaltyAccount {
+  publicId: string;
+  pointsBalance: string;
+  lifetimePoints: string;
+  tier: LoyaltyTier | null;
+  status: WalletStatus;
+}
+
+export interface LoyaltyTransaction {
+  type: LoyaltyTxnType;
+  points: string;
+  balanceAfter: string;
+  source: LoyaltySource;
+  reason: string | null;
+  createdAt: string;
+}
+
+export type ReferralQualifyingEvent = 'SIGNUP' | 'FIRST_ORDER';
+export type ReferralRewardType = 'STORE_CREDIT' | 'POINTS';
+export type ReferralStatus = 'SIGNED_UP' | 'QUALIFIED' | 'REWARDED' | 'EXPIRED' | 'REVERSED';
+export type ReferralBeneficiary = 'REFERRER' | 'REFEREE';
+
+export interface ReferralProgram {
+  publicId: string;
+  websiteCode: string;
+  name: string;
+  status: LoyaltyProgramStatus;
+  qualifyingEvent: ReferralQualifyingEvent;
+  minOrderAmount: string | null;
+  referrerRewardType: ReferralRewardType;
+  referrerRewardAmount: string | null;
+  referrerRewardPoints: string | null;
+  refereeRewardType: ReferralRewardType;
+  refereeRewardAmount: string | null;
+  refereeRewardPoints: string | null;
+  maxReferralsPerCustomer: number | null;
+  attributionWindowDays: number | null;
+}
+
+export interface ReferralReward {
+  beneficiary: ReferralBeneficiary;
+  rewardType: ReferralRewardType;
+  amount: string | null;
+  points: string | null;
+}
+
+export interface ReferralView {
+  publicId: string;
+  status: ReferralStatus;
+  createdAt: string;
+  qualifiedAt: string | null;
+  rewardedAt: string | null;
+  referrerReward: ReferralReward | null;
+}
+
+export interface MyReferrals {
+  code: string;
+  referrals: ReferralView[];
+}
+
+export interface AdminReferralListItem {
+  publicId: string;
+  referrerEmail: string;
+  refereeEmail: string;
+  status: ReferralStatus;
+  createdAt: string;
+  qualifiedAt: string | null;
+  rewardedAt: string | null;
+  referrerReward: ReferralReward | null;
+  refereeReward: ReferralReward | null;
+}
+
+export interface AdminReferralList {
+  total: number;
+  page: number;
+  pageSize: number;
+  referrals: AdminReferralListItem[];
+}

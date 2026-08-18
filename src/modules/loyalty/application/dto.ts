@@ -20,6 +20,7 @@ export interface UpdateLoyaltyProgramCommand {
 
 export interface LoyaltyProgramView {
   publicId: string;
+  websiteCode: string;
   name: string;
   status: LoyaltyProgramStatus;
   pointsPerCurrencyUnit: string;
