@@ -43,3 +43,8 @@ export const listReferralsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().optional(),
 });
+
+/** Matches CMS's identical cmsStoreViewQuerySchema — every public store-scoped read resolves by storeViewId. */
+export const referralStoreViewQuerySchema = z.object({
+  storeViewId: z.string().regex(/^\d+$/, 'storeViewId query param required'),
+});

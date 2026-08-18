@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { isAxiosError } from 'axios';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { register as registerRequest } from '@/services/customer.service';
+import { attachReferral } from '@/services/rewards.service';
 import { useAuthStore } from '@/store/auth-store';
 
 const schema = z.object({
@@ -22,8 +24,11 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function RegisterPage() {
+/** useSearchParams() (to capture ?ref=<code>) needs a Suspense boundary — see the wrapping default export below. */
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const referralCode = searchParams.get('ref');
   const hydrate = useAuthStore((s) => s.hydrate);
   const [serverError, setServerError] = useState<string | null>(null);
   const {
@@ -37,6 +42,16 @@ export default function RegisterPage() {
     try {
       await registerRequest(values);
       await hydrate();
+      // A captured ?ref= code is attached post-login, best-effort — a bad or
+      // expired code must never block registration, so failures only toast.
+      if (referralCode) {
+        try {
+          await attachReferral(referralCode);
+          toast.success('Referral applied!');
+        } catch {
+          toast.error("That referral link couldn't be applied, but your account was created.");
+        }
+      }
       router.push('/account');
       router.refresh();
     } catch (err) {
@@ -84,5 +99,13 @@ export default function RegisterPage() {
         </Button>
       </form>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }

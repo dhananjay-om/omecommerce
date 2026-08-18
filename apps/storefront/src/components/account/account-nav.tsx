@@ -8,6 +8,9 @@ const LINKS = [
   { href: '/account/orders', label: 'Orders' },
   { href: '/account/addresses', label: 'Addresses' },
   { href: '/account/wishlist', label: 'Wishlist' },
+  { href: '/account/wallet', label: 'Wallet' },
+  { href: '/account/rewards', label: 'Rewards' },
+  { href: '/account/referrals', label: 'Referrals' },
 ];
 
 export function AccountNav() {
