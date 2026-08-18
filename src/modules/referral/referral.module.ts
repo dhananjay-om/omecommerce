@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
+import { PrismaStoreContextResolver } from '../../shared/infrastructure/store-context.repository.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
 import { PrismaLoyaltyLedger } from '../loyalty/infrastructure/prisma-loyalty-ledger.js';
 import { PrismaReferralProgramRepository } from './infrastructure/prisma-referral-program.repository.js';
@@ -16,11 +17,13 @@ import { ReverseReferralReward } from './application/reverse-referral-reward.use
 import { IssueReferralReward } from './application/issue-referral-reward.js';
 import { ListReferralPrograms, GetReferralProgram, UpdateReferralProgram } from './application/referral-program-queries.usecases.js';
 import { ListReferralsForAdmin } from './application/list-referrals-for-admin.usecase.js';
+import { GetPublicReferralProgram } from './application/get-public-referral-program.usecase.js';
 import {
   createReferralProgramSchema,
   updateReferralProgramSchema,
   attachReferralSchema,
   listReferralsQuerySchema,
+  referralStoreViewQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface ReferralRouters {
@@ -57,6 +60,8 @@ export function createReferralModule(db: Db, authorize: (permission: string) => 
   const listReferralsForAdmin = new ListReferralsForAdmin(referrals);
   const attachReferral = new AttachReferral(customerContext, codes, programs, referrals, issueReward);
   const getMyReferrals = new GetMyReferrals(customerContext, programs, codes, referrals, rewards);
+  const storeContext = new PrismaStoreContextResolver(db);
+  const getPublicReferralProgram = new GetPublicReferralProgram(programs, storeContext);
 
   async function resolveActorId(adminUserPublicId: string | undefined): Promise<bigint | undefined> {
     if (!adminUserPublicId) return undefined;
@@ -115,6 +120,13 @@ export function createReferralModule(db: Db, authorize: (permission: string) => 
   );
 
   const store = Router();
+  store.get(
+    '/referral/program',
+    asyncHandler(async (req, res) => {
+      const query = parse(referralStoreViewQuerySchema, req.query);
+      res.json({ data: await getPublicReferralProgram.execute(BigInt(query.storeViewId)) });
+    }),
+  );
   store.get(
     '/me/referrals',
     requireCustomer,

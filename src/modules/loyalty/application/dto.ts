@@ -80,3 +80,23 @@ export interface RedeemLoyaltyPointsResult {
   storeCreditAmount: string;
   walletBalance: string;
 }
+
+export interface PublicLoyaltyTierView {
+  name: string;
+  thresholdPoints: string;
+  earnMultiplier: string;
+  sortOrder: number;
+}
+
+/** Public, unauthenticated read for the storefront rewards page (plan/15
+ *  Phase 4) — deliberately excludes websiteCode/status/publicId, which
+ *  a shopper has no use for; a program that isn't ACTIVE is treated as
+ *  not existing (see get-public-loyalty-program.usecase.ts). */
+export interface PublicLoyaltyProgramView {
+  name: string;
+  pointsPerCurrencyUnit: string;
+  pointValue: string;
+  redeemMinPoints: number;
+  pointsExpiryMonths: number | null;
+  tiers: PublicLoyaltyTierView[];
+}

@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
+import { PrismaStoreContextResolver } from '../../shared/infrastructure/store-context.repository.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
 import { PrismaLoyaltyLedger } from './infrastructure/prisma-loyalty-ledger.js';
 import { PrismaLoyaltyProgramRepository } from './infrastructure/prisma-loyalty-program.repository.js';
@@ -14,6 +15,7 @@ import { RedeemLoyaltyPoints } from './application/redeem-loyalty-points.usecase
 import { GetLoyaltyAccount, ListLoyaltyTransactions, AdjustLoyaltyAccount } from './application/loyalty-account-queries.usecases.js';
 import { ListLoyaltyPrograms, GetLoyaltyProgram, UpdateLoyaltyProgram } from './application/loyalty-program-queries.usecases.js';
 import { ListLoyaltyTiers, UpdateLoyaltyTier, DeleteLoyaltyTier } from './application/loyalty-tier-queries.usecases.js';
+import { GetPublicLoyaltyProgram } from './application/get-public-loyalty-program.usecase.js';
 import {
   createLoyaltyProgramSchema,
   updateLoyaltyProgramSchema,
@@ -21,6 +23,7 @@ import {
   updateLoyaltyTierSchema,
   adjustLoyaltyAccountSchema,
   redeemLoyaltyPointsSchema,
+  loyaltyStoreViewQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface LoyaltyRouters {
@@ -57,6 +60,8 @@ export function createLoyaltyModule(db: Db, authorize: (permission: string) => R
   const listLoyaltyTransactions = new ListLoyaltyTransactions(ledger, programs, customerContext);
   const adjustLoyaltyAccount = new AdjustLoyaltyAccount(ledger, programs, customerContext);
   const redeemLoyaltyPoints = new RedeemLoyaltyPoints(ledger, programs, wallets, customerContext);
+  const storeContext = new PrismaStoreContextResolver(db);
+  const getPublicLoyaltyProgram = new GetPublicLoyaltyProgram(programs, tiers, storeContext);
 
   async function resolveActorId(adminUserPublicId: string | undefined): Promise<bigint | undefined> {
     if (!adminUserPublicId) return undefined;
@@ -152,6 +157,13 @@ export function createLoyaltyModule(db: Db, authorize: (permission: string) => R
   );
 
   const store = Router();
+  store.get(
+    '/loyalty/program',
+    asyncHandler(async (req, res) => {
+      const query = parse(loyaltyStoreViewQuerySchema, req.query);
+      res.json({ data: await getPublicLoyaltyProgram.execute(BigInt(query.storeViewId)) });
+    }),
+  );
   store.get(
     '/me/loyalty',
     requireCustomer,

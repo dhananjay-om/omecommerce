@@ -41,3 +41,8 @@ export const adjustLoyaltyAccountSchema = z.object({
 export const redeemLoyaltyPointsSchema = z.object({
   points: z.string().regex(/^\d+$/, 'expected a non-negative integer'),
 });
+
+/** Matches CMS's identical cmsStoreViewQuerySchema — every public store-scoped read resolves by storeViewId. */
+export const loyaltyStoreViewQuerySchema = z.object({
+  storeViewId: z.string().regex(/^\d+$/, 'storeViewId query param required'),
+});

@@ -103,3 +103,21 @@ export interface AdminReferralListView {
   pageSize: number;
   referrals: AdminReferralListItemView[];
 }
+
+/** Public, unauthenticated read for the storefront referral page (plan/15
+ *  Phase 4) — states the offer terms so a shopper knows what they and their
+ *  friend get before sharing their link. Excludes websiteCode/publicId; a
+ *  program that isn't ACTIVE is treated as not existing (see
+ *  get-public-referral-program.usecase.ts). */
+export interface PublicReferralProgramView {
+  name: string;
+  qualifyingEvent: ReferralQualifyingEvent;
+  minOrderAmount: string | null;
+  referrerRewardType: ReferralRewardType;
+  referrerRewardAmount: string | null;
+  referrerRewardPoints: string | null;
+  refereeRewardType: ReferralRewardType;
+  refereeRewardAmount: string | null;
+  refereeRewardPoints: string | null;
+  maxReferralsPerCustomer: number | null;
+}
