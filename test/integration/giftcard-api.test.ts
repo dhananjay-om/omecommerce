@@ -39,6 +39,18 @@ describe.skipIf(!process.env.INTEGRATION)('gift card API (live DB)', () => {
     await prisma.$disconnect();
   });
 
+  it("admin: GET /auth/me returns the caller's own email and permissions from the JWT", async () => {
+    const res = await admin.get('/admin/v1/auth/me');
+    expect(res.status).toBe(200);
+    expect(res.body.data.email).toEqual(expect.any(String));
+    expect(res.body.data.permissions).toContain('wallet:manage');
+  });
+
+  it('401s /auth/me with no admin auth', async () => {
+    const res = await request(app).get('/admin/v1/auth/me');
+    expect(res.status).toBe(401);
+  });
+
   it('issues a gift card, returning the raw code once', async () => {
     const res = await admin
       .post('/admin/v1/gift-cards')
@@ -122,6 +134,35 @@ describe.skipIf(!process.env.INTEGRATION)('gift card API (live DB)', () => {
     const txns = await admin.get(`/admin/v1/gift-cards/${publicId}/transactions`);
     expect(txns.status).toBe(200);
     expect(txns.body.data.map((t: { type: string }) => t.type).sort()).toEqual(['ADJUST', 'ISSUE']);
+  });
+
+  it('admin: lists gift cards, filterable by status/last4/recipientEmail/website, paginated', async () => {
+    const issue = await admin
+      .post('/admin/v1/gift-cards')
+      .send({ websiteCode: 'us_retail', amount: '15.00', recipientEmail: 'list-target@example.com' });
+    const { publicId, codeLast4 } = issue.body.data;
+
+    const all = await admin.get('/admin/v1/gift-cards');
+    expect(all.status).toBe(200);
+    expect(all.body.data.total).toBeGreaterThan(0);
+    expect(all.body.data.giftCards.some((c: { publicId: string }) => c.publicId === publicId)).toBe(true);
+    // List rows never carry the raw code, only what's needed for a browse table.
+    expect(all.body.data.giftCards[0]).not.toHaveProperty('code');
+
+    const byLast4 = await admin.get('/admin/v1/gift-cards').query({ last4: codeLast4 });
+    expect(byLast4.body.data.giftCards.every((c: { codeLast4: string }) => c.codeLast4 === codeLast4)).toBe(true);
+
+    const byEmail = await admin.get('/admin/v1/gift-cards').query({ recipientEmail: 'list-target' });
+    expect(byEmail.body.data.giftCards.some((c: { publicId: string }) => c.publicId === publicId)).toBe(true);
+
+    const byStatus = await admin.get('/admin/v1/gift-cards').query({ status: 'ACTIVE' });
+    expect(byStatus.body.data.giftCards.every((c: { status: string }) => c.status === 'ACTIVE')).toBe(true);
+
+    const byUnknownWebsite = await admin.get('/admin/v1/gift-cards').query({ websiteCode: 'no-such-website' });
+    expect(byUnknownWebsite.body.data).toMatchObject({ total: 0, giftCards: [] });
+
+    const paged = await admin.get('/admin/v1/gift-cards').query({ page: 1, pageSize: 1 });
+    expect(paged.body.data.giftCards).toHaveLength(1);
   });
 
   it('401s issuing a gift card with no admin auth', async () => {

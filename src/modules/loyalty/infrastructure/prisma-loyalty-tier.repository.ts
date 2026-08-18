@@ -1,6 +1,6 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
-import type { LoyaltyTierRepository, LoyaltyTierInfo, CreateLoyaltyTierInput } from '../domain/repositories.js';
+import type { LoyaltyTierRepository, LoyaltyTierInfo, CreateLoyaltyTierInput, UpdateLoyaltyTierInput } from '../domain/repositories.js';
 
 function formatDecimal(value: { toString(): string }): string {
   return fromMinorUnits(toMinorUnits(value.toString()));
@@ -47,5 +47,28 @@ export class PrismaLoyaltyTierRepository implements LoyaltyTierRepository {
   async listByProgramId(programId: bigint): Promise<LoyaltyTierInfo[]> {
     const rows = await this.db.loyaltyTier.findMany({ where: { programId }, select: TIER_SELECT, orderBy: { sortOrder: 'asc' } });
     return rows.map(toInfo);
+  }
+
+  async findById(id: bigint): Promise<LoyaltyTierInfo | null> {
+    const row = await this.db.loyaltyTier.findUnique({ where: { id }, select: TIER_SELECT });
+    return row ? toInfo(row) : null;
+  }
+
+  async update(id: bigint, input: UpdateLoyaltyTierInput): Promise<LoyaltyTierInfo> {
+    const row = await this.db.loyaltyTier.update({
+      where: { id },
+      data: {
+        name: input.name,
+        thresholdPoints: input.thresholdPoints,
+        earnMultiplier: input.earnMultiplier,
+        sortOrder: input.sortOrder,
+      },
+      select: TIER_SELECT,
+    });
+    return toInfo(row);
+  }
+
+  async delete(id: bigint): Promise<void> {
+    await this.db.loyaltyTier.delete({ where: { id } });
   }
 }

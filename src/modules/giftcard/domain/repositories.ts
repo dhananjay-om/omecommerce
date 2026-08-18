@@ -57,6 +57,33 @@ export interface LedgerWriteOptions {
   reason?: string;
 }
 
+export interface ListGiftCardsFilter {
+  websiteId?: bigint;
+  status?: GiftCardStatus;
+  last4?: string;
+  recipientEmail?: string;
+  page: number;
+  pageSize: number;
+}
+
+export interface GiftCardListRow {
+  publicId: string;
+  codeLast4: string;
+  initialAmount: string;
+  balance: string;
+  currency: string;
+  status: GiftCardStatus;
+  kind: GiftCardKind;
+  recipientEmail: string | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+}
+
+export interface GiftCardListResult {
+  total: number;
+  giftCards: GiftCardListRow[];
+}
+
 /**
  * The gift card ledger (plan/10 §2/§5). Every mutation is a guarded UPDATE + an
  * append-only gift_card_transaction row, executed atomically — the same
@@ -76,4 +103,7 @@ export interface GiftCardLedger {
   disable(giftCardId: bigint): Promise<void>;
 
   listTransactions(giftCardId: bigint): Promise<GiftCardTransactionInfo[]>;
+
+  /** Admin browse (Content > Gift Cards). Soft-delete-aware, newest first. */
+  list(filter: ListGiftCardsFilter): Promise<GiftCardListResult>;
 }

@@ -46,6 +46,35 @@ export interface AdjustGiftCardCommand {
   reason: string;
 }
 
+export interface ListGiftCardsQuery {
+  status?: GiftCardStatus;
+  last4?: string;
+  recipientEmail?: string;
+  websiteCode?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface GiftCardListItemView {
+  publicId: string;
+  codeLast4: string;
+  initialAmount: string;
+  balance: string;
+  currency: string;
+  status: GiftCardStatus;
+  kind: GiftCardKind;
+  recipientEmail: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface GiftCardListView {
+  total: number;
+  page: number;
+  pageSize: number;
+  giftCards: GiftCardListItemView[];
+}
+
 export interface RedeemGiftCardIntoWalletResult {
   redeemedAmount: string;
   walletBalance: string;

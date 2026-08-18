@@ -7,6 +7,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher.js
 import { JwtTokenService } from './infrastructure/jwt-token.service.js';
 import { Login } from './application/login.usecase.js';
 import { CreateAdminUser } from './application/create-admin-user.usecase.js';
+import { GetCurrentAdmin } from './application/get-current-admin.usecase.js';
 import { authenticate, authorize } from './interface/http/auth.middleware.js';
 import { loginSchema, createAdminUserSchema } from './interface/http/schemas.js';
 
@@ -28,6 +29,7 @@ export function createAuthModule(db: Db): AuthModule {
 
   const login = new Login(adminUsers, hasher, tokens);
   const createAdminUser = new CreateAdminUser(adminUsers, hasher);
+  const getCurrentAdmin = new GetCurrentAdmin(adminUsers);
 
   const publicRouter = Router();
   publicRouter.post(
@@ -39,6 +41,14 @@ export function createAuthModule(db: Db): AuthModule {
   );
 
   const admin = Router();
+  // No authorize() — every authenticated admin may read their own identity;
+  // this is what apps/admin's nav/UI permission gating reads from.
+  admin.get(
+    '/auth/me',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCurrentAdmin.execute(req.adminUser!.adminUserPublicId, req.adminUser!.permissions) });
+    }),
+  );
   admin.post(
     '/auth/admin-users',
     authorize('admin:manage'),

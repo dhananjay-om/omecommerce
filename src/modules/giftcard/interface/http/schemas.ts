@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GiftCardKind } from '@prisma/client';
+import { GiftCardKind, GiftCardStatus } from '@prisma/client';
 
 export const issueGiftCardSchema = z.object({
   websiteCode: z.string().min(1),
@@ -18,4 +18,13 @@ export const adjustGiftCardSchema = z.object({
 
 export const redeemGiftCardSchema = z.object({
   code: z.string().min(1),
+});
+
+export const listGiftCardsQuerySchema = z.object({
+  status: z.nativeEnum(GiftCardStatus).optional(),
+  last4: z.string().length(4).optional(),
+  recipientEmail: z.string().optional(),
+  websiteCode: z.string().optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
 });

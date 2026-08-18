@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import TiptapLink from '@tiptap/extension-link';
 import TiptapImage from '@tiptap/extension-image';
 import {
   Bold,
@@ -77,7 +76,11 @@ export function RichTextEditor({ id, content, onChange }: { id?: string; content
   const [uploading, setUploading] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, TiptapLink.configure({ openOnClick: false }), ImageWithMediaKey],
+    // Tiptap v3's StarterKit already bundles a Link extension internally
+    // (configurable via its own `link` option) — registering
+    // @tiptap/extension-link separately on top of it caused a "duplicate
+    // extension names found: ['link']" warning.
+    extensions: [StarterKit.configure({ link: { openOnClick: false } }), ImageWithMediaKey],
     content,
     immediatelyRender: false, // avoids an SSR/hydration mismatch — Tiptap only renders once mounted client-side
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),

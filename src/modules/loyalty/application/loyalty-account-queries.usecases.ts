@@ -34,7 +34,15 @@ export class GetLoyaltyAccount {
     if (account.tierId) {
       const tierList = await this.tiers.listByProgramId(account.programId);
       const tier = tierList.find((t) => t.id === account.tierId);
-      if (tier) tierView = { id: tier.id.toString(), name: tier.name, thresholdPoints: tier.thresholdPoints.toString(), earnMultiplier: tier.earnMultiplier };
+      if (tier) {
+        tierView = {
+          id: tier.id.toString(),
+          name: tier.name,
+          thresholdPoints: tier.thresholdPoints.toString(),
+          earnMultiplier: tier.earnMultiplier,
+          sortOrder: tier.sortOrder,
+        };
+      }
     }
 
     return {

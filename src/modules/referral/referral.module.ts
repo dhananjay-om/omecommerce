@@ -14,7 +14,14 @@ import { GetMyReferrals } from './application/get-my-referrals.usecase.js';
 import { QualifyReferral } from './application/qualify-referral.usecase.js';
 import { ReverseReferralReward } from './application/reverse-referral-reward.usecase.js';
 import { IssueReferralReward } from './application/issue-referral-reward.js';
-import { createReferralProgramSchema, attachReferralSchema } from './interface/http/schemas.js';
+import { ListReferralPrograms, GetReferralProgram, UpdateReferralProgram } from './application/referral-program-queries.usecases.js';
+import { ListReferralsForAdmin } from './application/list-referrals-for-admin.usecase.js';
+import {
+  createReferralProgramSchema,
+  updateReferralProgramSchema,
+  attachReferralSchema,
+  listReferralsQuerySchema,
+} from './interface/http/schemas.js';
 
 export interface ReferralRouters {
   admin: Router;
@@ -44,6 +51,10 @@ export function createReferralModule(db: Db, authorize: (permission: string) => 
 
   const issueReward = new IssueReferralReward(rewards, wallets, loyaltyLedger, loyaltyPrograms, customerContext);
   const createReferralProgram = new CreateReferralProgram(programs, websites, loyaltyPrograms);
+  const listReferralPrograms = new ListReferralPrograms(programs);
+  const getReferralProgram = new GetReferralProgram(programs);
+  const updateReferralProgram = new UpdateReferralProgram(programs, loyaltyPrograms);
+  const listReferralsForAdmin = new ListReferralsForAdmin(referrals);
   const attachReferral = new AttachReferral(customerContext, codes, programs, referrals, issueReward);
   const getMyReferrals = new GetMyReferrals(customerContext, programs, codes, referrals, rewards);
 
@@ -53,6 +64,13 @@ export function createReferralModule(db: Db, authorize: (permission: string) => 
   }
 
   const admin = Router();
+  admin.get(
+    '/referral/programs',
+    authorize('referral:manage'),
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listReferralPrograms.execute() });
+    }),
+  );
   admin.post(
     '/referral/programs',
     authorize('referral:manage'),
@@ -60,6 +78,39 @@ export function createReferralModule(db: Db, authorize: (permission: string) => 
       const body = parse(createReferralProgramSchema, req.body);
       const actorId = await resolveActorId(req.adminUser?.adminUserPublicId);
       res.status(201).json({ data: await createReferralProgram.execute(body, actorId) });
+    }),
+  );
+  admin.get(
+    '/referral/programs/:id',
+    authorize('referral:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getReferralProgram.execute(req.params.id!) });
+    }),
+  );
+  admin.patch(
+    '/referral/programs/:id',
+    authorize('referral:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateReferralProgramSchema, req.body);
+      res.json({ data: await updateReferralProgram.execute(req.params.id!, body) });
+    }),
+  );
+  admin.get(
+    '/referral/referrals',
+    authorize('referral:manage'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listReferralsQuerySchema, req.query);
+      res.json({ data: await listReferralsForAdmin.execute(query) });
+    }),
+  );
+  admin.get(
+    '/customers/:id/referrals',
+    authorize('referral:manage'),
+    asyncHandler(async (req, res) => {
+      // Same usecase as the storefront's GET /store/v1/me/referrals — it's
+      // auth-agnostic (just a customerPublicId in, a view out), the caller's
+      // identity/permission is enforced at the route layer, not inside it.
+      res.json({ data: await getMyReferrals.execute(req.params.id!) });
     }),
   );
 

@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits, isNegative } from '../../../shared/domain/decimal.js';
 import type {
@@ -6,6 +7,8 @@ import type {
   GiftCardTransactionInfo,
   IssueGiftCardInput,
   LedgerWriteOptions,
+  ListGiftCardsFilter,
+  GiftCardListResult,
 } from '../domain/repositories.js';
 import { InsufficientGiftCardBalanceError } from '../domain/errors.js';
 
@@ -215,5 +218,51 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
       reason: r.reason,
       createdAt: r.createdAt,
     }));
+  }
+
+  async list(filter: ListGiftCardsFilter): Promise<GiftCardListResult> {
+    const where: Prisma.GiftCardWhereInput = {
+      deletedAt: null,
+      ...(filter.websiteId ? { websiteId: filter.websiteId } : {}),
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.last4 ? { codeLast4: filter.last4 } : {}),
+      ...(filter.recipientEmail ? { recipientEmail: { contains: filter.recipientEmail, mode: 'insensitive' } } : {}),
+    };
+    const [total, rows] = await this.db.$transaction([
+      this.db.giftCard.count({ where }),
+      this.db.giftCard.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+        select: {
+          publicId: true,
+          codeLast4: true,
+          initialAmount: true,
+          balance: true,
+          currency: true,
+          status: true,
+          kind: true,
+          recipientEmail: true,
+          expiresAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    return {
+      total,
+      giftCards: rows.map((r) => ({
+        publicId: r.publicId,
+        codeLast4: r.codeLast4,
+        initialAmount: formatDecimal(r.initialAmount),
+        balance: formatDecimal(r.balance),
+        currency: r.currency,
+        status: r.status,
+        kind: r.kind,
+        recipientEmail: r.recipientEmail,
+        expiresAt: r.expiresAt,
+        createdAt: r.createdAt,
+      })),
+    };
   }
 }

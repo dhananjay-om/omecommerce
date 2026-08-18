@@ -47,10 +47,22 @@ export interface CreateLoyaltyProgramInput {
   createdBy?: bigint;
 }
 
+export interface UpdateLoyaltyProgramInput {
+  name?: string;
+  pointsPerCurrencyUnit?: string;
+  pointValue?: string;
+  redeemMinPoints?: number;
+  pointsExpiryMonths?: number | null;
+  status?: LoyaltyProgramStatus;
+}
+
 export interface LoyaltyProgramRepository {
   create(input: CreateLoyaltyProgramInput): Promise<LoyaltyProgramInfo>;
   findByWebsiteId(websiteId: bigint): Promise<LoyaltyProgramInfo | null>;
   findByPublicId(publicId: string): Promise<LoyaltyProgramInfo | null>;
+  /** Admin browse (Content > Loyalty) — one row per website today, but listed rather than singleton-fetched so the settings screen can render one card per website. */
+  list(): Promise<LoyaltyProgramInfo[]>;
+  update(id: bigint, input: UpdateLoyaltyProgramInput): Promise<LoyaltyProgramInfo>;
 }
 
 export interface LoyaltyTierInfo {
@@ -71,10 +83,22 @@ export interface CreateLoyaltyTierInput {
   createdBy?: bigint;
 }
 
+export interface UpdateLoyaltyTierInput {
+  name?: string;
+  thresholdPoints?: bigint;
+  earnMultiplier?: string;
+  sortOrder?: number;
+}
+
 export interface LoyaltyTierRepository {
   create(input: CreateLoyaltyTierInput): Promise<LoyaltyTierInfo>;
+  findById(id: bigint): Promise<LoyaltyTierInfo | null>;
   /** All tiers for a program, ordered by thresholdPoints descending — the first one whose threshold <= lifetimePoints is the customer's tier. */
   listByProgramId(programId: bigint): Promise<LoyaltyTierInfo[]>;
+  update(id: bigint, input: UpdateLoyaltyTierInput): Promise<LoyaltyTierInfo>;
+  /** Hard delete — LoyaltyTier has no deletedAt and LoyaltyAccount.tierId is
+   *  onDelete: SetNull, so this is safe; the next earn re-tiers the account. */
+  delete(id: bigint): Promise<void>;
 }
 
 export interface LoyaltyAccountSnapshot {

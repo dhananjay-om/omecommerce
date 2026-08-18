@@ -34,6 +34,7 @@ describe.skipIf(!process.env.INTEGRATION)('referral API (live DB)', () => {
   let storeViewId = '';
   let storeId = 0n;
   let worker: Worker;
+  let programPublicId = '';
 
   const address = { name: 'Jane Doe', line1: '123 Main St', city: 'Springfield', postalCode: '12345', country: 'US' };
 
@@ -169,6 +170,7 @@ describe.skipIf(!process.env.INTEGRATION)('referral API (live DB)', () => {
     });
     expect(program.status).toBe(201);
     expect(program.body.data).toMatchObject({ name: 'OME Referrals', qualifyingEvent: 'FIRST_ORDER', referrerRewardType: 'STORE_CREDIT', refereeRewardType: 'POINTS' });
+    programPublicId = program.body.data.publicId;
   });
 
   it('rejects a second referral program for the same website with 409', async () => {
@@ -211,6 +213,32 @@ describe.skipIf(!process.env.INTEGRATION)('referral API (live DB)', () => {
       refereeRewardAmount: '1.00',
     });
     expect(zero.status).toBe(422);
+  });
+
+  it('admin: lists and gets referral programs, and updates one', async () => {
+    const list = await admin.get('/admin/v1/referral/programs');
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((p: { publicId: string }) => p.publicId === programPublicId)).toBe(true);
+
+    const single = await admin.get(`/admin/v1/referral/programs/${programPublicId}`);
+    expect(single.status).toBe(200);
+    expect(single.body.data).toMatchObject({ name: 'OME Referrals', status: 'ACTIVE', minOrderAmount: '40.0000', maxReferralsPerCustomer: 2 });
+
+    const updated = await admin.patch(`/admin/v1/referral/programs/${programPublicId}`).send({ maxReferralsPerCustomer: 3 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.maxReferralsPerCustomer).toBe(3);
+
+    // Restore — the "rejects attaching once maxReferralsPerCustomer is reached" test later in this file depends on the cap being exactly 2.
+    await admin.patch(`/admin/v1/referral/programs/${programPublicId}`).send({ maxReferralsPerCustomer: 2 });
+  });
+
+  it('PATCH re-validates the reward shape when a reward field changes', async () => {
+    const res = await admin.patch(`/admin/v1/referral/programs/${programPublicId}`).send({ referrerRewardType: 'STORE_CREDIT', referrerRewardAmount: '0' });
+    expect(res.status).toBe(422);
+
+    // A patch that doesn't touch any reward field is unaffected by reward-shape validation.
+    const rename = await admin.patch(`/admin/v1/referral/programs/${programPublicId}`).send({ name: 'OME Referrals' });
+    expect(rename.status).toBe(200);
   });
 
   it('rejects storefront referral routes with no auth', async () => {
@@ -365,5 +393,35 @@ describe.skipIf(!process.env.INTEGRATION)('referral API (live DB)', () => {
 
     expect(await walletBalance(referrer.token)).toBe('5.0000');
     expect(await walletBalance(referee.token)).toBe('5.0000');
+  });
+
+  it('admin: lists every referral across all customers, filterable by status, paginated', async () => {
+    const all = await admin.get('/admin/v1/referral/referrals');
+    expect(all.status).toBe(200);
+    expect(all.body.data.total).toBeGreaterThan(0);
+    const sample = all.body.data.referrals[0];
+    expect(sample).toMatchObject({
+      publicId: expect.any(String),
+      referrerEmail: expect.stringContaining('@example.com'),
+      refereeEmail: expect.stringContaining('@example.com'),
+      status: expect.any(String),
+      createdAt: expect.any(String),
+    });
+
+    const reversed = await admin.get('/admin/v1/referral/referrals').query({ status: 'REVERSED' });
+    expect(reversed.status).toBe(200);
+    expect(reversed.body.data.referrals.every((r: { status: string }) => r.status === 'REVERSED')).toBe(true);
+    expect(reversed.body.data.referrals.length).toBeGreaterThan(0); // the clawed-back referral from the earlier full-flow test
+
+    const paged = await admin.get('/admin/v1/referral/referrals').query({ page: 1, pageSize: 1 });
+    expect(paged.body.data.referrals).toHaveLength(1);
+  });
+
+  it("admin: views a customer's own referral panel (same shape as the storefront's self-view)", async () => {
+    const referrer = await registerAndLogin('referrer1@example.com');
+    const res = await admin.get(`/admin/v1/customers/${referrer.publicId}/referrals`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.code).toEqual(expect.any(String));
+    expect(res.body.data.referrals.length).toBeGreaterThan(0);
   });
 });

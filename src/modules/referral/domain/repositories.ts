@@ -68,10 +68,29 @@ export interface CreateReferralProgramInput {
   createdBy?: bigint;
 }
 
+export interface UpdateReferralProgramInput {
+  name?: string;
+  status?: LoyaltyProgramStatus;
+  qualifyingEvent?: ReferralQualifyingEvent;
+  minOrderAmount?: string | null;
+  referrerRewardType?: ReferralRewardType;
+  referrerRewardAmount?: string | null;
+  referrerRewardPoints?: bigint | null;
+  refereeRewardType?: ReferralRewardType;
+  refereeRewardAmount?: string | null;
+  refereeRewardPoints?: bigint | null;
+  maxReferralsPerCustomer?: number | null;
+  attributionWindowDays?: number | null;
+}
+
 export interface ReferralProgramRepository {
   create(input: CreateReferralProgramInput): Promise<ReferralProgramInfo>;
   findById(id: bigint): Promise<ReferralProgramInfo | null>;
+  findByPublicId(publicId: string): Promise<ReferralProgramInfo | null>;
   findByWebsiteId(websiteId: bigint): Promise<ReferralProgramInfo | null>;
+  /** Admin browse — one row per website today, but listed rather than singleton-fetched, matching Loyalty's identical pattern. */
+  list(): Promise<ReferralProgramInfo[]>;
+  update(id: bigint, input: UpdateReferralProgramInput): Promise<ReferralProgramInfo>;
 }
 
 export interface ReferralCodeInfo {
@@ -112,6 +131,28 @@ export interface CreateReferralInput {
   refereeCustomerId: bigint;
 }
 
+export interface AdminReferralFilter {
+  status?: ReferralStatus;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminReferralRow {
+  publicId: string;
+  referrerEmail: string;
+  refereeEmail: string;
+  status: ReferralStatus;
+  createdAt: Date;
+  qualifiedAt: Date | null;
+  rewardedAt: Date | null;
+  rewards: Array<{ beneficiary: 'REFERRER' | 'REFEREE'; rewardType: ReferralRewardType; amount: string | null; points: bigint | null }>;
+}
+
+export interface AdminReferralListResult {
+  total: number;
+  referrals: AdminReferralRow[];
+}
+
 /**
  * Referral relationships. Unlike Wallet/Loyalty this isn't a balance ledger —
  * a Referral progresses through a small, one-way state machine
@@ -132,6 +173,9 @@ export interface ReferralRepository {
   markRewarded(id: bigint): Promise<ReferralInfo>;
   markExpired(id: bigint): Promise<ReferralInfo>;
   markReversed(id: bigint): Promise<ReferralInfo>;
+
+  /** Admin browse (Content > Referrals) — every referral across all customers, newest first. */
+  listForAdmin(filter: AdminReferralFilter): Promise<AdminReferralListResult>;
 }
 
 export interface ReferralRewardInfo {

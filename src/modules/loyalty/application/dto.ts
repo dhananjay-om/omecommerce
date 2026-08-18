@@ -1,4 +1,4 @@
-import type { LoyaltyTxnType, LoyaltySource, WalletStatus } from '@prisma/client';
+import type { LoyaltyTxnType, LoyaltySource, LoyaltyProgramStatus, WalletStatus } from '@prisma/client';
 
 export interface CreateLoyaltyProgramCommand {
   websiteCode: string;
@@ -9,12 +9,23 @@ export interface CreateLoyaltyProgramCommand {
   pointsExpiryMonths?: number | null;
 }
 
+export interface UpdateLoyaltyProgramCommand {
+  name?: string;
+  pointsPerCurrencyUnit?: string;
+  pointValue?: string;
+  redeemMinPoints?: number;
+  pointsExpiryMonths?: number | null;
+  status?: LoyaltyProgramStatus;
+}
+
 export interface LoyaltyProgramView {
   publicId: string;
   name: string;
+  status: LoyaltyProgramStatus;
   pointsPerCurrencyUnit: string;
   pointValue: string;
   redeemMinPoints: number;
+  pointsExpiryMonths: number | null;
 }
 
 export interface CreateLoyaltyTierCommand {
@@ -25,11 +36,19 @@ export interface CreateLoyaltyTierCommand {
   sortOrder?: number;
 }
 
+export interface UpdateLoyaltyTierCommand {
+  name?: string;
+  thresholdPoints?: string;
+  earnMultiplier?: string;
+  sortOrder?: number;
+}
+
 export interface LoyaltyTierView {
   id: string;
   name: string;
   thresholdPoints: string;
   earnMultiplier: string;
+  sortOrder: number;
 }
 
 export interface LoyaltyAccountView {

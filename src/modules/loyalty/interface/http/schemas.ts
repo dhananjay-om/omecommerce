@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LoyaltyProgramStatus } from '@prisma/client';
 
 export const createLoyaltyProgramSchema = z.object({
   websiteCode: z.string().min(1),
@@ -9,9 +10,25 @@ export const createLoyaltyProgramSchema = z.object({
   pointsExpiryMonths: z.number().int().positive().nullish(),
 });
 
+export const updateLoyaltyProgramSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  pointsPerCurrencyUnit: z.string().min(1).optional(),
+  pointValue: z.string().min(1).optional(),
+  redeemMinPoints: z.number().int().nonnegative().optional(),
+  pointsExpiryMonths: z.number().int().positive().nullish(),
+  status: z.nativeEnum(LoyaltyProgramStatus).optional(),
+});
+
 export const createLoyaltyTierSchema = z.object({
   name: z.string().min(1).max(255),
   thresholdPoints: z.string().regex(/^\d+$/, 'expected a non-negative integer'),
+  earnMultiplier: z.string().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const updateLoyaltyTierSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  thresholdPoints: z.string().regex(/^\d+$/, 'expected a non-negative integer').optional(),
   earnMultiplier: z.string().optional(),
   sortOrder: z.number().int().optional(),
 });

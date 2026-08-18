@@ -32,9 +32,11 @@ export class CreateLoyaltyProgram {
     return {
       publicId: program.publicId,
       name: program.name,
+      status: program.status,
       pointsPerCurrencyUnit: program.pointsPerCurrencyUnit,
       pointValue: program.pointValue,
       redeemMinPoints: program.redeemMinPoints,
+      pointsExpiryMonths: program.pointsExpiryMonths,
     };
   }
 }
