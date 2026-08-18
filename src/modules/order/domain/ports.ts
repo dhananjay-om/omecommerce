@@ -41,6 +41,11 @@ export interface TaxContext {
   /** The shipping address's 2-digit CBIC state code — null when unknown/not
    *  yet collected, treated as inter-state (see gst.ts's documented default). */
   destinationStateCode: string | null;
+  /** plan/15 Phase 6 — a tax-exempt B2B buyer (Company.taxExempt, resolved
+   *  fresh at checkout). taxClassCode/rateMinor are still reported on
+   *  TaxLineResult for audit purposes even though nothing is collected —
+   *  only amountMinor (and therefore the GST breakdown) is forced to zero. */
+  taxExempt: boolean;
 }
 
 export interface TaxCalculator {

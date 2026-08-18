@@ -1,5 +1,13 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { VariantLookup, WarehouseResolver, CustomerGroupLookup, CartProductMediaLookup, AdminUserLookup } from '../domain/repositories.js';
+import type {
+  VariantLookup,
+  WarehouseResolver,
+  CustomerGroupLookup,
+  CartProductMediaLookup,
+  AdminUserLookup,
+  CompanyMembershipLookup,
+  CompanyLookup,
+} from '../domain/repositories.js';
 
 export class PrismaVariantLookup implements VariantLookup {
   constructor(private readonly db: Db) {}
@@ -47,6 +55,37 @@ export class PrismaCustomerGroupLookup implements CustomerGroupLookup {
 
   async byCode(code: string): Promise<{ id: bigint } | null> {
     return this.db.customerGroup.findFirst({ where: { code }, select: { id: true } });
+  }
+
+  async findDefault(): Promise<{ id: bigint } | null> {
+    return this.db.customerGroup.findFirst({ where: { isDefault: true, deletedAt: null }, select: { id: true } });
+  }
+
+  async byId(id: bigint): Promise<{ name: string } | null> {
+    return this.db.customerGroup.findFirst({ where: { id, deletedAt: null }, select: { name: true } });
+  }
+}
+
+/** plan/15 Phase 6 — read-only cross-module lookup into company/company_customer (own copy, not company module's own repository). Only ACTIVE companies grant membership here. */
+export class PrismaCompanyMembershipLookup implements CompanyMembershipLookup {
+  constructor(private readonly db: Db) {}
+
+  async findActiveByCustomerId(customerId: bigint): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean } | null> {
+    const membership = await this.db.companyCustomer.findUnique({
+      where: { customerId },
+      select: { company: { select: { id: true, status: true, customerGroupId: true, taxExempt: true, deletedAt: true } } },
+    });
+    if (!membership || membership.company.deletedAt || membership.company.status !== 'ACTIVE') return null;
+    return { companyId: membership.company.id, customerGroupId: membership.company.customerGroupId, taxExempt: membership.company.taxExempt };
+  }
+}
+
+/** plan/15 Phase 6 — order-detail "company" badge/link (own copy, not company module's own repository). */
+export class PrismaCompanyLookup implements CompanyLookup {
+  constructor(private readonly db: Db) {}
+
+  async byId(companyId: bigint): Promise<{ publicId: string; name: string } | null> {
+    return this.db.company.findFirst({ where: { id: companyId }, select: { publicId: true, name: true } });
   }
 }
 

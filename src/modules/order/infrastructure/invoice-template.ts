@@ -68,8 +68,17 @@ function addressBlock(address: OrderAddressView | undefined, label: string): str
 /** Every line in one order shares the same intra/inter-state determination
  *  (one shipping address per order) — so this only needs to look at the
  *  order's OrderTaxLine rows ONCE, not per line, to know whether to render a
- *  CGST+SGST pair of columns or a single IGST column for every row. */
-function gstColumnMode(taxLines: OrderTaxLineView[]): 'CGST_SGST' | 'IGST' | 'NONE' {
+ *  CGST+SGST pair of columns or a single IGST column for every row.
+ *
+ *  plan/15 Phase 6 — EXEMPT is checked FIRST, before taxLines is even
+ *  consulted: a tax-exempt B2B order has zero OrderTaxLine rows by
+ *  construction (NativeGstTaxCalculator forces amountMinor to 0 when
+ *  Order.taxExempt), so taxLines alone is indistinguishable from "this
+ *  website simply has no tax classes configured" — the printed invoice
+ *  needs to say WHY, not just show a blank/zero row (see the totals-block
+ *  fallback in buildInvoiceHtml() below). */
+function gstColumnMode(taxLines: OrderTaxLineView[], taxExempt: boolean): 'EXEMPT' | 'CGST_SGST' | 'IGST' | 'NONE' {
+  if (taxExempt) return 'EXEMPT';
   if (taxLines.some((t) => t.taxType === 'CGST' || t.taxType === 'SGST')) return 'CGST_SGST';
   if (taxLines.some((t) => t.taxType === 'IGST')) return 'IGST';
   return 'NONE';
@@ -93,7 +102,7 @@ function gstColumnMode(taxLines: OrderTaxLineView[]): 'CGST_SGST' | 'IGST' | 'NO
 export async function buildInvoiceHtml(order: OrderView, invoice: OrderInvoiceView, branding: InvoiceBranding): Promise<string> {
   const billing = order.addresses.find((a) => a.type === 'BILLING');
   const shipping = order.addresses.find((a) => a.type === 'SHIPPING');
-  const columnMode = gstColumnMode(order.taxLines);
+  const columnMode = gstColumnMode(order.taxLines, order.taxExempt);
   const barcodeDataUri = await buildBarcodeDataUri(`INV-${invoice.invoiceNumber}`);
 
   const gstHeaderCells =
@@ -140,11 +149,21 @@ export async function buildInvoiceHtml(order: OrderView, invoice: OrderInvoiceVi
   // through floating-point math, which this codebase's money conventions
   // forbid — see shared/domain/decimal.ts's header comment).
   const isFullInvoice = invoice.subtotal === order.subtotal;
-  const taxSummaryRows = isFullInvoice
-    ? order.taxLines
-        .map((t) => `<tr><td>${escapeHtml(t.taxType ?? t.taxClassCode)} @ ${formatPercent(t.rate)}</td><td class="num">${formatMoney(t.amount, order.currency)}</td></tr>`)
-        .join('')
-    : '';
+  const taxSummaryRows =
+    isFullInvoice && !order.taxExempt
+      ? order.taxLines
+          .map((t) => `<tr><td>${escapeHtml(t.taxType ?? t.taxClassCode)} @ ${formatPercent(t.rate)}</td><td class="num">${formatMoney(t.amount, order.currency)}</td></tr>`)
+          .join('')
+      : '';
+  // plan/15 Phase 6 — a tax-exempt order's fallback row must say WHY tax is
+  // zero, not just show a blank/zero-looking "Tax" line; the compliance
+  // reference is the Bill-To GSTIN already printed by addressBlock() above
+  // (no separate Order.taxExemptionRef snapshot — see company.prisma's
+  // header comment on why exemption itself is validated at the Company
+  // level, not re-captured per order).
+  const taxFallbackRow = order.taxExempt
+    ? `<tr><td colspan="2" class="muted">Tax exempt (B2B)</td></tr>`
+    : `<tr><td>Tax</td><td class="num">${formatMoney(invoice.taxTotal, order.currency)}</td></tr>`;
 
   return `<!doctype html>
 <html>
@@ -206,6 +225,7 @@ export async function buildInvoiceHtml(order: OrderView, invoice: OrderInvoiceVi
       <p><strong>${escapeHtml(invoice.invoiceNumber)}</strong></p>
       <p class="muted">Order ${escapeHtml(order.orderNumber)} &middot; ${new Date(invoice.createdAt).toLocaleDateString()}</p>
       <p class="muted">${escapeHtml(order.email)}</p>
+      ${order.poNumber ? `<p class="muted">PO: ${escapeHtml(order.poNumber)}</p>` : ''}
       ${barcodeDataUri ? `<div class="barcode"><img src="${barcodeDataUri}" alt="Invoice barcode INV-${escapeHtml(invoice.invoiceNumber)}"></div>` : ''}
     </div>
   </div>
@@ -221,7 +241,7 @@ export async function buildInvoiceHtml(order: OrderView, invoice: OrderInvoiceVi
     <table class="totals">
       <tr><td>Subtotal</td><td class="num">${formatMoney(invoice.subtotal, order.currency)}</td></tr>
       <tr><td>Discount</td><td class="num">-${formatMoney(invoice.discountTotal, order.currency)}</td></tr>
-      ${taxSummaryRows || `<tr><td>Tax</td><td class="num">${formatMoney(invoice.taxTotal, order.currency)}</td></tr>`}
+      ${taxSummaryRows || taxFallbackRow}
       <tr class="grand"><td>Total</td><td class="num">${formatMoney(invoice.grandTotal, order.currency)}</td></tr>
     </table>
   </div>

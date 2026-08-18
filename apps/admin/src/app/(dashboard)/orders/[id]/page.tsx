@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
 import type { OrderDetail } from '@/lib/types';
 import { formatPrice } from '@/lib/format-price';
@@ -82,6 +83,22 @@ export default async function OrderInformationPage({ params }: { params: Promise
           <div className="overflow-hidden rounded-lg border">
             <InfoRow label="Customer Name" value={customerName} />
             <InfoRow label="Email" value={order.email} />
+            {order.companyName ? (
+              <InfoRow
+                label="Company"
+                value={
+                  order.companyPublicId ? (
+                    <Link href={`/companies/${order.companyPublicId}`} className="hover:underline">
+                      {order.companyName}
+                    </Link>
+                  ) : (
+                    order.companyName
+                  )
+                }
+              />
+            ) : null}
+            {order.poNumber ? <InfoRow label="PO Number" value={order.poNumber} /> : null}
+            {order.taxExempt ? <InfoRow label="Tax" value={<Badge variant="secondary">Tax Exempt</Badge>} /> : null}
           </div>
         </div>
       </SectionCard>

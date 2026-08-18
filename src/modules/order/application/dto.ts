@@ -1,9 +1,10 @@
 import type { OrderStatus, FinancialStatus, FulfillmentStatus, TenderType } from '@prisma/client';
 
+/** plan/15 Phase 6 — customerGroupCode was removed: the pricing group is
+ *  always server-derived now, see CreateCart/resolveCustomerGroupId. */
 export interface CreateCartCommand {
   storeViewId: string;
   customerPublicId?: string | null;
-  customerGroupCode?: string | null;
 }
 
 export interface CartLineDto {
@@ -30,6 +31,12 @@ export interface CartView {
   publicId: string;
   currency: string;
   status: string;
+  /** plan/15 Phase 6 — the resolved CustomerGroup's display name when the cart has one
+   *  (from a company membership, the customer's own group, or the website default),
+   *  null for guests/base pricing — drives the storefront's "your company pricing is
+   *  applied" cart-summary line. Not itself proof of a DIFFERENT price (a group can be
+   *  configured with no price lists), just that a non-base group is in effect. */
+  customerGroupName: string | null;
   lines: CartLineDto[];
   /** Sum of every line's `lineTotal` that resolved to a real price; null if the cart has no priced lines yet. */
   subtotal: string | null;
@@ -134,6 +141,8 @@ export interface CompleteCheckoutCommand {
   testScenario?: 'approve' | 'decline';
   /** req.ip, captured at the HTTP layer — plan/15 Phase 0a, shown on the admin Order Information section. */
   customerIp?: string | null;
+  /** plan/15 Phase 6 — a B2B buyer's purchase-order reference, print-only (no validation beyond length); snapshotted onto Order.poNumber regardless of company membership. */
+  poNumber?: string | null;
 }
 
 export interface OrderLineViewDto {
@@ -261,6 +270,14 @@ export interface OrderViewDto {
   shippingMethodCode: string | null;
   couponCode: string | null;
   customerIp: string | null;
+  /** plan/15 Phase 6 — snapshotted at checkout; companyPublicId/companyName are
+   *  only populated by GetOrder/GetCustomerOrder (the two order-detail read
+   *  paths), null elsewhere (mutation-result DTOs from cancel/close/fulfill/
+   *  etc. don't do the extra company lookup, callers re-fetch via GetOrder anyway). */
+  taxExempt: boolean;
+  poNumber: string | null;
+  companyPublicId: string | null;
+  companyName: string | null;
   placedAt: string;
   closedAt: string | null;
   lines: OrderLineViewDto[];

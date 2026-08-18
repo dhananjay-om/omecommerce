@@ -52,6 +52,7 @@ model Customer {
   referralCodes       ReferralCode[]
   referralsAsReferrer Referral[]        @relation("ReferralAsReferrer")
   referralsAsReferee  Referral[]        @relation("ReferralAsReferee")
+  companyMembership   CompanyCustomer?
 
   @@unique([websiteId, email], map: "uq_customer_website_email")
   @@index([deletedAt])

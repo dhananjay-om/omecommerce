@@ -118,6 +118,7 @@ async function main() {
     { code: 'loyalty:manage', description: 'Manage loyalty programs, tiers, and customer point balances' },
     { code: 'referral:manage', description: 'Manage referral programs' },
     { code: 'coupon:manage', description: 'Manage discount coupons' },
+    { code: 'company:manage', description: 'Manage B2B companies and their members' },
   ];
   for (const p of PERMISSIONS) {
     await prisma.permission.upsert({ where: { code: p.code }, update: {}, create: p });

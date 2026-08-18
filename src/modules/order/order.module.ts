@@ -13,6 +13,8 @@ import {
   PrismaCustomerGroupLookup,
   PrismaCartProductMediaLookup,
   PrismaAdminUserLookup,
+  PrismaCompanyMembershipLookup,
+  PrismaCompanyLookup,
 } from './infrastructure/prisma-lookups.js';
 import { PrismaCustomerLookup } from './infrastructure/prisma-customer-lookup.js';
 import { PrismaTaxClassLookup, PrismaWebsiteTaxConfigLookup, NativeGstTaxCalculator } from './infrastructure/native-tax-calculator.js';
@@ -23,6 +25,7 @@ import { S3MediaUrlResolver } from './infrastructure/s3-media-url-resolver.js';
 import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { EnrichCartView } from './application/enrich-cart-view.js';
 import { CreateCart } from './application/create-cart.usecase.js';
+import { AttachCustomerToCart } from './application/attach-customer-to-cart.usecase.js';
 import { AddCartLine } from './application/add-cart-line.usecase.js';
 import { GetCart } from './application/get-cart.usecase.js';
 import { RemoveCartLine } from './application/remove-cart-line.usecase.js';
@@ -111,6 +114,8 @@ export function createOrderModule(
   const customerGroups = new PrismaCustomerGroupLookup(db);
   const customers = new PrismaCustomerLookup(db);
   const adminUsers = new PrismaAdminUserLookup(db);
+  const companyMemberships = new PrismaCompanyMembershipLookup(db);
+  const companies = new PrismaCompanyLookup(db);
   const taxClassLookup = new PrismaTaxClassLookup(db);
   const websiteTaxConfigLookup = new PrismaWebsiteTaxConfigLookup(db);
   const taxCalculator = new NativeGstTaxCalculator(taxClassLookup, websiteTaxConfigLookup);
@@ -142,9 +147,11 @@ export function createOrderModule(
     taxClassLookup,
     walletLedger,
     giftCardLedger,
+    customerGroups,
   );
 
-  const createCart = new CreateCart(carts, storeContext, customerGroups, customers, enrichCartView);
+  const createCart = new CreateCart(carts, storeContext, customerGroups, customers, companyMemberships, enrichCartView);
+  const attachCustomerToCart = new AttachCustomerToCart(carts, customerGroups, customers, companyMemberships, enrichCartView);
   const addCartLine = new AddCartLine(carts, variants, enrichCartView);
   const getCart = new GetCart(carts, enrichCartView);
   const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
@@ -169,8 +176,9 @@ export function createOrderModule(
     discountCalculator,
     walletLedger,
     giftCardLedger,
+    companyMemberships,
   );
-  const getOrder = new GetOrder(orders);
+  const getOrder = new GetOrder(orders, companies);
   const listOrders = new ListOrders(orders);
   const listShippingMethods = new ListShippingMethods(shippingMethods);
   // walletLedger is already constructed above (shared with EnrichCartView).
@@ -205,7 +213,7 @@ export function createOrderModule(
   const getEmailLog = new GetEmailLog(orders);
   const closeOrder = new CloseOrder(orders, outbox);
   const exportOrders = new ExportOrders(orders);
-  const getCustomerOrder = new GetCustomerOrder(orders, customers);
+  const getCustomerOrder = new GetCustomerOrder(orders, customers, companies);
   const getCustomerOrderInvoicePdfUrl = new GetCustomerOrderInvoicePdfUrl(orders, customers, mediaUrlResolver);
   const getCustomerOrderTracking = new GetCustomerOrderTracking(orders, customers);
   const reorder = new Reorder(orders, customers, variants, carts);
@@ -449,6 +457,16 @@ export function createOrderModule(
     requireCustomer,
     asyncHandler(async (req, res) => {
       res.json({ data: await removeWalletFromCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+    }),
+  );
+  // plan/15 Phase 6 — claims a guest cart at login and re-derives its
+  // pricing group; failures are expected to be swallowed by the caller
+  // (see AttachCustomerToCart's doc comment).
+  store.post(
+    '/carts/:publicId/actions/attach-customer',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await attachCustomerToCart.execute(req.params.publicId!, req.customer!.customerPublicId) });
     }),
   );
   store.post(

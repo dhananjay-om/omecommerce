@@ -11,6 +11,7 @@ const LINKS = [
   { href: '/account/wallet', label: 'Wallet' },
   { href: '/account/rewards', label: 'Rewards' },
   { href: '/account/referrals', label: 'Referrals' },
+  { href: '/account/company', label: 'Company' },
 ];
 
 export function AccountNav() {

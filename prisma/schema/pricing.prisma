@@ -39,6 +39,7 @@ model CustomerGroup {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   priceLists PriceList[]
+  companies  Company[]
 
   @@index([deletedAt])
   @@map("customer_group")

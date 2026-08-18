@@ -600,3 +600,30 @@ enum GstTaxType {
   SGST
   IGST
 }
+
+/// company.prisma — B2B company approval workflow (plan/15 Phase 6). New
+/// companies default to PENDING (self-registered or admin-created but not
+/// yet vetted); an admin moves it to ACTIVE (members can shop under its
+/// pricing/tax terms) or REJECTED (never was legitimate). SUSPENDED is a
+/// separate reversible state from ACTIVE (temporary hold, e.g. billing
+/// dispute) — modeled as its own state rather than a boolean so the history
+/// of "was this ever active" isn't lost the way a single isActive flip would
+/// lose it. Only ACTIVE companies are honored by CompanyMembershipLookup
+/// (pricing/tax-exemption resolution) and by checkout.
+enum CompanyStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+/// company.prisma's CompanyCustomer — ADMIN can manage the company's own
+/// buyer list (storefront /account/company member add/remove/role-change);
+/// BUYER can only shop under the company's pricing/tax-exemption. No
+/// spending-approval chain this pass (see company.prisma's header comment),
+/// so the two roles differ only in member-management access, not in
+/// ordering ability.
+enum CompanyMemberRole {
+  ADMIN
+  BUYER
+}

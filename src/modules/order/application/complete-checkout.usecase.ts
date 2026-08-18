@@ -1,4 +1,4 @@
-import type { CartRepository, OrderRepository, VariantLookup, WarehouseResolver, CartTenderView } from '../domain/repositories.js';
+import type { CartRepository, OrderRepository, VariantLookup, WarehouseResolver, CartTenderView, CompanyMembershipLookup } from '../domain/repositories.js';
 import type { TaxCalculator, ShippingCalculator, PaymentGateway } from '../domain/ports.js';
 import type { StoreContextResolver, StoreViewContext } from '../../../shared/application/scope.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
@@ -61,6 +61,7 @@ export class CompleteCheckout {
     private readonly discountCalculator: DiscountCalculator,
     private readonly wallets: WalletLedger,
     private readonly giftCards: GiftCardLedger,
+    private readonly companyMemberships: CompanyMembershipLookup,
   ) {}
 
   async execute(cmd: CompleteCheckoutCommand): Promise<OrderViewDto> {
@@ -148,9 +149,16 @@ export class CompleteCheckout {
     // it's added to grandTotal below. When prices are tax-exclusive (default,
     // unchanged from before this setting existed), taxableAmountMinor is
     // just the input subtotal passed straight through.
+    // plan/15 Phase 6 — resolved FRESH here (not inherited from Cart, unlike
+    // customerGroupId below) so a company's tax-exemption status is always
+    // current as of checkout time; snapshotted onto the Order below so a
+    // LATER company change never retroactively alters this placed order.
+    const companyMembership = cart.customerId ? await this.companyMemberships.findActiveByCustomerId(cart.customerId) : null;
+    const taxExempt = companyMembership?.taxExempt ?? false;
+
     const taxResults = await this.taxCalculator.calculate(
       pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
-      { websiteId: ctx.websiteId, destinationStateCode: cmd.shippingAddress.stateCode ?? null },
+      { websiteId: ctx.websiteId, destinationStateCode: cmd.shippingAddress.stateCode ?? null, taxExempt },
     );
     const taxByVariant = new Map(taxResults.map((t) => [t.variantId.toString(), t]));
     const taxTotalMinor = addMinor(...taxResults.map((t) => t.amountMinor));
@@ -323,6 +331,9 @@ export class CompleteCheckout {
         storeViewId: ctx.storeViewId,
         customerId: cart.customerId,
         customerGroupId: cart.customerGroupId,
+        companyId: companyMembership?.companyId ?? null,
+        taxExempt,
+        poNumber: cmd.poNumber ?? null,
         email: cmd.email,
         currency: cart.currency,
         customerIp: cmd.customerIp,

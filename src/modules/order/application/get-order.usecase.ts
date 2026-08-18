@@ -1,4 +1,4 @@
-import type { OrderRepository, OrderView, OrderInvoiceView } from '../domain/repositories.js';
+import type { OrderRepository, OrderView, OrderInvoiceView, CompanyLookup } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import type { OrderViewDto, OrderInvoiceDto } from './dto.js';
 
@@ -36,6 +36,10 @@ export function toOrderDto(order: OrderView): OrderViewDto {
     shippingMethodCode: order.shippingMethodCode,
     couponCode: order.couponCode,
     customerIp: order.customerIp,
+    taxExempt: order.taxExempt,
+    poNumber: order.poNumber,
+    companyPublicId: null,
+    companyName: null,
     placedAt: order.placedAt.toISOString(),
     closedAt: order.closedAt ? order.closedAt.toISOString() : null,
     lines: order.lines.map((l) => ({
@@ -114,11 +118,17 @@ export function toOrderDto(order: OrderView): OrderViewDto {
 }
 
 export class GetOrder {
-  constructor(private readonly orders: OrderRepository) {}
+  constructor(
+    private readonly orders: OrderRepository,
+    private readonly companies: CompanyLookup,
+  ) {}
 
   async execute(orderPublicId: string): Promise<OrderViewDto> {
     const order = await this.orders.findByPublicId(orderPublicId);
     if (!order) throw new NotFoundError('Order', orderPublicId);
-    return toOrderDto(order);
+    const dto = toOrderDto(order);
+    if (!order.companyId) return dto;
+    const company = await this.companies.byId(order.companyId);
+    return { ...dto, companyPublicId: company?.publicId ?? null, companyName: company?.name ?? null };
   }
 }

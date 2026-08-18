@@ -76,6 +76,10 @@ export class PrismaCartRepository implements CartRepository {
   async removeTender(cartId: bigint, tenderType: TenderType, giftCardId: bigint | null): Promise<void> {
     await this.db.cartTender.deleteMany({ where: { cartId, tenderType, giftCardId } });
   }
+
+  async attachCustomer(cartId: bigint, customerId: bigint, customerGroupId: bigint | null): Promise<void> {
+    await this.db.cart.update({ where: { id: cartId }, data: { customerId, customerGroupId } });
+  }
 }
 
 /** Joins the variant's publicId alongside the internal FK — checkout needs the internal id, the storefront cart response needs the public one (plan/14 Phase 0d). */
