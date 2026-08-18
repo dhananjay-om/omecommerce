@@ -562,6 +562,7 @@ export interface Banner {
   imageUrl: string | null;
   ctaLabel: string | null;
   ctaHref: string | null;
+  gradient: string | null;
   position: number;
   isActive: boolean;
   updatedAt: string;
@@ -587,5 +588,6 @@ export interface WidgetInstance {
   title: string | null;
   isActive: boolean;
   config: Record<string, unknown>;
+  customCss: string | null;
   updatedAt: string;
 }

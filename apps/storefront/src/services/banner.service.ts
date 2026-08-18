@@ -11,6 +11,7 @@ export interface BannerRecord {
   imageUrl: string | null;
   ctaLabel: string | null;
   ctaHref: string | null;
+  gradient: string | null;
   position: number;
   isActive: boolean;
 }

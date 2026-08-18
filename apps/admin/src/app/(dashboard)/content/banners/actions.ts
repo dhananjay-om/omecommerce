@@ -17,6 +17,7 @@ export async function createBanner(_prevState: ActionState, formData: FormData):
   const imageMediaKey = String(formData.get('imageMediaKey') ?? '').trim();
   const ctaLabel = String(formData.get('ctaLabel') ?? '').trim();
   const ctaHref = String(formData.get('ctaHref') ?? '').trim();
+  const gradient = String(formData.get('gradient') ?? '').trim();
   const position = String(formData.get('position') ?? '').trim();
   const isActive = String(formData.get('isActive') ?? '').trim();
 
@@ -32,6 +33,7 @@ export async function createBanner(_prevState: ActionState, formData: FormData):
       imageMediaKey: imageMediaKey || undefined,
       ctaLabel: ctaLabel || undefined,
       ctaHref: ctaHref || undefined,
+      gradient: gradient || undefined,
       position: position ? Number(position) : undefined,
       isActive: isActive ? isActive === 'true' : undefined,
     });
@@ -52,6 +54,7 @@ export async function updateBanner(_prevState: ActionState, formData: FormData):
   const imageMediaKey = String(formData.get('imageMediaKey') ?? '').trim();
   const ctaLabel = String(formData.get('ctaLabel') ?? '').trim();
   const ctaHref = String(formData.get('ctaHref') ?? '').trim();
+  const gradient = String(formData.get('gradient') ?? '').trim();
   const position = String(formData.get('position') ?? '').trim();
   const isActive = String(formData.get('isActive') ?? '').trim();
 
@@ -64,6 +67,7 @@ export async function updateBanner(_prevState: ActionState, formData: FormData):
       imageMediaKey: imageMediaKey || null,
       ctaLabel: ctaLabel || null,
       ctaHref: ctaHref || null,
+      gradient: gradient || null,
       position: position ? Number(position) : undefined,
       isActive: isActive ? isActive === 'true' : undefined,
     });

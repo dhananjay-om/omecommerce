@@ -21,6 +21,7 @@ export interface WidgetInstance {
   title: string | null;
   isActive: boolean;
   config: Record<string, unknown>;
+  customCss: string | null;
   updatedAt: string;
 }
 

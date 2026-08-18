@@ -84,6 +84,28 @@ describe.skipIf(!process.env.INTEGRATION)('banner API (live DB)', () => {
     expect(store.body.data.some((b: { title: string }) => b.title === 'Deletable')).toBe(false);
   });
 
+  it('accepts and persists a gradient preset, and lets it be cleared on update', async () => {
+    const created = await admin.post('/admin/v1/banners').send({ group: 'PROMO', title: 'Gradient Tile', gradient: 'from-blue-600 to-indigo-700' });
+    expect(created.status).toBe(201);
+    expect(created.body.data.gradient).toBe('from-blue-600 to-indigo-700');
+
+    const store = await request(app).get('/store/v1/banners').query({ group: 'PROMO' });
+    const found = store.body.data.find((b: { title: string }) => b.title === 'Gradient Tile');
+    expect(found.gradient).toBe('from-blue-600 to-indigo-700');
+
+    // blankToUndefined only kicks in for a *string*; an explicit `null` is
+    // how a nullable field is actually cleared via update (same pattern as
+    // the admin form's actions.ts sending `gradient || null`, not `''`).
+    const cleared = await admin.put(`/admin/v1/banners/${created.body.data.publicId}`).send({ gradient: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.data.gradient).toBeNull();
+  });
+
+  it('422s creating a banner with a gradient value outside the fixed preset list', async () => {
+    const res = await admin.post('/admin/v1/banners').send({ group: 'PROMO', title: 'Bad Gradient', gradient: 'not-a-real-class' });
+    expect(res.status).toBe(422);
+  });
+
   it('404s deleting a non-existent banner', async () => {
     const res = await admin.delete('/admin/v1/banners/019f6a8d-be4e-7fb9-8d0a-95aa834a0c8b');
     expect(res.status).toBe(404);

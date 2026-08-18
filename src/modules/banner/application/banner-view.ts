@@ -14,6 +14,7 @@ export async function toBannerView(b: BannerRecord): Promise<BannerView> {
     imageUrl: b.imageMediaKey ? await presignGetUrl(b.imageMediaKey) : null,
     ctaLabel: b.ctaLabel,
     ctaHref: b.ctaHref,
+    gradient: b.gradient,
     position: b.position,
     isActive: b.isActive,
     updatedAt: b.updatedAt.toISOString(),

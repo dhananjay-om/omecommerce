@@ -16,6 +16,7 @@ const WIDGET_SELECT = {
   title: true,
   isActive: true,
   config: true,
+  customCss: true,
   updatedAt: true,
 } as const;
 
@@ -32,6 +33,7 @@ export class PrismaWidgetInstanceRepository implements WidgetInstanceRepository 
         title: input.title,
         isActive: input.isActive,
         config: input.config as object,
+        customCss: input.customCss,
       },
       select: WIDGET_SELECT,
     });
@@ -66,6 +68,7 @@ export class PrismaWidgetInstanceRepository implements WidgetInstanceRepository 
         title: input.title,
         isActive: input.isActive,
         config: input.config as object | undefined,
+        customCss: input.customCss,
       },
       select: WIDGET_SELECT,
     });

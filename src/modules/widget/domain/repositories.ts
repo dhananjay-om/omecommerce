@@ -9,6 +9,7 @@ export interface WidgetInstanceRecord {
   title: string | null;
   isActive: boolean;
   config: unknown;
+  customCss: string | null;
   updatedAt: Date;
 }
 
@@ -20,6 +21,7 @@ export interface CreateWidgetInstanceInput {
   title?: string | null;
   isActive?: boolean;
   config: unknown;
+  customCss?: string | null;
 }
 
 export interface UpdateWidgetInstanceInput {
@@ -28,6 +30,7 @@ export interface UpdateWidgetInstanceInput {
   title?: string | null;
   isActive?: boolean;
   config?: unknown;
+  customCss?: string | null;
 }
 
 export interface WidgetInstanceRepository {

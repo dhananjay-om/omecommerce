@@ -13,6 +13,7 @@ function toView(w: WidgetInstanceRecord): WidgetInstanceView {
     title: w.title,
     isActive: w.isActive,
     config: w.config,
+    customCss: w.customCss,
     updatedAt: w.updatedAt.toISOString(),
   };
 }

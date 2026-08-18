@@ -14,6 +14,14 @@
 // String-plus-manual-JSON.parse pattern (that one predates this and stores
 // raw HTML, a genuinely different shape).
 //
+// `customCss`, unlike `config`, is NOT type-specific — it's a shared,
+// optional field on every widget type (same as `title`), holding raw CSS
+// injected as-is in a <style> tag next to the widget's rendered markup on
+// the storefront (WidgetZone wraps each instance in a
+// data-widget-instance={publicId} container an admin can scope selectors
+// to). No sanitization — same trust level this app already extends to
+// CmsPage/CmsBlock's raw HTML body. No JS equivalent by design.
+//
 // Shapes by type:
 //   CMS_BLOCK           { code: string }                              — an existing CmsBlock, picked by code
 //   HERO_BANNER_SLIDER  { limit?: number }                             — active Banner rows, group=HERO
@@ -51,6 +59,8 @@ model WidgetInstance {
   title     String?
   isActive  Boolean       @default(true) @map("is_active")
   config    Json          @default("{}") @db.JsonB
+  /// Shared across every widget type (not part of `config`) — see header comment.
+  customCss String?       @map("custom_css") @db.Text
   createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy BigInt?       @map("created_by")

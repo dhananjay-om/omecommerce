@@ -8,6 +8,7 @@ export interface CreateWidgetInstanceCommand {
   title?: string | null;
   isActive?: boolean;
   config: unknown;
+  customCss?: string | null;
 }
 
 export interface UpdateWidgetInstanceCommand {
@@ -17,6 +18,7 @@ export interface UpdateWidgetInstanceCommand {
   title?: string | null;
   isActive?: boolean;
   config?: unknown;
+  customCss?: string | null;
 }
 
 export interface WidgetInstanceView {
@@ -28,5 +30,6 @@ export interface WidgetInstanceView {
   title: string | null;
   isActive: boolean;
   config: unknown;
+  customCss: string | null;
   updatedAt: string;
 }
