@@ -22,6 +22,14 @@ export const addCartLineSchema = z.object({
   qty: z.number().int().positive(),
 });
 
+export const applyGiftCardToCartSchema = z.object({
+  code: z.string().min(1).max(32),
+});
+
+export const removeGiftCardFromCartSchema = z.object({
+  giftCardPublicId: z.string().uuid(),
+});
+
 const addressSchema = z
   .object({
     name: z.string().min(1),
@@ -57,7 +65,9 @@ export const completeCheckoutSchema = z.object({
   billingAddress: addressSchema,
   shippingAddress: addressSchema,
   shippingMethodCode: z.string().min(1),
-  paymentMethod: z.string().min(1),
+  // Optional (plan/15 Phase 5) — CompleteCheckout itself validates it's
+  // present whenever anything is still due after wallet/gift-card tenders.
+  paymentMethod: z.string().min(1).optional(),
   testScenario: z.enum(['approve', 'decline']).optional(),
 });
 

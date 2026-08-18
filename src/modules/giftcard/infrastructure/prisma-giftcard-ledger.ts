@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma, ReservationRefType } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits, isNegative } from '../../../shared/domain/decimal.js';
 import type {
@@ -9,8 +9,26 @@ import type {
   LedgerWriteOptions,
   ListGiftCardsFilter,
   GiftCardListResult,
+  StoredValueHoldHandle,
+  CapturedGiftCardHold,
 } from '../domain/repositories.js';
-import { InsufficientGiftCardBalanceError } from '../domain/errors.js';
+import { InsufficientGiftCardBalanceError, InsufficientAvailableGiftCardBalanceError, InvalidGiftCardHoldStateError } from '../domain/errors.js';
+
+/** Default checkout-hold TTL — same 15-minute window as inventory's DEFAULT_RESERVATION_TTL_SECONDS
+ *  (src/modules/inventory/domain/reservation.ts), own copy per this project's per-module convention. */
+const DEFAULT_HOLD_TTL_SECONDS = 900;
+
+interface HoldRow {
+  id: bigint;
+  public_id: string;
+  amount: string;
+  currency: string;
+  expires_at: Date | null;
+}
+
+function toHoldHandle(row: HoldRow): StoredValueHoldHandle {
+  return { id: row.id, publicId: row.public_id, amount: row.amount, currency: row.currency, expiresAt: row.expires_at };
+}
 
 // Prisma's Decimal.toString() strips trailing zeros ("100.0000" -> "100");
 // this round-trip through the fixed-point minor-units helpers restores the
@@ -27,6 +45,7 @@ interface GiftCardRow {
   code_last4: string;
   initial_amount: string;
   balance: string;
+  held_balance: string;
   currency: string;
   status: string;
   kind: string;
@@ -42,6 +61,7 @@ function toSnapshot(row: GiftCardRow): GiftCardSnapshot {
     codeLast4: row.code_last4,
     initialAmount: row.initial_amount,
     balance: row.balance,
+    heldBalance: row.held_balance,
     currency: row.currency,
     status: row.status as GiftCardSnapshot['status'],
     kind: row.kind as GiftCardSnapshot['kind'],
@@ -57,6 +77,7 @@ const GIFT_CARD_SELECT = {
   codeLast4: true,
   initialAmount: true,
   balance: true,
+  heldBalance: true,
   currency: true,
   status: true,
   kind: true,
@@ -71,6 +92,7 @@ function fromOrmRow(row: {
   codeLast4: string;
   initialAmount: { toString(): string };
   balance: { toString(): string };
+  heldBalance: { toString(): string };
   currency: string;
   status: string;
   kind: string;
@@ -84,6 +106,7 @@ function fromOrmRow(row: {
     codeLast4: row.codeLast4,
     initialAmount: formatDecimal(row.initialAmount),
     balance: formatDecimal(row.balance),
+    heldBalance: formatDecimal(row.heldBalance),
     currency: row.currency,
     status: row.status as GiftCardSnapshot['status'],
     kind: row.kind as GiftCardSnapshot['kind'],
@@ -146,6 +169,11 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
     return row ? fromOrmRow(row) : null;
   }
 
+  async findById(giftCardId: bigint): Promise<GiftCardSnapshot | null> {
+    const row = await this.db.giftCard.findFirst({ where: { id: giftCardId }, select: GIFT_CARD_SELECT });
+    return row ? fromOrmRow(row) : null;
+  }
+
   async redeem(giftCardId: bigint, amount: string, opts: LedgerWriteOptions = {}): Promise<GiftCardSnapshot> {
     return this.db.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<GiftCardRow[]>`
@@ -153,7 +181,7 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
            SET balance = balance - ${amount}::numeric,
                status = CASE WHEN balance - ${amount}::numeric = 0 THEN 'REDEEMED'::"GiftCardStatus" ELSE status END
          WHERE id = ${giftCardId} AND balance >= ${amount}::numeric AND status = 'ACTIVE'
-         RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, currency, status::text, kind::text, source::text, expires_at`;
+         RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
       if (rows.length === 0) {
         throw new InsufficientGiftCardBalanceError(amount);
       }
@@ -175,7 +203,7 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
           UPDATE gift_card
              SET balance = balance - ${magnitude}::numeric
            WHERE id = ${giftCardId} AND balance >= ${magnitude}::numeric AND status = 'ACTIVE'
-           RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, currency, status::text, kind::text, source::text, expires_at`;
+           RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
         if (rows.length === 0) {
           throw new InsufficientGiftCardBalanceError(magnitude);
         }
@@ -191,7 +219,7 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
         UPDATE gift_card
            SET balance = balance + ${amount}::numeric
          WHERE id = ${giftCardId}
-         RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, currency, status::text, kind::text, source::text, expires_at`;
+         RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
       const snapshot = rows[0]!;
       await tx.$executeRaw`
         INSERT INTO gift_card_transaction (gift_card_id, type, amount, balance_after, currency, actor_id, reason)
@@ -264,5 +292,133 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
         createdAt: r.createdAt,
       })),
     };
+  }
+
+  async hold(
+    giftCardId: bigint,
+    amount: string,
+    refType: ReservationRefType,
+    refId: bigint,
+    ttlSeconds: number = DEFAULT_HOLD_TTL_SECONDS,
+  ): Promise<StoredValueHoldHandle> {
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    return this.db.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ id: bigint; currency: string }>>`
+        UPDATE gift_card
+           SET held_balance = held_balance + ${amount}::numeric
+         WHERE id = ${giftCardId} AND (balance - held_balance) >= ${amount}::numeric AND status = 'ACTIVE'
+         RETURNING id, currency`;
+      if (rows.length === 0) {
+        throw new InsufficientAvailableGiftCardBalanceError(amount);
+      }
+      const card = rows[0]!;
+      const hold = await tx.$queryRaw<HoldRow[]>`
+        INSERT INTO stored_value_hold (tender_type, gift_card_id, amount, currency, ref_type, ref_id, status, expires_at)
+        VALUES ('GIFT_CARD'::"TenderType", ${giftCardId}, ${amount}::numeric, ${card.currency}, ${refType}::"ReservationRefType", ${refId}, 'HELD', ${expiresAt})
+        RETURNING id, public_id, amount::text, currency, expires_at`;
+      return toHoldHandle(hold[0]!);
+    });
+  }
+
+  async captureHold(holdPublicId: string): Promise<GiftCardSnapshot> {
+    return this.db.$transaction(async (tx) => {
+      const holdRows = await tx.$queryRaw<Array<{ gift_card_id: bigint; amount: string }>>`
+        UPDATE stored_value_hold
+           SET status = 'CAPTURED'
+         WHERE public_id = ${holdPublicId}::uuid AND status = 'HELD' AND gift_card_id IS NOT NULL
+         RETURNING gift_card_id, amount::text`;
+      if (holdRows.length === 0) {
+        throw new InvalidGiftCardHoldStateError(`gift card hold ${holdPublicId} is not HELD`);
+      }
+      const { gift_card_id, amount } = holdRows[0]!;
+      const rows = await tx.$queryRaw<GiftCardRow[]>`
+        UPDATE gift_card
+           SET balance = balance - ${amount}::numeric, held_balance = held_balance - ${amount}::numeric,
+               status = CASE WHEN balance - ${amount}::numeric = 0 THEN 'REDEEMED'::"GiftCardStatus" ELSE status END
+         WHERE id = ${gift_card_id}
+         RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
+      const snapshot = rows[0]!;
+      await tx.$executeRaw`
+        INSERT INTO gift_card_transaction (gift_card_id, type, amount, balance_after, currency, ref_type, ref_id)
+        VALUES (${gift_card_id}, 'REDEEM'::"GiftCardTxnType", ${'-' + amount}::numeric, ${snapshot.balance}::numeric, ${snapshot.currency}, 'ORDER', ${gift_card_id})`;
+      return toSnapshot(snapshot);
+    });
+  }
+
+  async releaseHold(holdPublicId: string): Promise<void> {
+    await this.releaseByStatus(holdPublicId, 'RELEASED');
+  }
+
+  async releaseExpiredHolds(now: Date): Promise<number> {
+    const expired = await this.db.storedValueHold.findMany({
+      where: { status: 'HELD', giftCardId: { not: null }, expiresAt: { lt: now } },
+      select: { publicId: true },
+    });
+    let count = 0;
+    for (const h of expired) {
+      try {
+        await this.releaseByStatus(h.publicId, 'EXPIRED');
+        count++;
+      } catch {
+        // lost a race with a concurrent capture/release — not an error for the sweep
+      }
+    }
+    return count;
+  }
+
+  private async releaseByStatus(holdPublicId: string, toStatus: 'RELEASED' | 'EXPIRED'): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const holdRows = await tx.$queryRaw<Array<{ gift_card_id: bigint; amount: string }>>`
+        UPDATE stored_value_hold
+           SET status = ${toStatus}::"StoredValueHoldStatus"
+         WHERE public_id = ${holdPublicId}::uuid AND status = 'HELD' AND gift_card_id IS NOT NULL
+         RETURNING gift_card_id, amount::text`;
+      if (holdRows.length === 0) {
+        throw new InvalidGiftCardHoldStateError(`gift card hold ${holdPublicId} is not HELD`);
+      }
+      const { gift_card_id, amount } = holdRows[0]!;
+      await tx.$executeRaw`
+        UPDATE gift_card SET held_balance = held_balance - ${amount}::numeric WHERE id = ${gift_card_id} AND held_balance >= ${amount}::numeric`;
+    });
+  }
+
+  async findHoldByPublicId(publicId: string): Promise<StoredValueHoldHandle | null> {
+    const row = await this.db.storedValueHold.findFirst({ where: { publicId, giftCardId: { not: null } } });
+    return row ? { id: row.id, publicId: row.publicId, amount: formatDecimal(row.amount), currency: row.currency, expiresAt: row.expiresAt } : null;
+  }
+
+  async findCapturedHoldsByRef(refType: ReservationRefType, refId: bigint): Promise<CapturedGiftCardHold[]> {
+    const rows = await this.db.storedValueHold.findMany({
+      where: { refType, refId, status: 'CAPTURED', giftCardId: { not: null } },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      publicId: r.publicId,
+      amount: formatDecimal(r.amount),
+      currency: r.currency,
+      expiresAt: r.expiresAt,
+      giftCardId: r.giftCardId!,
+    }));
+  }
+
+  async refundCredit(giftCardId: bigint, amount: string, opts: LedgerWriteOptions = {}): Promise<GiftCardSnapshot> {
+    return this.db.$transaction(async (tx) => {
+      // Unguarded (can only ever go up) — reactivates a fully-REDEEMED card
+      // back to ACTIVE, same reasoning a partial refund landing on a
+      // DISABLED/EXPIRED card should NOT silently reactivate: only the
+      // REDEEMED -> ACTIVE edge is safe to flip automatically here.
+      const rows = await tx.$queryRaw<GiftCardRow[]>`
+        UPDATE gift_card
+           SET balance = balance + ${amount}::numeric,
+               status = CASE WHEN status = 'REDEEMED' THEN 'ACTIVE'::"GiftCardStatus" ELSE status END
+         WHERE id = ${giftCardId}
+         RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
+      const snapshot = rows[0]!;
+      await tx.$executeRaw`
+        INSERT INTO gift_card_transaction (gift_card_id, type, amount, balance_after, currency, ref_type, ref_id, actor_id, reason)
+        VALUES (${giftCardId}, 'REFUND'::"GiftCardTxnType", ${amount}::numeric, ${snapshot.balance}::numeric, ${snapshot.currency},
+                ${opts.refType ?? null}, ${opts.refId ?? null}, ${opts.actorId ?? null}, ${opts.reason ?? null})`;
+      return toSnapshot(snapshot);
+    });
   }
 }

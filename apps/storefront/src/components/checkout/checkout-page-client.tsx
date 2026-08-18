@@ -17,6 +17,8 @@ import { checkoutSchema, STEP_FIELDS, type CheckoutFormValues } from './checkout
 import { formatPrice } from '@/lib/format-price';
 import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import { CouponField } from '@/components/cart/coupon-field';
+import { GiftCardField } from '@/components/cart/gift-card-field';
+import { WalletToggle } from '@/components/cart/wallet-toggle';
 import type { Cart } from '@/types/cart';
 import type { ShippingMethod } from '@/types/order';
 
@@ -85,6 +87,10 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
     displayCart.estimatedTotal !== null
       ? Number(displayCart.estimatedTotal) + (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0)
       : null;
+  // Same shipping-inclusive adjustment as estimatedGrandTotal above, applied
+  // to amountDue (which — like estimatedTotal — is computed pre-shipping,
+  // the only total known before a shipping method is picked).
+  const estimatedAmountDue = displayCart.amountDue !== null ? Number(displayCart.amountDue) + (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0) : null;
 
   async function goNext() {
     // Step 2's billing fields are only required (and only rendered) when
@@ -195,9 +201,15 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
           {step === 4 ? (
             <div className="flex flex-col gap-4">
               <h2 className="font-semibold">Payment</h2>
-              <p className="text-sm text-muted-foreground">
-                This store uses a test payment gateway — no real card is charged. Card details aren&apos;t collected.
-              </p>
+              {estimatedAmountDue !== null && estimatedAmountDue <= 0 ? (
+                <p className="text-sm text-success">
+                  Your wallet/gift card tenders cover the full total — no card payment is needed.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  This store uses a test payment gateway — no real card is charged. Card details aren&apos;t collected.
+                </p>
+              )}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="paymentMethod">Payment method</Label>
                 <select id="paymentMethod" {...register('paymentMethod')} className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm">
@@ -302,6 +314,14 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             </div>
           </div>
           <CouponField cart={displayCart} />
+          <GiftCardField cart={displayCart} />
+          <WalletToggle cart={displayCart} />
+          {displayCart.tenders.length > 0 && estimatedAmountDue !== null ? (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Amount due</span>
+              <span>{formatPrice(estimatedAmountDue, displayCart.currency)}</span>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

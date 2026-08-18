@@ -12,6 +12,7 @@ import type {
   InvoiceStatus,
   EmailLogStatus,
   OrderEmailType,
+  TenderType,
 } from '@prisma/client';
 
 // --- Cross-module read-only lookups (each module resolves its own dependencies) ---
@@ -132,6 +133,14 @@ export interface CartLineView {
   qty: number;
 }
 
+/** Which stored-value instrument a cart intends to pay with — never a persisted amount (plan/15 Phase 5), matching couponCode. */
+export interface CartTenderView {
+  tenderType: TenderType;
+  /** Set only for GIFT_CARD tenders. */
+  giftCardId: bigint | null;
+  createdAt: Date;
+}
+
 export interface CartView {
   id: bigint;
   publicId: string;
@@ -144,6 +153,7 @@ export interface CartView {
   /** Applied coupon code, if any — no FK, revalidated live on every read/checkout. */
   couponCode: string | null;
   lines: CartLineView[];
+  tenders: CartTenderView[];
 }
 
 export interface CreateCartInput {
@@ -164,6 +174,14 @@ export interface CartRepository {
   /** null clears the applied coupon. Not itself validated here — callers (ApplyCouponToCart)
    *  validate via DiscountCalculator.evaluate() first. */
   setCouponCode(cartId: bigint, code: string | null): Promise<void>;
+
+  /** Idempotent — re-adding the same (tenderType, giftCardId) is a no-op (the
+   *  NULLS NOT DISTINCT unique index catches a WALLET-vs-WALLET collision;
+   *  callers pre-check for an existing GIFT_CARD row by giftCardId to keep
+   *  a re-apply from throwing a raw unique-violation). */
+  addTender(cartId: bigint, tenderType: TenderType, giftCardId: bigint | null): Promise<void>;
+  /** No-op if the tender isn't present. */
+  removeTender(cartId: bigint, tenderType: TenderType, giftCardId: bigint | null): Promise<void>;
 }
 
 // --- Order ---
@@ -418,6 +436,12 @@ export interface OrderView {
   orderNumber: string;
   websiteId: bigint;
   storeId: bigint;
+  /** The cart this order was created from — StoredValueHold rows stay ref'd
+   *  to this (refType CART), never re-pointed to the Order, so a split-tender
+   *  refund finds "what funded this order" via findCapturedHoldsByRef('CART',
+   *  order.cartId) rather than needing a second polymorphic ref (plan/15
+   *  Phase 5). Not exposed on OrderViewDto — internal use only. */
+  cartId: bigint | null;
   /** plan/15 Phase 11 — Reorder needs the original store view to create the new cart in the same scope. */
   storeViewId: bigint;
   customerId: bigint | null;

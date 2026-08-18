@@ -18,3 +18,17 @@ export class GiftCardExpiredError extends DomainError {
     super('gift card has expired', 'https://errors.ome/gift-card-expired', 409);
   }
 }
+
+/** Thrown when a guarded hold-placement UPDATE affects 0 rows (insufficient available balance, not ACTIVE, or lost a race). */
+export class InsufficientAvailableGiftCardBalanceError extends DomainError {
+  constructor(requested: string) {
+    super(`Insufficient available gift card balance to hold ${requested}`, 'https://errors.ome/insufficient-balance', 409);
+  }
+}
+
+/** Thrown when capturing/releasing a stored-value hold that isn't (or is no longer) HELD. */
+export class InvalidGiftCardHoldStateError extends DomainError {
+  constructor(message: string) {
+    super(message, 'https://errors.ome/invalid-hold-state', 409);
+  }
+}

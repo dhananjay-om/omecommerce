@@ -30,3 +30,24 @@ export async function removeCoupon(): Promise<Cart> {
   const res = await api.delete<Cart>('/cart/coupon');
   return res.data;
 }
+
+export async function applyGiftCard(code: string): Promise<Cart> {
+  const res = await api.post<Cart>('/cart/gift-card', { code });
+  return res.data;
+}
+
+export async function removeGiftCard(giftCardPublicId: string): Promise<Cart> {
+  const res = await api.delete<Cart>('/cart/gift-card', { data: { giftCardPublicId } });
+  return res.data;
+}
+
+/** requireCustomer-gated server-side — same-origin Route Handler resolves the caller's own session, no body needed. */
+export async function applyWallet(): Promise<Cart> {
+  const res = await api.post<Cart>('/cart/wallet');
+  return res.data;
+}
+
+export async function removeWallet(): Promise<Cart> {
+  const res = await api.delete<Cart>('/cart/wallet');
+  return res.data;
+}

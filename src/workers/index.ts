@@ -1,10 +1,11 @@
 import { Worker, type Job } from 'bullmq';
 import { OutboxRelay } from '../shared/infrastructure/outbox/outbox-relay.js';
-import { DOMAIN_EVENTS_QUEUE, getDomainEventsQueue } from '../shared/infrastructure/queue/queues.js';
+import { DOMAIN_EVENTS_QUEUE, MAINTENANCE_QUEUE, getDomainEventsQueue } from '../shared/infrastructure/queue/queues.js';
 import { getQueueConnectionOptions } from '../shared/infrastructure/queue/connection.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
 import { handleOrderConfirmation } from './order-confirmation.worker.js';
-import { startReservationSweepWorker, scheduleReservationSweep } from './reservation-sweep.worker.js';
+import { createReservationSweepHandler, scheduleReservationSweep } from './reservation-sweep.worker.js';
+import { createStoredValueHoldSweepHandler, scheduleStoredValueHoldSweep } from './stored-value-hold-sweep.worker.js';
 import { createSearchIndexHandler } from './search-indexer.worker.js';
 import { startBulkImportWorker } from './bulk-import.worker.js';
 import { createLoyaltyEarnHandler } from './loyalty-earn.worker.js';
@@ -53,6 +54,31 @@ function startDomainEventsWorker(): Worker {
 }
 
 /**
+ * `maintenance` has two logical sweeps (stock reservations, stored-value
+ * holds — plan/15 Phase 5) — same "one Worker per queue, dispatch by job
+ * name" reasoning as startDomainEventsWorker() above, not two separate
+ * Worker instances competing for the same queue's jobs.
+ */
+function startMaintenanceWorker(): Worker {
+  const handlers: Array<(job: Job) => Promise<void>> = [createReservationSweepHandler(), createStoredValueHoldSweepHandler()];
+
+  const worker = new Worker(
+    MAINTENANCE_QUEUE,
+    async (job) => {
+      for (const handler of handlers) {
+        try {
+          await handler(job);
+        } catch (err) {
+          logger.error({ err, jobId: job.id, jobName: job.name }, 'maintenance handler failed');
+        }
+      }
+    },
+    { connection: getQueueConnectionOptions() },
+  );
+  return worker;
+}
+
+/**
  * Starts background processing (Stage 3/4 cross-cutting infra): the outbox
  * relay plus its consumers. Called only from main.ts (the actual running server
  * process) — never from createApp()/tests, so the test suite doesn't spin up
@@ -64,19 +90,20 @@ export async function startWorkers(): Promise<WorkerHandles> {
   outboxRelay.start();
 
   const domainEventsWorker = startDomainEventsWorker();
-  const reservationSweepWorker = startReservationSweepWorker();
+  const maintenanceWorker = startMaintenanceWorker();
   const bulkImportWorker = startBulkImportWorker();
   await scheduleReservationSweep();
+  await scheduleStoredValueHoldSweep();
 
   logger.info(
-    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify], reservation sweep, bulk import)',
+    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify], maintenance [reservation sweep, stored-value hold sweep], bulk import)',
   );
 
   return {
     outboxRelay,
     async stop() {
       outboxRelay.stop();
-      await Promise.allSettled([domainEventsWorker.close(), reservationSweepWorker.close(), bulkImportWorker.close()]);
+      await Promise.allSettled([domainEventsWorker.close(), maintenanceWorker.close(), bulkImportWorker.close()]);
     },
   };
 }

@@ -1,8 +1,24 @@
-import { Prisma, type WalletBucket, type WalletSource, type WalletTxnType } from '@prisma/client';
+import { Prisma, type WalletBucket, type WalletSource, type WalletTxnType, type ReservationRefType } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
-import type { WalletLedger, WalletSnapshot, WalletTransactionInfo, LedgerWriteOptions } from '../domain/repositories.js';
-import { InsufficientBalanceError } from '../domain/errors.js';
+import type { WalletLedger, WalletSnapshot, WalletTransactionInfo, LedgerWriteOptions, StoredValueHoldHandle, CapturedWalletHold } from '../domain/repositories.js';
+import { InsufficientBalanceError, InsufficientAvailableBalanceError, InvalidWalletHoldStateError } from '../domain/errors.js';
+
+/** Default checkout-hold TTL — same 15-minute window as inventory's DEFAULT_RESERVATION_TTL_SECONDS
+ *  (src/modules/inventory/domain/reservation.ts), own copy per this project's per-module convention. */
+const DEFAULT_HOLD_TTL_SECONDS = 900;
+
+interface HoldRow {
+  id: bigint;
+  public_id: string;
+  amount: string;
+  currency: string;
+  expires_at: Date | null;
+}
+
+function toHoldHandle(row: HoldRow): StoredValueHoldHandle {
+  return { id: row.id, publicId: row.public_id, amount: row.amount, currency: row.currency, expiresAt: row.expires_at };
+}
 
 // Prisma's Decimal.toString() strips trailing zeros ("100.0000" -> "100");
 // this round-trip through the fixed-point minor-units helpers restores the
@@ -16,12 +32,20 @@ interface WalletRow {
   id: bigint;
   public_id: string;
   balance: string;
+  held_balance: string;
   currency: string;
   status: string;
 }
 
 function toSnapshot(row: WalletRow): WalletSnapshot {
-  return { id: row.id, publicId: row.public_id, balance: row.balance, currency: row.currency, status: row.status as WalletSnapshot['status'] };
+  return {
+    id: row.id,
+    publicId: row.public_id,
+    balance: row.balance,
+    heldBalance: row.held_balance,
+    currency: row.currency,
+    status: row.status as WalletSnapshot['status'],
+  };
 }
 
 /**
@@ -59,12 +83,16 @@ export class PrismaWalletLedger implements WalletLedger {
 
   async findByPublicId(publicId: string): Promise<WalletSnapshot | null> {
     const row = await this.db.wallet.findFirst({ where: { publicId } });
-    return row ? { id: row.id, publicId: row.publicId, balance: formatDecimal(row.balance), currency: row.currency, status: row.status } : null;
+    return row
+      ? { id: row.id, publicId: row.publicId, balance: formatDecimal(row.balance), heldBalance: formatDecimal(row.heldBalance), currency: row.currency, status: row.status }
+      : null;
   }
 
   async findByCustomerId(customerId: bigint): Promise<WalletSnapshot | null> {
     const row = await this.db.wallet.findFirst({ where: { customerId } });
-    return row ? { id: row.id, publicId: row.publicId, balance: formatDecimal(row.balance), currency: row.currency, status: row.status } : null;
+    return row
+      ? { id: row.id, publicId: row.publicId, balance: formatDecimal(row.balance), heldBalance: formatDecimal(row.heldBalance), currency: row.currency, status: row.status }
+      : null;
   }
 
   async credit(
@@ -80,7 +108,7 @@ export class PrismaWalletLedger implements WalletLedger {
         UPDATE wallet
            SET balance = balance + ${amount}::numeric
          WHERE id = ${walletId}
-         RETURNING id, public_id, balance::text, currency, status::text`;
+         RETURNING id, public_id, balance::text, held_balance::text, currency, status::text`;
       const snapshot = rows[0]!;
       await tx.$executeRaw`
         INSERT INTO wallet_transaction
@@ -106,7 +134,7 @@ export class PrismaWalletLedger implements WalletLedger {
         UPDATE wallet
            SET balance = balance - ${amount}::numeric
          WHERE id = ${walletId} AND balance >= ${amount}::numeric AND status = 'ACTIVE'
-         RETURNING id, public_id, balance::text, currency, status::text`;
+         RETURNING id, public_id, balance::text, held_balance::text, currency, status::text`;
       if (rows.length === 0) {
         throw new InsufficientBalanceError(amount);
       }
@@ -145,6 +173,117 @@ export class PrismaWalletLedger implements WalletLedger {
       source: r.source,
       reason: r.reason,
       createdAt: r.createdAt,
+    }));
+  }
+
+  async hold(
+    walletId: bigint,
+    amount: string,
+    refType: ReservationRefType,
+    refId: bigint,
+    ttlSeconds: number = DEFAULT_HOLD_TTL_SECONDS,
+  ): Promise<StoredValueHoldHandle> {
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    return this.db.$transaction(async (tx) => {
+      // Guarded exactly like debit(), but against (balance - held_balance) —
+      // the wallet's own currency, not the caller's, is trusted for the new
+      // row (mirrors PrismaStockLedger.reserve not trusting caller input for
+      // anything the stock_item row itself already knows).
+      const rows = await tx.$queryRaw<Array<{ id: bigint; currency: string }>>`
+        UPDATE wallet
+           SET held_balance = held_balance + ${amount}::numeric
+         WHERE id = ${walletId} AND (balance - held_balance) >= ${amount}::numeric AND status = 'ACTIVE'
+         RETURNING id, currency`;
+      if (rows.length === 0) {
+        throw new InsufficientAvailableBalanceError(amount);
+      }
+      const wallet = rows[0]!;
+      const hold = await tx.$queryRaw<HoldRow[]>`
+        INSERT INTO stored_value_hold (tender_type, wallet_id, amount, currency, ref_type, ref_id, status, expires_at)
+        VALUES ('WALLET'::"TenderType", ${walletId}, ${amount}::numeric, ${wallet.currency}, ${refType}::"ReservationRefType", ${refId}, 'HELD', ${expiresAt})
+        RETURNING id, public_id, amount::text, currency, expires_at`;
+      return toHoldHandle(hold[0]!);
+    });
+  }
+
+  async captureHold(holdPublicId: string): Promise<WalletSnapshot> {
+    return this.db.$transaction(async (tx) => {
+      const holdRows = await tx.$queryRaw<Array<{ wallet_id: bigint; amount: string }>>`
+        UPDATE stored_value_hold
+           SET status = 'CAPTURED'
+         WHERE public_id = ${holdPublicId}::uuid AND status = 'HELD' AND wallet_id IS NOT NULL
+         RETURNING wallet_id, amount::text`;
+      if (holdRows.length === 0) {
+        throw new InvalidWalletHoldStateError(`wallet hold ${holdPublicId} is not HELD`);
+      }
+      const { wallet_id, amount } = holdRows[0]!;
+      const rows = await tx.$queryRaw<WalletRow[]>`
+        UPDATE wallet
+           SET balance = balance - ${amount}::numeric, held_balance = held_balance - ${amount}::numeric
+         WHERE id = ${wallet_id}
+         RETURNING id, public_id, balance::text, held_balance::text, currency, status::text`;
+      const snapshot = rows[0]!;
+      await tx.$executeRaw`
+        INSERT INTO wallet_transaction (wallet_id, bucket, type, amount, balance_after, currency, source, ref_type, ref_id)
+        VALUES (${wallet_id}, 'STORE_CREDIT'::"WalletBucket", 'DEBIT'::"WalletTxnType", ${'-' + amount}::numeric, ${snapshot.balance}::numeric,
+                ${snapshot.currency}, 'ORDER'::"WalletSource", 'ORDER', ${wallet_id})`;
+      return toSnapshot(snapshot);
+    });
+  }
+
+  async releaseHold(holdPublicId: string): Promise<void> {
+    await this.releaseByStatus(holdPublicId, 'RELEASED');
+  }
+
+  async releaseExpiredHolds(now: Date): Promise<number> {
+    const expired = await this.db.storedValueHold.findMany({
+      where: { status: 'HELD', walletId: { not: null }, expiresAt: { lt: now } },
+      select: { publicId: true },
+    });
+    let count = 0;
+    for (const h of expired) {
+      try {
+        await this.releaseByStatus(h.publicId, 'EXPIRED');
+        count++;
+      } catch {
+        // lost a race with a concurrent capture/release — not an error for the sweep
+      }
+    }
+    return count;
+  }
+
+  private async releaseByStatus(holdPublicId: string, toStatus: 'RELEASED' | 'EXPIRED'): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const holdRows = await tx.$queryRaw<Array<{ wallet_id: bigint; amount: string }>>`
+        UPDATE stored_value_hold
+           SET status = ${toStatus}::"StoredValueHoldStatus"
+         WHERE public_id = ${holdPublicId}::uuid AND status = 'HELD' AND wallet_id IS NOT NULL
+         RETURNING wallet_id, amount::text`;
+      if (holdRows.length === 0) {
+        throw new InvalidWalletHoldStateError(`wallet hold ${holdPublicId} is not HELD`);
+      }
+      const { wallet_id, amount } = holdRows[0]!;
+      await tx.$executeRaw`
+        UPDATE wallet SET held_balance = held_balance - ${amount}::numeric WHERE id = ${wallet_id} AND held_balance >= ${amount}::numeric`;
+    });
+  }
+
+  async findHoldByPublicId(publicId: string): Promise<StoredValueHoldHandle | null> {
+    const row = await this.db.storedValueHold.findFirst({ where: { publicId, walletId: { not: null } } });
+    return row ? { id: row.id, publicId: row.publicId, amount: formatDecimal(row.amount), currency: row.currency, expiresAt: row.expiresAt } : null;
+  }
+
+  async findCapturedHoldsByRef(refType: ReservationRefType, refId: bigint): Promise<CapturedWalletHold[]> {
+    const rows = await this.db.storedValueHold.findMany({
+      where: { refType, refId, status: 'CAPTURED', walletId: { not: null } },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      publicId: r.publicId,
+      amount: formatDecimal(r.amount),
+      currency: r.currency,
+      expiresAt: r.expiresAt,
+      walletId: r.walletId!,
     }));
   }
 }

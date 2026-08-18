@@ -56,12 +56,19 @@ import { S3PdfStorage } from './infrastructure/s3-pdf-storage.js';
 import { PrismaWalletLedger } from '../wallet/infrastructure/prisma-wallet-ledger.js';
 import { PrismaCustomerContextLookup } from '../wallet/infrastructure/prisma-customer-context-lookup.js';
 import { CreditWallet } from '../wallet/application/credit-wallet.usecase.js';
+import { PrismaGiftCardLedger } from '../giftcard/infrastructure/prisma-giftcard-ledger.js';
 import { PrismaCouponRepository } from '../coupon/infrastructure/prisma-coupon.repository.js';
 import { ApplyCouponToCart } from './application/apply-coupon-to-cart.usecase.js';
 import { RemoveCouponFromCart } from './application/remove-coupon-from-cart.usecase.js';
+import { ApplyGiftCardToCart } from './application/apply-gift-card-to-cart.usecase.js';
+import { RemoveGiftCardFromCart } from './application/remove-gift-card-from-cart.usecase.js';
+import { ApplyWalletToCart } from './application/apply-wallet-to-cart.usecase.js';
+import { RemoveWalletFromCart } from './application/remove-wallet-from-cart.usecase.js';
 import {
   createCartSchema,
   addCartLineSchema,
+  applyGiftCardToCartSchema,
+  removeGiftCardFromCartSchema,
   completeCheckoutSchema,
   fulfillOrderSchema,
   refundOrderSchema,
@@ -87,7 +94,12 @@ export interface OrderRouters {
  * Pricing's PriceResolver directly (see complete-checkout.usecase.ts's header
  * comment for why) rather than duplicating their correctness-critical logic.
  */
-export function createOrderModule(db: Db, authorize: (permission: string) => RequestHandler, requireCustomer: RequestHandler): OrderRouters {
+export function createOrderModule(
+  db: Db,
+  authorize: (permission: string) => RequestHandler,
+  requireCustomer: RequestHandler,
+  giftCardHmacSecret: string,
+): OrderRouters {
   const storeContext = new PrismaStoreContextResolver(db);
   const priceResolver = new PrismaPriceResolver(db);
   const ledger = new PrismaStockLedger(db);
@@ -114,6 +126,12 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   // factory (that factory also wires coupon's admin HTTP routes, which Order
   // has no business constructing).
   const discountCalculator = new PrismaCouponRepository(db);
+  // Own instances, same "correctness-critical shared logic, imported not
+  // reimplemented" carve-out as StockLedger/PriceResolver above — used both
+  // for cart tender preview (EnrichCartView) and checkout-time hold
+  // placement (CompleteCheckout) below.
+  const walletLedger = new PrismaWalletLedger(db);
+  const giftCardLedger = new PrismaGiftCardLedger(db);
   const enrichCartView = new EnrichCartView(
     variants,
     priceResolver,
@@ -122,6 +140,8 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     discountCalculator,
     websiteTaxConfigLookup,
     taxClassLookup,
+    walletLedger,
+    giftCardLedger,
   );
 
   const createCart = new CreateCart(carts, storeContext, customerGroups, customers, enrichCartView);
@@ -130,6 +150,10 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
   const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
   const applyCouponToCart = new ApplyCouponToCart(carts, variants, discountCalculator, enrichCartView);
   const removeCouponFromCart = new RemoveCouponFromCart(carts, enrichCartView);
+  const applyGiftCardToCart = new ApplyGiftCardToCart(carts, giftCardLedger, enrichCartView, giftCardHmacSecret);
+  const removeGiftCardFromCart = new RemoveGiftCardFromCart(carts, giftCardLedger, enrichCartView);
+  const applyWalletToCart = new ApplyWalletToCart(carts, customers, enrichCartView);
+  const removeWalletFromCart = new RemoveWalletFromCart(carts, customers, enrichCartView);
   const completeCheckout = new CompleteCheckout(
     carts,
     orders,
@@ -143,24 +167,25 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     paymentGateway,
     outbox,
     discountCalculator,
+    walletLedger,
+    giftCardLedger,
   );
   const getOrder = new GetOrder(orders);
   const listOrders = new ListOrders(orders);
   const listShippingMethods = new ListShippingMethods(shippingMethods);
-  // Own instances of the wallet ledger/customer-context lookup — CreditWallet
-  // is reused directly (money-moving ledger write, the correctness-critical
-  // carve-out), not re-implemented, but Order still composes its own copy of
-  // the module here rather than importing wallet.module.ts's factory (that
-  // factory also wires wallet's HTTP routes, which Order has no business
-  // constructing).
-  const walletLedger = new PrismaWalletLedger(db);
+  // walletLedger is already constructed above (shared with EnrichCartView).
+  // Own instance of the customer-context lookup — CreditWallet is reused
+  // directly (money-moving ledger write, the correctness-critical carve-out),
+  // not re-implemented, but Order still composes its own copy here rather
+  // than importing wallet.module.ts's factory (that factory also wires
+  // wallet's HTTP routes, which Order has no business constructing).
   const walletCustomerContext = new PrismaCustomerContextLookup(db);
   const creditWallet = new CreditWallet(walletLedger, walletCustomerContext);
 
   const pdfRenderer = new PuppeteerPdfRenderer();
   const pdfStorage = new S3PdfStorage();
   const fulfillOrder = new FulfillOrder(orders, warehouses, outbox, pdfRenderer, pdfStorage);
-  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet);
+  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet, walletLedger, giftCardLedger);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const listTaxClasses = new ListTaxClasses(taxClasses);
@@ -392,6 +417,38 @@ export function createOrderModule(db: Db, authorize: (permission: string) => Req
     '/carts/:publicId/actions/remove-coupon',
     asyncHandler(async (req, res) => {
       res.json({ data: await removeCouponFromCart.execute({ cartPublicId: req.params.publicId! }) });
+    }),
+  );
+  // Unauthenticated, bearer-code trust — same level as ApplyCouponToCart and
+  // the gift card balance-check route (plan/15 Phase 5).
+  store.post(
+    '/carts/:publicId/actions/apply-gift-card',
+    asyncHandler(async (req, res) => {
+      const body = parse(applyGiftCardToCartSchema, req.body);
+      res.json({ data: await applyGiftCardToCart.execute({ cartPublicId: req.params.publicId!, code: body.code }) });
+    }),
+  );
+  store.post(
+    '/carts/:publicId/actions/remove-gift-card',
+    asyncHandler(async (req, res) => {
+      const body = parse(removeGiftCardFromCartSchema, req.body);
+      res.json({ data: await removeGiftCardFromCart.execute({ cartPublicId: req.params.publicId!, giftCardPublicId: body.giftCardPublicId }) });
+    }),
+  );
+  // requireCustomer + ownership-checked — unlike gift cards, a wallet tender
+  // has no bearer secret, so it's gated on the caller's own session.
+  store.post(
+    '/carts/:publicId/actions/apply-wallet',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await applyWalletToCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+    }),
+  );
+  store.post(
+    '/carts/:publicId/actions/remove-wallet',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await removeWalletFromCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
     }),
   );
   store.post(

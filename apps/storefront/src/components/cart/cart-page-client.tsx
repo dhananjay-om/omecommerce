@@ -8,6 +8,8 @@ import { formatPrice } from '@/lib/format-price';
 import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import { CartLineRow } from './cart-line-row';
 import { CouponField } from './coupon-field';
+import { GiftCardField } from './gift-card-field';
+import { WalletToggle } from './wallet-toggle';
 import type { Cart } from '@/types/cart';
 
 export function CartPageClient({ initialCart }: { initialCart: Cart }) {
@@ -85,6 +87,14 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
           </div>
 
           <CouponField cart={displayCart} />
+          <GiftCardField cart={displayCart} />
+          <WalletToggle cart={displayCart} />
+          {displayCart.tenders.length > 0 && displayCart.amountDue !== null ? (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Amount due</span>
+              <span>{formatPrice(displayCart.amountDue, displayCart.currency)}</span>
+            </div>
+          ) : null}
 
           <Button variant="cta" size="lg" render={<Link href="/checkout" />} nativeButton={false}>
             Proceed to Checkout

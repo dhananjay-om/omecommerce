@@ -119,8 +119,9 @@ model Cart {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  lines CartLine[]
-  order Order?
+  lines   CartLine[]
+  tenders CartTender[]
+  order   Order?
 
   @@index([websiteId])
   @@index([storeViewId])
@@ -142,6 +143,38 @@ model CartLine {
 
   @@unique([cartId, variantId])
   @@map("cart_line")
+}
+
+/// Which stored-value instrument(s) a cart intends to pay with (plan/15 Phase
+/// 5) — never a persisted amount, exactly like Cart.couponCode; the actual
+/// amount applied is always live-computed at read/checkout time against the
+/// instrument's current available balance. WALLET is a singleton per cart
+/// (giftCardId NULL); GIFT_CARD is one row per distinct card, letting a
+/// customer stack several — both constraints enforced by a single raw-SQL
+/// NULLS NOT DISTINCT unique index (Prisma's own @@unique treats NULLs as
+/// distinct, which would let duplicate WALLET rows slip through).
+model CartTender {
+  id         BigInt     @id @default(autoincrement())
+  cartId     BigInt     @map("cart_id")
+  tenderType TenderType @map("tender_type")
+  giftCardId BigInt?    @map("gift_card_id")
+  /// Application order — gift card tenders drain in this order, before wallet
+  /// (CompleteCheckout's resolution loop; plan/15 Phase 5).
+  sortOrder  Int        @default(0) @map("sort_order")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  cart     Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  giftCard GiftCard? @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+
+  /// Declared for Prisma-side type-safe findUnique/upsert by natural key; the
+  /// raw-SQL block replaces the underlying index with an equivalent NULLS NOT
+  /// DISTINCT one (Prisma's own @@unique treats NULLs as distinct, which
+  /// would let duplicate WALLET rows slip through) — same "declare it in
+  /// Prisma, replace it in raw SQL" pattern as uq_pav_scope/uq_metafield_ver.
+  @@unique([cartId, tenderType, giftCardId], map: "uq_cart_tender_cart_type_giftcard")
+  @@index([cartId])
+  @@index([giftCardId])
+  @@map("cart_tender")
 }
 
 /// The order aggregate. NEVER soft-deleted (cancel, don't delete — plan/08 §2).

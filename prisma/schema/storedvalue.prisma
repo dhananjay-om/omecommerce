@@ -34,34 +34,51 @@
 //   ledger row must match its parent's fixed currency (plan/10 §2: "a gift
 //   card / wallet bucket has a fixed currency").
 // - NOT built this pass (documented deferrals, not silently dropped):
-//   * Checkout tender integration (paying an order with gift card/wallet) —
-//     needs complete-checkout.usecase.ts surgery (holds, split tender, refund
-//     routing, plan/10 §6). This is why WalletTxnType has no HOLD/RELEASE and
-//     there's no wallet_hold table yet.
 //   * Gift-card-as-product issuance (buying one as a virtual product) — needs
 //     an OrderPaid consumer; GiftCardSource has no PURCHASED value yet.
 //   * Wallet top-up via PSP — separate payment-gateway wiring, deferred.
 //   * Liability/breakage analytics read model (plan/10 §9) — Stage 6.
+//
+// CHECKOUT TENDER (plan/15 Phase 5 — added this pass):
+// - Paying an order with wallet/gift-card stored value uses REAL two-phase
+//   holds, not optimistic-debit-then-compensate — StoredValueHold is
+//   structurally identical to StockReservation (HELD/CAPTURED/RELEASED/
+//   EXPIRED, TTL swept by stored-value-hold-sweep.worker.ts, same shape as
+//   reservation-sweep.worker.ts). Wallet/GiftCard each gain `heldBalance`
+//   (the StockItem.reserved pattern) plus a STORED generated `available`
+//   column (raw SQL). A HELD hold moves no balance and gets no
+//   WalletTxnType/GiftCardTxnType value — exactly why StockReservation's
+//   ACTIVE state never writes a stock_movement row either; only CAPTURED
+//   writes the real ledger DEBIT/REDEEM row (source/type ORDER, plan/15
+//   Phase 5 — WalletSource gained ORDER for this).
+// - CartTender (order.prisma) records which instrument a cart intends to pay
+//   with — never a persisted amount, exactly like Cart.couponCode.
 // =============================================================================
 
 model Wallet {
-  id         BigInt       @id @default(autoincrement())
-  publicId   String       @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
-  customerId BigInt       @map("customer_id")
-  websiteId  BigInt       @map("website_id")
-  currency   String       @db.Char(3)
-  balance    Decimal      @default(0) @db.Decimal(18, 4)
-  status     WalletStatus @default(ACTIVE)
+  id          BigInt       @id @default(autoincrement())
+  publicId    String       @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  customerId  BigInt       @map("customer_id")
+  websiteId   BigInt       @map("website_id")
+  currency    String       @db.Char(3)
+  balance     Decimal      @default(0) @db.Decimal(18, 4)
+  /// Sum of this wallet's HELD checkout holds (StoredValueHold) — the
+  /// StockItem.reserved pattern. `available` (balance - heldBalance, raw-SQL
+  /// STORED generated column) is what a new hold must be guarded against, not
+  /// `balance` directly — mirrors stock_item.available exactly.
+  heldBalance Decimal      @default(0) @map("held_balance") @db.Decimal(18, 4)
+  status      WalletStatus @default(ACTIVE)
   /// Declared for schema-level parity with stock_item — not actively
   /// referenced by the guarded-UPDATE queries, same as stock_item's own
   /// version field today (the WHERE-guarded balance check is what makes
   /// concurrent debits race-safe, not this counter).
-  version    Int          @default(0)
-  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version     Int          @default(0)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   customer     Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
   transactions WalletTransaction[]
+  holds        StoredValueHold[]
 
   @@unique([customerId, websiteId, currency], map: "uq_wallet_customer_website_currency")
   @@index([websiteId])
@@ -109,6 +126,9 @@ model GiftCard {
   codeLast4           String         @map("code_last4")
   initialAmount       Decimal        @map("initial_amount") @db.Decimal(18, 4)
   balance             Decimal        @default(0) @db.Decimal(18, 4)
+  /// Sum of this gift card's HELD checkout holds — same StockItem.reserved-style
+  /// pattern as Wallet.heldBalance above; see that field's doc comment.
+  heldBalance         Decimal        @default(0) @map("held_balance") @db.Decimal(18, 4)
   currency            String         @db.Char(3)
   status              GiftCardStatus @default(ACTIVE)
   kind                GiftCardKind   @default(DIGITAL)
@@ -126,6 +146,8 @@ model GiftCard {
   deletedAt           DateTime?      @map("deleted_at") @db.Timestamptz(6)
 
   transactions GiftCardTransaction[]
+  holds        StoredValueHold[]
+  cartTenders  CartTender[]
 
   @@index([deletedAt])
   @@index([websiteId])
@@ -154,4 +176,42 @@ model GiftCardTransaction {
   @@unique([giftCardId, idempotencyKey], map: "uq_gift_card_txn_giftcard_idempotency")
   @@index([giftCardId, createdAt])
   @@map("gift_card_transaction")
+}
+
+/// Soft hold against a wallet OR a gift card (never both — see the raw-SQL
+/// shape CHECK), structurally identical to StockReservation (plan/15 Phase
+/// 5). HELD increments the owning instrument's heldBalance; CAPTURED/
+/// RELEASED/EXPIRED decrement it back out, mirroring stock_item.reserved
+/// exactly. Never soft-deleted — status carries the terminal state, same as
+/// StockReservation. refType/refId are bare scalars (not FK'd), matching
+/// WalletTransaction.refType/refId's polymorphic-reference precedent — a
+/// hold references a Cart while pending, then an Order once one exists
+/// (CompleteCheckout re-points refType/refId at the Order right after
+/// creating it, before capture/release).
+model StoredValueHold {
+  id         BigInt                @id @default(autoincrement())
+  publicId   String                @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  tenderType TenderType            @map("tender_type")
+  walletId   BigInt?               @map("wallet_id")
+  giftCardId BigInt?               @map("gift_card_id")
+  amount     Decimal               @db.Decimal(18, 4)
+  currency   String                @db.Char(3)
+  /// Reuses ReservationRefType (CART|ORDER) — unlike WalletTransaction/
+  /// GiftCardTransaction's genuinely open-ended refType (order/return/
+  /// loyalty/promo/...), a hold's own doc comment claims a closed CART|ORDER
+  /// domain identical to StockReservation's, so it gets the same enum
+  /// instead of a bare String (schema-reviewer finding).
+  refType    ReservationRefType    @map("ref_type")
+  refId      BigInt                @map("ref_id")
+  status     StoredValueHoldStatus @default(HELD)
+  expiresAt  DateTime?             @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  wallet   Wallet?   @relation(fields: [walletId], references: [id])
+  giftCard GiftCard? @relation(fields: [giftCardId], references: [id])
+
+  @@index([walletId])
+  @@index([giftCardId])
+  @@map("stored_value_hold")
 }
