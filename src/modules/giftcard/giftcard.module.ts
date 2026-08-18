@@ -6,9 +6,9 @@ import { PrismaGiftCardLedger } from './infrastructure/prisma-giftcard-ledger.js
 import { PrismaWebsiteLookup, PrismaCustomerLookup } from './infrastructure/lookups.js';
 import { PrismaAdminUserLookup } from './infrastructure/prisma-admin-user-lookup.js';
 import { IssueGiftCard } from './application/issue-gift-card.usecase.js';
-import { GetGiftCard, GetGiftCardByCode, ListGiftCardTransactions, DisableGiftCard, AdjustGiftCard } from './application/gift-card-queries.usecases.js';
+import { GetGiftCard, GetGiftCardByCode, ListGiftCardTransactions, DisableGiftCard, AdjustGiftCard, ListGiftCards } from './application/gift-card-queries.usecases.js';
 import { RedeemGiftCardIntoWallet } from './application/redeem-gift-card-into-wallet.usecase.js';
-import { issueGiftCardSchema, adjustGiftCardSchema, redeemGiftCardSchema } from './interface/http/schemas.js';
+import { issueGiftCardSchema, adjustGiftCardSchema, redeemGiftCardSchema, listGiftCardsQuerySchema } from './interface/http/schemas.js';
 
 export interface GiftCardRouters {
   admin: Router;
@@ -34,6 +34,7 @@ export function createGiftCardModule(
   const listGiftCardTransactions = new ListGiftCardTransactions(giftCards);
   const disableGiftCard = new DisableGiftCard(giftCards);
   const adjustGiftCard = new AdjustGiftCard(giftCards);
+  const listGiftCards = new ListGiftCards(giftCards, websites);
   const redeemGiftCardIntoWallet = new RedeemGiftCardIntoWallet(giftCards, wallets, customers, hmacSecret);
 
   async function resolveActorId(adminUserPublicId: string | undefined): Promise<bigint | undefined> {
@@ -42,6 +43,14 @@ export function createGiftCardModule(
   }
 
   const admin = Router();
+  admin.get(
+    '/gift-cards',
+    authorize('wallet:manage'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listGiftCardsQuerySchema, req.query);
+      res.json({ data: await listGiftCards.execute(query) });
+    }),
+  );
   admin.post(
     '/gift-cards',
     authorize('wallet:manage'),

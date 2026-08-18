@@ -1,7 +1,10 @@
-import type { GiftCardLedger } from '../domain/repositories.js';
+import type { GiftCardLedger, WebsiteLookup } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import { hashGiftCardCode } from '../infrastructure/code.js';
-import type { GiftCardView, GiftCardTransactionView } from './dto.js';
+import type { GiftCardView, GiftCardTransactionView, ListGiftCardsQuery, GiftCardListView } from './dto.js';
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 
 function toView(c: { publicId: string; codeLast4: string; initialAmount: string; balance: string; currency: string; status: GiftCardView['status']; kind: GiftCardView['kind']; expiresAt: Date | null }): GiftCardView {
   return {
@@ -69,5 +72,51 @@ export class AdjustGiftCard {
     if (!card) throw new NotFoundError('gift card', publicId);
     const updated = await this.giftCards.adjust(card.id, amount, { actorId, reason });
     return toView(updated);
+  }
+}
+
+/** Admin browse (Content > Gift Cards). */
+export class ListGiftCards {
+  constructor(
+    private readonly giftCards: GiftCardLedger,
+    private readonly websites: WebsiteLookup,
+  ) {}
+
+  async execute(query: ListGiftCardsQuery): Promise<GiftCardListView> {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const pageSize = query.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
+    // An unresolvable websiteCode must filter to zero rows, not silently fall
+    // back to "no filter" (which would return every website's gift cards).
+    let websiteId: bigint | undefined;
+    if (query.websiteCode) {
+      const website = await this.websites.byCode(query.websiteCode);
+      if (!website) return { total: 0, page, pageSize, giftCards: [] };
+      websiteId = website.id;
+    }
+    const result = await this.giftCards.list({
+      websiteId,
+      status: query.status,
+      last4: query.last4,
+      recipientEmail: query.recipientEmail,
+      page,
+      pageSize,
+    });
+    return {
+      total: result.total,
+      page,
+      pageSize,
+      giftCards: result.giftCards.map((c) => ({
+        publicId: c.publicId,
+        codeLast4: c.codeLast4,
+        initialAmount: c.initialAmount,
+        balance: c.balance,
+        currency: c.currency,
+        status: c.status,
+        kind: c.kind,
+        recipientEmail: c.recipientEmail,
+        expiresAt: c.expiresAt?.toISOString() ?? null,
+        createdAt: c.createdAt.toISOString(),
+      })),
+    };
   }
 }

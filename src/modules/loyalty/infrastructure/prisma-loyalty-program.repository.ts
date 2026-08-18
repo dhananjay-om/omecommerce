@@ -1,6 +1,6 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
-import type { LoyaltyProgramRepository, LoyaltyProgramInfo, CreateLoyaltyProgramInput } from '../domain/repositories.js';
+import type { LoyaltyProgramRepository, LoyaltyProgramInfo, CreateLoyaltyProgramInput, UpdateLoyaltyProgramInput } from '../domain/repositories.js';
 
 // Prisma's Decimal.toString() strips trailing zeros ("1.0000" -> "1"); this
 // round-trip through the fixed-point minor-units helpers restores the scale-4
@@ -72,5 +72,26 @@ export class PrismaLoyaltyProgramRepository implements LoyaltyProgramRepository 
   async findByPublicId(publicId: string): Promise<LoyaltyProgramInfo | null> {
     const row = await this.db.loyaltyProgram.findFirst({ where: { publicId }, select: PROGRAM_SELECT });
     return row ? toInfo(row) : null;
+  }
+
+  async list(): Promise<LoyaltyProgramInfo[]> {
+    const rows = await this.db.loyaltyProgram.findMany({ select: PROGRAM_SELECT, orderBy: { id: 'asc' } });
+    return rows.map(toInfo);
+  }
+
+  async update(id: bigint, input: UpdateLoyaltyProgramInput): Promise<LoyaltyProgramInfo> {
+    const row = await this.db.loyaltyProgram.update({
+      where: { id },
+      data: {
+        name: input.name,
+        pointsPerCurrencyUnit: input.pointsPerCurrencyUnit,
+        pointValue: input.pointValue,
+        redeemMinPoints: input.redeemMinPoints,
+        pointsExpiryMonths: input.pointsExpiryMonths,
+        status: input.status,
+      },
+      select: PROGRAM_SELECT,
+    });
+    return toInfo(row);
   }
 }

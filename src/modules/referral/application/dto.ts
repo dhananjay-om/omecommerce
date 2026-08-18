@@ -1,4 +1,4 @@
-import type { ReferralQualifyingEvent, ReferralRewardType, ReferralStatus, ReferralBeneficiary } from '@prisma/client';
+import type { ReferralQualifyingEvent, ReferralRewardType, ReferralStatus, ReferralBeneficiary, LoyaltyProgramStatus } from '@prisma/client';
 
 export interface CreateReferralProgramCommand {
   websiteCode: string;
@@ -15,12 +15,35 @@ export interface CreateReferralProgramCommand {
   attributionWindowDays?: number;
 }
 
+export interface UpdateReferralProgramCommand {
+  name?: string;
+  status?: LoyaltyProgramStatus;
+  qualifyingEvent?: ReferralQualifyingEvent;
+  minOrderAmount?: string | null;
+  referrerRewardType?: ReferralRewardType;
+  referrerRewardAmount?: string | null;
+  referrerRewardPoints?: string | null;
+  refereeRewardType?: ReferralRewardType;
+  refereeRewardAmount?: string | null;
+  refereeRewardPoints?: string | null;
+  maxReferralsPerCustomer?: number | null;
+  attributionWindowDays?: number | null;
+}
+
 export interface ReferralProgramView {
   publicId: string;
   name: string;
+  status: LoyaltyProgramStatus;
   qualifyingEvent: ReferralQualifyingEvent;
+  minOrderAmount: string | null;
   referrerRewardType: ReferralRewardType;
+  referrerRewardAmount: string | null;
+  referrerRewardPoints: string | null;
   refereeRewardType: ReferralRewardType;
+  refereeRewardAmount: string | null;
+  refereeRewardPoints: string | null;
+  maxReferralsPerCustomer: number | null;
+  attributionWindowDays: number | null;
 }
 
 export interface ReferralRewardView {
@@ -53,4 +76,29 @@ export interface AttachReferralResult {
   referralPublicId: string;
   status: ReferralStatus;
   refereeReward: ReferralRewardView | null;
+}
+
+export interface ListReferralsQuery {
+  status?: ReferralStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminReferralListItemView {
+  publicId: string;
+  referrerEmail: string;
+  refereeEmail: string;
+  status: ReferralStatus;
+  createdAt: string;
+  qualifiedAt: string | null;
+  rewardedAt: string | null;
+  referrerReward: ReferralRewardView | null;
+  refereeReward: ReferralRewardView | null;
+}
+
+export interface AdminReferralListView {
+  total: number;
+  page: number;
+  pageSize: number;
+  referrals: AdminReferralListItemView[];
 }

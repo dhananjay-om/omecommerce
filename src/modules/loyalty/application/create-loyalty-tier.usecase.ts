@@ -24,6 +24,12 @@ export class CreateLoyaltyTier {
       sortOrder: cmd.sortOrder,
       createdBy: actorId,
     });
-    return { id: tier.id.toString(), name: tier.name, thresholdPoints: tier.thresholdPoints.toString(), earnMultiplier: tier.earnMultiplier };
+    return {
+      id: tier.id.toString(),
+      name: tier.name,
+      thresholdPoints: tier.thresholdPoints.toString(),
+      earnMultiplier: tier.earnMultiplier,
+      sortOrder: tier.sortOrder,
+    };
   }
 }

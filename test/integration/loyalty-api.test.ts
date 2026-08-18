@@ -195,6 +195,43 @@ describe.skipIf(!process.env.INTEGRATION)('loyalty API (live DB)', () => {
     expect(gold.body.data).toMatchObject({ name: 'Gold', thresholdPoints: '500', earnMultiplier: '2.0000' });
   });
 
+  it('admin: lists and gets loyalty programs, and updates one', async () => {
+    const list = await admin.get('/admin/v1/loyalty/programs');
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((p: { publicId: string }) => p.publicId === programPublicId)).toBe(true);
+
+    const single = await admin.get(`/admin/v1/loyalty/programs/${programPublicId}`);
+    expect(single.status).toBe(200);
+    expect(single.body.data).toMatchObject({ name: 'OME Rewards', status: 'ACTIVE', pointsExpiryMonths: null });
+
+    const updated = await admin.patch(`/admin/v1/loyalty/programs/${programPublicId}`).send({ name: 'OME Rewards Plus', pointsExpiryMonths: 12 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toMatchObject({ name: 'OME Rewards Plus', pointsExpiryMonths: 12 });
+
+    // Restore the name — later tests/assertions don't depend on it, but keep state predictable for anyone reading this file top-to-bottom.
+    await admin.patch(`/admin/v1/loyalty/programs/${programPublicId}`).send({ name: 'OME Rewards' });
+  });
+
+  it('admin: lists tiers, updates one, and deletes one (re-tiering the account to null on next earn)', async () => {
+    const list = await admin.get(`/admin/v1/loyalty/programs/${programPublicId}/tiers`);
+    expect(list.status).toBe(200);
+    expect(list.body.data.map((t: { name: string }) => t.name).sort()).toEqual(['Gold', 'Silver']);
+    const silver = list.body.data.find((t: { name: string }) => t.name === 'Silver');
+
+    const updated = await admin.patch(`/admin/v1/loyalty/programs/${programPublicId}/tiers/${silver.id}`).send({ earnMultiplier: '1.5' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toMatchObject({ name: 'Silver', earnMultiplier: '1.5000' });
+
+    const throwaway = await admin
+      .post(`/admin/v1/loyalty/programs/${programPublicId}/tiers`)
+      .send({ name: 'Throwaway', thresholdPoints: '999999' });
+    const del = await admin.delete(`/admin/v1/loyalty/programs/${programPublicId}/tiers/${throwaway.body.data.id}`);
+    expect(del.status).toBe(204);
+
+    const listAfter = await admin.get(`/admin/v1/loyalty/programs/${programPublicId}/tiers`);
+    expect(listAfter.body.data.some((t: { name: string }) => t.name === 'Throwaway')).toBe(false);
+  });
+
   it('rejects storefront loyalty routes with no auth', async () => {
     const res = await request(app).get('/store/v1/me/loyalty');
     expect(res.status).toBe(401);

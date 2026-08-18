@@ -1,6 +1,6 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
-import type { ReferralProgramRepository, ReferralProgramInfo, CreateReferralProgramInput } from '../domain/repositories.js';
+import type { ReferralProgramRepository, ReferralProgramInfo, CreateReferralProgramInput, UpdateReferralProgramInput } from '../domain/repositories.js';
 
 function formatDecimal(value: { toString(): string }): string {
   return fromMinorUnits(toMinorUnits(value.toString()));
@@ -95,5 +95,37 @@ export class PrismaReferralProgramRepository implements ReferralProgramRepositor
   async findByWebsiteId(websiteId: bigint): Promise<ReferralProgramInfo | null> {
     const row = await this.db.referralProgram.findFirst({ where: { websiteId }, select: PROGRAM_SELECT });
     return row ? toInfo(row) : null;
+  }
+
+  async findByPublicId(publicId: string): Promise<ReferralProgramInfo | null> {
+    const row = await this.db.referralProgram.findFirst({ where: { publicId }, select: PROGRAM_SELECT });
+    return row ? toInfo(row) : null;
+  }
+
+  async list(): Promise<ReferralProgramInfo[]> {
+    const rows = await this.db.referralProgram.findMany({ select: PROGRAM_SELECT, orderBy: { id: 'asc' } });
+    return rows.map(toInfo);
+  }
+
+  async update(id: bigint, input: UpdateReferralProgramInput): Promise<ReferralProgramInfo> {
+    const row = await this.db.referralProgram.update({
+      where: { id },
+      data: {
+        name: input.name,
+        status: input.status,
+        qualifyingEvent: input.qualifyingEvent,
+        minOrderAmount: input.minOrderAmount,
+        referrerRewardType: input.referrerRewardType,
+        referrerRewardAmount: input.referrerRewardAmount,
+        referrerRewardPoints: input.referrerRewardPoints,
+        refereeRewardType: input.refereeRewardType,
+        refereeRewardAmount: input.refereeRewardAmount,
+        refereeRewardPoints: input.refereeRewardPoints,
+        maxReferralsPerCustomer: input.maxReferralsPerCustomer,
+        attributionWindowDays: input.attributionWindowDays,
+      },
+      select: PROGRAM_SELECT,
+    });
+    return toInfo(row);
   }
 }
