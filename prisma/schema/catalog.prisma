@@ -182,7 +182,10 @@ model Product {
 model Brand {
   id          BigInt    @id @default(autoincrement())
   publicId    String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
-  slug        String    @unique
+  /// Real index is partial (`WHERE deleted_at IS NULL`, see migration
+  /// 20260818100000_brand_slug_soft_delete_reuse) so a deleted brand's
+  /// slug can be reused — same override pattern as Category.slug.
+  slug        String    @unique(map: "ix_brand_slug_active")
   name        String
   description String?
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -332,7 +335,12 @@ model Category {
   position         Int                   @default(0)
   nameDefault      String?               @map("name_default")
   /// URL-safe identifier for storefront routes (/collections/:slug). Backfilled from nameDefault for pre-existing rows.
-  slug             String                @unique
+  /// Real index is partial (`WHERE deleted_at IS NULL`, see migration
+  /// 20260817100000_category_slug_soft_delete_reuse) so a deleted
+  /// category's slug can be reused — Prisma can't express a partial WHERE
+  /// clause natively, so this just declares the same name for its own
+  /// bookkeeping. Same override pattern as CmsPage/CmsBlock's handle/code.
+  slug             String                @unique(map: "ix_category_slug_active")
   /// Storefront-facing body copy — shown on the category's own collections
   /// page (above the product grid), not used anywhere else.
   description      String?               @db.Text

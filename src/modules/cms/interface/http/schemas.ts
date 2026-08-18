@@ -28,3 +28,8 @@ export const updateCmsBlockSchema = z.object({
 export const cmsStoreViewQuerySchema = z.object({
   storeViewId: z.string().regex(/^\d+$/, 'storeViewId query param required'),
 });
+
+export const requestCmsImageUploadSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(128),
+});

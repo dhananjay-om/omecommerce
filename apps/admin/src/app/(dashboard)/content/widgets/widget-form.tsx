@@ -2,8 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import { createWidget, updateWidget, type ActionState } from './actions';
-import { CmsBlockConfigField, LimitConfigField, WhyChooseUsConfigField, TestimonialConfigField } from './widget-config-fields';
-import type { WidgetInstance, WidgetType, WidgetSection, CmsBlock } from '@/lib/types';
+import { CmsBlockConfigField, LimitConfigField, ItemPickerConfigField, WhyChooseUsConfigField, TestimonialConfigField } from './widget-config-fields';
+import type { WidgetInstance, WidgetType, WidgetSection, CmsBlock, Category, Brand } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,25 @@ const TYPE_LABELS: Record<WidgetType, string> = {
 };
 
 const SECTION_LABELS: Record<WidgetSection, string> = { TOP: 'Top', MIDDLE: 'Middle', FOOTER: 'Footer' };
+
+/** Depth-prefixed labels ("— Laptops") so the flat picker still conveys the
+ *  tree shape — own copy of categories/category-edit-form.tsx's helper. */
+function withDepthLabels(categories: Category[]): Array<{ publicId: string; label: string }> {
+  const byId = new Map(categories.map((c) => [c.publicId, c]));
+  function depthOf(c: Category): number {
+    let depth = 0;
+    let current = c.parentId ? byId.get(c.parentId) : undefined;
+    while (current) {
+      depth += 1;
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return depth;
+  }
+  return categories.map((c) => ({
+    publicId: c.publicId,
+    label: `${'— '.repeat(depthOf(c))}${c.nameDefault ?? '(untitled)'}`,
+  }));
+}
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -48,7 +67,17 @@ function defaultConfigFor(type: WidgetType): Record<string, unknown> {
 
 const initialState: ActionState = { error: null, success: false };
 
-export function WidgetForm({ widget, blocks }: { widget?: WidgetInstance; blocks: CmsBlock[] }) {
+export function WidgetForm({
+  widget,
+  blocks,
+  categories,
+  brands,
+}: {
+  widget?: WidgetInstance;
+  blocks: CmsBlock[];
+  categories: Category[];
+  brands: Brand[];
+}) {
   const isEdit = !!widget;
   const action = isEdit ? updateWidget : createWidget;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -148,17 +177,37 @@ export function WidgetForm({ widget, blocks }: { widget?: WidgetInstance; blocks
             note="Pulls active banners from Content > Banners (group: Promo), ordered by their own Position."
           />
         ) : type === 'CATEGORY_GRID' ? (
-          <LimitConfigField
-            limit={config.limit ? String(config.limit) : ''}
-            onChange={(v) => setConfig({ limit: v ? Number(v) : undefined })}
-            note="Pulls root categories, ordered by their own Position."
-          />
+          <div className="space-y-4">
+            <ItemPickerConfigField
+              label="Featured Categories"
+              addLabel="Add Category"
+              emptyStateNote="No categories picked — shows all root categories (in their own Position order) by default."
+              items={withDepthLabels(categories)}
+              selectedIds={(config.categoryIds as string[]) ?? []}
+              onChange={(categoryIds) => setConfig({ ...config, categoryIds })}
+            />
+            <LimitConfigField
+              limit={config.limit ? String(config.limit) : ''}
+              onChange={(v) => setConfig({ ...config, limit: v ? Number(v) : undefined })}
+              note="Caps how many show when no specific categories are picked above."
+            />
+          </div>
         ) : type === 'BRAND_GRID' ? (
-          <LimitConfigField
-            limit={config.limit ? String(config.limit) : ''}
-            onChange={(v) => setConfig({ limit: v ? Number(v) : undefined })}
-            note="Pulls brands."
-          />
+          <div className="space-y-4">
+            <ItemPickerConfigField
+              label="Featured Brands"
+              addLabel="Add Brand"
+              emptyStateNote="No brands picked — shows all brands by default."
+              items={brands.map((b) => ({ publicId: b.publicId, label: b.name }))}
+              selectedIds={(config.brandIds as string[]) ?? []}
+              onChange={(brandIds) => setConfig({ ...config, brandIds })}
+            />
+            <LimitConfigField
+              limit={config.limit ? String(config.limit) : ''}
+              onChange={(v) => setConfig({ ...config, limit: v ? Number(v) : undefined })}
+              note="Caps how many show when no specific brands are picked above."
+            />
+          </div>
         ) : type === 'WHY_CHOOSE_US_LIST' ? (
           <WhyChooseUsConfigField
             features={(config.features as Array<{ icon: string; title: string; description: string }>) ?? []}

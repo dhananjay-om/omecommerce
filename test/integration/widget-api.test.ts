@@ -100,6 +100,46 @@ describe.skipIf(!process.env.INTEGRATION)('widget API (live DB)', () => {
     expect(blockRead.body.data.body).toBe('<p>Hello from a widget</p>');
   });
 
+  it('accepts a CATEGORY_GRID config with a curated, ordered categoryIds list', async () => {
+    const cat = await admin.post('/admin/v1/categories').send({ nameDefault: 'Widget Test Category' });
+    const res = await admin.post('/admin/v1/widgets').send({
+      type: 'CATEGORY_GRID',
+      section: 'MIDDLE',
+      config: { categoryIds: [cat.body.data.publicId], limit: 5 },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.config.categoryIds).toEqual([cat.body.data.publicId]);
+  });
+
+  it('rejects a CATEGORY_GRID config with a malformed categoryIds entry', async () => {
+    const res = await admin.post('/admin/v1/widgets').send({
+      type: 'CATEGORY_GRID',
+      section: 'MIDDLE',
+      config: { categoryIds: ['not-a-uuid'] },
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('accepts a BRAND_GRID config with a curated, ordered brandIds list', async () => {
+    const brand = await admin.post('/admin/v1/brands').send({ name: 'Widget Test Brand' });
+    const res = await admin.post('/admin/v1/widgets').send({
+      type: 'BRAND_GRID',
+      section: 'MIDDLE',
+      config: { brandIds: [brand.body.data.publicId] },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.config.brandIds).toEqual([brand.body.data.publicId]);
+  });
+
+  it('rejects a BRAND_GRID config with a malformed brandIds entry', async () => {
+    const res = await admin.post('/admin/v1/widgets').send({
+      type: 'BRAND_GRID',
+      section: 'MIDDLE',
+      config: { brandIds: ['not-a-uuid'] },
+    });
+    expect(res.status).toBe(422);
+  });
+
   it('admin: soft-deletes a widget — disappears from admin list and storefront read', async () => {
     const created = await admin.post('/admin/v1/widgets').send({ type: 'BRAND_GRID', section: 'FOOTER', position: 99, config: {} });
     const del = await admin.delete(`/admin/v1/widgets/${created.body.data.publicId}`);

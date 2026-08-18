@@ -178,4 +178,26 @@ describe.skipIf(!process.env.INTEGRATION)('CMS API (live DB)', () => {
     const listAfter = await admin.get('/admin/v1/cms/blocks');
     expect(listAfter.body.data.some((b: { publicId: string }) => b.publicId === create.body.data.publicId)).toBe(false);
   });
+
+  it('mints a presigned upload URL for an inline rich-text-editor image', async () => {
+    const res = await admin.post('/admin/v1/cms/image-upload-url').send({ filename: 'inline.jpg', mimeType: 'image/jpeg' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.uploadUrl).toEqual(expect.any(String));
+    expect(res.body.data.imageMediaKey).toContain('cms-images/');
+  });
+
+  it('resolves a data-media-key inline image to a fresh presigned src on every read', async () => {
+    const create = await admin
+      .post('/admin/v1/cms/pages')
+      .send({ handle: 'inline-image-page', title: 'Inline Image', body: '<p>before</p><img data-media-key="cms-images/test-key.png" src="blob:stale"><p>after</p>' });
+    expect(create.status).toBe(201);
+
+    // The saved body keeps the data-media-key attribute, but src is re-presigned (no longer the stale local blob: URL saved by the client).
+    const single = await admin.get(`/admin/v1/cms/pages/${create.body.data.publicId}`);
+    expect(single.body.data.body).toContain('data-media-key="cms-images/test-key.png"');
+    expect(single.body.data.body).not.toContain('src="blob:stale"');
+    expect(single.body.data.body).toContain('cms-images');
+    expect(single.body.data.body).toContain('test-key.png');
+    expect(single.body.data.body).toMatch(/src="https?:\/\/[^"]+"/);
+  });
 });

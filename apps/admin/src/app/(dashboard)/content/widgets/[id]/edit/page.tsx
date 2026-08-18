@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { apiGet, ApiError } from '@/lib/api-client';
-import type { WidgetInstance, CmsBlock } from '@/lib/types';
+import type { WidgetInstance, CmsBlock, Category, Brand } from '@/lib/types';
 import { WidgetForm } from '../../widget-form';
 
 export default async function EditWidgetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,13 +13,17 @@ export default async function EditWidgetPage({ params }: { params: Promise<{ id:
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
-  const blocks = await apiGet<CmsBlock[]>('/admin/v1/cms/blocks');
+  const [blocks, categories, brands] = await Promise.all([
+    apiGet<CmsBlock[]>('/admin/v1/cms/blocks'),
+    apiGet<Category[]>('/admin/v1/categories'),
+    apiGet<Brand[]>('/admin/v1/brands'),
+  ]);
 
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight">Edit Widget — {widget.title ?? widget.type}</h1>
       <div className="mt-6">
-        <WidgetForm widget={widget} blocks={blocks} />
+        <WidgetForm widget={widget} blocks={blocks} categories={categories} brands={brands} />
       </div>
     </div>
   );

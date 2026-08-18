@@ -41,6 +41,78 @@ export function CmsBlockConfigField({ blocks, code, onChange }: { blocks: CmsBlo
   );
 }
 
+export interface PickableItem {
+  publicId: string;
+  label: string;
+}
+
+/**
+ * Generic "pick specific items, in this order" repeatable-row picker — used
+ * for both CATEGORY_GRID and BRAND_GRID configs (same shape: a curated,
+ * admin-ordered subset of an existing list, by publicId). Row order IS the
+ * storefront display order; an empty list means "no curation" and falls
+ * back to the widget's default behavior (see widget-renderer.tsx).
+ */
+export function ItemPickerConfigField({
+  label,
+  addLabel,
+  emptyStateNote,
+  items,
+  selectedIds,
+  onChange,
+}: {
+  label: string;
+  addLabel: string;
+  emptyStateNote: string;
+  items: PickableItem[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  function updateRow(i: number, id: string) {
+    onChange(selectedIds.map((v, idx) => (idx === i ? id : v)));
+  }
+  function addRow() {
+    const firstUnused = items.find((it) => !selectedIds.includes(it.publicId));
+    onChange([...selectedIds, firstUnused?.publicId ?? items[0]?.publicId ?? '']);
+  }
+
+  return (
+    <div className="space-y-3">
+      <Label>{label}</Label>
+      {selectedIds.length === 0 ? <p className="text-xs text-muted-foreground">{emptyStateNote}</p> : null}
+      {selectedIds.map((id, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-5 shrink-0 text-xs text-muted-foreground">{i + 1}.</span>
+          <Select value={id} onValueChange={(v) => updateRow(i, v ?? '')}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select...">{(value: string) => items.find((it) => it.publicId === value)?.label ?? 'Select...'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {items.map((it) => (
+                <SelectItem key={it.publicId} value={it.publicId}>
+                  {it.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Remove row"
+            onClick={() => onChange(selectedIds.filter((_, idx) => idx !== i))}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addRow} disabled={items.length === 0}>
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
+
 export function LimitConfigField({ limit, onChange, note }: { limit: string; onChange: (limit: string) => void; note: string }) {
   return (
     <div className="space-y-2">

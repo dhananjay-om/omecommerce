@@ -84,6 +84,14 @@ export interface Category {
   createdAt: string;
 }
 
+export interface Brand {
+  publicId: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
 export interface AttributeSet {
   id: string;
   code: string;

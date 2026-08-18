@@ -1,5 +1,6 @@
 import type { CmsBlockRepository } from '../domain/repositories.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+import { resolveInlineImages } from './resolve-inline-images.js';
 import type { CreateCmsBlockCommand, UpdateCmsBlockCommand, CmsBlockView } from './dto.js';
 
 function parseStoreViewId(value: string | null | undefined): bigint | null {
@@ -10,8 +11,10 @@ function parseStoreViewId(value: string | null | undefined): bigint | null {
   return BigInt(value);
 }
 
-function toView(b: { publicId: string; code: string; body: string; status: CmsBlockView['status']; updatedAt: Date }): CmsBlockView {
-  return { publicId: b.publicId, code: b.code, body: b.body, status: b.status, updatedAt: b.updatedAt.toISOString() };
+/** Async since it resolves any inline `data-media-key` images in `body`
+ *  to fresh presigned URLs — see resolve-inline-images.ts. */
+async function toView(b: { publicId: string; code: string; body: string; status: CmsBlockView['status']; updatedAt: Date }): Promise<CmsBlockView> {
+  return { publicId: b.publicId, code: b.code, body: await resolveInlineImages(b.body), status: b.status, updatedAt: b.updatedAt.toISOString() };
 }
 
 export class CreateCmsBlock {
@@ -46,7 +49,7 @@ export class ListCmsBlocks {
 
   async execute(): Promise<CmsBlockView[]> {
     const rows = await this.blocks.list();
-    return rows.map(toView);
+    return Promise.all(rows.map(toView));
   }
 }
 

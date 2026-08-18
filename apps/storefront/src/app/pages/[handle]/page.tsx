@@ -38,7 +38,17 @@ export default async function CmsPageRoute({ params }: Props) {
     <div className="mx-auto max-w-3xl px-4 py-16">
       <h1 className="text-3xl font-bold">{page.title}</h1>
       <div
-        className="prose mt-6 max-w-none text-muted-foreground [&_a]:text-primary [&_a]:underline [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_p]:my-3"
+        // No @tailwindcss/typography plugin in this app — hand-rolled
+        // element-selector overrides for whatever the admin's rich text
+        // editor (apps/admin's RichTextEditor) can produce.
+        className={
+          'mt-6 max-w-none text-muted-foreground ' +
+          '[&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground ' +
+          '[&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-foreground ' +
+          '[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5 ' +
+          '[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:italic ' +
+          '[&_a]:text-primary [&_a]:underline [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-md'
+        }
         dangerouslySetInnerHTML={{ __html: page.body }}
       />
     </div>

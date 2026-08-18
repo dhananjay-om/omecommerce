@@ -6,12 +6,14 @@ import { PrismaCmsBlockRepository } from './infrastructure/prisma-cms-block.repo
 import { CreateCmsPage, UpdateCmsPage, ListCmsPages, GetCmsPageByPublicId, DeleteCmsPage } from './application/cms-page.usecases.js';
 import { CreateCmsBlock, UpdateCmsBlock, ListCmsBlocks, GetCmsBlockByPublicId, DeleteCmsBlock } from './application/cms-block.usecases.js';
 import { GetCmsPage, GetCmsBlock } from './application/get-cms-content.usecases.js';
+import { RequestCmsImageUpload } from './application/request-cms-image-upload.usecase.js';
 import {
   createCmsPageSchema,
   updateCmsPageSchema,
   createCmsBlockSchema,
   updateCmsBlockSchema,
   cmsStoreViewQuerySchema,
+  requestCmsImageUploadSchema,
 } from './interface/http/schemas.js';
 
 export interface CmsRouters {
@@ -36,6 +38,7 @@ export function createCmsModule(db: Db, authorize: (permission: string) => Reque
   const deleteCmsBlock = new DeleteCmsBlock(blocks);
   const getCmsPage = new GetCmsPage(pages);
   const getCmsBlock = new GetCmsBlock(blocks);
+  const requestCmsImageUpload = new RequestCmsImageUpload();
 
   const admin = Router();
   admin.get(
@@ -112,6 +115,14 @@ export function createCmsModule(db: Db, authorize: (permission: string) => Reque
     asyncHandler(async (req, res) => {
       await deleteCmsBlock.execute(req.params.publicId!);
       res.status(204).send();
+    }),
+  );
+  admin.post(
+    '/cms/image-upload-url',
+    authorize('cms:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(requestCmsImageUploadSchema, req.body);
+      res.status(201).json({ data: await requestCmsImageUpload.execute(body) });
     }),
   );
 
