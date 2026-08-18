@@ -30,6 +30,12 @@ model Banner {
   imageMediaKey String?     @map("image_media_key")
   ctaLabel      String?     @map("cta_label")
   ctaHref       String?     @map("cta_href")
+  /// A raw Tailwind gradient-utility string (e.g. "from-blue-600 to-indigo-700"),
+  /// picked from a fixed preset list in the admin form (not free text) — the
+  /// backdrop shown on the storefront when no image is uploaded above.
+  /// Null ⇒ falls back to the position-cycled default (DEFAULT_SLIDE_GRADIENTS
+  /// in widget-renderer.tsx), same as before this column existed.
+  gradient      String?     @db.VarChar(64)
   position      Int         @default(0)
   isActive      Boolean     @default(true) @map("is_active")
   createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)

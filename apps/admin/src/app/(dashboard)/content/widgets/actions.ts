@@ -16,6 +16,7 @@ export async function createWidget(_prevState: ActionState, formData: FormData):
   const title = String(formData.get('title') ?? '').trim();
   const position = String(formData.get('position') ?? '').trim();
   const configJson = String(formData.get('configJson') ?? '{}');
+  const customCss = String(formData.get('customCss') ?? '').trim();
 
   if (!type) return { error: 'Type is required.', success: false };
   if (!section) return { error: 'Section is required.', success: false };
@@ -35,6 +36,7 @@ export async function createWidget(_prevState: ActionState, formData: FormData):
       title: title || undefined,
       position: position ? Number(position) : undefined,
       config,
+      customCss: customCss || undefined,
     });
     publicId = widget.publicId;
   } catch (err) {
@@ -53,6 +55,7 @@ export async function updateWidget(_prevState: ActionState, formData: FormData):
   const position = String(formData.get('position') ?? '').trim();
   const isActive = String(formData.get('isActive') ?? '').trim();
   const configJson = String(formData.get('configJson') ?? '{}');
+  const customCss = String(formData.get('customCss') ?? '').trim();
 
   let config: unknown;
   try {
@@ -68,6 +71,7 @@ export async function updateWidget(_prevState: ActionState, formData: FormData):
       position: position ? Number(position) : undefined,
       isActive: isActive ? isActive === 'true' : undefined,
       config,
+      customCss: customCss || null,
     });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };

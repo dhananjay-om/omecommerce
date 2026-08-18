@@ -7,6 +7,7 @@ export interface CreateBannerCommand {
   imageMediaKey?: string | null;
   ctaLabel?: string | null;
   ctaHref?: string | null;
+  gradient?: string | null;
   position?: number;
   isActive?: boolean;
 }
@@ -18,6 +19,7 @@ export interface UpdateBannerCommand {
   imageMediaKey?: string | null;
   ctaLabel?: string | null;
   ctaHref?: string | null;
+  gradient?: string | null;
   position?: number;
   isActive?: boolean;
 }
@@ -33,6 +35,7 @@ export interface BannerView {
   imageUrl: string | null;
   ctaLabel: string | null;
   ctaHref: string | null;
+  gradient: string | null;
   position: number;
   isActive: boolean;
   updatedAt: string;

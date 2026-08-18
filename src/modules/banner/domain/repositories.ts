@@ -8,6 +8,7 @@ export interface BannerRecord {
   imageMediaKey: string | null;
   ctaLabel: string | null;
   ctaHref: string | null;
+  gradient: string | null;
   position: number;
   isActive: boolean;
   updatedAt: Date;
@@ -20,6 +21,7 @@ export interface CreateBannerInput {
   imageMediaKey?: string | null;
   ctaLabel?: string | null;
   ctaHref?: string | null;
+  gradient?: string | null;
   position?: number;
   isActive?: boolean;
 }
@@ -30,6 +32,7 @@ export interface UpdateBannerInput {
   imageMediaKey?: string | null;
   ctaLabel?: string | null;
   ctaHref?: string | null;
+  gradient?: string | null;
   position?: number;
   isActive?: boolean;
 }

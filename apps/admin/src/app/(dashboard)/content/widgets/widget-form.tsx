@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const TYPE_LABELS: Record<WidgetType, string> = {
   CMS_BLOCK: 'CMS Block',
@@ -219,6 +220,28 @@ export function WidgetForm({
             onChange={(testimonials) => setConfig({ testimonials })}
           />
         )}
+      </SectionCard>
+
+      <SectionCard title="Advanced">
+        <div className="space-y-2">
+          <Label htmlFor="widget-customCss">Custom CSS (optional)</Label>
+          <Textarea
+            id="widget-customCss"
+            name="customCss"
+            rows={6}
+            defaultValue={widget?.customCss ?? ''}
+            className="font-mono text-xs"
+            placeholder={`[data-widget-instance="..."] h2 {\n  color: #ff0000;\n}`}
+          />
+          <p className="text-xs text-muted-foreground">
+            Injected as a &lt;style&gt; tag on the storefront for every visitor — not sanitized, same trust level as
+            CMS page/block HTML. Scope it to just this widget with{' '}
+            <code className="rounded bg-muted px-1 py-0.5">
+              [data-widget-instance=&quot;{isEdit ? widget.publicId : '<this widget’s id, shown after saving>'}&quot;]
+            </code>
+            ; anything unscoped applies globally to the page.
+          </p>
+        </div>
       </SectionCard>
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}

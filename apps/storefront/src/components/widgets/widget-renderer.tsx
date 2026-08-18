@@ -80,7 +80,7 @@ export async function WidgetRenderer({ widget }: { widget: WidgetInstance }) {
         ctaLabel: b.ctaLabel ?? 'Shop Now',
         ctaHref: b.ctaHref ?? '/products',
         imageUrl: b.imageUrl,
-        gradient: DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
+        gradient: b.gradient ?? DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
       }));
       return <HeroBanner slides={slides.length > 0 ? slides : undefined} />;
     }
@@ -94,7 +94,7 @@ export async function WidgetRenderer({ widget }: { widget: WidgetInstance }) {
         subtitle: b.subtitle ?? '',
         href: b.ctaHref ?? '/products',
         imageUrl: b.imageUrl,
-        gradient: DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
+        gradient: b.gradient ?? DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
       }));
       return <PromoBanners banners={bannerProps.length > 0 ? bannerProps : undefined} />;
     }

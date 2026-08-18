@@ -140,6 +140,35 @@ describe.skipIf(!process.env.INTEGRATION)('widget API (live DB)', () => {
     expect(res.status).toBe(422);
   });
 
+  it('accepts and persists customCss, and it flows through to the storefront read', async () => {
+    const created = await admin.post('/admin/v1/widgets').send({
+      type: 'BRAND_GRID',
+      section: 'MIDDLE',
+      config: {},
+      customCss: '[data-widget-instance="x"] h2 { color: red; }',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.customCss).toBe('[data-widget-instance="x"] h2 { color: red; }');
+
+    const store = await request(app).get('/store/v1/widgets').query({ page: 'home', section: 'MIDDLE' });
+    const found = store.body.data.find((w: { publicId: string }) => w.publicId === created.body.data.publicId);
+    expect(found.customCss).toBe('[data-widget-instance="x"] h2 { color: red; }');
+
+    const cleared = await admin.put(`/admin/v1/widgets/${created.body.data.publicId}`).send({ customCss: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.data.customCss).toBeNull();
+  });
+
+  it('422s a customCss over the 20000-character limit', async () => {
+    const res = await admin.post('/admin/v1/widgets').send({
+      type: 'BRAND_GRID',
+      section: 'MIDDLE',
+      config: {},
+      customCss: 'a'.repeat(20001),
+    });
+    expect(res.status).toBe(422);
+  });
+
   it('admin: soft-deletes a widget — disappears from admin list and storefront read', async () => {
     const created = await admin.post('/admin/v1/widgets').send({ type: 'BRAND_GRID', section: 'FOOTER', position: 99, config: {} });
     const del = await admin.delete(`/admin/v1/widgets/${created.body.data.publicId}`);

@@ -32,6 +32,9 @@ const baseFields = {
   position: z.number().int().optional(),
   title: blankToUndefined(z.string().max(255).nullish()),
   isActive: z.boolean().optional(),
+  /** Shared across every widget type (unlike `config`, which is per-type) —
+   *  raw CSS injected as-is on the storefront, see widget.prisma's header comment. */
+  customCss: blankToUndefined(z.string().max(20000).nullish()),
 };
 
 /** Discriminated on `type` so each widget type's `config` is validated
@@ -59,6 +62,7 @@ export const updateWidgetInstanceSchema = z.object({
   title: blankToUndefined(z.string().max(255).nullish()),
   isActive: z.boolean().optional(),
   config: z.record(z.unknown()).optional(),
+  customCss: blankToUndefined(z.string().max(20000).nullish()),
 });
 
 export const widgetPageQuerySchema = z.object({

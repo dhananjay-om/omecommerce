@@ -21,6 +21,30 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
+const NO_GRADIENT = '__none__';
+
+/** Fixed preset list — the admin picks one of these, never free text, so
+ *  the stored value is always a known-good Tailwind gradient-utility
+ *  string. Reuses the exact colors already hardcoded in
+ *  promo-banners.tsx's DEFAULT_BANNERS / widget-renderer.tsx's
+ *  DEFAULT_SLIDE_GRADIENTS (the fallback this field now lets an admin
+ *  actually control), plus one new neutral option. */
+const GRADIENT_PRESETS = [
+  { value: 'from-blue-600 to-indigo-700', label: 'Blue → Indigo' },
+  { value: 'from-rose-500 to-pink-600', label: 'Rose → Pink' },
+  { value: 'from-amber-600 to-orange-700', label: 'Amber → Orange' },
+  { value: 'from-emerald-600 to-teal-700', label: 'Emerald → Teal' },
+  { value: 'from-indigo-600 to-violet-700', label: 'Indigo → Violet' },
+  { value: 'from-rose-600 to-orange-600', label: 'Rose → Orange' },
+  { value: 'from-primary to-blue-700', label: 'Primary → Blue' },
+  { value: 'from-slate-700 to-slate-900', label: 'Slate (neutral)' },
+];
+
+function gradientLabel(value: string): string {
+  if (value === NO_GRADIENT) return 'None (default rotation)';
+  return GRADIENT_PRESETS.find((p) => p.value === value)?.label ?? value;
+}
+
 const initialState: ActionState = { error: null, success: false };
 
 export function BannerForm({ banner }: { banner?: Banner }) {
@@ -28,6 +52,7 @@ export function BannerForm({ banner }: { banner?: Banner }) {
   const action = isEdit ? updateBanner : createBanner;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [group, setGroup] = useState<BannerGroup>(banner?.group ?? 'HERO');
+  const [gradient, setGradient] = useState(banner?.gradient ?? NO_GRADIENT);
 
   return (
     <form action={formAction} className="max-w-3xl space-y-6">
@@ -89,6 +114,27 @@ export function BannerForm({ banner }: { banner?: Banner }) {
 
       <SectionCard title="Image">
         <BannerImageUploadField group={group} initialImageUrl={banner?.imageUrl ?? null} initialImageMediaKey={banner?.imageMediaKey ?? null} />
+      </SectionCard>
+
+      <SectionCard title="Backdrop Color">
+        <div className="space-y-2">
+          <Label htmlFor="banner-gradient">Gradient</Label>
+          <input type="hidden" name="gradient" value={gradient === NO_GRADIENT ? '' : gradient} />
+          <Select value={gradient} onValueChange={(v) => setGradient(v ?? NO_GRADIENT)}>
+            <SelectTrigger id="banner-gradient" className="w-full">
+              <SelectValue>{(value: string) => gradientLabel(value)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_GRADIENT}>None (default rotation)</SelectItem>
+              {GRADIENT_PRESETS.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Used as the backdrop when no image is uploaded above.</p>
+        </div>
       </SectionCard>
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
