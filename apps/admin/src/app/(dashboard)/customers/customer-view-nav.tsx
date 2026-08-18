@@ -9,7 +9,7 @@ interface NavItem {
   label: string;
 }
 
-/** Same shape as orders/order-view-nav.tsx — Phase 3 appends Loyalty and Referrals here. */
+/** Same shape as orders/order-view-nav.tsx. */
 export function CustomerViewNav({ customerPublicId }: { customerPublicId: string }) {
   const pathname = usePathname();
   const base = `/customers/${customerPublicId}`;
@@ -17,6 +17,8 @@ export function CustomerViewNav({ customerPublicId }: { customerPublicId: string
   const items: NavItem[] = [
     { href: base, label: 'Overview' },
     { href: `${base}/wallet`, label: 'Wallet' },
+    { href: `${base}/loyalty`, label: 'Loyalty' },
+    { href: `${base}/referrals`, label: 'Referrals' },
   ];
 
   return (

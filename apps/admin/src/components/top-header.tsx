@@ -12,6 +12,8 @@ const SECTION_LABELS: Record<string, string> = {
   orders: 'Orders',
   customers: 'Customers',
   'gift-cards': 'Gift Cards',
+  loyalty: 'Loyalty Program',
+  referrals: 'Referrals',
 };
 
 export function TopHeader() {

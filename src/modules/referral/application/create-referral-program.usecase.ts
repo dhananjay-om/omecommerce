@@ -5,6 +5,7 @@ import type { CreateReferralProgramCommand, ReferralProgramView } from './dto.js
 
 export interface WebsiteLookup {
   byCode(code: string): Promise<{ id: bigint } | null>;
+  byId(id: bigint): Promise<{ code: string } | null>;
 }
 
 export class CreateReferralProgram {
@@ -41,14 +42,17 @@ export class CreateReferralProgram {
       attributionWindowDays: cmd.attributionWindowDays,
       createdBy: actorId,
     });
-    return toReferralProgramView(program);
+    return toReferralProgramView(program, cmd.websiteCode);
   }
 }
 
-/** Shared by every usecase that returns a ReferralProgramView (create/get/list/update). */
-export function toReferralProgramView(program: ReferralProgramInfo): ReferralProgramView {
+/** Shared by every usecase that returns a ReferralProgramView (create/get/list/update) —
+ *  `websiteCode` is resolved by the caller (create already has it from the command;
+ *  get/list/update resolve it via WebsiteLookup.byId(program.websiteId)). */
+export function toReferralProgramView(program: ReferralProgramInfo, websiteCode: string): ReferralProgramView {
   return {
     publicId: program.publicId,
+    websiteCode,
     name: program.name,
     status: program.status,
     qualifyingEvent: program.qualifyingEvent,

@@ -47,6 +47,10 @@ export class PrismaWebsiteLookup implements WebsiteLookup {
   async byCode(code: string): Promise<{ id: bigint } | null> {
     return this.db.website.findFirst({ where: { code }, select: { id: true } });
   }
+
+  async byId(id: bigint): Promise<{ code: string } | null> {
+    return this.db.website.findFirst({ where: { id }, select: { code: true } });
+  }
 }
 
 /** Read-only cross-module lookup: own trivial copy of "does a Loyalty program exist for this website" — not Loyalty module's own repository. */

@@ -51,9 +51,9 @@ export function createReferralModule(db: Db, authorize: (permission: string) => 
 
   const issueReward = new IssueReferralReward(rewards, wallets, loyaltyLedger, loyaltyPrograms, customerContext);
   const createReferralProgram = new CreateReferralProgram(programs, websites, loyaltyPrograms);
-  const listReferralPrograms = new ListReferralPrograms(programs);
-  const getReferralProgram = new GetReferralProgram(programs);
-  const updateReferralProgram = new UpdateReferralProgram(programs, loyaltyPrograms);
+  const listReferralPrograms = new ListReferralPrograms(programs, websites);
+  const getReferralProgram = new GetReferralProgram(programs, websites);
+  const updateReferralProgram = new UpdateReferralProgram(programs, loyaltyPrograms, websites);
   const listReferralsForAdmin = new ListReferralsForAdmin(referrals);
   const attachReferral = new AttachReferral(customerContext, codes, programs, referrals, issueReward);
   const getMyReferrals = new GetMyReferrals(customerContext, programs, codes, referrals, rewards);
