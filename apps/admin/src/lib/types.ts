@@ -591,3 +591,82 @@ export interface WidgetInstance {
   customCss: string | null;
   updatedAt: string;
 }
+
+export type WalletStatus = 'ACTIVE' | 'FROZEN';
+export type WalletBucket = 'STORE_CREDIT' | 'PREPAID_TOPUP' | 'CASHBACK' | 'LOYALTY_CONVERSION';
+export type WalletTxnType = 'CREDIT' | 'DEBIT' | 'ADJUST' | 'EXPIRE';
+export type WalletSource = 'REFUND' | 'RETURN' | 'GOODWILL' | 'TOPUP' | 'CASHBACK' | 'LOYALTY' | 'GIFTCARD_LOAD' | 'PROMO' | 'ADMIN_ADJUST' | 'REFERRAL';
+
+export interface WalletView {
+  publicId: string;
+  balance: string;
+  currency: string;
+  status: WalletStatus;
+}
+
+export interface WalletTransaction {
+  bucket: WalletBucket;
+  type: WalletTxnType;
+  amount: string;
+  balanceAfter: string;
+  currency: string;
+  source: WalletSource;
+  reason: string | null;
+  createdAt: string;
+}
+
+export type GiftCardStatus = 'ACTIVE' | 'REDEEMED' | 'EXPIRED' | 'DISABLED' | 'PENDING';
+export type GiftCardKind = 'DIGITAL' | 'PHYSICAL';
+export type GiftCardTxnType = 'ISSUE' | 'REDEEM' | 'REFUND' | 'ADJUST' | 'VOID' | 'EXPIRE';
+
+export interface GiftCard {
+  publicId: string;
+  codeLast4: string;
+  initialAmount: string;
+  balance: string;
+  currency: string;
+  status: GiftCardStatus;
+  kind: GiftCardKind;
+  expiresAt: string | null;
+}
+
+export interface GiftCardListItem {
+  publicId: string;
+  codeLast4: string;
+  initialAmount: string;
+  balance: string;
+  currency: string;
+  status: GiftCardStatus;
+  kind: GiftCardKind;
+  recipientEmail: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface GiftCardList {
+  total: number;
+  page: number;
+  pageSize: number;
+  giftCards: GiftCardListItem[];
+}
+
+/** Only ever seen once, right after issuance — the raw redeemable code is never
+ *  stored server-side (only its hash), so this is the sole place it appears. */
+export interface IssuedGiftCard {
+  publicId: string;
+  code: string;
+  codeLast4: string;
+  initialAmount: string;
+  balance: string;
+  currency: string;
+  status: GiftCardStatus;
+}
+
+export interface GiftCardTransaction {
+  type: GiftCardTxnType;
+  amount: string;
+  balanceAfter: string;
+  currency: string;
+  reason: string | null;
+  createdAt: string;
+}

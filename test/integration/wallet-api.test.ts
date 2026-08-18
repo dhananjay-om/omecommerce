@@ -46,6 +46,27 @@ describe.skipIf(!process.env.INTEGRATION)('wallet API (live DB)', () => {
     expect(res.body.data).toEqual({ publicId: expect.any(String), balance: '0.0000', currency: 'USD', status: 'ACTIVE' });
   });
 
+  it('two concurrent first-time reads for the same brand-new customer both lazy-create cleanly (no 500)', async () => {
+    // Regression test: PrismaWalletLedger.getOrCreateWallet's upsert() is not
+    // a true atomic INSERT...ON CONFLICT under concurrent load — two callers
+    // racing to lazy-create the same never-before-seen customer's wallet (the
+    // admin Wallet tab's own Promise.all([wallet, transactions]) is exactly
+    // this) could raise a raw P2002 instead of resolving cleanly.
+    const reg = await request(app)
+      .post('/store/v1/customers')
+      .send({ websiteCode: 'us_retail', email: 'wallet-race-lazy-create@example.com', password: 'correct-horse-battery' });
+    const raceCustomerId = reg.body.data.publicId as string;
+
+    const [balanceRes, txnRes] = await Promise.all([
+      admin.get(`/admin/v1/customers/${raceCustomerId}/wallet`),
+      admin.get(`/admin/v1/customers/${raceCustomerId}/wallet/transactions`),
+    ]);
+    expect(balanceRes.status).toBe(200);
+    expect(txnRes.status).toBe(200);
+    expect(balanceRes.body.data.balance).toBe('0.0000');
+    expect(txnRes.body.data).toEqual([]);
+  });
+
   it('rejects wallet routes with no auth (storefront)', async () => {
     const res = await request(app).get('/store/v1/me/wallet');
     expect(res.status).toBe(401);

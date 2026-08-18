@@ -243,6 +243,28 @@ describe.skipIf(!process.env.INTEGRATION)('loyalty API (live DB)', () => {
     expect(res.body.data).toMatchObject({ pointsBalance: '0', lifetimePoints: '0', tier: null, status: 'ACTIVE' });
   });
 
+  it('two concurrent first-time reads for the same brand-new customer both lazy-create cleanly (no 500)', async () => {
+    // Same regression class as wallet-api.test.ts's identical test —
+    // PrismaLoyaltyLedger.getOrCreateAccount's upsert() isn't a true atomic
+    // INSERT...ON CONFLICT under concurrent load; two callers racing to
+    // lazy-create the same never-before-seen customer's account (e.g. a
+    // future admin Loyalty tab firing balance + transactions in parallel)
+    // could raise a raw P2002 instead of resolving cleanly.
+    const reg = await request(app)
+      .post('/store/v1/customers')
+      .send({ websiteCode: 'us_retail', email: 'loyalty-race-lazy-create@example.com', password: 'correct-horse-battery' });
+    const raceCustomerId = reg.body.data.publicId as string;
+
+    const [accountRes, txnRes] = await Promise.all([
+      admin.get(`/admin/v1/customers/${raceCustomerId}/loyalty`),
+      admin.get(`/admin/v1/customers/${raceCustomerId}/loyalty/transactions`),
+    ]);
+    expect(accountRes.status).toBe(200);
+    expect(txnRes.status).toBe(200);
+    expect(accountRes.body.data.pointsBalance).toBe('0');
+    expect(txnRes.body.data).toEqual([]);
+  });
+
   it('earns points automatically on a paid checkout, with no manual trigger', async () => {
     const variantId = await createVariant('LOY-SKU-1', '50.00');
     await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'LOY-WH', delta: 10, reason: 'PURCHASE' });

@@ -1,4 +1,4 @@
-import type { WalletBucket, WalletSource, WalletTxnType } from '@prisma/client';
+import { Prisma, type WalletBucket, type WalletSource, type WalletTxnType } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import type { WalletLedger, WalletSnapshot, WalletTransactionInfo, LedgerWriteOptions } from '../domain/repositories.js';
@@ -35,12 +35,26 @@ export class PrismaWalletLedger implements WalletLedger {
   constructor(private readonly db: Db) {}
 
   async getOrCreateWallet(customerId: bigint, websiteId: bigint, currency: string): Promise<{ id: bigint; publicId: string }> {
-    const wallet = await this.db.wallet.upsert({
-      where: { customerId_websiteId_currency: { customerId, websiteId, currency } },
-      update: {},
-      create: { customerId, websiteId, currency },
-    });
-    return { id: wallet.id, publicId: wallet.publicId };
+    try {
+      const wallet = await this.db.wallet.upsert({
+        where: { customerId_websiteId_currency: { customerId, websiteId, currency } },
+        update: {},
+        create: { customerId, websiteId, currency },
+      });
+      return { id: wallet.id, publicId: wallet.publicId };
+    } catch (err) {
+      // Two concurrent lazy-creates for the same brand-new customer's wallet
+      // (e.g. the admin Wallet tab's Promise.all firing GetWalletBalance and
+      // ListWalletTransactions in parallel — both call this) can both see "no
+      // row" before either commits, so upsert()'s own conflict handling loses
+      // the race and one caller gets a raw P2002 instead of a resolved
+      // update. The loser just re-reads what the winner created.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const wallet = await this.db.wallet.findFirstOrThrow({ where: { customerId, websiteId, currency } });
+        return { id: wallet.id, publicId: wallet.publicId };
+      }
+      throw err;
+    }
   }
 
   async findByPublicId(publicId: string): Promise<WalletSnapshot | null> {

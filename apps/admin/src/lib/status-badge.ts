@@ -1,7 +1,7 @@
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'outline';
 
-const POSITIVE = new Set(['ACTIVE', 'PAID', 'COMPLETED', 'FULFILLED', 'BOTH', 'CLOSED', 'SENT', 'ISSUED', 'DELIVERED']);
-const NEGATIVE = new Set(['DISABLED', 'CANCELLED', 'VOIDED', 'INACTIVE', 'NOT_VISIBLE', 'FAILED']);
+const POSITIVE = new Set(['ACTIVE', 'PAID', 'COMPLETED', 'FULFILLED', 'BOTH', 'CLOSED', 'SENT', 'ISSUED', 'DELIVERED', 'REDEEMED']);
+const NEGATIVE = new Set(['DISABLED', 'CANCELLED', 'VOIDED', 'INACTIVE', 'NOT_VISIBLE', 'FAILED', 'FROZEN', 'EXPIRED']);
 const NEUTRAL_WARNING = new Set([
   'DRAFT',
   'PENDING',
