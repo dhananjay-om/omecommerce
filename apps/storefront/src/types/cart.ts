@@ -47,6 +47,12 @@ export interface Cart {
    *  disabled gift card, a frozen wallet) — same soft-fail-on-read shape as
    *  couponError; checkout re-validates for real and hard-fails there. */
   tenderError: string | null;
+  /** Admin-configured wallet rule blocking the tender entirely right now (store-wide
+   *  disabled, or below the configured minimum order value) — null means it's offered
+   *  (still subject to balance and any % / per-order cap, reflected in a lower
+   *  appliedAmount rather than this field). Set unconditionally, independent of whether
+   *  WALLET is even an applied tender, so the UI can decide whether to show the toggle. */
+  walletUnavailableReason: string | null;
 }
 
 export type TenderType = 'WALLET' | 'GIFT_CARD' | 'CREDIT_TERMS';

@@ -26,6 +26,7 @@ import {
   Award,
   Share2,
   Building2,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -86,6 +87,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/stores/currencies', label: 'Currency Setup', icon: Coins },
       { href: '/stores/tax-classes', label: 'Tax Classes', icon: Receipt },
       { href: '/stores/gst-settings', label: 'GST Settings', icon: Landmark },
+      { href: '/stores/wallet-settings', label: 'Wallet Settings', icon: Wallet },
     ],
   },
 ];

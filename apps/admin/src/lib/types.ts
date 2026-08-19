@@ -261,6 +261,10 @@ export interface Website {
   logoMediaKey: string | null;
   logoUrl: string | null;
   supportEmail: string | null;
+  walletEnabled: boolean;
+  walletMaxPercentOfOrder: string | null;
+  walletMinOrderValue: string | null;
+  walletMaxAmountPerOrder: string | null;
 }
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';

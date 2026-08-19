@@ -24,6 +24,17 @@ export function WalletToggle({
 
   const walletTender = cart.tenders.find((t) => t.tenderType === 'WALLET');
 
+  // Admin-configured rule blocking the tender entirely right now (store-wide
+  // disabled, or this cart doesn't clear the configured minimum order value)
+  // — plan/17. Never a checkbox in this state: there's nothing to toggle.
+  if (cart.walletUnavailableReason) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Pay with wallet balance — {cart.walletUnavailableReason}.
+      </p>
+    );
+  }
+
   async function handleToggle(checked: boolean) {
     setPending(true);
     setError(null);

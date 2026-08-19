@@ -14,16 +14,25 @@ import type {
   OrderEmailType,
   TenderType,
 } from '@prisma/client';
+import type { WalletSettings } from './wallet-rules.js';
 
 // --- Cross-module read-only lookups (each module resolves its own dependencies) ---
 
 export interface VariantLookup {
-  byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null>;
+  byPublicId(
+    publicId: string,
+  ): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null>;
   /** `status` added for plan/15 Phase 11 (Reorder) — must skip variants that no longer exist or are INACTIVE; every existing caller ignores the extra field.
    *  `hsnCode` added for the GST module — snapshotted onto OrderLine.hsnCode at order-creation time; every existing caller ignores it too. */
   byId(
     id: bigint,
-  ): Promise<{ sku: string; nameDefault: string | null; productId: bigint; status: 'ACTIVE' | 'INACTIVE'; hsnCode: string | null } | null>;
+  ): Promise<{
+    sku: string;
+    nameDefault: string | null;
+    productId: bigint;
+    status: 'ACTIVE' | 'INACTIVE';
+    hsnCode: string | null;
+  } | null>;
 }
 
 /** The lowest-position media asset's storage KEY for a product (plan/14 Phase 5a) — own copy of the same lookup search's IndexProduct uses; not a URL, see MediaUrlResolver's doc comment for why. */
@@ -63,7 +72,12 @@ export interface CompanyMembershipLookup {
   /** creditAccountId is null when the company has no Net-X terms configured — CREDIT_TERMS simply isn't an available tender for that customer's cart (plan/15 Phase 7). */
   findActiveByCustomerId(
     customerId: bigint,
-  ): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean; creditAccountId: bigint | null } | null>;
+  ): Promise<{
+    companyId: bigint;
+    customerGroupId: bigint | null;
+    taxExempt: boolean;
+    creditAccountId: bigint | null;
+  } | null>;
 }
 
 /** plan/15 Phase 6 — admin/storefront order-detail "company" badge/link (own copy, not company module's own repository). */
@@ -112,7 +126,10 @@ export interface TaxClassRepository {
   findByCode(code: string): Promise<TaxClassAdminInfo | null>;
   /** Admin browse — the product-edit Tax Class picker and the standalone Tax Classes screen. */
   list(): Promise<TaxClassAdminInfo[]>;
-  update(code: string, input: { name?: string; rate?: string; isActive?: boolean }): Promise<TaxClassAdminInfo>;
+  update(
+    code: string,
+    input: { name?: string; rate?: string; isActive?: boolean },
+  ): Promise<TaxClassAdminInfo>;
   /** Soft-delete only — a deleted class simply stops resolving in TaxClassLookup
    *  (same reasoning as Coupon's soft-delete: no FK-driven reason to block it). */
   softDelete(code: string): Promise<void>;
@@ -134,6 +151,14 @@ export interface WebsiteTaxConfigLookup {
   } | null>;
 }
 
+/** This selling Website's admin-configured wallet-tender rules (plan/17) — own
+ *  copy, per-module lookup convention (same reasoning as WebsiteTaxConfigLookup
+ *  just above, kept separate rather than folded into it since these are an
+ *  unrelated concern that happens to live on the same Website row). */
+export interface WalletSettingsLookup {
+  byId(websiteId: bigint): Promise<WalletSettings | null>;
+}
+
 export interface ShippingMethodInfo {
   code: string;
   name: string;
@@ -142,7 +167,12 @@ export interface ShippingMethodInfo {
 }
 
 export interface ShippingMethodRepository {
-  create(input: { code: string; name: string; flatRate: string; currency: string }): Promise<{ publicId: string; code: string }>;
+  create(input: {
+    code: string;
+    name: string;
+    flatRate: string;
+    currency: string;
+  }): Promise<{ publicId: string; code: string }>;
   findByCode(code: string): Promise<{ id: bigint; code: string } | null>;
   /** Storefront checkout needs to show real options, not a blind code (plan/14 Phase 7a). */
   list(currency: string): Promise<ShippingMethodInfo[]>;
@@ -448,7 +478,13 @@ export interface CreateInvoiceInput {
   taxTotalMinor: bigint;
   grandTotalMinor: bigint;
   createdBy?: bigint | null;
-  lines: Array<{ orderLineId: bigint; qty: number; unitPriceMinor: bigint; taxAmountMinor: bigint; rowTotalMinor: bigint }>;
+  lines: Array<{
+    orderLineId: bigint;
+    qty: number;
+    unitPriceMinor: bigint;
+    taxAmountMinor: bigint;
+    rowTotalMinor: bigint;
+  }>;
 }
 
 /** plan/15 Phase 3 — one row of the manual-send email log. */

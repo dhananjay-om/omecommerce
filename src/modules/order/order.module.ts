@@ -15,12 +15,20 @@ import {
   PrismaAdminUserLookup,
   PrismaCompanyMembershipLookup,
   PrismaCompanyLookup,
+  PrismaWalletSettingsLookup,
 } from './infrastructure/prisma-lookups.js';
 import { PrismaCustomerLookup } from './infrastructure/prisma-customer-lookup.js';
-import { PrismaTaxClassLookup, PrismaWebsiteTaxConfigLookup, NativeGstTaxCalculator } from './infrastructure/native-tax-calculator.js';
+import {
+  PrismaTaxClassLookup,
+  PrismaWebsiteTaxConfigLookup,
+  NativeGstTaxCalculator,
+} from './infrastructure/native-tax-calculator.js';
 import { NativeShippingCalculator } from './infrastructure/native-shipping-calculator.js';
 import { TestPaymentGateway } from './infrastructure/test-payment-gateway.js';
-import { PrismaTaxClassRepository, PrismaShippingMethodRepository } from './infrastructure/prisma-setup.repository.js';
+import {
+  PrismaTaxClassRepository,
+  PrismaShippingMethodRepository,
+} from './infrastructure/prisma-setup.repository.js';
 import { S3MediaUrlResolver } from './infrastructure/s3-media-url-resolver.js';
 import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { EnrichCartView } from './application/enrich-cart-view.js';
@@ -35,7 +43,13 @@ import { ListOrders } from './application/list-orders.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
-import { CreateTaxClass, ListTaxClasses, UpdateTaxClass, DeleteTaxClass, CreateShippingMethod } from './application/setup.usecases.js';
+import {
+  CreateTaxClass,
+  ListTaxClasses,
+  UpdateTaxClass,
+  DeleteTaxClass,
+  CreateShippingMethod,
+} from './application/setup.usecases.js';
 import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
 import { GetOrderHistory } from './application/get-order-history.usecase.js';
 import { AddOrderNote } from './application/add-order-note.usecase.js';
@@ -145,6 +159,10 @@ export function createOrderModule(
   // placement (CompleteCheckout) below.
   const walletLedger = new PrismaWalletLedger(db);
   const giftCardLedger = new PrismaGiftCardLedger(db);
+  // Own instance, same "correctness-critical shared logic" carve-out as
+  // companyCredit above — used both for cart tender preview (EnrichCartView)
+  // and checkout-time capping (CompleteCheckout) below.
+  const walletSettings = new PrismaWalletSettingsLookup(db);
   const enrichCartView = new EnrichCartView(
     variants,
     priceResolver,
@@ -158,16 +176,40 @@ export function createOrderModule(
     customerGroups,
     companyCredit,
     companyMemberships,
+    walletSettings,
   );
 
-  const createCart = new CreateCart(carts, storeContext, customerGroups, customers, companyMemberships, enrichCartView);
-  const attachCustomerToCart = new AttachCustomerToCart(carts, customerGroups, customers, companyMemberships, enrichCartView);
+  const createCart = new CreateCart(
+    carts,
+    storeContext,
+    customerGroups,
+    customers,
+    companyMemberships,
+    enrichCartView,
+  );
+  const attachCustomerToCart = new AttachCustomerToCart(
+    carts,
+    customerGroups,
+    customers,
+    companyMemberships,
+    enrichCartView,
+  );
   const addCartLine = new AddCartLine(carts, variants, enrichCartView);
   const getCart = new GetCart(carts, enrichCartView);
   const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
-  const applyCouponToCart = new ApplyCouponToCart(carts, variants, discountCalculator, enrichCartView);
+  const applyCouponToCart = new ApplyCouponToCart(
+    carts,
+    variants,
+    discountCalculator,
+    enrichCartView,
+  );
   const removeCouponFromCart = new RemoveCouponFromCart(carts, enrichCartView);
-  const applyGiftCardToCart = new ApplyGiftCardToCart(carts, giftCardLedger, enrichCartView, giftCardHmacSecret);
+  const applyGiftCardToCart = new ApplyGiftCardToCart(
+    carts,
+    giftCardLedger,
+    enrichCartView,
+    giftCardHmacSecret,
+  );
   const removeGiftCardFromCart = new RemoveGiftCardFromCart(carts, giftCardLedger, enrichCartView);
   const applyWalletToCart = new ApplyWalletToCart(carts, customers, enrichCartView);
   const removeWalletFromCart = new RemoveWalletFromCart(carts, customers, enrichCartView);
@@ -190,6 +232,7 @@ export function createOrderModule(
     giftCardLedger,
     companyMemberships,
     companyCredit,
+    walletSettings,
   );
   const getOrder = new GetOrder(orders, companies);
   const listOrders = new ListOrders(orders);
@@ -206,7 +249,18 @@ export function createOrderModule(
   const pdfRenderer = new PuppeteerPdfRenderer();
   const pdfStorage = new S3PdfStorage();
   const fulfillOrder = new FulfillOrder(orders, warehouses, outbox, pdfRenderer, pdfStorage);
-  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet, walletLedger, giftCardLedger, companyCredit);
+  const refundOrder = new RefundOrder(
+    orders,
+    ledger,
+    variants,
+    warehouses,
+    outbox,
+    customers,
+    creditWallet,
+    walletLedger,
+    giftCardLedger,
+    companyCredit,
+  );
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const listTaxClasses = new ListTaxClasses(taxClasses);
@@ -215,11 +269,22 @@ export function createOrderModule(
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
   const getOrderHistory = new GetOrderHistory(orders);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
-  const createInvoice = new CreateInvoice(orders, adminUsers, pdfRenderer, pdfStorage, websiteTaxConfigLookup);
+  const createInvoice = new CreateInvoice(
+    orders,
+    adminUsers,
+    pdfRenderer,
+    pdfStorage,
+    websiteTaxConfigLookup,
+  );
   const listInvoices = new ListInvoices(orders);
   const getInvoice = new GetInvoice(orders);
   const getInvoicePdfUrl = new GetInvoicePdfUrl(orders, mediaUrlResolver);
-  const regenerateInvoice = new RegenerateInvoice(orders, pdfRenderer, pdfStorage, websiteTaxConfigLookup);
+  const regenerateInvoice = new RegenerateInvoice(
+    orders,
+    pdfRenderer,
+    pdfStorage,
+    websiteTaxConfigLookup,
+  );
   const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
   const emailSender = new SimulatedEmailSender();
   const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
@@ -227,7 +292,11 @@ export function createOrderModule(
   const closeOrder = new CloseOrder(orders, outbox);
   const exportOrders = new ExportOrders(orders);
   const getCustomerOrder = new GetCustomerOrder(orders, customers, companies);
-  const getCustomerOrderInvoicePdfUrl = new GetCustomerOrderInvoicePdfUrl(orders, customers, mediaUrlResolver);
+  const getCustomerOrderInvoicePdfUrl = new GetCustomerOrderInvoicePdfUrl(
+    orders,
+    customers,
+    mediaUrlResolver,
+  );
   const getCustomerOrderTracking = new GetCustomerOrderTracking(orders, customers);
   const reorder = new Reorder(orders, customers, variants, carts);
 
@@ -305,7 +374,15 @@ export function createOrderModule(
     authorize('orders:view'),
     asyncHandler(async (req, res) => {
       const body = parse(addOrderNoteSchema, req.body);
-      res.status(201).json({ data: await addOrderNote.execute({ orderPublicId: req.params.publicId!, createdBy: req.adminUser?.adminUserPublicId, ...body }) });
+      res
+        .status(201)
+        .json({
+          data: await addOrderNote.execute({
+            orderPublicId: req.params.publicId!,
+            createdBy: req.adminUser?.adminUserPublicId,
+            ...body,
+          }),
+        });
     }),
   );
   admin.post(
@@ -313,14 +390,19 @@ export function createOrderModule(
     authorize('orders:fulfill'),
     asyncHandler(async (req, res) => {
       const body = parse(fulfillOrderSchema, req.body);
-      res.json({ data: await fulfillOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
+      res.json({
+        data: await fulfillOrder.execute({ orderPublicId: req.params.publicId!, ...body }),
+      });
     }),
   );
   admin.get(
     '/orders/:publicId/shipment/:fulfillmentId/packing-slip',
     authorize('orders:fulfill'),
     asyncHandler(async (req, res) => {
-      const url = await getPackingSlipPdfUrl.execute(req.params.publicId!, req.params.fulfillmentId!);
+      const url = await getPackingSlipPdfUrl.execute(
+        req.params.publicId!,
+        req.params.fulfillmentId!,
+      );
       res.redirect(302, url);
     }),
   );
@@ -329,7 +411,9 @@ export function createOrderModule(
     authorize('orders:refund'),
     asyncHandler(async (req, res) => {
       const body = parse(refundOrderSchema, req.body);
-      res.json({ data: await refundOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
+      res.json({
+        data: await refundOrder.execute({ orderPublicId: req.params.publicId!, ...body }),
+      });
     }),
   );
   admin.post(
@@ -337,7 +421,9 @@ export function createOrderModule(
     authorize('orders:cancel'),
     asyncHandler(async (req, res) => {
       const body = parse(cancelOrderSchema, req.body);
-      res.json({ data: await cancelOrder.execute({ orderPublicId: req.params.publicId!, ...body }) });
+      res.json({
+        data: await cancelOrder.execute({ orderPublicId: req.params.publicId!, ...body }),
+      });
     }),
   );
   admin.post(
@@ -345,7 +431,15 @@ export function createOrderModule(
     authorize('orders:invoice'),
     asyncHandler(async (req, res) => {
       const body = parse(createInvoiceSchema, req.body);
-      res.status(201).json({ data: await createInvoice.execute({ orderPublicId: req.params.publicId!, createdBy: req.adminUser?.adminUserPublicId, ...body }) });
+      res
+        .status(201)
+        .json({
+          data: await createInvoice.execute({
+            orderPublicId: req.params.publicId!,
+            createdBy: req.adminUser?.adminUserPublicId,
+            ...body,
+          }),
+        });
     }),
   );
   admin.get(
@@ -374,7 +468,9 @@ export function createOrderModule(
     '/orders/:publicId/invoice/:invoiceId/regenerate',
     authorize('orders:invoice'),
     asyncHandler(async (req, res) => {
-      res.json({ data: await regenerateInvoice.execute(req.params.publicId!, req.params.invoiceId!) });
+      res.json({
+        data: await regenerateInvoice.execute(req.params.publicId!, req.params.invoiceId!),
+      });
     }),
   );
   admin.post(
@@ -382,7 +478,15 @@ export function createOrderModule(
     authorize('orders:email'),
     asyncHandler(async (req, res) => {
       const body = parse(sendOrderEmailSchema, req.body);
-      res.status(201).json({ data: await sendOrderEmail.execute({ orderPublicId: req.params.publicId!, sentBy: req.adminUser?.adminUserPublicId, ...body }) });
+      res
+        .status(201)
+        .json({
+          data: await sendOrderEmail.execute({
+            orderPublicId: req.params.publicId!,
+            sentBy: req.adminUser?.adminUserPublicId,
+            ...body,
+          }),
+        });
     }),
   );
   admin.get(
@@ -418,26 +522,40 @@ export function createOrderModule(
     '/carts/:publicId/lines',
     asyncHandler(async (req, res) => {
       const body = parse(addCartLineSchema, req.body);
-      res.json({ data: await addCartLine.execute({ cartPublicId: req.params.publicId!, ...body }) });
+      res.json({
+        data: await addCartLine.execute({ cartPublicId: req.params.publicId!, ...body }),
+      });
     }),
   );
   store.delete(
     '/carts/:publicId/lines/:variantId',
     asyncHandler(async (req, res) => {
-      res.json({ data: await removeCartLine.execute({ cartPublicId: req.params.publicId!, variantId: req.params.variantId! }) });
+      res.json({
+        data: await removeCartLine.execute({
+          cartPublicId: req.params.publicId!,
+          variantId: req.params.variantId!,
+        }),
+      });
     }),
   );
   store.post(
     '/carts/:publicId/actions/apply-coupon',
     asyncHandler(async (req, res) => {
       const body = parse(applyCouponSchema, req.body);
-      res.json({ data: await applyCouponToCart.execute({ cartPublicId: req.params.publicId!, code: body.code }) });
+      res.json({
+        data: await applyCouponToCart.execute({
+          cartPublicId: req.params.publicId!,
+          code: body.code,
+        }),
+      });
     }),
   );
   store.post(
     '/carts/:publicId/actions/remove-coupon',
     asyncHandler(async (req, res) => {
-      res.json({ data: await removeCouponFromCart.execute({ cartPublicId: req.params.publicId! }) });
+      res.json({
+        data: await removeCouponFromCart.execute({ cartPublicId: req.params.publicId! }),
+      });
     }),
   );
   // Unauthenticated, bearer-code trust — same level as ApplyCouponToCart and
@@ -446,14 +564,24 @@ export function createOrderModule(
     '/carts/:publicId/actions/apply-gift-card',
     asyncHandler(async (req, res) => {
       const body = parse(applyGiftCardToCartSchema, req.body);
-      res.json({ data: await applyGiftCardToCart.execute({ cartPublicId: req.params.publicId!, code: body.code }) });
+      res.json({
+        data: await applyGiftCardToCart.execute({
+          cartPublicId: req.params.publicId!,
+          code: body.code,
+        }),
+      });
     }),
   );
   store.post(
     '/carts/:publicId/actions/remove-gift-card',
     asyncHandler(async (req, res) => {
       const body = parse(removeGiftCardFromCartSchema, req.body);
-      res.json({ data: await removeGiftCardFromCart.execute({ cartPublicId: req.params.publicId!, giftCardPublicId: body.giftCardPublicId }) });
+      res.json({
+        data: await removeGiftCardFromCart.execute({
+          cartPublicId: req.params.publicId!,
+          giftCardPublicId: body.giftCardPublicId,
+        }),
+      });
     }),
   );
   // requireCustomer + ownership-checked — unlike gift cards, a wallet tender
@@ -462,14 +590,24 @@ export function createOrderModule(
     '/carts/:publicId/actions/apply-wallet',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await applyWalletToCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+      res.json({
+        data: await applyWalletToCart.execute({
+          cartPublicId: req.params.publicId!,
+          customerPublicId: req.customer!.customerPublicId,
+        }),
+      });
     }),
   );
   store.post(
     '/carts/:publicId/actions/remove-wallet',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await removeWalletFromCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+      res.json({
+        data: await removeWalletFromCart.execute({
+          cartPublicId: req.params.publicId!,
+          customerPublicId: req.customer!.customerPublicId,
+        }),
+      });
     }),
   );
   // requireCustomer + ownership-checked — same shape as wallet (plan/15 Phase 7).
@@ -477,14 +615,24 @@ export function createOrderModule(
     '/carts/:publicId/actions/apply-credit-terms',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await applyCreditTermsToCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+      res.json({
+        data: await applyCreditTermsToCart.execute({
+          cartPublicId: req.params.publicId!,
+          customerPublicId: req.customer!.customerPublicId,
+        }),
+      });
     }),
   );
   store.post(
     '/carts/:publicId/actions/remove-credit-terms',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await removeCreditTermsFromCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+      res.json({
+        data: await removeCreditTermsFromCart.execute({
+          cartPublicId: req.params.publicId!,
+          customerPublicId: req.customer!.customerPublicId,
+        }),
+      });
     }),
   );
   // plan/15 Phase 6 — claims a guest cart at login and re-derives its
@@ -494,7 +642,12 @@ export function createOrderModule(
     '/carts/:publicId/actions/attach-customer',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await attachCustomerToCart.execute(req.params.publicId!, req.customer!.customerPublicId) });
+      res.json({
+        data: await attachCustomerToCart.execute(
+          req.params.publicId!,
+          req.customer!.customerPublicId,
+        ),
+      });
     }),
   );
   store.post(
@@ -502,7 +655,15 @@ export function createOrderModule(
     idempotent('POST /store/v1/carts/:publicId/checkout'),
     asyncHandler(async (req, res) => {
       const body = parse(completeCheckoutSchema, req.body);
-      res.status(201).json({ data: await completeCheckout.execute({ cartPublicId: req.params.publicId!, customerIp: req.ip, ...body }) });
+      res
+        .status(201)
+        .json({
+          data: await completeCheckout.execute({
+            cartPublicId: req.params.publicId!,
+            customerIp: req.ip,
+            ...body,
+          }),
+        });
     }),
   );
   store.get(
@@ -522,14 +683,19 @@ export function createOrderModule(
     '/me/orders/:publicId',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await getCustomerOrder.execute(req.customer!.customerPublicId, req.params.publicId!) });
+      res.json({
+        data: await getCustomerOrder.execute(req.customer!.customerPublicId, req.params.publicId!),
+      });
     }),
   );
   store.get(
     '/me/orders/:publicId/invoice',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      const url = await getCustomerOrderInvoicePdfUrl.execute(req.customer!.customerPublicId, req.params.publicId!);
+      const url = await getCustomerOrderInvoicePdfUrl.execute(
+        req.customer!.customerPublicId,
+        req.params.publicId!,
+      );
       res.redirect(302, url);
     }),
   );
@@ -537,14 +703,21 @@ export function createOrderModule(
     '/me/orders/:publicId/tracking',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await getCustomerOrderTracking.execute(req.customer!.customerPublicId, req.params.publicId!) });
+      res.json({
+        data: await getCustomerOrderTracking.execute(
+          req.customer!.customerPublicId,
+          req.params.publicId!,
+        ),
+      });
     }),
   );
   store.post(
     '/me/orders/:publicId/reorder',
     requireCustomer,
     asyncHandler(async (req, res) => {
-      res.json({ data: await reorder.execute(req.customer!.customerPublicId, req.params.publicId!) });
+      res.json({
+        data: await reorder.execute(req.customer!.customerPublicId, req.params.publicId!),
+      });
     }),
   );
 

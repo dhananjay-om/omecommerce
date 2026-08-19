@@ -21,24 +21,44 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
   let storeViewId = '';
   let admin: ReturnType<typeof adminRequest>;
 
-  const address = { name: 'Jane Doe', line1: '123 Main St', city: 'Springfield', postalCode: '12345', country: 'US' };
+  const address = {
+    name: 'Jane Doe',
+    line1: '123 Main St',
+    city: 'Springfield',
+    postalCode: '12345',
+    country: 'US',
+  };
 
   async function createVariant(sku: string, price: string): Promise<string> {
-    const created = await admin.post('/admin/v1/products').send({ type: 'SIMPLE', sku, attributeSetId, status: 'ACTIVE' });
+    const created = await admin
+      .post('/admin/v1/products')
+      .send({ type: 'SIMPLE', sku, attributeSetId, status: 'ACTIVE' });
     expect(created.status).toBe(201);
     const variant = await prisma.productVariant.findFirstOrThrow({ where: { sku } });
-    await admin.post('/admin/v1/price-lists').send({ code: `PL-${sku}`, name: sku, currency: 'USD', priority: 0 });
-    await admin.put(`/admin/v1/price-lists/PL-${sku}/prices`).send({ variantId: variant.publicId, price });
+    await admin
+      .post('/admin/v1/price-lists')
+      .send({ code: `PL-${sku}`, name: sku, currency: 'USD', priority: 0 });
+    await admin
+      .put(`/admin/v1/price-lists/PL-${sku}/prices`)
+      .send({ variantId: variant.publicId, price });
     return variant.publicId;
   }
 
   async function stockUp(variantId: string, qty: number): Promise<void> {
-    await admin.post('/admin/v1/inventory/adjustments').send({ variantId, warehouseCode: 'TND-WH', delta: qty, reason: 'PURCHASE' });
+    await admin
+      .post('/admin/v1/inventory/adjustments')
+      .send({ variantId, warehouseCode: 'TND-WH', delta: qty, reason: 'PURCHASE' });
   }
 
-  async function registerCustomer(email: string): Promise<{ customerPublicId: string; token: string }> {
-    const reg = await request(app).post('/store/v1/customers').send({ websiteCode: 'us_retail', email, password: 'a-fine-password-1' });
-    const login = await request(app).post('/store/v1/customers/actions/login').send({ websiteCode: 'us_retail', email, password: 'a-fine-password-1' });
+  async function registerCustomer(
+    email: string,
+  ): Promise<{ customerPublicId: string; token: string }> {
+    const reg = await request(app)
+      .post('/store/v1/customers')
+      .send({ websiteCode: 'us_retail', email, password: 'a-fine-password-1' });
+    const login = await request(app)
+      .post('/store/v1/customers/actions/login')
+      .send({ websiteCode: 'us_retail', email, password: 'a-fine-password-1' });
     return { customerPublicId: reg.body.data.publicId, token: login.body.data.token };
   }
 
@@ -55,7 +75,11 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     expect(res.status).toBe(200);
   }
 
-  async function createCartWithLine(variantId: string, qty: number, customerPublicId?: string): Promise<string> {
+  async function createCartWithLine(
+    variantId: string,
+    qty: number,
+    customerPublicId?: string,
+  ): Promise<string> {
     const cart = await request(app).post('/store/v1/carts').send({ storeViewId, customerPublicId });
     const cartId = cart.body.data.publicId;
     await request(app).post(`/store/v1/carts/${cartId}/lines`).send({ variantId, qty });
@@ -90,7 +114,11 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     });
     attributeSetId = set.id.toString();
 
-    await prisma.currency.upsert({ where: { code: 'USD' }, update: {}, create: { code: 'USD', symbol: '$', minorUnits: 2, name: 'US Dollar' } });
+    await prisma.currency.upsert({
+      where: { code: 'USD' },
+      update: {},
+      create: { code: 'USD', symbol: '$', minorUnits: 2, name: 'US Dollar' },
+    });
     const website = await prisma.website.upsert({
       where: { code: 'us_retail' },
       update: {},
@@ -101,7 +129,11 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
       update: {},
       create: { websiteId: website.id, code: 'main', name: 'Main' },
     });
-    const lang = await prisma.language.upsert({ where: { code: 'en-US' }, update: {}, create: { code: 'en-US', name: 'English', nativeName: 'English' } });
+    const lang = await prisma.language.upsert({
+      where: { code: 'en-US' },
+      update: {},
+      create: { code: 'en-US', name: 'English', nativeName: 'English' },
+    });
     const sv = await prisma.storeView.upsert({
       where: { storeId_code: { storeId: store.id, code: 'en' } },
       update: {},
@@ -114,8 +146,12 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     await admin.post('/admin/v1/warehouses').send({ code: 'TND-WH', name: 'Tender Warehouse' });
     const warehouse = await prisma.warehouse.findFirstOrThrow({ where: { code: 'TND-WH' } });
     await prisma.storeWarehouse.deleteMany({ where: { storeId: store.id } });
-    await prisma.storeWarehouse.create({ data: { storeId: store.id, warehouseId: warehouse.id, priority: 0 } });
-    await admin.post('/admin/v1/shipping-methods').send({ code: 'STANDARD', name: 'Standard Shipping', flatRate: '5.00', currency: 'USD' });
+    await prisma.storeWarehouse.create({
+      data: { storeId: store.id, warehouseId: warehouse.id, priority: 0 },
+    });
+    await admin
+      .post('/admin/v1/shipping-methods')
+      .send({ code: 'STANDARD', name: 'Standard Shipping', flatRate: '5.00', currency: 'USD' });
   });
 
   afterAll(async () => {
@@ -128,15 +164,22 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     const giftCard = await issueGiftCard('10.00');
 
     const cartId = await createCartWithLine(variantId, 1);
-    const applied = await request(app).post(`/store/v1/carts/${cartId}/actions/apply-gift-card`).send({ code: giftCard.code });
+    const applied = await request(app)
+      .post(`/store/v1/carts/${cartId}/actions/apply-gift-card`)
+      .send({ code: giftCard.code });
     expect(applied.status).toBe(200);
     expect(applied.body.data.tenders).toHaveLength(1);
-    expect(applied.body.data.tenders[0]).toMatchObject({ tenderType: 'GIFT_CARD', giftCardLast4: expect.any(String) });
+    expect(applied.body.data.tenders[0]).toMatchObject({
+      tenderType: 'GIFT_CARD',
+      giftCardLast4: expect.any(String),
+    });
     // Cart-level amountDue is computed pre-shipping (like estimatedTotal — shipping is
     // only known at checkout): subtotal 30.00, gift card covers 10.00 of it.
     expect(applied.body.data.amountDue).toBe('20.0000');
 
-    const checkout = await request(app).post(`/store/v1/carts/${cartId}/checkout`).send(checkoutBody());
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send(checkoutBody());
     expect(checkout.status).toBe(201);
     expect(checkout.body.data.financialStatus).toBe('PAID');
 
@@ -144,7 +187,13 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     expect(gcAfter.body.data.balance).toBe('0.0000');
 
     const payments = await admin.get(`/admin/v1/orders/${checkout.body.data.publicId}`);
-    const methods = payments.body.data.payments.map((p: { method: string; amount: string; status: string }) => ({ method: p.method, amount: p.amount, status: p.status }));
+    const methods = payments.body.data.payments.map(
+      (p: { method: string; amount: string; status: string }) => ({
+        method: p.method,
+        amount: p.amount,
+        status: p.status,
+      }),
+    );
     expect(methods).toContainEqual({ method: 'giftcard', amount: '10.0000', status: 'SUCCEEDED' });
     expect(methods).toContainEqual({ method: 'test_card', amount: '25.0000', status: 'SUCCEEDED' });
   });
@@ -156,7 +205,10 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     await creditWallet(customerPublicId, '100.00');
 
     const cartId = await createCartWithLine(variantId, 1, customerPublicId);
-    const applied = await request(app).post(`/store/v1/carts/${cartId}/actions/apply-wallet`).set('Authorization', `Bearer ${token}`).send();
+    const applied = await request(app)
+      .post(`/store/v1/carts/${cartId}/actions/apply-wallet`)
+      .set('Authorization', `Bearer ${token}`)
+      .send();
     expect(applied.status).toBe(200);
     // grandTotal = 20.00 + 5.00 shipping = 25.00, wallet has 100 available -> fully covers it.
     expect(applied.body.data.amountDue).toBe('0.0000');
@@ -164,7 +216,12 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     // No paymentMethod at all — CompleteCheckout must not require it when nothing is due.
     const checkout = await request(app)
       .post(`/store/v1/carts/${cartId}/checkout`)
-      .send({ email: 'jane@example.com', billingAddress: address, shippingAddress: address, shippingMethodCode: 'STANDARD' });
+      .send({
+        email: 'jane@example.com',
+        billingAddress: address,
+        shippingAddress: address,
+        shippingMethodCode: 'STANDARD',
+      });
     expect(checkout.status).toBe(201);
     expect(checkout.body.data.financialStatus).toBe('PAID');
 
@@ -172,7 +229,9 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     const methods = payments.body.data.payments.map((p: { method: string }) => p.method);
     expect(methods).toEqual(['wallet']); // no PSP row at all
 
-    const wallet = await request(app).get('/store/v1/me/wallet').set('Authorization', `Bearer ${token}`);
+    const wallet = await request(app)
+      .get('/store/v1/me/wallet')
+      .set('Authorization', `Bearer ${token}`);
     expect(wallet.body.data.balance).toBe('75.0000');
   });
 
@@ -182,9 +241,13 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     const giftCard = await issueGiftCard('10.00');
 
     const cartId = await createCartWithLine(variantId, 1);
-    await request(app).post(`/store/v1/carts/${cartId}/actions/apply-gift-card`).send({ code: giftCard.code });
+    await request(app)
+      .post(`/store/v1/carts/${cartId}/actions/apply-gift-card`)
+      .send({ code: giftCard.code });
 
-    const checkout = await request(app).post(`/store/v1/carts/${cartId}/checkout`).send(checkoutBody({ testScenario: 'decline' }));
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send(checkoutBody({ testScenario: 'decline' }));
     expect(checkout.status).toBe(402);
 
     // Gift card hold released: balance untouched, heldBalance back to 0.
@@ -194,12 +257,16 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     // Scoped to THIS test's own gift card — other tests in this file share
     // the same DB (only a beforeAll truncate, not per-test), so querying
     // "every gift-card hold ever" would pick up earlier tests' CAPTURED ones.
-    const holds = await prisma.storedValueHold.findMany({ where: { giftCard: { publicId: giftCard.publicId } } });
+    const holds = await prisma.storedValueHold.findMany({
+      where: { giftCard: { publicId: giftCard.publicId } },
+    });
     expect(holds.length).toBeGreaterThan(0);
     expect(holds.every((h) => h.status === 'RELEASED')).toBe(true);
 
     // stock: reservation released too, same as the existing non-tender decline test.
-    const stock = await admin.get('/admin/v1/inventory/stock').query({ variantId, warehouseCode: 'TND-WH' });
+    const stock = await admin
+      .get('/admin/v1/inventory/stock')
+      .query({ variantId, warehouseCode: 'TND-WH' });
     expect(stock.body.data.reserved).toBe(0);
   });
 
@@ -213,26 +280,49 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     // 10 separate $10 orders (+ $5 shipping = $15 each, $150 total demand)
     // against a $50 wallet — each applies the wallet tender, then checks out
     // with a valid PSP fallback so a partially-covered order still succeeds.
-    const cartIds = await Promise.all(Array.from({ length: 10 }, () => createCartWithLine(variantId, 1, customerPublicId)));
+    const cartIds = await Promise.all(
+      Array.from({ length: 10 }, () => createCartWithLine(variantId, 1, customerPublicId)),
+    );
     const login = await request(app)
       .post('/store/v1/customers/actions/login')
-      .send({ websiteCode: 'us_retail', email: 'wallet-race@example.com', password: 'a-fine-password-1' });
+      .send({
+        websiteCode: 'us_retail',
+        email: 'wallet-race@example.com',
+        password: 'a-fine-password-1',
+      });
     const customerToken = login.body.data.token as string;
 
-    await Promise.all(cartIds.map((cartId) => request(app).post(`/store/v1/carts/${cartId}/actions/apply-wallet`).set('Authorization', `Bearer ${customerToken}`).send()));
+    await Promise.all(
+      cartIds.map((cartId) =>
+        request(app)
+          .post(`/store/v1/carts/${cartId}/actions/apply-wallet`)
+          .set('Authorization', `Bearer ${customerToken}`)
+          .send(),
+      ),
+    );
 
-    const results = await Promise.all(cartIds.map((cartId) => request(app).post(`/store/v1/carts/${cartId}/checkout`).send(checkoutBody())));
+    const results = await Promise.all(
+      cartIds.map((cartId) =>
+        request(app).post(`/store/v1/carts/${cartId}/checkout`).send(checkoutBody()),
+      ),
+    );
     expect(results.every((r) => r.status === 201)).toBe(true);
     expect(results.every((r) => r.body.data.financialStatus === 'PAID')).toBe(true);
 
-    const wallet = await request(app).get('/store/v1/me/wallet').set('Authorization', `Bearer ${customerToken}`);
+    const wallet = await request(app)
+      .get('/store/v1/me/wallet')
+      .set('Authorization', `Bearer ${customerToken}`);
     // Exactly $50 got captured via wallet across all 10 orders — never more.
     expect(wallet.body.data.balance).toBe('0.0000');
 
     for (const r of results) {
       const order = await admin.get(`/admin/v1/orders/${r.body.data.publicId}`);
-      const walletPayment = order.body.data.payments.find((p: { method: string }) => p.method === 'wallet');
-      const pspPayment = order.body.data.payments.find((p: { method: string }) => p.method === 'test_card');
+      const walletPayment = order.body.data.payments.find(
+        (p: { method: string }) => p.method === 'wallet',
+      );
+      const pspPayment = order.body.data.payments.find(
+        (p: { method: string }) => p.method === 'test_card',
+      );
       // Every order was funded by SOME combination of wallet + PSP summing to its $15 total.
       const walletAmount = walletPayment ? Number(walletPayment.amount) : 0;
       const pspAmount = pspPayment ? Number(pspPayment.amount) : 0;
@@ -242,7 +332,9 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
 
   it('expired holds are swept: status -> EXPIRED, heldBalance released', async () => {
     const giftCard = await issueGiftCard('20.00');
-    const gcRow = await prisma.giftCard.findFirstOrThrow({ where: { publicId: giftCard.publicId } });
+    const gcRow = await prisma.giftCard.findFirstOrThrow({
+      where: { publicId: giftCard.publicId },
+    });
 
     // Manually place an already-expired HELD hold, bypassing the API (the
     // real hold() call always uses a future TTL) — same "seed the DB
@@ -265,11 +357,16 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     const beforeSweep = await admin.get(`/admin/v1/gift-cards/${giftCard.publicId}`);
     expect(beforeSweep.body.data.balance).toBe('20.0000'); // unaffected — a hold never touches balance
 
-    const sweep = new ReleaseExpiredStoredValueHolds(new PrismaWalletLedger(prisma), new PrismaGiftCardLedger(prisma));
+    const sweep = new ReleaseExpiredStoredValueHolds(
+      new PrismaWalletLedger(prisma),
+      new PrismaGiftCardLedger(prisma),
+    );
     const result = await sweep.execute();
     expect(result.releasedCount).toBeGreaterThanOrEqual(1);
 
-    const hold = await prisma.storedValueHold.findFirstOrThrow({ where: { giftCardId: gcRow.id, refId: 999999n } });
+    const hold = await prisma.storedValueHold.findFirstOrThrow({
+      where: { giftCardId: gcRow.id, refId: 999999n },
+    });
     expect(hold.status).toBe('EXPIRED');
     const gcAfter = await prisma.giftCard.findFirstOrThrow({ where: { id: gcRow.id } });
     // Prisma's Decimal.toString() strips trailing zeros ("0.0000" -> "0") —
@@ -284,9 +381,13 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     const giftCard = await issueGiftCard('10.00');
 
     const cartId = await createCartWithLine(variantId, 1);
-    await request(app).post(`/store/v1/carts/${cartId}/actions/apply-gift-card`).send({ code: giftCard.code });
+    await request(app)
+      .post(`/store/v1/carts/${cartId}/actions/apply-gift-card`)
+      .send({ code: giftCard.code });
     // grandTotal = 30 + 5 shipping = 35; gift card covers 10, PSP covers 25.
-    const checkout = await request(app).post(`/store/v1/carts/${cartId}/checkout`).send(checkoutBody());
+    const checkout = await request(app)
+      .post(`/store/v1/carts/${cartId}/checkout`)
+      .send(checkoutBody());
     expect(checkout.status).toBe(201);
     const orderPublicId = checkout.body.data.publicId;
 
@@ -294,7 +395,9 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     // in this codebase only ever refund subtotal+tax-discount per line, not
     // shipping (pre-existing behavior, unchanged by Phase 5) — so
     // refundTotalMinor here is 30.00, not the order's 35.00 grandTotal.
-    const refund = await admin.post(`/admin/v1/orders/${orderPublicId}/refunds`).send({ lines: [{ sku: 'TND-REFUND', qty: 1 }] });
+    const refund = await admin
+      .post(`/admin/v1/orders/${orderPublicId}/refunds`)
+      .send({ lines: [{ sku: 'TND-REFUND', qty: 1 }] });
     expect(refund.status).toBe(200);
     expect(refund.body.data.financialStatus).toBe('REFUNDED');
 
@@ -303,11 +406,162 @@ describe.skipIf(!process.env.INTEGRATION)('checkout tender (live DB)', () => {
     expect(gcAfter.body.data.balance).toBe('8.5714');
 
     const order = await admin.get(`/admin/v1/orders/${orderPublicId}`);
-    const refundRows = order.body.data.payments.filter((p: { type: string }) => p.type === 'REFUND');
+    const refundRows = order.body.data.payments.filter(
+      (p: { type: string }) => p.type === 'REFUND',
+    );
     const giftCardRefund = refundRows.find((p: { method: string }) => p.method === 'giftcard');
     const pspRefund = refundRows.find((p: { method: string }) => p.method === 'original');
     expect(giftCardRefund.amount).toBe('8.5714');
     // The PSP share absorbs the rounding remainder: 30.00 - 8.5714 = 21.4286.
     expect(pspRefund.amount).toBe('21.4286');
+  });
+
+  // --- Admin-configurable wallet-tender rules (plan/17) ---
+
+  async function setWalletSettings(overrides: Record<string, unknown>): Promise<void> {
+    const res = await admin.patch('/admin/v1/websites/us_retail/wallet-settings').send(overrides);
+    expect(res.status).toBe(200);
+  }
+
+  async function resetWalletSettings(): Promise<void> {
+    await setWalletSettings({
+      walletEnabled: true,
+      walletMaxPercentOfOrder: null,
+      walletMinOrderValue: null,
+      walletMaxAmountPerOrder: null,
+    });
+  }
+
+  it('a store-wide disabled wallet is never applied at checkout, even with balance and no other cap', async () => {
+    const { customerPublicId, token } = await registerCustomer('wallet-disabled@example.com');
+    await creditWallet(customerPublicId, '100.00');
+    const variantId = await createVariant('TND-WALLET-DISABLED', '20.00');
+    await stockUp(variantId, 5);
+
+    await setWalletSettings({ walletEnabled: false });
+    try {
+      const cartId = await createCartWithLine(variantId, 1, customerPublicId);
+      const applied = await request(app)
+        .post(`/store/v1/carts/${cartId}/actions/apply-wallet`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      expect(applied.status).toBe(200);
+      expect(applied.body.data.walletUnavailableReason).toContain('unavailable');
+      // The tender row exists (apply-wallet never pre-validates — see its own
+      // doc comment), but it contributes nothing to amountDue.
+      expect(applied.body.data.amountDue).toBe('20.0000');
+
+      const checkout = await request(app)
+        .post(`/store/v1/carts/${cartId}/checkout`)
+        .send(checkoutBody());
+      expect(checkout.status).toBe(201);
+      expect(checkout.body.data.financialStatus).toBe('PAID');
+      const payments = await admin.get(`/admin/v1/orders/${checkout.body.data.publicId}`);
+      const methods = payments.body.data.payments.map((p: { method: string }) => p.method);
+      expect(methods).toEqual(['test_card']); // wallet never captured a cent
+
+      const wallet = await request(app)
+        .get('/store/v1/me/wallet')
+        .set('Authorization', `Bearer ${token}`);
+      expect(wallet.body.data.balance).toBe('100.0000'); // untouched
+    } finally {
+      await resetWalletSettings();
+    }
+  });
+
+  it('a max-% cap limits how much of the order the wallet may cover, even with plenty of balance', async () => {
+    const { customerPublicId, token } = await registerCustomer('wallet-pctcap@example.com');
+    await creditWallet(customerPublicId, '1000.00');
+    const variantId = await createVariant('TND-WALLET-PCTCAP', '100.00');
+    await stockUp(variantId, 5);
+
+    await setWalletSettings({ walletMaxPercentOfOrder: '50' });
+    try {
+      const cartId = await createCartWithLine(variantId, 1, customerPublicId);
+      const applied = await request(app)
+        .post(`/store/v1/carts/${cartId}/actions/apply-wallet`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      // Subtotal 100.00 (amountDue is computed pre-shipping) — 50% cap -> wallet covers exactly 50.00, not the full 100.
+      expect(applied.body.data.amountDue).toBe('50.0000');
+      expect(applied.body.data.walletUnavailableReason).toBeNull();
+
+      const checkout = await request(app)
+        .post(`/store/v1/carts/${cartId}/checkout`)
+        .send(checkoutBody());
+      expect(checkout.status).toBe(201);
+      // grandTotal = 100 + 5 shipping = 105; 50% of 105 = 52.50 wallet, 52.50 PSP.
+      const payments = await admin.get(`/admin/v1/orders/${checkout.body.data.publicId}`);
+      const walletPayment = payments.body.data.payments.find(
+        (p: { method: string }) => p.method === 'wallet',
+      );
+      const pspPayment = payments.body.data.payments.find(
+        (p: { method: string }) => p.method === 'test_card',
+      );
+      expect(walletPayment.amount).toBe('52.5000');
+      expect(pspPayment.amount).toBe('52.5000');
+    } finally {
+      await resetWalletSettings();
+    }
+  });
+
+  it('a minimum order value blocks the wallet tender on smaller orders but allows it on larger ones', async () => {
+    const { customerPublicId, token } = await registerCustomer('wallet-minorder@example.com');
+    await creditWallet(customerPublicId, '500.00');
+    const smallVariantId = await createVariant('TND-WALLET-MINORDER-SMALL', '20.00');
+    const bigVariantId = await createVariant('TND-WALLET-MINORDER-BIG', '200.00');
+    await stockUp(smallVariantId, 5);
+    await stockUp(bigVariantId, 5);
+
+    await setWalletSettings({ walletMinOrderValue: '100.00' });
+    try {
+      const smallCartId = await createCartWithLine(smallVariantId, 1, customerPublicId);
+      const smallApplied = await request(app)
+        .post(`/store/v1/carts/${smallCartId}/actions/apply-wallet`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      expect(smallApplied.body.data.walletUnavailableReason).toContain('at least');
+      expect(smallApplied.body.data.amountDue).toBe('20.0000'); // wallet contributed nothing
+
+      const bigCartId = await createCartWithLine(bigVariantId, 1, customerPublicId);
+      const bigApplied = await request(app)
+        .post(`/store/v1/carts/${bigCartId}/actions/apply-wallet`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      expect(bigApplied.body.data.walletUnavailableReason).toBeNull();
+      expect(bigApplied.body.data.amountDue).toBe('0.0000'); // fully covered
+    } finally {
+      await resetWalletSettings();
+    }
+  });
+
+  it('an absolute per-order cap limits the wallet amount regardless of order size or balance', async () => {
+    const { customerPublicId, token } = await registerCustomer('wallet-amountcap@example.com');
+    await creditWallet(customerPublicId, '1000.00');
+    const variantId = await createVariant('TND-WALLET-AMOUNTCAP', '300.00');
+    await stockUp(variantId, 5);
+
+    await setWalletSettings({ walletMaxAmountPerOrder: '75.00' });
+    try {
+      const cartId = await createCartWithLine(variantId, 1, customerPublicId);
+      const applied = await request(app)
+        .post(`/store/v1/carts/${cartId}/actions/apply-wallet`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      // Subtotal 300.00, ample balance, but capped at a flat 75.00 regardless.
+      expect(applied.body.data.amountDue).toBe('225.0000');
+
+      const checkout = await request(app)
+        .post(`/store/v1/carts/${cartId}/checkout`)
+        .send(checkoutBody());
+      expect(checkout.status).toBe(201);
+      const payments = await admin.get(`/admin/v1/orders/${checkout.body.data.publicId}`);
+      const walletPayment = payments.body.data.payments.find(
+        (p: { method: string }) => p.method === 'wallet',
+      );
+      expect(walletPayment.amount).toBe('75.0000');
+    } finally {
+      await resetWalletSettings();
+    }
   });
 });

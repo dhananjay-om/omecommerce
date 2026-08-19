@@ -56,16 +56,26 @@ export interface WebsiteInfo {
   logoMediaKey: string | null;
   /** Store contact email — see store.prisma's doc comment. */
   supportEmail: string | null;
+  /** Store-wide wallet-tender kill switch — see store.prisma's doc comment. */
+  walletEnabled: boolean;
+  /** Percent (0-100) cap on how much of an order the wallet tender may cover — null means no cap. */
+  walletMaxPercentOfOrder: string | null;
+  /** Minimum order total (this website's base currency) required to offer the wallet tender — null means no minimum. */
+  walletMinOrderValue: string | null;
+  /** Absolute per-order wallet cap (this website's base currency) — null means no cap. */
+  walletMaxAmountPerOrder: string | null;
 }
 
 /** Website/Store View management is still a deliberate later addition (see
- *  store.module.ts) — this is scoped to exactly two admin-facing settings
- *  groups: GST registration (gstin/originStateCode/pricesIncludeTax) and
- *  general store branding (address/logoMediaKey/supportEmail) — deliberately
- *  split into two update() call shapes even though both write the same
- *  Website row, mirroring the two separate admin pages/endpoints (General
- *  Settings vs GST Settings) rather than one grab-bag "tax settings" update
- *  that also happened to carry unrelated branding fields. Not full Website CRUD. */
+ *  store.module.ts) — this is scoped to exactly three admin-facing settings
+ *  groups: GST registration (gstin/originStateCode/pricesIncludeTax), general
+ *  store branding (address/logoMediaKey/supportEmail), and wallet-tender
+ *  rules (walletEnabled/walletMaxPercentOfOrder/walletMinOrderValue/
+ *  walletMaxAmountPerOrder, plan/17) — deliberately split into three update()
+ *  call shapes even though all three write the same Website row, mirroring
+ *  the separate admin pages/endpoints (General Settings vs GST Settings vs
+ *  Wallet Settings) rather than one grab-bag update that also happened to
+ *  carry unrelated fields. Not full Website CRUD. */
 export interface WebsiteRepository {
   list(): Promise<WebsiteInfo[]>;
   update(
@@ -77,6 +87,10 @@ export interface WebsiteRepository {
       address?: string | null;
       logoMediaKey?: string | null;
       supportEmail?: string | null;
+      walletEnabled?: boolean;
+      walletMaxPercentOfOrder?: string | null;
+      walletMinOrderValue?: string | null;
+      walletMaxAmountPerOrder?: string | null;
     },
   ): Promise<WebsiteInfo>;
 }
