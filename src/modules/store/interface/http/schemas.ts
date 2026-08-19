@@ -6,7 +6,10 @@ import { z } from 'zod';
  *  hard validation failure instead of "not provided." Own-copy per module,
  *  same convention as this codebase's other tiny per-module helpers. */
 function blankToUndefined(schema: z.ZodTypeAny) {
-  return z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), schema);
+  return z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    schema,
+  );
 }
 
 export const createCurrencySchema = z.object({
@@ -27,20 +30,37 @@ export const updateWebsiteTaxSettingsSchema = z.object({
   gstin: blankToUndefined(
     z
       .string()
-      .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'expected a valid 15-character GSTIN')
+      .regex(
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/,
+        'expected a valid 15-character GSTIN',
+      )
       .nullish(),
   ),
-  originStateCode: blankToUndefined(z.string().regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"').nullish()),
+  originStateCode: blankToUndefined(
+    z
+      .string()
+      .regex(/^\d{2}$/, 'expected a 2-digit GST state code, e.g. "27"')
+      .nullish(),
+  ),
   pricesIncludeTax: z.boolean().optional(),
 });
 
 export const updateWebsiteGeneralSettingsSchema = z.object({
   address: blankToUndefined(z.string().max(500).nullish()),
   logoMediaKey: blankToUndefined(z.string().max(500).nullish()),
-  supportEmail: blankToUndefined(z.string().email('expected a valid email address').max(255).nullish()),
+  supportEmail: blankToUndefined(
+    z.string().email('expected a valid email address').max(255).nullish(),
+  ),
 });
 
 export const requestLogoUploadSchema = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(128),
+});
+
+export const updateWebsiteWalletSettingsSchema = z.object({
+  walletEnabled: z.boolean().optional(),
+  walletMaxPercentOfOrder: blankToUndefined(z.string().nullish()),
+  walletMinOrderValue: blankToUndefined(z.string().nullish()),
+  walletMaxAmountPerOrder: blankToUndefined(z.string().nullish()),
 });

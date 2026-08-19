@@ -10,12 +10,14 @@ import { DeleteCurrency } from './application/delete-currency.usecase.js';
 import { ListWebsites } from './application/list-websites.usecase.js';
 import { UpdateWebsiteTaxSettings } from './application/update-website-tax-settings.usecase.js';
 import { UpdateWebsiteGeneralSettings } from './application/update-website-general-settings.usecase.js';
+import { UpdateWebsiteWalletSettings } from './application/update-website-wallet-settings.usecase.js';
 import { RequestWebsiteLogoUpload } from './application/request-logo-upload.usecase.js';
 import {
   createCurrencySchema,
   updateCurrencySchema,
   updateWebsiteTaxSettingsSchema,
   updateWebsiteGeneralSettingsSchema,
+  updateWebsiteWalletSettingsSchema,
   requestLogoUploadSchema,
 } from './interface/http/schemas.js';
 
@@ -38,6 +40,7 @@ export function createStoreModule(db: Db): StoreRouters {
   const listWebsites = new ListWebsites(websites);
   const updateWebsiteTaxSettings = new UpdateWebsiteTaxSettings(websites);
   const updateWebsiteGeneralSettings = new UpdateWebsiteGeneralSettings(websites);
+  const updateWebsiteWalletSettings = new UpdateWebsiteWalletSettings(websites);
   const requestWebsiteLogoUpload = new RequestWebsiteLogoUpload(websites);
 
   const admin = Router();
@@ -96,6 +99,15 @@ export function createStoreModule(db: Db): StoreRouters {
     asyncHandler(async (req, res) => {
       const body = parse(updateWebsiteGeneralSettingsSchema, req.body);
       const view = await updateWebsiteGeneralSettings.execute({ code: req.params.code!, ...body });
+      res.json({ data: view });
+    }),
+  );
+
+  admin.patch(
+    '/websites/:code/wallet-settings',
+    asyncHandler(async (req, res) => {
+      const body = parse(updateWebsiteWalletSettingsSchema, req.body);
+      const view = await updateWebsiteWalletSettings.execute({ code: req.params.code!, ...body });
       res.json({ data: view });
     }),
   );

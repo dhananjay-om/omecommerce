@@ -85,6 +85,14 @@ export interface CartView {
    *  applied) — same soft-fail-on-read philosophy as couponError; checkout
    *  re-validates for real and hard-fails there instead. */
   tenderError: string | null;
+  /** Admin-configured wallet rule blocking the tender entirely on this cart right now
+   *  (store-wide disabled, or below the configured minimum order value) — plan/17.
+   *  Null means the wallet tender is offered (still subject to available balance and
+   *  any % / per-order amount cap, silently reflected in a lower appliedAmount, not
+   *  this field). Set unconditionally, independent of whether WALLET is even one of
+   *  this cart's applied tenders, so the storefront can decide whether to show the
+   *  "Pay with wallet balance" toggle at all. */
+  walletUnavailableReason: string | null;
 }
 
 export interface CartTenderDto {

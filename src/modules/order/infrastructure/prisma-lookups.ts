@@ -7,28 +7,51 @@ import type {
   AdminUserLookup,
   CompanyMembershipLookup,
   CompanyLookup,
+  WalletSettingsLookup,
 } from '../domain/repositories.js';
+import type { WalletSettings } from '../domain/wallet-rules.js';
 
 export class PrismaVariantLookup implements VariantLookup {
   constructor(private readonly db: Db) {}
 
-  async byPublicId(publicId: string): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null> {
+  async byPublicId(
+    publicId: string,
+  ): Promise<{ id: bigint; sku: string; nameDefault: string | null; productId: bigint } | null> {
     const row = await this.db.productVariant.findFirst({
       where: { publicId },
       select: { id: true, sku: true, productId: true, product: { select: { nameDefault: true } } },
     });
-    return row ? { id: row.id, sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId } : null;
+    return row
+      ? { id: row.id, sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId }
+      : null;
   }
 
   async byId(
     id: bigint,
-  ): Promise<{ sku: string; nameDefault: string | null; productId: bigint; status: 'ACTIVE' | 'INACTIVE'; hsnCode: string | null } | null> {
+  ): Promise<{
+    sku: string;
+    nameDefault: string | null;
+    productId: bigint;
+    status: 'ACTIVE' | 'INACTIVE';
+    hsnCode: string | null;
+  } | null> {
     const row = await this.db.productVariant.findFirst({
       where: { id },
-      select: { sku: true, productId: true, status: true, product: { select: { nameDefault: true, hsnCode: true } } },
+      select: {
+        sku: true,
+        productId: true,
+        status: true,
+        product: { select: { nameDefault: true, hsnCode: true } },
+      },
     });
     return row
-      ? { sku: row.sku, nameDefault: row.product.nameDefault, productId: row.productId, status: row.status, hsnCode: row.product.hsnCode }
+      ? {
+          sku: row.sku,
+          nameDefault: row.product.nameDefault,
+          productId: row.productId,
+          status: row.status,
+          hsnCode: row.product.hsnCode,
+        }
       : null;
   }
 }
@@ -58,11 +81,17 @@ export class PrismaCustomerGroupLookup implements CustomerGroupLookup {
   }
 
   async findDefault(): Promise<{ id: bigint } | null> {
-    return this.db.customerGroup.findFirst({ where: { isDefault: true, deletedAt: null }, select: { id: true } });
+    return this.db.customerGroup.findFirst({
+      where: { isDefault: true, deletedAt: null },
+      select: { id: true },
+    });
   }
 
   async byId(id: bigint): Promise<{ name: string } | null> {
-    return this.db.customerGroup.findFirst({ where: { id, deletedAt: null }, select: { name: true } });
+    return this.db.customerGroup.findFirst({
+      where: { id, deletedAt: null },
+      select: { name: true },
+    });
   }
 }
 
@@ -72,14 +101,29 @@ export class PrismaCompanyMembershipLookup implements CompanyMembershipLookup {
 
   async findActiveByCustomerId(
     customerId: bigint,
-  ): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean; creditAccountId: bigint | null } | null> {
+  ): Promise<{
+    companyId: bigint;
+    customerGroupId: bigint | null;
+    taxExempt: boolean;
+    creditAccountId: bigint | null;
+  } | null> {
     const membership = await this.db.companyCustomer.findUnique({
       where: { customerId },
       select: {
-        company: { select: { id: true, status: true, customerGroupId: true, taxExempt: true, deletedAt: true, creditAccount: { select: { id: true } } } },
+        company: {
+          select: {
+            id: true,
+            status: true,
+            customerGroupId: true,
+            taxExempt: true,
+            deletedAt: true,
+            creditAccount: { select: { id: true } },
+          },
+        },
       },
     });
-    if (!membership || membership.company.deletedAt || membership.company.status !== 'ACTIVE') return null;
+    if (!membership || membership.company.deletedAt || membership.company.status !== 'ACTIVE')
+      return null;
     return {
       companyId: membership.company.id,
       customerGroupId: membership.company.customerGroupId,
@@ -94,7 +138,37 @@ export class PrismaCompanyLookup implements CompanyLookup {
   constructor(private readonly db: Db) {}
 
   async byId(companyId: bigint): Promise<{ publicId: string; name: string } | null> {
-    return this.db.company.findFirst({ where: { id: companyId }, select: { publicId: true, name: true } });
+    return this.db.company.findFirst({
+      where: { id: companyId },
+      select: { publicId: true, name: true },
+    });
+  }
+}
+
+/** plan/17 — admin-configurable wallet-tender rules, read alongside checkout/cart-preview. */
+export class PrismaWalletSettingsLookup implements WalletSettingsLookup {
+  constructor(private readonly db: Db) {}
+
+  async byId(websiteId: bigint): Promise<WalletSettings | null> {
+    const w = await this.db.website.findFirst({
+      where: { id: websiteId },
+      select: {
+        walletEnabled: true,
+        walletMaxPercentOfOrder: true,
+        walletMinOrderValue: true,
+        walletMaxAmountPerOrder: true,
+      },
+    });
+    if (!w) return null;
+    return {
+      walletEnabled: w.walletEnabled,
+      // walletMaxPercentOfOrder only ever feeds Number(...) math (walletCapMinor),
+      // never a money round-trip through toMinorUnits — Prisma's Decimal.toString()
+      // trailing-zero-stripping ("50.00" -> "50") parses identically via Number().
+      walletMaxPercentOfOrder: w.walletMaxPercentOfOrder?.toString() ?? null,
+      walletMinOrderValue: w.walletMinOrderValue?.toString() ?? null,
+      walletMaxAmountPerOrder: w.walletMaxAmountPerOrder?.toString() ?? null,
+    };
   }
 }
 

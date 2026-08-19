@@ -34,6 +34,10 @@ export interface WebsiteView {
    *  expiry, same as every other presigned URL in this codebase) — null when no logo is set. */
   logoUrl: string | null;
   supportEmail: string | null;
+  walletEnabled: boolean;
+  walletMaxPercentOfOrder: string | null;
+  walletMinOrderValue: string | null;
+  walletMaxAmountPerOrder: string | null;
 }
 
 /** GST Settings page — GST registration only, nothing else. */
@@ -50,6 +54,15 @@ export interface UpdateWebsiteGeneralSettingsCommand {
   address?: string | null;
   logoMediaKey?: string | null;
   supportEmail?: string | null;
+}
+
+/** Wallet Settings page (plan/17) — checkout-tender rules only, nothing else. */
+export interface UpdateWebsiteWalletSettingsCommand {
+  code: string;
+  walletEnabled?: boolean;
+  walletMaxPercentOfOrder?: string | null;
+  walletMinOrderValue?: string | null;
+  walletMaxAmountPerOrder?: string | null;
 }
 
 export interface RequestLogoUploadCommand {

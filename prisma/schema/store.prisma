@@ -49,46 +49,70 @@ model Theme {
 }
 
 model Website {
-  id               BigInt    @id @default(autoincrement())
-  publicId         String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
-  code             String    @unique @db.Citext // e.g. "us_retail"
-  name             String
-  baseCurrency     String    @map("base_currency") @db.Char(3)
-  defaultStoreId   BigInt?   @map("default_store_id") // FK added via raw SQL (deferred cycle)
-  isDefault        Boolean   @default(false) @map("is_default")
+  id                      BigInt    @id @default(autoincrement())
+  publicId                String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code                    String    @unique @db.Citext // e.g. "us_retail"
+  name                    String
+  baseCurrency            String    @map("base_currency") @db.Char(3)
+  defaultStoreId          BigInt?   @map("default_store_id") // FK added via raw SQL (deferred cycle)
+  isDefault               Boolean   @default(false) @map("is_default")
   /// This website's own GST registration — single-registration/single-state
   /// scope (a seller registered in multiple states would need this per
   /// warehouse instead; not built, see gst.ts's header comment).
-  gstin            String?   @db.VarChar(15)
+  gstin                   String?   @db.VarChar(15)
   /// 2-digit CBIC GST state/UT code this website is registered in — compared
   /// against an order's shipping OrderAddress.stateCode to decide CGST+SGST
   /// (match) vs IGST (no match).
-  originStateCode  String?   @map("origin_state_code") @db.Char(2)
+  originStateCode         String?   @map("origin_state_code") @db.Char(2)
   /// When true, every catalog/price-list price on this website is the FINAL
   /// price the customer pays (GST already baked in, MRP-style) — tax is
   /// backed out of it at checkout instead of added on top. When false
   /// (default, matches every website created before this column existed),
   /// prices are tax-exclusive and GST is added on top, unchanged behavior.
-  pricesIncludeTax Boolean   @default(false) @map("prices_include_tax")
+  pricesIncludeTax        Boolean   @default(false) @map("prices_include_tax")
   /// Freeform, print-only mailing address shown on the invoice letterhead —
   /// deliberately not structured (unlike OrderAddress/CustomerAddress), since
   /// nothing computes against it; it's never compared to a customer's state
   /// or used for tax logic, which already has originStateCode for that.
-  address          String?   @db.Text
+  address                 String?   @db.Text
   /// S3 object key for the invoice-letterhead logo (same key convention as
   /// MediaAsset.storageKey) — resolved to bytes and base64-embedded into the
   /// invoice HTML at generation time (see invoice-branding.ts); Puppeteer's
   /// PDF renderer has no network path to fetch an external image URL.
-  logoMediaKey     String?   @map("logo_media_key")
+  logoMediaKey            String?   @map("logo_media_key")
   /// Store contact email, shown in admin "General" settings — not the
   /// transactional "from" address (that's a deploy-time env var, unrelated),
   /// just a store-facing contact/support address, print-only like address.
-  supportEmail     String?   @map("support_email") @db.VarChar(255)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  createdBy        BigInt?   @map("created_by")
-  updatedBy        BigInt?   @map("updated_by")
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  supportEmail            String?   @map("support_email") @db.VarChar(255)
+  /// Store-wide kill switch for the wallet tender at checkout (plan/17) —
+  /// false hides "Pay with wallet balance" for every shopper on this website,
+  /// without touching any customer's actual balance or the per-customer
+  /// freeze (Wallet.status) already available on the customer detail page.
+  /// Default true, matching every website created before this column existed
+  /// (wallet tender already worked unconditionally).
+  walletEnabled           Boolean   @default(true) @map("wallet_enabled")
+  /// Caps how much of an order's total the wallet tender may cover, as a
+  /// percentage (0 < x <= 100) — e.g. 50.00 means at most half the order can
+  /// be paid from wallet balance, the rest must come from another tender.
+  /// Null (default) means no cap, matching pre-existing behavior (up to the
+  /// full order, bounded only by available balance).
+  walletMaxPercentOfOrder Decimal?  @map("wallet_max_percent_of_order") @db.Decimal(5, 2)
+  /// Wallet tender is only offered when the order's grand total is at least
+  /// this amount, in the website's base currency — no separate currency
+  /// column needed, same narrow "website-scoped rule threshold, not a
+  /// per-transaction amount" exception to money's usual Decimal+currency
+  /// pairing that ReferralProgram.minOrderAmount already uses (referral.prisma).
+  /// Null (default) means no minimum.
+  walletMinOrderValue     Decimal?  @map("wallet_min_order_value") @db.Decimal(18, 4)
+  /// Caps the absolute wallet amount usable on a single order, in the
+  /// website's base currency (same reasoning as walletMinOrderValue above),
+  /// regardless of order size or available balance. Null (default) means no cap.
+  walletMaxAmountPerOrder Decimal?  @map("wallet_max_amount_per_order") @db.Decimal(18, 4)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy               BigInt?   @map("created_by")
+  updatedBy               BigInt?   @map("updated_by")
+  deletedAt               DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   currency Currency @relation("WebsiteBaseCurrency", fields: [baseCurrency], references: [code])
   stores   Store[]

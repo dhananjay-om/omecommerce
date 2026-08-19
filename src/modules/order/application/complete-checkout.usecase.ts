@@ -1,18 +1,43 @@
-import type { CartRepository, OrderRepository, VariantLookup, WarehouseResolver, CartTenderView, CompanyMembershipLookup } from '../domain/repositories.js';
+import type {
+  CartRepository,
+  OrderRepository,
+  VariantLookup,
+  WarehouseResolver,
+  CartTenderView,
+  CompanyMembershipLookup,
+  WalletSettingsLookup,
+} from '../domain/repositories.js';
+import {
+  walletBlockReason,
+  walletCapMinor,
+  UNRESTRICTED_WALLET_SETTINGS,
+} from '../domain/wallet-rules.js';
 import type { TaxCalculator, ShippingCalculator, PaymentGateway } from '../domain/ports.js';
 import type { StoreContextResolver, StoreViewContext } from '../../../shared/application/scope.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { StockLedger, ReservationHandle } from '../../inventory/domain/repositories.js';
 import type { DiscountCalculator } from '../../coupon/domain/repositories.js';
-import type { WalletLedger, StoredValueHoldHandle as WalletHoldHandle } from '../../wallet/domain/repositories.js';
-import type { GiftCardLedger, StoredValueHoldHandle as GiftCardHoldHandle } from '../../giftcard/domain/repositories.js';
+import type {
+  WalletLedger,
+  StoredValueHoldHandle as WalletHoldHandle,
+} from '../../wallet/domain/repositories.js';
+import type {
+  GiftCardLedger,
+  StoredValueHoldHandle as GiftCardHoldHandle,
+} from '../../giftcard/domain/repositories.js';
 import type { CompanyCreditLedger } from '../../company/domain/repositories.js';
 import { InsufficientAvailableBalanceError } from '../../wallet/domain/errors.js';
 import { InsufficientAvailableGiftCardBalanceError } from '../../giftcard/domain/errors.js';
 import { CreditLimitExceededError } from '../../company/domain/errors.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import { PaymentDeclinedError } from '../domain/errors.js';
-import { addMinor, subtractMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
+import {
+  addMinor,
+  subtractMinor,
+  multiplyByQty,
+  toMinorUnits,
+  fromMinorUnits,
+} from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { CompleteCheckoutCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
@@ -76,13 +101,16 @@ export class CompleteCheckout {
     private readonly giftCards: GiftCardLedger,
     private readonly companyMemberships: CompanyMembershipLookup,
     private readonly companyCredit: CompanyCreditLedger,
+    private readonly walletSettings: WalletSettingsLookup,
   ) {}
 
   async execute(cmd: CompleteCheckoutCommand): Promise<OrderViewDto> {
     const cart = await this.carts.findByPublicId(cmd.cartPublicId);
     if (!cart) throw new NotFoundError('Cart', cmd.cartPublicId);
     if (cart.lines.length === 0) {
-      throw new ValidationError('cart is empty', [{ path: 'cart', message: 'must have at least one line' }]);
+      throw new ValidationError('cart is empty', [
+        { path: 'cart', message: 'must have at least one line' },
+      ]);
     }
 
     const ctx = await this.storeContext.byStoreViewId(cart.storeViewId);
@@ -146,7 +174,14 @@ export class CompleteCheckout {
 
   private async priceAndPlace(
     cmd: CompleteCheckoutCommand,
-    cart: { id: bigint; currency: string; customerId: bigint | null; customerGroupId: bigint | null; couponCode: string | null; tenders: CartTenderView[] },
+    cart: {
+      id: bigint;
+      currency: string;
+      customerId: bigint | null;
+      customerGroupId: bigint | null;
+      couponCode: string | null;
+      tenders: CartTenderView[];
+    },
     ctx: StoreViewContext,
     pricedLines: PricedLine[],
     reservations: ReservationHandle[],
@@ -167,12 +202,18 @@ export class CompleteCheckout {
     // customerGroupId below) so a company's tax-exemption status is always
     // current as of checkout time; snapshotted onto the Order below so a
     // LATER company change never retroactively alters this placed order.
-    const companyMembership = cart.customerId ? await this.companyMemberships.findActiveByCustomerId(cart.customerId) : null;
+    const companyMembership = cart.customerId
+      ? await this.companyMemberships.findActiveByCustomerId(cart.customerId)
+      : null;
     const taxExempt = companyMembership?.taxExempt ?? false;
 
     const taxResults = await this.taxCalculator.calculate(
       pricedLines.map((l) => ({ variantId: l.variantId, lineSubtotalMinor: l.subtotalMinor })),
-      { websiteId: ctx.websiteId, destinationStateCode: cmd.shippingAddress.stateCode ?? null, taxExempt },
+      {
+        websiteId: ctx.websiteId,
+        destinationStateCode: cmd.shippingAddress.stateCode ?? null,
+        taxExempt,
+      },
     );
     const taxByVariant = new Map(taxResults.map((t) => [t.variantId.toString(), t]));
     const taxTotalMinor = addMinor(...taxResults.map((t) => t.amountMinor));
@@ -185,14 +226,21 @@ export class CompleteCheckout {
     // never a money-correctness issue.
     const correctedLines: PricedLine[] = pricedLines.map((l) => {
       const tax = taxByVariant.get(l.variantId.toString())!;
-      return { ...l, subtotalMinor: tax.taxableAmountMinor, unitPriceMinor: tax.taxableAmountMinor / BigInt(l.qty) };
+      return {
+        ...l,
+        subtotalMinor: tax.taxableAmountMinor,
+        unitPriceMinor: tax.taxableAmountMinor / BigInt(l.qty),
+      };
     });
     const subtotalMinor = addMinor(...correctedLines.map((l) => l.subtotalMinor));
 
     // Resolved once, up front — needed both for the coupon's per-line context
     // (productId per line) and for building OrderLine inputs below, so the
     // lines-building loop further down reuses this map instead of re-querying.
-    const variantById = new Map<string, { sku: string; nameDefault: string | null; productId: bigint; hsnCode: string | null }>();
+    const variantById = new Map<
+      string,
+      { sku: string; nameDefault: string | null; productId: bigint; hsnCode: string | null }
+    >();
     for (const line of correctedLines) {
       const variant = await this.variants.byId(line.variantId);
       if (!variant) throw new NotFoundError('ProductVariant', line.variantId.toString());
@@ -226,12 +274,19 @@ export class CompleteCheckout {
           asOf: new Date(),
         });
     const discountTotalMinor = discount?.discountAmountMinor ?? 0n;
-    const discountByVariant = new Map((discount?.lineDiscounts ?? []).map((d) => [d.variantId.toString(), d.discountAmountMinor]));
+    const discountByVariant = new Map(
+      (discount?.lineDiscounts ?? []).map((d) => [d.variantId.toString(), d.discountAmountMinor]),
+    );
 
     const shipping = await this.shippingCalculator.quote(cmd.shippingMethodCode, cart.currency);
     if (!shipping) throw new NotFoundError('ShippingMethod', cmd.shippingMethodCode);
 
-    let grandTotalMinor = addMinor(subtotalMinor, taxTotalMinor, shipping.amountMinor, -discountTotalMinor);
+    let grandTotalMinor = addMinor(
+      subtotalMinor,
+      taxTotalMinor,
+      shipping.amountMinor,
+      -discountTotalMinor,
+    );
 
     // Step 4.5: resolve cart tenders live and place real holds, each capped
     // at what's still due — gift cards drain first (in application order),
@@ -244,17 +299,31 @@ export class CompleteCheckout {
     // a failed hold never needs an order to roll back — same ordering
     // reasoning as inventory reservation happening before order creation.
     let remainingMinor = grandTotalMinor;
-    const TENDER_PRIORITY: Record<CartTenderView['tenderType'], number> = { GIFT_CARD: 0, WALLET: 1, CREDIT_TERMS: 2 };
+    // Read once per checkout, outside the loop — a website lookup miss falls
+    // back to "no restrictions" rather than ever being the reason checkout
+    // itself breaks (plan/17).
+    const walletRules =
+      (await this.walletSettings.byId(ctx.websiteId)) ?? UNRESTRICTED_WALLET_SETTINGS;
+    const TENDER_PRIORITY: Record<CartTenderView['tenderType'], number> = {
+      GIFT_CARD: 0,
+      WALLET: 1,
+      CREDIT_TERMS: 2,
+    };
     const sortedTenders = [...cart.tenders].sort((a, b) => {
-      if (a.tenderType !== b.tenderType) return TENDER_PRIORITY[a.tenderType] - TENDER_PRIORITY[b.tenderType];
+      if (a.tenderType !== b.tenderType)
+        return TENDER_PRIORITY[a.tenderType] - TENDER_PRIORITY[b.tenderType];
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
     for (const tender of sortedTenders) {
       if (remainingMinor <= 0n) break;
       if (tender.tenderType === 'GIFT_CARD') {
         const giftCard = await this.giftCards.findById(tender.giftCardId!);
-        if (!giftCard || giftCard.currency !== cart.currency || giftCard.status !== 'ACTIVE') continue;
-        const availableMinor = subtractMinor(toMinorUnits(giftCard.balance), toMinorUnits(giftCard.heldBalance));
+        if (!giftCard || giftCard.currency !== cart.currency || giftCard.status !== 'ACTIVE')
+          continue;
+        const availableMinor = subtractMinor(
+          toMinorUnits(giftCard.balance),
+          toMinorUnits(giftCard.heldBalance),
+        );
         if (availableMinor <= 0n) continue;
         const holdMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
         try {
@@ -265,7 +334,12 @@ export class CompleteCheckout {
           // race isn't a checkout failure: same "gracefully degrade, don't
           // abort" philosophy as the auto-applied-coupon race below —
           // this tender just contributes nothing and the PSP covers more.
-          const hold = await this.giftCards.hold(giftCard.id, fromMinorUnits(holdMinor), 'CART', cart.id);
+          const hold = await this.giftCards.hold(
+            giftCard.id,
+            fromMinorUnits(holdMinor),
+            'CART',
+            cart.id,
+          );
           holds.push({ tenderType: 'GIFT_CARD', hold });
           remainingMinor = subtractMinor(remainingMinor, holdMinor);
         } catch (err) {
@@ -273,18 +347,37 @@ export class CompleteCheckout {
         }
       } else if (tender.tenderType === 'WALLET') {
         if (!cart.customerId) continue; // apply-wallet already requires a customer, but stay defensive
-        const wallet = await this.wallets.getOrCreateWallet(cart.customerId, ctx.websiteId, cart.currency);
+        // Store-wide disable / below-minimum-order-value (plan/17) — same
+        // "not applying is silent, checkout still succeeds via another
+        // tender" philosophy as insufficient balance, not a hard failure.
+        if (walletBlockReason(grandTotalMinor, walletRules)) continue;
+        const wallet = await this.wallets.getOrCreateWallet(
+          cart.customerId,
+          ctx.websiteId,
+          cart.currency,
+        );
         const snapshot = await this.wallets.findByPublicId(wallet.publicId);
         if (!snapshot || snapshot.status !== 'ACTIVE') continue;
-        const availableMinor = subtractMinor(toMinorUnits(snapshot.balance), toMinorUnits(snapshot.heldBalance));
+        const availableMinor = subtractMinor(
+          toMinorUnits(snapshot.balance),
+          toMinorUnits(snapshot.heldBalance),
+        );
         if (availableMinor <= 0n) continue;
-        const holdMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
+        let holdMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
+        const capMinor = walletCapMinor(grandTotalMinor, walletRules);
+        if (capMinor < holdMinor) holdMinor = capMinor;
+        if (holdMinor <= 0n) continue;
         try {
           // Same race-loss-degrades-gracefully reasoning as the gift-card
           // branch above — concurrent checkouts against the same wallet are
           // exactly the case this guards (proven by a 10-concurrent-checkout
           // integration test).
-          const hold = await this.wallets.hold(wallet.id, fromMinorUnits(holdMinor), 'CART', cart.id);
+          const hold = await this.wallets.hold(
+            wallet.id,
+            fromMinorUnits(holdMinor),
+            'CART',
+            cart.id,
+          );
           holds.push({ tenderType: 'WALLET', hold });
           remainingMinor = subtractMinor(remainingMinor, holdMinor);
         } catch (err) {
@@ -298,7 +391,10 @@ export class CompleteCheckout {
         if (!cart.customerId || !companyMembership?.creditAccountId) continue;
         const account = await this.companyCredit.findById(companyMembership.creditAccountId);
         if (!account || account.status !== 'ACTIVE' || account.currency !== cart.currency) continue;
-        const availableMinor = subtractMinor(toMinorUnits(account.creditLimit), toMinorUnits(account.outstanding));
+        const availableMinor = subtractMinor(
+          toMinorUnits(account.creditLimit),
+          toMinorUnits(account.outstanding),
+        );
         if (availableMinor <= 0n) continue;
         const chargeMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
         try {
@@ -307,8 +403,15 @@ export class CompleteCheckout {
           // guarded UPDATE is what's actually race-safe against concurrent
           // checkouts drawing on the same credit limit (the 10-concurrent
           // proof this phase's integration test repeats for the third time).
-          await this.companyCredit.charge(account.id, fromMinorUnits(chargeMinor), { refType: 'CART', refId: cart.id });
-          holds.push({ tenderType: 'CREDIT_TERMS', creditAccountId: account.id, amountMinor: chargeMinor });
+          await this.companyCredit.charge(account.id, fromMinorUnits(chargeMinor), {
+            refType: 'CART',
+            refId: cart.id,
+          });
+          holds.push({
+            tenderType: 'CREDIT_TERMS',
+            creditAccountId: account.id,
+            amountMinor: chargeMinor,
+          });
           remainingMinor = subtractMinor(remainingMinor, chargeMinor);
         } catch (err) {
           if (!(err instanceof CreditLimitExceededError)) throw err;
@@ -320,7 +423,10 @@ export class CompleteCheckout {
     // entirely — paymentMethod is only required when something is still due.
     if (remainingMinor > 0n && !cmd.paymentMethod) {
       throw new ValidationError('paymentMethod is required', [
-        { path: 'paymentMethod', message: `required — ${fromMinorUnits(remainingMinor)} ${cart.currency} is still due after applied tenders` },
+        {
+          path: 'paymentMethod',
+          message: `required — ${fromMinorUnits(remainingMinor)} ${cart.currency} is still due after applied tenders`,
+        },
       ]);
     }
 
@@ -345,7 +451,15 @@ export class CompleteCheckout {
     // Grouped by (taxClassCode, taxType) — not just taxClassCode — so an
     // intra-state order writes 2 OrderTaxLine rows per class (CGST + SGST,
     // each half the rate) and an inter-state one writes 1 (IGST, full rate).
-    const taxLinesByClass = new Map<string, { taxClassCode: string; taxType: 'CGST' | 'SGST' | 'IGST'; rateMinor: bigint; amountMinor: bigint }>();
+    const taxLinesByClass = new Map<
+      string,
+      {
+        taxClassCode: string;
+        taxType: 'CGST' | 'SGST' | 'IGST';
+        rateMinor: bigint;
+        amountMinor: bigint;
+      }
+    >();
     for (const t of taxResults) {
       if (!t.taxClassCode) continue;
       for (const b of t.breakdown) {
@@ -541,7 +655,10 @@ export class CompleteCheckout {
           eventType: 'PAYMENT_RECEIVED',
           fromValue: 'PENDING',
           toValue: 'PAID',
-          message: remainingMinor > 0n ? `Payment captured via ${cmd.paymentMethod}` : 'Payment fully covered by wallet/gift card tenders',
+          message:
+            remainingMinor > 0n
+              ? `Payment captured via ${cmd.paymentMethod}`
+              : 'Payment fully covered by wallet/gift card tenders',
           actorType: 'SYSTEM',
         });
       }
@@ -589,7 +706,9 @@ export class CompleteCheckout {
       } else {
         // reverseCharge() never throws (see its own "unguarded" contract),
         // but caught defensively anyway for symmetry with the other two.
-        await this.companyCredit.reverseCharge(h.creditAccountId, fromMinorUnits(h.amountMinor)).catch(() => undefined);
+        await this.companyCredit
+          .reverseCharge(h.creditAccountId, fromMinorUnits(h.amountMinor))
+          .catch(() => undefined);
       }
     }
   }
