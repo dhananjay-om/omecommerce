@@ -1,18 +1,44 @@
 import Link from 'next/link';
 import { apiGet } from '@/lib/api-client';
-import type { OrderDetail } from '@/lib/types';
+import type { OrderDetail, OrderPayment } from '@/lib/types';
 import { formatPrice } from '@/lib/format-price';
 import { Badge } from '@/components/ui/badge';
+import { statusBadgeVariant } from '@/lib/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { AddNoteForm } from '../add-note-form';
 
 function sum(values: string[]): number {
   return values.reduce((acc, v) => acc + Number(v), 0);
 }
 
+/** Raw gateway/method strings the backend actually sends (checkout-tender.test.ts, complete-checkout.usecase.ts) — shown to merchants, so plain-English beats the raw enum, same "never show raw enum names" convention the storefront uses for customers. */
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  test_card: 'Card',
+  wallet: 'Wallet',
+  giftcard: 'Gift Card',
+  credit_terms: 'Credit Terms',
+  original: 'Original Payment Method',
+};
+
+function paymentMethodLabel(method: string): string {
+  return PAYMENT_METHOD_LABEL[method] ?? method;
+}
+
 function invoicedQty(order: OrderDetail, sku: string): number {
-  return sum(order.invoices.flatMap((inv) => inv.lines).filter((l) => l.sku === sku).map((l) => String(l.qty)));
+  return sum(
+    order.invoices
+      .flatMap((inv) => inv.lines)
+      .filter((l) => l.sku === sku)
+      .map((l) => String(l.qty)),
+  );
 }
 
 function InfoRow({ label, value }: { label: React.ReactNode; value: React.ReactNode }) {
@@ -35,7 +61,13 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-function AddressBlock({ label, address }: { label: string; address: OrderDetail['addresses'][number] | undefined }) {
+function AddressBlock({
+  label,
+  address,
+}: {
+  label: string;
+  address: OrderDetail['addresses'][number] | undefined;
+}) {
   return (
     <div>
       <div className="text-sm font-semibold">{label}</div>
@@ -50,7 +82,9 @@ function AddressBlock({ label, address }: { label: string; address: OrderDetail[
           </div>
           <div>{address.country}</div>
           {address.phone ? <div>T: {address.phone}</div> : null}
-          {address.gstin ? <div className="mt-1 text-xs text-muted-foreground">GSTIN: {address.gstin}</div> : null}
+          {address.gstin ? (
+            <div className="mt-1 text-xs text-muted-foreground">GSTIN: {address.gstin}</div>
+          ) : null}
         </div>
       ) : (
         <div className="mt-2 text-sm text-muted-foreground">—</div>
@@ -59,16 +93,27 @@ function AddressBlock({ label, address }: { label: string; address: OrderDetail[
   );
 }
 
-export default async function OrderInformationPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderInformationPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const order = await apiGet<OrderDetail>(`/admin/v1/orders/${id}`);
   const billing = order.addresses.find((a) => a.type === 'BILLING');
   const shipping = order.addresses.find((a) => a.type === 'SHIPPING');
   const customerName = billing?.name ?? order.email;
-  const latestPayment = order.payments[order.payments.length - 1];
 
-  const paidTotal = sum(order.payments.filter((p) => p.type === 'CAPTURE' && p.status === 'SUCCEEDED').map((p) => p.amount));
-  const refundedTotal = sum(order.payments.filter((p) => p.type === 'REFUND' && p.status === 'SUCCEEDED').map((p) => p.amount));
+  const paidTotal = sum(
+    order.payments
+      .filter((p) => p.type === 'CAPTURE' && p.status === 'SUCCEEDED')
+      .map((p) => p.amount),
+  );
+  const refundedTotal = sum(
+    order.payments
+      .filter((p) => p.type === 'REFUND' && p.status === 'SUCCEEDED')
+      .map((p) => p.amount),
+  );
   const remaining = Number(order.grandTotal) - paidTotal + refundedTotal;
 
   return (
@@ -98,7 +143,9 @@ export default async function OrderInformationPage({ params }: { params: Promise
               />
             ) : null}
             {order.poNumber ? <InfoRow label="PO Number" value={order.poNumber} /> : null}
-            {order.taxExempt ? <InfoRow label="Tax" value={<Badge variant="secondary">Tax Exempt</Badge>} /> : null}
+            {order.taxExempt ? (
+              <InfoRow label="Tax" value={<Badge variant="secondary">Tax Exempt</Badge>} />
+            ) : null}
           </div>
         </div>
       </SectionCard>
@@ -114,22 +161,43 @@ export default async function OrderInformationPage({ params }: { params: Promise
         <div className="grid gap-6 sm:grid-cols-2">
           <div>
             <div className="text-sm font-semibold">Payment Information</div>
-            <div className="mt-2 text-sm">
-              {latestPayment ? (
-                <>
-                  <div>{latestPayment.method}</div>
-                  <div className="text-muted-foreground">The order was placed using {order.currency}.</div>
-                </>
-              ) : (
-                <div className="text-muted-foreground">No payment recorded yet.</div>
-              )}
-            </div>
+            {order.payments.length === 0 ? (
+              <div className="mt-2 text-sm text-muted-foreground">No payment recorded yet.</div>
+            ) : (
+              // One row per tender — an order can be split across several
+              // (card + gift card, wallet + credit terms, ...) since Phase 5's
+              // checkout tender; a single "latest payment" summary silently
+              // hid every other tender's amount, gift cards included.
+              <div className="mt-2 overflow-hidden rounded-lg border">
+                {order.payments.map((p: OrderPayment, i: number) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-4 border-b px-3 py-2.5 text-sm odd:bg-muted/30 last:border-0"
+                  >
+                    <span className="flex items-center gap-2">
+                      {paymentMethodLabel(p.method)}
+                      <Badge variant="outline" className="text-xs">
+                        {p.type}
+                      </Badge>
+                      <Badge variant={statusBadgeVariant(p.status)} className="text-xs">
+                        {p.status}
+                      </Badge>
+                    </span>
+                    <span className="text-right font-medium">
+                      {formatPrice(p.amount, p.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <div className="text-sm font-semibold">Shipping & Handling Information</div>
             <div className="mt-2 text-sm">
               <div>{order.shippingMethodCode ?? '—'}</div>
-              <div className="text-muted-foreground">{formatPrice(order.shippingTotal, order.currency)}</div>
+              <div className="text-muted-foreground">
+                {formatPrice(order.shippingTotal, order.currency)}
+              </div>
             </div>
           </div>
         </div>
@@ -167,7 +235,9 @@ export default async function OrderInformationPage({ params }: { params: Promise
                   <TableCell>{line.refundedQty}</TableCell>
                   <TableCell>{formatPrice(line.discountAmount, order.currency)}</TableCell>
                   <TableCell>{formatPrice(line.taxAmount, order.currency)}</TableCell>
-                  <TableCell className="text-right font-medium">{formatPrice(line.rowTotal, order.currency)}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatPrice(line.rowTotal, order.currency)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -186,8 +256,12 @@ export default async function OrderInformationPage({ params }: { params: Promise
                 {order.notes.map((n) => (
                   <li key={n.id} className="border-b pb-3 last:border-0">
                     <div className="flex items-center gap-2">
-                      <Badge variant={n.type === 'INTERNAL' ? 'secondary' : 'outline'}>{n.type}</Badge>
-                      <span className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleString('en-US')}</span>
+                      <Badge variant={n.type === 'INTERNAL' ? 'secondary' : 'outline'}>
+                        {n.type}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(n.createdAt).toLocaleString('en-US')}
+                      </span>
                     </div>
                     <p className="mt-1">{n.body}</p>
                   </li>
@@ -204,7 +278,10 @@ export default async function OrderInformationPage({ params }: { params: Promise
               label={order.couponCode ? `Discount (${order.couponCode})` : 'Discount'}
               value={`-${formatPrice(order.discountTotal, order.currency)}`}
             />
-            <InfoRow label="Shipping & Handling" value={formatPrice(order.shippingTotal, order.currency)} />
+            <InfoRow
+              label="Shipping & Handling"
+              value={formatPrice(order.shippingTotal, order.currency)}
+            />
             {order.taxLines.length > 0 ? (
               order.taxLines.map((t, i) => (
                 <InfoRow
@@ -218,7 +295,9 @@ export default async function OrderInformationPage({ params }: { params: Promise
             )}
             <InfoRow
               label={<span className="font-semibold">Grand Total</span>}
-              value={<span className="font-bold">{formatPrice(order.grandTotal, order.currency)}</span>}
+              value={
+                <span className="font-bold">{formatPrice(order.grandTotal, order.currency)}</span>
+              }
             />
             <InfoRow label="Total Paid" value={formatPrice(paidTotal, order.currency)} />
             <InfoRow label="Total Refunded" value={formatPrice(refundedTotal, order.currency)} />
