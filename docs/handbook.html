@@ -1,0 +1,790 @@
+<title>OMEcommerce Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #F6F4EF;
+    --panel: #FBFAF6;
+    --panel-2: #F0EDE3;
+    --ink: #16233A;
+    --muted: #5B6472;
+    --line: #DCD7C9;
+    --brass: #8C6A22;
+    --brass-strong: #6E5419;
+    --success: #2F7A5C;
+    --success-bg: #E4F0EA;
+    --warning: #A6650F;
+    --warning-bg: #F6EBD8;
+    --critical: #A83E30;
+    --critical-bg: #F5E4E0;
+    --code-bg: #ECE7D8;
+    --shadow: 0 1px 2px rgba(22,35,58,0.06), 0 8px 24px -12px rgba(22,35,58,0.15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #12161F;
+      --panel: #171C27;
+      --panel-2: #1E2430;
+      --ink: #EDE9DC;
+      --muted: #9AA3B5;
+      --line: #2B3140;
+      --brass: #D3A94B;
+      --brass-strong: #E6C374;
+      --success: #63B693;
+      --success-bg: #1B2C26;
+      --warning: #D9A24C;
+      --warning-bg: #2E2618;
+      --critical: #E1897A;
+      --critical-bg: #33201D;
+      --code-bg: #1E2430;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12161F;
+    --panel: #171C27;
+    --panel-2: #1E2430;
+    --ink: #EDE9DC;
+    --muted: #9AA3B5;
+    --line: #2B3140;
+    --brass: #D3A94B;
+    --brass-strong: #E6C374;
+    --success: #63B693;
+    --success-bg: #1B2C26;
+    --warning: #D9A24C;
+    --warning-bg: #2E2618;
+    --critical: #E1897A;
+    --critical-bg: #33201D;
+    --code-bg: #1E2430;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  a { color: var(--brass-strong); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--brass); }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  h1, h2, h3 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    text-wrap: balance;
+    color: var(--ink);
+    line-height: 1.15;
+  }
+  h4 { font-family: "Public Sans", sans-serif; font-weight: 700; font-size: 1.02rem; margin: 0 0 .6rem; }
+  p { margin: 0 0 1rem; max-width: 68ch; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    padding: 3rem 2rem 2.4rem;
+    background:
+      radial-gradient(1200px 320px at 12% -10%, color-mix(in srgb, var(--brass) 10%, transparent), transparent 65%),
+      var(--panel);
+  }
+  .masthead-inner { max-width: 1180px; margin: 0 auto; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .72rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 .9rem;
+  }
+  .masthead h1 { font-size: clamp(2rem, 4vw, 2.7rem); margin: 0 0 .7rem; }
+  .masthead .lede { font-size: 1.08rem; color: var(--muted); max-width: 62ch; margin: 0 0 1.4rem; }
+  .status-note {
+    display: inline-flex; align-items: flex-start; gap: .6rem;
+    background: var(--warning-bg); color: var(--warning);
+    border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+    border-radius: 10px; padding: .7rem .95rem; font-size: .88rem; max-width: 62ch;
+  }
+  .status-note svg { flex: none; margin-top: .15rem; }
+  .status-note strong { color: inherit; }
+
+  /* ---------- layout ---------- */
+  .layout {
+    max-width: 1180px; margin: 0 auto;
+    display: grid; grid-template-columns: 250px minmax(0,1fr);
+    gap: 3rem; padding: 2.6rem 2rem 6rem;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; padding: 1.6rem 1.2rem 4rem; gap: 1.4rem; }
+    .sidebar { position: static; order: -1; }
+  }
+
+  .sidebar {
+    position: sticky; top: 1.6rem;
+    max-height: calc(100vh - 3.2rem);
+    overflow-y: auto;
+    padding-right: .4rem;
+  }
+  @media (max-width: 900px) {
+    .sidebar { max-height: none; overflow: visible; }
+  }
+  .side-group { margin-bottom: 1.5rem; }
+  .side-group-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 .5rem; padding-left: .75rem;
+  }
+  .side-group ul { list-style: none; margin: 0; padding: 0; }
+  .side-group a {
+    display: block; padding: .38rem .75rem; border-radius: 8px;
+    color: var(--muted); text-decoration: none; font-size: .92rem;
+    border-left: 2px solid transparent;
+  }
+  .side-group a:hover { color: var(--ink); background: var(--panel-2); }
+  .side-group a.active {
+    color: var(--brass-strong); font-weight: 600;
+    background: var(--panel-2); border-left-color: var(--brass);
+  }
+
+  main { min-width: 0; }
+
+  .part {
+    padding-top: 2.2rem; margin-top: 2.2rem;
+    border-top: 1px solid var(--line);
+  }
+  .part:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+  .part-head { display: flex; align-items: baseline; gap: .9rem; margin-bottom: .4rem; }
+  .part h2 { font-size: 1.7rem; margin: 0; }
+  .part-num { font-family: "IBM Plex Mono", monospace; color: var(--brass); font-size: .95rem; }
+  .part-intro { color: var(--muted); max-width: 64ch; margin-bottom: 1.8rem; }
+
+  .feature { padding: 2rem 0; border-top: 1px dashed var(--line); }
+  .feature:first-of-type { border-top: none; padding-top: .4rem; }
+  .feature h3 { font-size: 1.32rem; margin: 0 0 .3rem; }
+  .feature .dek { color: var(--muted); margin-bottom: 1.1rem; }
+  .route {
+    display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .82rem;
+    background: var(--code-bg); color: var(--brass-strong);
+    border-radius: 6px; padding: .12rem .5rem; margin: 0 .1rem;
+  }
+  .nav-path { font-size: .85rem; color: var(--muted); margin: .4rem 0 1.1rem; }
+  .nav-path .route { margin: 0 .25rem; }
+
+  .subhead { margin: 1.6rem 0 .6rem; }
+
+  ol.steps { margin: 0 0 1.2rem; padding-left: 1.4rem; }
+  ol.steps li { margin-bottom: .55rem; padding-left: .2rem; }
+  ol.steps li::marker { font-family: "IBM Plex Mono", monospace; color: var(--brass); font-weight: 600; }
+
+  table.fields { width: 100%; border-collapse: collapse; margin: 0 0 1.3rem; font-size: .92rem; }
+  .table-wrap { overflow-x: auto; margin: 0 0 1.3rem; border: 1px solid var(--line); border-radius: 10px; }
+  .table-wrap table.fields { margin: 0; border: none; }
+  table.fields th, table.fields td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.fields thead th {
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); background: var(--panel-2);
+  }
+  table.fields tbody tr:last-child td { border-bottom: none; }
+  table.fields td:first-child { font-family: "IBM Plex Mono", monospace; font-size: .87rem; color: var(--ink); white-space: nowrap; }
+
+  .callout {
+    display: flex; gap: .7rem; align-items: flex-start;
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--brass);
+    border-radius: 8px; padding: .85rem 1rem; margin: 0 0 1.2rem; font-size: .93rem;
+  }
+  .callout.warn { border-left-color: var(--warning); }
+  .callout.critical { border-left-color: var(--critical); }
+  .callout svg { flex: none; margin-top: .15rem; color: var(--brass); }
+  .callout.warn svg { color: var(--warning); }
+  .callout.critical svg { color: var(--critical); }
+  .callout strong { display: block; font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; margin-bottom: .2rem; color: inherit; font-family: "IBM Plex Mono", monospace; }
+  .callout p { margin: 0; max-width: none; }
+  .callout.warn { color: var(--warning); } .callout.warn p, .callout.warn strong { color: var(--warning); }
+  .callout.critical { color: var(--critical); } .callout.critical p, .callout.critical strong { color: var(--critical); }
+  .callout:not(.warn):not(.critical) { color: var(--brass-strong); } .callout:not(.warn):not(.critical) p, .callout:not(.warn):not(.critical) strong { color: var(--brass-strong); }
+
+  .badge {
+    display: inline-block; font-size: .74rem; font-weight: 600; padding: .12rem .55rem; border-radius: 999px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .badge.success { background: var(--success-bg); color: var(--success); border-color: transparent; }
+  .badge.warning { background: var(--warning-bg); color: var(--warning); border-color: transparent; }
+  .badge.critical { background: var(--critical-bg); color: var(--critical); border-color: transparent; }
+
+  .shot {
+    border: 1.5px dashed var(--line); border-radius: 12px; background: var(--panel);
+    padding: 2.4rem 1.5rem; text-align: center; margin: 1.2rem 0 1.6rem; color: var(--muted);
+  }
+  .shot svg { color: var(--muted); opacity: .6; }
+  .shot .cap { font-size: .86rem; margin-top: .7rem; max-width: 42ch; margin-left: auto; margin-right: auto; }
+  .shot .cap b { color: var(--ink); font-weight: 600; }
+
+  .toc-intro {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 1.4rem 1.6rem; margin-bottom: 2.4rem; box-shadow: var(--shadow);
+  }
+  .toc-intro h2 { font-size: 1.25rem; margin: 0 0 .6rem; }
+  .toc-intro p { margin: 0 0 .5rem; max-width: 70ch; }
+  .toc-intro p:last-child { margin-bottom: 0; }
+
+  .key {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .82rem; color: var(--muted); margin-right: 1.2rem;
+  }
+  .key .swatch { width: .7rem; height: .7rem; border-radius: 3px; }
+
+  footer.page-footer {
+    max-width: 1180px; margin: 0 auto; padding: 2rem; color: var(--muted); font-size: .85rem;
+    border-top: 1px solid var(--line);
+  }
+</style>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <p class="eyebrow">Merchant &amp; shopper reference</p>
+    <h1>The OMEcommerce Handbook</h1>
+    <p class="lede">A complete, task-by-task walkthrough of the admin back office and the customer-facing storefront — catalog and inventory, orders, B2B companies, loyalty and rewards, and the shopping and checkout experience.</p>
+    <div class="status-note">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span><strong>About the screenshots:</strong> every numbered step below is accurate to the running app, but the screenshot panels are placeholders — real captures will be dropped in once a live session is available. Read past them; the instructions stand on their own.</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="sidebar" aria-label="Handbook sections">
+    <div class="side-group">
+      <p class="side-group-label">Start here</p>
+      <ul>
+        <li><a href="#getting-started">Signing in</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <p class="side-group-label">Admin — Catalog &amp; Inventory</p>
+      <ul>
+        <li><a href="#products">Products</a></li>
+        <li><a href="#attribute-sets">Attribute sets</a></li>
+        <li><a href="#attributes">Attributes</a></li>
+        <li><a href="#categories">Categories</a></li>
+        <li><a href="#inventory">Inventory</a></li>
+        <li><a href="#warehouses">Warehouses</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <p class="side-group-label">Admin — Commerce &amp; B2B</p>
+      <ul>
+        <li><a href="#orders">Orders</a></li>
+        <li><a href="#customers">Customers</a></li>
+        <li><a href="#coupons">Coupons</a></li>
+        <li><a href="#companies">Companies (B2B)</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <p class="side-group-label">Admin — Loyalty &amp; Rewards</p>
+      <ul>
+        <li><a href="#gift-cards">Gift cards</a></li>
+        <li><a href="#loyalty-program">Loyalty program</a></li>
+        <li><a href="#referrals-admin">Referrals</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <p class="side-group-label">Storefront</p>
+      <ul>
+        <li><a href="#browsing">Browsing &amp; search</a></li>
+        <li><a href="#cart">Cart</a></li>
+        <li><a href="#checkout">Checkout</a></li>
+        <li><a href="#account">Account area</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+
+    <div class="toc-intro">
+      <h2>How this handbook is organized</h2>
+      <p>It follows the product's own shape: admin features grouped exactly as they appear in the dashboard's left-hand navigation, then the storefront a shopper actually sees. Every feature gets what it does, the fields you'll fill in, and — set apart in a callout — the rules that aren't obvious from the screen alone.</p>
+      <p>
+        <span class="key"><span class="swatch" style="background:var(--brass)"></span> Good to know</span>
+        <span class="key"><span class="swatch" style="background:var(--warning)"></span> Read before you click</span>
+        <span class="key"><span class="swatch" style="background:var(--critical)"></span> Can't be undone</span>
+      </p>
+    </div>
+
+    <!-- =========================================================== -->
+    <section class="part" id="getting-started">
+      <div class="part-head"><span class="part-num">00</span><h2>Signing in</h2></div>
+      <p class="part-intro">OMEcommerce is two separate apps: the <b>admin</b> back office your team runs the store from, and the <b>storefront</b> your customers shop on. They have separate accounts and separate logins.</p>
+
+      <div class="feature">
+        <h3>Admin login</h3>
+        <p class="dek">Every admin page requires a signed-in session — there's no browsing the dashboard while logged out.</p>
+        <ol class="steps">
+          <li>Open the admin app and go to <span class="route">/admin/login</span>.</li>
+          <li>Enter your admin email and password.</li>
+          <li>You're dropped onto the Dashboard, with the full sidebar available for whatever permissions your account has.</li>
+        </ol>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: the admin sign-in screen.</p></div>
+      </div>
+
+      <div class="feature">
+        <h3>Storefront: browsing without an account</h3>
+        <p class="dek">Most of the storefront works whether or not a shopper is signed in.</p>
+        <p>You can browse, search, add items to a cart, and check out entirely as a guest — an account only unlocks order history, saved addresses, wallet, rewards, referrals, and company access. A guest's cart is remembered by the browser, not tied to any login.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Create an account</h3>
+        <p class="nav-path">Go to <span class="route">/register</span> — or the "Create an account" link on the sign-in page.</p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Field</th><th>Notes</th></tr></thead><tbody>
+          <tr><td>First name</td><td>Required.</td></tr>
+          <tr><td>Last name</td><td>Optional.</td></tr>
+          <tr><td>Email</td><td>Required, must be a valid address.</td></tr>
+          <tr><td>Password</td><td>Required, at least 8 characters.</td></tr>
+        </tbody></table></div>
+        <p>Click <b>Create account</b> and you're signed in immediately and dropped onto <span class="route">/account</span>.</p>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>Arrived via a shared referral link (a URL ending in <code>?ref=CODE</code>)? The code rides along through registration automatically. If it's expired or invalid it never blocks account creation — you just get a toast saying the link couldn't be applied, and your account is created regardless.</p></div>
+        </div>
+      </div>
+
+      <div class="feature">
+        <h3>Sign in</h3>
+        <p class="nav-path">Go to <span class="route">/login</span>.</p>
+        <p>Enter your email and password and click <b>Sign in</b>. A wrong password shows an inline error without saying which of email/password was wrong.</p>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section class="part" id="catalog-heading">
+      <div class="part-head"><span class="part-num">01</span><h2>Catalog &amp; Inventory</h2></div>
+      <p class="part-intro">Everything about what you sell: the products themselves, the reusable attributes that describe them, the category tree shoppers browse, and how much of each you have where.</p>
+
+      <div class="feature" id="products">
+        <h3>Products</h3>
+        <p class="dek">Create and manage everything in the catalog — simple items, configurable products with size/color variants, bundles, digital and virtual goods.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Products</b> — <span class="route">/products</span></p>
+
+        <h4 class="subhead">Finding a product</h4>
+        <p>The list has a search box (matches SKU or name), and dropdown filters for Status, Type, and Attribute Set. Column headers for SKU, Name, Created, and Status are sortable — click one to toggle ascending/descending. Each row also shows a Tax badge: "GST" if a tax class is assigned, or "None" if the item is charged zero tax at checkout.</p>
+        <p>Select rows with the checkboxes to reveal a bulk bar with <b>Activate</b> and <b>Deactivate</b> — handy for taking a batch of products live or off-sale at once.</p>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: the Products list, filters expanded, a few rows selected.</p></div>
+
+        <h4 class="subhead">Creating a product</h4>
+        <p class="nav-path"><b>New Product</b> button → <span class="route">/products/new</span></p>
+        <ol class="steps">
+          <li>Fill in <b>SKU</b> and pick a <b>Type</b> — Simple, Configurable, Bundle, Digital, or Virtual. Choosing Configurable adds a note that you'll generate its Size/Color variants after saving.</li>
+          <li>Pick an <b>Attribute set</b> — this decides which extra fields appear below, since every product must belong to exactly one set.</li>
+          <li>Fill in <b>Name</b> and, if relevant, <b>Weight (kg)</b>.</li>
+          <li>Set <b>Status</b> (starts as Draft) and, under Tax, a <b>Tax Class</b> plus an <b>HSN/SAC code</b> if this item is taxed.</li>
+          <li>Work through the attribute fields the chosen set brought in — Description and SEO fields are always present; everything else depends on the set.</li>
+          <li>Tick the <b>Categories</b> this product should appear under.</li>
+          <li>Click <b>Create Product</b>. You land on the new product's detail page.</li>
+        </ol>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>SKU and Type can never be changed once the product is created. Leaving an attribute field blank simply omits it — there's no separate "clear this value" action. Ticking zero categories replaces the full assignment with nothing, so an empty checklist really does remove the product from every category it was in.</p></div>
+        </div>
+
+        <h4 class="subhead">Editing, variants, pricing, and images</h4>
+        <p class="nav-path">Open a product → <b>Edit</b> — <span class="route">/products/{id}/edit</span></p>
+        <p>The main form covers Name, Attribute Set, Weight, Status, Visibility, Tax Class/HSN, attributes, and categories — SKU and Type are shown locked. Three more sections live on the same page, each saving independently:</p>
+        <ol class="steps">
+          <li><b>Variants</b> (Configurable products only) — tick which attributes form the variant axes (e.g. Size, Color), tick which of their option values to include, and click <b>Generate Variants</b> to create every combination at once, each with an auto-built SKU. Existing variants can be edited (SKU, Active/Inactive) or deleted from the table below.</li>
+          <li><b>Pricing &amp; Inventory</b> — per variant, a pricing table (one row per price list, <b>Set Price</b> to fill it in) and an inventory table (one row per warehouse, <b>Adjust</b> to change stock — see <a href="#inventory">Inventory</a> below for how adjustments work).</li>
+          <li><b>Images</b> — <b>Add Images</b> uploads one or more files; hover any thumbnail for <b>Set as Main</b> and <b>Delete</b>. The main image is what shows on the storefront's grid, product page, mini-cart, and cart.</li>
+        </ol>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: a Configurable product's edit page with the Variants and Pricing &amp; Inventory sections open.</p></div>
+        <div class="callout critical">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <div><strong>Can't be undone</strong><p>Deleting a product or a single variant is blocked while it still has stock in any warehouse — zero out its stock first. Past orders are safe either way, since every order line keeps its own snapshot of the name, SKU, and price at the time of purchase.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="attribute-sets">
+        <h3>Attribute sets</h3>
+        <p class="dek">Groups of attributes a product picks up all at once. Every product has exactly one set, and everything assigned to that set shows up on the product's edit page.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Attribute Sets</b> — <span class="route">/attribute-sets</span></p>
+        <ol class="steps">
+          <li>Click <b>New Attribute Set</b>, give it a <b>Code</b> and <b>Name</b>, and optionally mark it the <b>Default set</b> (the one pre-selected on the New Product form).</li>
+          <li>Open the set to organize it into <b>Groups</b> (e.g. "General", "Dimensions") — each needs a Name and a Sort Order.</li>
+          <li>Inside a group, click <b>Assign Attribute</b> to pull in an attribute from the reusable library (search by code or label), with a Sort Order for where it lands.</li>
+        </ol>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>Removing an attribute from a set doesn't delete any values already stored on products — it just stops showing the field. A set can't be deleted while any product still uses it.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="attributes">
+        <h3>Attributes</h3>
+        <p class="dek">The reusable field library — build an attribute once here, then assign it into whichever Attribute Sets need it.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Attributes</b> — <span class="route">/attributes</span></p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Field</th><th>Notes</th></tr></thead><tbody>
+          <tr><td>Code</td><td>Permanent identifier.</td></tr>
+          <tr><td>Label</td><td>What shows on the form.</td></tr>
+          <tr><td>Data type</td><td>Text, Number, Boolean, Date, Select, Multiselect, Rich text, Image, and more.</td></tr>
+          <tr><td>Input type</td><td>How it's edited — dropdown, switch, color picker, etc.</td></tr>
+          <tr><td>Required / Filterable / Searchable / Comparable</td><td>Checkboxes controlling catalog behavior.</td></tr>
+          <tr><td>Variant forming</td><td>Select-type only — lets this attribute (e.g. Size, Color) generate a Configurable product's variants.</td></tr>
+          <tr><td>Options</td><td>Select/Multiselect only — a repeatable value/label list, set once at creation.</td></tr>
+        </tbody></table></div>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>Data type and Input type lock once an attribute is created — changing them later could invalidate values already stored against it. Only a Select attribute (not Multiselect) marked Variant Forming can drive variant generation on a product.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="categories">
+        <h3>Categories</h3>
+        <p class="dek">The navigation tree shoppers browse by.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Categories</b> — <span class="route">/categories</span></p>
+        <p>The list is a tree — each row has <b>Edit</b> and <b>Delete</b>. <b>New Category</b> asks for a Name and a Parent (defaults to root). There's no separate read-only detail view; Edit is the only page per category, covering Name, Parent, Position, Sort Mode (manual, name, price, or newest-first), whether it's included in the storefront menu, an image, description, and SEO meta fields.</p>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>The slug is fixed at creation. Hiding a category from the menu also hides everything nested under it. A category can never be re-parented under itself or one of its own children.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="inventory">
+        <h3>Inventory</h3>
+        <p class="dek">Per-warehouse stock levels, and the one place you adjust them by hand.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Inventory</b> — <span class="route">/inventory</span></p>
+        <p>Chips across the top switch which warehouse's stock table you're viewing (On Hand, Reserved, Available per SKU). To change a number, click <b>Adjust</b> on a row, or use the page-level <b>Adjust Stock</b> button and search by SKU first — it accepts either a base product SKU or a full variant SKU.</p>
+        <ol class="steps">
+          <li>Enter the <b>Quantity change</b> — this is a delta, not a new total. Positive adds stock, negative removes it (a helper link fills in the exact negative number needed to zero out the current On Hand).</li>
+          <li>Pick a <b>Reason</b>: Purchase, Return, Adjustment, Transfer, or Correction.</li>
+          <li>Add an optional <b>Note</b>, then click <b>Adjust Stock</b>.</li>
+        </ol>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: the Adjust Stock dialog, quantity-change step.</p></div>
+      </div>
+
+      <div class="feature" id="warehouses">
+        <h3>Warehouses</h3>
+        <p class="dek">The fulfillment locations stock is held at.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Warehouses</b> — <span class="route">/inventory/warehouses</span></p>
+        <p><b>New Warehouse</b> asks for Code (permanent), Name, and Type (Physical, Virtual, or Dropship). Editing adds Priority (higher-priority warehouses are preferred when an order could be fulfilled from more than one location) and a Status toggle.</p>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>Setting a warehouse to Inactive is the safe way to retire it — its history stays intact and it doesn't need zero stock first. Actually deleting one does require zero stock everywhere.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="pricing">
+        <h3>Pricing</h3>
+        <p class="dek">Price lists — base retail pricing plus wholesale, B2B, or scheduled special pricing — and the prices set on each.</p>
+        <p class="nav-path">Sidebar → Catalog → <b>Pricing</b> — <span class="route">/pricing</span></p>
+        <p><b>New Price List</b> asks for Code (permanent), Name, Currency, Type (Base, Wholesale, B2B, Special), and Priority — when more than one list could apply to a sale, the higher-priority one wins. <b>Set Price</b> on any list uses the same SKU-search flow as Inventory adjustments: find the variant, then enter its Price.</p>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>Deleting a price list is really a deactivation — it stops applying immediately, but any prices already set on it are kept, not erased. Which customers see a B2B/wholesale list is controlled by the Customer Group set on their <a href="#companies">Company</a>, not from this page.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section class="part" id="commerce-heading">
+      <div class="part-head"><span class="part-num">02</span><h2>Commerce &amp; B2B</h2></div>
+      <p class="part-intro">Orders from placement through to closing the book, customer accounts and their wallets, discount coupons, and the B2B company accounts that unlock special pricing and tax terms.</p>
+
+      <div class="feature" id="orders">
+        <h3>Orders</h3>
+        <p class="dek">Everything that's been bought — filter and export the list, then work each order through fulfillment, invoicing, and (when needed) refunds and cancellation.</p>
+        <p class="nav-path">Sidebar → Commerce → <b>Orders</b> — <span class="route">/orders</span></p>
+
+        <h4 class="subhead">Finding orders</h4>
+        <p>Filter by order number, email, customer name, Status, Payment Status, Fulfillment Status, and a date range. <b>Export CSV</b> / <b>Export Excel</b> download whatever the current filters return.</p>
+
+        <h4 class="subhead">An order's detail page</h4>
+        <p>Every order opens onto five tabs — <b>Information</b> (customer, addresses, payment/shipping method, line items, notes, and the full totals breakdown), <b>Invoices</b>, <b>Shipments</b>, <b>Emails</b> (an audit log of every email sent), and <b>Comments History</b> (the full activity feed). The action bar at the top offers whichever of Fulfill, Refund, Create Invoice, Send Email, Close Order, and Cancel Order currently apply.</p>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: an order's Information tab, action bar visible.</p></div>
+
+        <h4 class="subhead">Fulfilling an order</h4>
+        <ol class="steps">
+          <li>Click <b>Fulfill</b> (shown only once there's unshipped quantity remaining).</li>
+          <li>Adjust the quantity to ship per line — it defaults to the full remaining amount.</li>
+          <li>Fill in Carrier, Tracking Number, Carrier Tracking URL, Estimated Delivery, and any Shipping Notes.</li>
+          <li>Click <b>Fulfill</b> to create the shipment.</li>
+        </ol>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>An order has to be <span class="mono">PAID</span> before it can be fulfilled — an unpaid order rejects the request.</p></div>
+        </div>
+
+        <h4 class="subhead">Refunding, cancelling, and closing</h4>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Action</th><th>What it does</th><th>Requires</th></tr></thead><tbody>
+          <tr><td>Refund</td><td>Refund some or all of specific lines, optionally restocking them. Amount is proportional — a coupon-discounted item is refunded for what was actually paid.</td><td>Order is Paid or Partially Refunded; can't exceed a line's remaining refundable quantity.</td></tr>
+          <tr><td>Cancel Order</td><td>Refunds every remaining line in full, restocks, and closes the order out as Cancelled.</td><td>Nothing has shipped yet. Once any line has been fulfilled, cancel is blocked — use Refund for the fulfilled portion instead.</td></tr>
+          <tr><td>Close Order</td><td>Marks the order as fully settled — a distinct terminal state from simply "Completed."</td><td>Every line fully shipped, and financial status Paid or Refunded.</td></tr>
+        </tbody></table></div>
+        <div class="callout critical">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <div><strong>Can't be undone</strong><p>Cancel Order and Close Order both ask for a final confirmation and can't be reversed from the admin UI once confirmed.</p></div>
+        </div>
+
+        <h4 class="subhead">Invoicing and emailing</h4>
+        <p><b>Create Invoice</b> generates a PDF for some or all of the order's uninvoiced quantity — you can invoice the same order more than once as it partially ships. <b>Send Email</b> manually (re-)sends a transactional message: Order Confirmation, Invoice, Shipment Notification, Cancellation Notice, Refund Notice, or a fully Custom Message with its own subject and body.</p>
+      </div>
+
+      <div class="feature" id="customers">
+        <h3>Customers</h3>
+        <p class="dek">Every registered shopper's profile, and the wallet, loyalty, and referral activity tied to their account.</p>
+        <p class="nav-path">Sidebar → Commerce → <b>Customers</b> — <span class="route">/customers</span></p>
+        <p>Search by name or email. Opening a customer gives four tabs:</p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Tab</th><th>What's there</th></tr></thead><tbody>
+          <tr><td>Overview</td><td>Email, name, created date, and saved addresses (read-only).</td></tr>
+          <tr><td>Wallet</td><td>Store-credit balance and transaction history, plus Credit, Adjust, and Freeze/Unfreeze actions.</td></tr>
+          <tr><td>Loyalty</td><td>Points balance, lifetime points, current tier, and an Adjust Points action.</td></tr>
+          <tr><td>Referrals</td><td>The customer's own referral code and everyone they've referred — read-only, since qualification and rewards are fully automatic.</td></tr>
+        </tbody></table></div>
+
+        <h4 class="subhead">Wallet actions</h4>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Action</th><th>Fields</th><th>Rule</th></tr></thead><tbody>
+          <tr><td>Credit</td><td>Amount, Bucket, Source, Reason (optional)</td><td>Always adds funds — Reason isn't required.</td></tr>
+          <tr><td>Adjust</td><td>Amount (signed), Bucket, Reason (required)</td><td>A negative amount that would overdraw the balance is rejected.</td></tr>
+          <tr><td>Freeze / Unfreeze</td><td>—</td><td>Freezing blocks further debits (redemptions, checkout tender); admin credits still work while frozen.</td></tr>
+        </tbody></table></div>
+        <p>Loyalty's <b>Adjust Points</b> works the same way as Wallet Adjust — a signed amount, a required Reason, and a negative adjustment can't push the balance below zero.</p>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: a customer's Wallet tab with the Adjust dialog open.</p></div>
+      </div>
+
+      <div class="feature" id="coupons">
+        <h3>Coupons</h3>
+        <p class="dek">Discount codes — a flat percentage or fixed amount off, applied to the whole cart or targeted at specific items, entered manually or auto-applied.</p>
+        <p class="nav-path">Sidebar → Commerce → <b>Coupons</b> — <span class="route">/coupons</span></p>
+        <ol class="steps">
+          <li>Click <b>New Coupon</b> and set a <b>Code</b> (permanent) and optional internal Description.</li>
+          <li>Choose <b>Discount Type</b> — Percentage or Fixed Amount — and its Value. Fixed Amount also needs a Currency and unlocks an optional Minimum order subtotal.</li>
+          <li>Set <b>Applies to</b> — Whole Cart, or Specific Items (which opens the condition builder below) — and whether it's <b>Auto-Apply</b> or requires a code typed at checkout.</li>
+          <li>For Specific Items, add one or more conditions — match by Product/SKU, Category, or Attribute. A line must match every condition to qualify.</li>
+          <li>Set Usage limit, Per-customer limit, and a Start/End window, then Status.</li>
+          <li>Click <b>Create Coupon</b>.</li>
+        </ol>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>The code can't change after creation. A SKU typed into a condition row is looked up at save time — a typo that matches nothing will fail the save with "no product found for that SKU." Deleting a coupon stops it working immediately but keeps its redemption history.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="companies">
+        <h3>Companies (B2B)</h3>
+        <p class="dek">Business/wholesale buyer accounts — a company groups a set of shopper logins under shared pricing and tax terms.</p>
+        <p class="nav-path">Sidebar → B2B → <b>Companies</b> — <span class="route">/companies</span></p>
+
+        <h4 class="subhead">Registering a company</h4>
+        <ol class="steps">
+          <li>Click <b>New Company</b>.</li>
+          <li>Pick the <b>Website</b> it belongs to and set a <b>Code</b> — both are permanent once saved.</li>
+          <li>Fill in <b>Name</b>, and optionally a <b>Customer group code</b> — this is what controls which price list the company's buyers see; leave it blank and they default to ordinary retail pricing.</li>
+          <li>Under Tax, set <b>Tax exempt</b> if this company doesn't pay tax on its orders — a <b>Tax exemption reference</b> becomes required the moment you switch this on.</li>
+          <li>Optionally add a Billing Contact name, email, and phone.</li>
+          <li>Click <b>Create Company</b>.</li>
+        </ol>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: the New Company form, Tax section expanded with exemption reference required.</p></div>
+
+        <h4 class="subhead">Approving and managing status</h4>
+        <p>A new company starts as <span class="badge warning">PENDING</span> — its members shop as ordinary retail customers until it's approved. From the company's detail page:</p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Current status</th><th>Available actions</th></tr></thead><tbody>
+          <tr><td><span class="badge warning">PENDING</span></td><td><b>Approve</b> → Active, or <b>Reject</b> → Rejected.</td></tr>
+          <tr><td><span class="badge success">ACTIVE</span></td><td><b>Suspend</b> → Suspended.</td></tr>
+          <tr><td><span class="badge critical">SUSPENDED</span> / <span class="badge critical">REJECTED</span></td><td><b>Reactivate</b> → Active.</td></tr>
+        </tbody></table></div>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>Only an <b>Active</b> company grants its members B2B pricing and tax exemption — a Pending, Suspended, or Rejected company's members simply get treated as retail customers, with no error shown anywhere. No status is a dead end; any of them can be moved back to Active.</p></div>
+        </div>
+
+        <h4 class="subhead">Managing members</h4>
+        <p>On the company's detail page, <b>Add Member</b> takes an email (must already be a registered customer on that website) and a Role — Buyer or Admin. Each existing member gets a Role dropdown and a <b>Remove</b> button.</p>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>A customer can belong to at most one company at a time — adding someone already on another company's roster fails. Removing a member drops their B2B access but doesn't touch their customer account. Role (Buyer vs. Admin) only affects who can manage the member list on the storefront side — both roles can place B2B orders once the company is Active.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section class="part" id="loyalty-heading">
+      <div class="part-head"><span class="part-num">03</span><h2>Loyalty &amp; Rewards</h2></div>
+      <p class="part-intro">Gift cards you issue by hand, and the points and referral programs that run themselves once configured — earning, tier upgrades, and clawback on refund all happen automatically, with nothing to trigger manually.</p>
+
+      <div class="feature" id="gift-cards">
+        <h3>Gift cards</h3>
+        <p class="dek">Digital or physical stored-value cards, issued manually — for phone orders, goodwill gestures, or activating a physical card.</p>
+        <p class="nav-path">Sidebar → Loyalty &amp; Rewards → <b>Gift Cards</b> — <span class="route">/gift-cards</span></p>
+
+        <h4 class="subhead">Issuing a card</h4>
+        <ol class="steps">
+          <li>Click <b>Issue Gift Card</b>.</li>
+          <li>Pick the <b>Website</b>, enter the starting <b>Amount</b>, and choose <b>Kind</b> — Digital or Physical.</li>
+          <li>Optionally fill in Recipient Email, Recipient Name, a gift Message, and an Expiry date.</li>
+          <li>Click <b>Issue Gift Card</b>.</li>
+        </ol>
+        <div class="callout critical">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <div><strong>Can't be undone</strong><p>The redeemable code is shown exactly once, right after issuing — only a hash is ever stored, so it can never be retrieved or displayed again. Copy it before you navigate away.</p></div>
+        </div>
+
+        <h4 class="subhead">Managing an existing card</h4>
+        <p>Open any card for its balance, details, and full ledger (Issue, Redeem, Refund, Adjust, Void, Expire entries). <b>Adjust</b> takes a signed Amount and a required Reason — a debit that would overdraw the balance, or that targets a card that isn't Active, is rejected. <b>Disable</b> permanently blocks further redemption; there's no "re-enable" from this screen, and both buttons disappear once a card is disabled.</p>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: a gift card's ledger, Adjust dialog open.</p></div>
+      </div>
+
+      <div class="feature" id="loyalty-program">
+        <h3>Loyalty program</h3>
+        <p class="dek">Configure the earn rate, redemption rules, and tiers — one program per website. Earning and clawback are entirely automatic.</p>
+        <p class="nav-path">Sidebar → Loyalty &amp; Rewards → <b>Loyalty Program</b> — <span class="route">/loyalty</span></p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Field</th><th>Controls</th></tr></thead><tbody>
+          <tr><td>Points per currency unit</td><td>How many points a customer earns per unit spent.</td></tr>
+          <tr><td>Value per point</td><td>The store-credit value of one point when redeemed.</td></tr>
+          <tr><td>Minimum points to redeem</td><td>Balance floor before any redemption is allowed.</td></tr>
+          <tr><td>Points expire after (months)</td><td>Blank means points never expire.</td></tr>
+          <tr><td>Status</td><td>Active, Paused, or Ended (edit mode only).</td></tr>
+        </tbody></table></div>
+        <p>Below the settings, a <b>Tiers</b> table (Name, Threshold points, Earn multiplier, Sort order) with <b>Add Tier</b>, and per-row Edit/Delete.</p>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>Points are earned the moment an order is paid and clawed back proportionally on refund — there's no manual "award points" button here (per-customer manual adjustments live on the customer's own Loyalty tab instead). Tier is re-evaluated automatically every time a customer earns; deleting a tier just drops its members back to no tier until their next order re-sorts them.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="referrals-admin">
+        <h3>Referrals</h3>
+        <p class="dek">The "refer a friend" program — configure it per website and watch the results; qualification and reward issuance are fully automatic.</p>
+        <p class="nav-path">Sidebar → Loyalty &amp; Rewards → <b>Referrals</b> — <span class="route">/referrals</span></p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Field</th><th>Controls</th></tr></thead><tbody>
+          <tr><td>Qualifying event</td><td>On sign-up, or on the referee's first paid order.</td></tr>
+          <tr><td>Minimum order amount</td><td>Only for first-order qualifying — the order must reach this to count.</td></tr>
+          <tr><td>Referrer / Referee reward</td><td>Each side gets its own Store Credit or Loyalty Points reward.</td></tr>
+          <tr><td>Max referrals per customer</td><td>Blank means unlimited.</td></tr>
+          <tr><td>Attribution window (days)</td><td>How long after signup a first order can still qualify.</td></tr>
+        </tbody></table></div>
+        <p>Below the settings, a filterable, read-only <b>report</b> of every referral: referrer, referee, status, rewards, and the signed-up/qualified/rewarded dates.</p>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>Picking Loyalty Points as a reward type only works once this website already has a loyalty program configured. If an attribution window is set and it lapses before the referee orders, that referral is marked Expired automatically — even a later order won't revive it.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section class="part" id="storefront-heading">
+      <div class="part-head"><span class="part-num">04</span><h2>Storefront</h2></div>
+      <p class="part-intro">What a shopper actually sees — browsing and search, the cart, a five-step checkout, and everything under their account.</p>
+
+      <div class="feature" id="browsing">
+        <h3>Browsing &amp; search</h3>
+        <p class="dek">Product listing pages, search, and the product detail page itself.</p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Page</th><th>Route</th><th>What it's for</th></tr></thead><tbody>
+          <tr><td>All Products</td><td>/products</td><td>Sort (Relevance, Price, Name), filter by Brand/Price/Stock/attribute, paginate.</td></tr>
+          <tr><td>Search</td><td>/search?q=…</td><td>Same sort/filter UI, seeded from the header search bar.</td></tr>
+          <tr><td>Collection</td><td>/collections/{slug}</td><td>One category's products, with a breadcrumb and optional banner.</td></tr>
+          <tr><td>Brands</td><td>/brands, /brands/{slug}</td><td>Browse by brand.</td></tr>
+          <tr><td>Product detail</td><td>/products/{id}</td><td>Gallery, price, variant picker, quantity, Add to Cart / Buy Now, wishlist, description &amp; specs tabs.</td></tr>
+        </tbody></table></div>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: a product detail page, variant picker and Add to Cart visible.</p></div>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p>The wishlist heart on a product page toggles instantly for anyone, but only actually saves to the account when signed in — it resets on a fresh page load either way, so the account's real Wishlist page (see below) is the source of truth. The Offers page is promo banners and a popular-picks carousel, not a real discount engine. Reviews and star ratings aren't live yet — the tab just says "No reviews yet."</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="cart">
+        <h3>Cart</h3>
+        <p class="dek">Review and adjust items, then apply whatever discounts and stored value are available before checking out.</p>
+        <p class="nav-path"><span class="route">/cart</span>, or the bag icon in the header for the quick mini-cart drawer.</p>
+        <p>Each line has a quantity stepper and a remove action. The summary panel totals things up and offers three ways to reduce what's due:</p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Tender</th><th>How it works</th></tr></thead><tbody>
+          <tr><td>Coupon</td><td>Type a code and Apply. An auto-applied storewide promo shows without a Remove button — since nothing was typed — but typing a different code overrides it.</td></tr>
+          <tr><td>Gift card</td><td>Type a code and Apply — stackable, a cart can hold several at once, each removable on its own.</td></tr>
+          <tr><td>Wallet</td><td>A single checkbox — pays with the signed-in shopper's own store-credit balance.</td></tr>
+        </tbody></table></div>
+        <div class="callout warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Read before you click</strong><p>Paying with wallet requires being signed in — a guest who checks the box just gets an inline "sign in to pay with your wallet" message. Signing in (or registering) with items already in a guest cart automatically claims that cart and re-checks its pricing under your account — including B2B pricing, if you belong to a company.</p></div>
+        </div>
+      </div>
+
+      <div class="feature" id="checkout">
+        <h3>Checkout</h3>
+        <p class="dek">A five-step flow from shipping address to a placed order.</p>
+        <p class="nav-path"><span class="route">/checkout</span> — redirects back to the cart if it's empty.</p>
+        <ol class="steps">
+          <li><b>Shipping</b> — email and the delivery address (name, phone, address lines, city, state, postal code, country; a GST state and optional GSTIN for an Indian business invoice).</li>
+          <li><b>Billing</b> — "Same as shipping" is checked by default; uncheck it to enter a separate billing address.</li>
+          <li><b>Delivery</b> — pick a shipping method from the priced list.</li>
+          <li><b>Payment</b> — this store uses a test gateway: no real card is charged and no card details are collected. A "simulate result" dropdown lets you deliberately test an approved or declined payment. If wallet/gift-card tenders already cover the full total, this step just confirms that and skips asking for a card.</li>
+          <li><b>Review</b> — a final look at the order, then <b>Place Order</b>.</li>
+        </ol>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: the checkout wizard's Payment step, test-gateway note visible.</p></div>
+        <p>Placing the order lands on <span class="route">/checkout/success/{orderId}</span> with the order number, confirmation email address, full line items, tax breakdown, and total.</p>
+      </div>
+
+      <div class="feature" id="account">
+        <h3>Account area</h3>
+        <p class="dek">Everything behind sign-in — order history, saved addresses, wishlist, wallet, rewards, referrals, and (for B2B shoppers) the company page. Every page here requires being signed in.</p>
+        <div class="table-wrap"><table class="fields"><thead><tr><th>Page</th><th>Route</th><th>What's there</th></tr></thead><tbody>
+          <tr><td>Overview</td><td>/account</td><td>Who's signed in.</td></tr>
+          <tr><td>Orders</td><td>/account/orders</td><td>Order history with search; each row's menu offers View, Track Shipment, Download Invoice, and Reorder.</td></tr>
+          <tr><td>Order detail</td><td>/account/orders/{id}</td><td>Full breakdown, plus Track Shipment, Download Invoice, and Reorder actions.</td></tr>
+          <tr><td>Addresses</td><td>/account/addresses</td><td>Add or delete saved addresses.</td></tr>
+          <tr><td>Wishlist</td><td>/account/wishlist</td><td>Saved items, each removable.</td></tr>
+          <tr><td>Wallet</td><td>/account/wallet</td><td>Store-credit balance, transaction history, and a field to redeem a gift card into wallet balance.</td></tr>
+          <tr><td>Rewards</td><td>/account/rewards</td><td>Points balance, tier, redemption, and history.</td></tr>
+          <tr><td>Referrals</td><td>/account/referrals</td><td>Your referral code and link, and everyone you've referred.</td></tr>
+          <tr><td>Company</td><td>/account/company</td><td>Your B2B company's status, pricing, and tax terms; member management if you're an Admin-role member.</td></tr>
+        </tbody></table></div>
+
+        <h4 class="subhead">A few things worth knowing</h4>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 9.4-9 10-5.2-.6-9-5-9-10V6l9-4z"/></svg>
+          <div><strong>Good to know</strong><p><b>Addresses</b> has no edit — changing one means deleting it and adding a new one, and there's no "default address" concept. <b>Reorder</b> adds a past order's items to a fresh cart and warns if any SKU is no longer available, adding the rest regardless. On <b>Rewards</b> or <b>Referrals</b>, a store with no active program simply shows a friendly "not available right now" message rather than an error. On <b>Company</b>, member management only appears for Admin-role members — Buyers never see it, and can't reach it by URL either.</p></div>
+        </div>
+        <div class="shot"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p class="cap">Screenshot: the Company page for an Admin-role member, with the member list and Add Member form.</p></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="page-footer">
+  OMEcommerce Handbook — covers the admin Catalog &amp; Inventory, Commerce &amp; B2B, and Loyalty &amp; Rewards areas, plus the full storefront. Screenshot panels are placeholders pending a live capture pass.
+</footer>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.sidebar a[href^="#"]'));
+    var idToLink = {};
+    links.forEach(function (a) { idToLink[a.getAttribute('href').slice(1)] = a; });
+    var targets = links
+      .map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); })
+      .filter(Boolean);
+
+    if (!('IntersectionObserver' in window) || targets.length === 0) return;
+
+    var current = null;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          var link = idToLink[entry.target.id];
+          if (!link) return;
+          if (current) current.classList.remove('active');
+          link.classList.add('active');
+          current = link;
+        }
+      });
+    }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+    targets.forEach(function (t) { observer.observe(t); });
+  })();
+</script>
