@@ -125,6 +125,7 @@ export function CheckoutPageClient({
   myCredit,
   savedAddresses,
   customerEmail,
+  walletBalance,
 }: {
   cart: Cart;
   shippingMethods: ShippingMethod[];
@@ -134,6 +135,8 @@ export function CheckoutPageClient({
   savedAddresses: CustomerAddress[];
   /** null for a guest — the email field stays a plain editable input for them. A signed-in shopper's account email is already known, so it's shown read-only instead of asked for again. */
   customerEmail: string | null;
+  /** null for a guest — WalletToggle just hides its balance caption. A signed-in shopper sees their real balance, including a genuine "₹0.00". */
+  walletBalance: string | null;
 }) {
   const creditAccount =
     myCredit?.account &&
@@ -199,6 +202,19 @@ export function CheckoutPageClient({
     // Seed once from the server-rendered cart prop; afterwards the store is the
     // single source of truth (same pattern as CartPageClient) — needed so
     // CouponField's apply/remove actions are reflected here too.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Auto-select whichever saved address is marked default (set via
+    // /account/addresses' "Set as default" checkboxes) — a shopper who's
+    // already told us their default shouldn't have to pick it again every
+    // checkout. Runs once on mount; savedAddresses is a server-fetched prop
+    // that never changes for the life of this page.
+    const defaultShipping = savedAddresses.find((a) => a.isDefaultShipping);
+    if (defaultShipping) applySavedAddress('shippingAddress', defaultShipping);
+    const defaultBilling = savedAddresses.find((a) => a.isDefaultBilling);
+    if (defaultBilling) applySavedAddress('billingAddress', defaultBilling);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const displayCart = storeCart ?? cart;
@@ -561,7 +577,7 @@ export function CheckoutPageClient({
           </div>
           <CouponField cart={displayCart} />
           <GiftCardField cart={displayCart} />
-          <WalletToggle cart={displayCart} />
+          <WalletToggle cart={displayCart} walletBalance={walletBalance} />
           {creditAccount ? <CreditTermsToggle cart={displayCart} account={creditAccount} /> : null}
           {displayCart.tenders.length > 0 && estimatedAmountDue !== null ? (
             <div className="flex justify-between text-sm text-muted-foreground">

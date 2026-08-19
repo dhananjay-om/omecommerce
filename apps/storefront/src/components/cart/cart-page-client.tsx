@@ -12,13 +12,24 @@ import { GiftCardField } from './gift-card-field';
 import { WalletToggle } from './wallet-toggle';
 import type { Cart } from '@/types/cart';
 
-export function CartPageClient({ initialCart }: { initialCart: Cart }) {
+export function CartPageClient({
+  initialCart,
+  walletBalance,
+}: {
+  initialCart: Cart;
+  /** null for a guest — WalletToggle just hides its balance caption. */
+  walletBalance: string | null;
+}) {
   const cart = useCartStore((s) => s.cart);
   const hydrated = useCartStore((s) => s.hydrated);
 
   useEffect(() => {
     if (!hydrated) {
-      useCartStore.setState({ cart: initialCart, itemCount: countItems(initialCart), hydrated: true });
+      useCartStore.setState({
+        cart: initialCart,
+        itemCount: countItems(initialCart),
+        hydrated: true,
+      });
     }
     // Seed once from the server-rendered cart; afterwards the store is the single source of truth.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,7 +55,12 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
       <div className="flex flex-col gap-8 lg:flex-row">
         <div className="flex-1 rounded-lg border p-4">
           {displayCart.lines.map((line) => (
-            <CartLineRow key={line.id} line={line} currency={displayCart.currency} pricesIncludeTax={displayCart.pricesIncludeTax} />
+            <CartLineRow
+              key={line.id}
+              line={line}
+              currency={displayCart.currency}
+              pricesIncludeTax={displayCart.pricesIncludeTax}
+            />
           ))}
         </div>
 
@@ -53,7 +69,11 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>{displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}</span>
+              <span>
+                {displayCart.subtotal
+                  ? formatPrice(displayCart.subtotal, displayCart.currency)
+                  : '—'}
+              </span>
             </div>
             {displayCart.discountTotal ? (
               <div className="flex justify-between text-success">
@@ -66,7 +86,9 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
               <span className="text-muted-foreground">Calculated at checkout</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}</span>
+              <span className="text-muted-foreground">
+                Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}
+              </span>
               <span className={displayCart.pricesIncludeTax ? 'text-muted-foreground' : undefined}>
                 {displayCart.taxTotal
                   ? displayCart.pricesIncludeTax
@@ -81,20 +103,26 @@ export function CartPageClient({ initialCart }: { initialCart: Cart }) {
           <div className="flex justify-between border-t pt-3 text-base font-bold">
             <span>Estimated Total</span>
             <span>
-              {displayCart.estimatedTotal ? formatPrice(displayCart.estimatedTotal, displayCart.currency) : '—'}
-              {displayCart.estimatedTotal && displayCart.pricesIncludeTax ? <TaxInclusiveNote /> : null}
+              {displayCart.estimatedTotal
+                ? formatPrice(displayCart.estimatedTotal, displayCart.currency)
+                : '—'}
+              {displayCart.estimatedTotal && displayCart.pricesIncludeTax ? (
+                <TaxInclusiveNote />
+              ) : null}
             </span>
           </div>
 
           {displayCart.customerGroupName ? (
             <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-              Your <span className="font-medium text-foreground">{displayCart.customerGroupName}</span> pricing is applied to this order.
+              Your{' '}
+              <span className="font-medium text-foreground">{displayCart.customerGroupName}</span>{' '}
+              pricing is applied to this order.
             </p>
           ) : null}
 
           <CouponField cart={displayCart} />
           <GiftCardField cart={displayCart} />
-          <WalletToggle cart={displayCart} />
+          <WalletToggle cart={displayCart} walletBalance={walletBalance} />
           {displayCart.tenders.length > 0 && displayCart.amountDue !== null ? (
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Amount due</span>
