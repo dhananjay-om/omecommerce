@@ -3,6 +3,7 @@ import type { StockLedger } from '../../inventory/domain/repositories.js';
 import type { CreditWallet } from '../../wallet/application/credit-wallet.usecase.js';
 import type { WalletLedger } from '../../wallet/domain/repositories.js';
 import type { GiftCardLedger } from '../../giftcard/domain/repositories.js';
+import type { CompanyCreditLedger } from '../../company/domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import { InvalidOrderStateError } from '../domain/errors.js';
 import { addMinor, subtractMinor, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
@@ -10,15 +11,20 @@ import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-write
 import type { RefundOrderCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
-const REFUNDABLE_STATUSES = new Set(['PAID', 'PARTIALLY_REFUNDED']);
+// ON_ACCOUNT (plan/15 Phase 7) is refundable — CancelOrder relies on this to
+// reverse an unsettled credit-terms charge (see refundToOriginalTenders's
+// own doc comment on exactly what's and isn't handled once an on-account
+// order has already been settled).
+const REFUNDABLE_STATUSES = new Set(['PAID', 'PARTIALLY_REFUNDED', 'ON_ACCOUNT']);
 
 /** One slice of a split-tender refund, before it's actually credited. */
 interface FundingSlice {
-  kind: 'WALLET' | 'GIFT_CARD' | 'PSP';
+  kind: 'WALLET' | 'GIFT_CARD' | 'CREDIT_TERMS' | 'PSP';
   /** How much of the order's grandTotal this source originally funded. */
   originalMinor: bigint;
   walletId?: bigint;
   giftCardId?: bigint;
+  creditAccountId?: bigint;
 }
 
 /**
@@ -53,6 +59,7 @@ export class RefundOrder {
     private readonly creditWallet: CreditWallet,
     private readonly wallets: WalletLedger,
     private readonly giftCards: GiftCardLedger,
+    private readonly companyCredit: CompanyCreditLedger,
   ) {}
 
   async execute(cmd: RefundOrderCommand): Promise<OrderViewDto> {
@@ -172,18 +179,35 @@ export class RefundOrder {
    * `refundTotalMinor` — and when there's no real PSP portion (a fully
    * tender-funded order), that remainder correctly lands on a stored-value
    * source instead of inventing a phantom PSP refund.
+   *
+   * plan/15 Phase 7 — a credit-terms CHARGE is only added as a funding
+   * source while the order is STILL ON_ACCOUNT (never settled). CancelOrder
+   * is the intended caller for that case (nothing shipped yet, so it's
+   * always unsettled) and correctly reverses the charge, reducing what's
+   * owed. Deliberately NOT handled: refunding an order that was already
+   * settled via RecordCompanyCreditPayment (financialStatus flipped to
+   * PAID) — its credit-terms portion is, by then, real money the merchant
+   * already collected off-platform (check/wire), which this module has no
+   * way to route a refund back through; that portion falls through to the
+   * PSP bucket below instead, same known simplification as every other
+   * "which original tender" edge case in this codebase.
    */
   private async refundToOriginalTenders(
-    order: { id: bigint; publicId: string; orderNumber: string; currency: string; cartId: bigint | null; grandTotal: string },
+    order: { id: bigint; publicId: string; orderNumber: string; currency: string; cartId: bigint | null; grandTotal: string; financialStatus: string },
     refundTotalMinor: bigint,
     customerPublicId: string | null,
   ): Promise<void> {
     const walletHolds = order.cartId ? await this.wallets.findCapturedHoldsByRef('CART', order.cartId) : [];
     const giftCardHolds = order.cartId ? await this.giftCards.findCapturedHoldsByRef('CART', order.cartId) : [];
+    const creditCharge =
+      order.cartId && order.financialStatus === 'ON_ACCOUNT' ? await this.companyCredit.findChargeByRef('CART', order.cartId) : null;
 
     const sources: FundingSlice[] = [
       ...walletHolds.map((h) => ({ kind: 'WALLET' as const, originalMinor: toMinorUnits(h.amount), walletId: h.walletId })),
       ...giftCardHolds.map((h) => ({ kind: 'GIFT_CARD' as const, originalMinor: toMinorUnits(h.amount), giftCardId: h.giftCardId })),
+      ...(creditCharge
+        ? [{ kind: 'CREDIT_TERMS' as const, originalMinor: toMinorUnits(creditCharge.amount), creditAccountId: creditCharge.accountId }]
+        : []),
     ];
     const grandTotalMinor = toMinorUnits(order.grandTotal);
     const tenderedMinor = addMinor(...sources.map((s) => s.originalMinor));
@@ -239,6 +263,28 @@ export class RefundOrder {
           // loop tick, and Date.now() alone isn't guaranteed to differ
           // between them.
           gatewayRef: `giftcard_credit_${order.publicId}_${source.giftCardId}_${Date.now()}`,
+        });
+      } else if (source.kind === 'CREDIT_TERMS') {
+        // Reverses the charge (reduces what's owed) rather than crediting
+        // anything — no cash ever changed hands for an unsettled on-account
+        // charge, so there's nothing to "refund," only debt to forgive. Same
+        // CART ref as the original charge for traceability (see this
+        // method's own doc comment on why CompanyCreditTransaction refs
+        // never point at the Order).
+        await this.companyCredit.reverseCharge(source.creditAccountId!, fromMinorUnits(shareMinor), {
+          refType: 'CART',
+          refId: order.cartId!,
+          reason: `Refund/cancellation for order ${order.orderNumber}`,
+        });
+        await this.orders.recordPayment({
+          orderId: order.id,
+          method: 'credit_terms',
+          gateway: 'credit_terms',
+          type: 'REFUND',
+          amountMinor: shareMinor,
+          currency: order.currency,
+          status: 'SUCCEEDED',
+          gatewayRef: null,
         });
       } else {
         // Payment refund is simulated via the same test gateway used at

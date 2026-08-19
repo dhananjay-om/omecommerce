@@ -19,7 +19,9 @@ export class FulfillOrder {
   async execute(cmd: FulfillOrderCommand): Promise<OrderViewDto> {
     const order = await this.orders.findByPublicId(cmd.orderPublicId);
     if (!order) throw new NotFoundError('Order', cmd.orderPublicId);
-    if (order.financialStatus !== 'PAID') {
+    // ON_ACCOUNT (plan/15 Phase 7) ships now, pays later — the whole point
+    // of Net-X credit terms — so it's fulfillable exactly like PAID.
+    if (order.financialStatus !== 'PAID' && order.financialStatus !== 'ON_ACCOUNT') {
       throw new InvalidOrderStateError(`order ${cmd.orderPublicId} is not paid — cannot fulfill`);
     }
 

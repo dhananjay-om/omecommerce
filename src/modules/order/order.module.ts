@@ -61,12 +61,15 @@ import { PrismaCustomerContextLookup } from '../wallet/infrastructure/prisma-cus
 import { CreditWallet } from '../wallet/application/credit-wallet.usecase.js';
 import { PrismaGiftCardLedger } from '../giftcard/infrastructure/prisma-giftcard-ledger.js';
 import { PrismaCouponRepository } from '../coupon/infrastructure/prisma-coupon.repository.js';
+import { PrismaCompanyCreditLedger } from '../company/infrastructure/prisma-company-credit-ledger.js';
 import { ApplyCouponToCart } from './application/apply-coupon-to-cart.usecase.js';
 import { RemoveCouponFromCart } from './application/remove-coupon-from-cart.usecase.js';
 import { ApplyGiftCardToCart } from './application/apply-gift-card-to-cart.usecase.js';
 import { RemoveGiftCardFromCart } from './application/remove-gift-card-from-cart.usecase.js';
 import { ApplyWalletToCart } from './application/apply-wallet-to-cart.usecase.js';
 import { RemoveWalletFromCart } from './application/remove-wallet-from-cart.usecase.js';
+import { ApplyCreditTermsToCart } from './application/apply-credit-terms-to-cart.usecase.js';
+import { RemoveCreditTermsFromCart } from './application/remove-credit-terms-from-cart.usecase.js';
 import {
   createCartSchema,
   addCartLineSchema,
@@ -116,6 +119,11 @@ export function createOrderModule(
   const adminUsers = new PrismaAdminUserLookup(db);
   const companyMemberships = new PrismaCompanyMembershipLookup(db);
   const companies = new PrismaCompanyLookup(db);
+  // Own instance, same "correctness-critical shared logic, imported not
+  // reimplemented" carve-out as StockLedger/PriceResolver/WalletLedger above
+  // — used both for cart tender preview (EnrichCartView) and checkout-time
+  // charging (CompleteCheckout) below.
+  const companyCredit = new PrismaCompanyCreditLedger(db);
   const taxClassLookup = new PrismaTaxClassLookup(db);
   const websiteTaxConfigLookup = new PrismaWebsiteTaxConfigLookup(db);
   const taxCalculator = new NativeGstTaxCalculator(taxClassLookup, websiteTaxConfigLookup);
@@ -148,6 +156,8 @@ export function createOrderModule(
     walletLedger,
     giftCardLedger,
     customerGroups,
+    companyCredit,
+    companyMemberships,
   );
 
   const createCart = new CreateCart(carts, storeContext, customerGroups, customers, companyMemberships, enrichCartView);
@@ -161,6 +171,8 @@ export function createOrderModule(
   const removeGiftCardFromCart = new RemoveGiftCardFromCart(carts, giftCardLedger, enrichCartView);
   const applyWalletToCart = new ApplyWalletToCart(carts, customers, enrichCartView);
   const removeWalletFromCart = new RemoveWalletFromCart(carts, customers, enrichCartView);
+  const applyCreditTermsToCart = new ApplyCreditTermsToCart(carts, customers, enrichCartView);
+  const removeCreditTermsFromCart = new RemoveCreditTermsFromCart(carts, customers, enrichCartView);
   const completeCheckout = new CompleteCheckout(
     carts,
     orders,
@@ -177,6 +189,7 @@ export function createOrderModule(
     walletLedger,
     giftCardLedger,
     companyMemberships,
+    companyCredit,
   );
   const getOrder = new GetOrder(orders, companies);
   const listOrders = new ListOrders(orders);
@@ -193,7 +206,7 @@ export function createOrderModule(
   const pdfRenderer = new PuppeteerPdfRenderer();
   const pdfStorage = new S3PdfStorage();
   const fulfillOrder = new FulfillOrder(orders, warehouses, outbox, pdfRenderer, pdfStorage);
-  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet, walletLedger, giftCardLedger);
+  const refundOrder = new RefundOrder(orders, ledger, variants, warehouses, outbox, customers, creditWallet, walletLedger, giftCardLedger, companyCredit);
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const listTaxClasses = new ListTaxClasses(taxClasses);
@@ -457,6 +470,21 @@ export function createOrderModule(
     requireCustomer,
     asyncHandler(async (req, res) => {
       res.json({ data: await removeWalletFromCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+    }),
+  );
+  // requireCustomer + ownership-checked — same shape as wallet (plan/15 Phase 7).
+  store.post(
+    '/carts/:publicId/actions/apply-credit-terms',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await applyCreditTermsToCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
+    }),
+  );
+  store.post(
+    '/carts/:publicId/actions/remove-credit-terms',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await removeCreditTermsFromCart.execute({ cartPublicId: req.params.publicId!, customerPublicId: req.customer!.customerPublicId }) });
     }),
   );
   // plan/15 Phase 6 — claims a guest cart at login and re-derives its

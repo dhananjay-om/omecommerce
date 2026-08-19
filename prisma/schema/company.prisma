@@ -2,11 +2,36 @@
 // company.prisma — B2B company accounts (plan/15 Phase 6).
 //
 // SCOPE FOR THIS PASS: company accounts + multi-user membership + group-scoped
-// pricing + tax exemption. Explicitly NOT built this pass (documented
-// deferrals): quotes/RFQ, spending-approval chains, Net-30 credit terms
-// (plan/15 Phase 7 — CompanyCreditAccount hangs off Company but doesn't exist
-// yet), multi-company buyers (CompanyCustomer.customerId is unique — one
-// buyer belongs to at most one company, by design, not an oversight).
+// pricing + tax exemption + Net-X credit terms (CompanyCreditAccount/
+// CompanyCreditTransaction, plan/15 Phase 7). Explicitly NOT built:
+// quotes/RFQ, spending-approval chains, multi-company buyers
+// (CompanyCustomer.customerId is unique — one buyer belongs to at most one
+// company, by design, not an oversight).
+//
+// - CompanyCreditAccount is a ledger mirrored from Wallet but inverted —
+//   `outstanding` tracks what the company owes (increases on CHARGE,
+//   decreases on PAYMENT/WRITE_OFF) instead of a spendable balance, guarded
+//   against `creditLimit` instead of against zero. Same
+//   guarded-UPDATE-plus-append-only-ledger discipline as Wallet/
+//   WalletTransaction (storedvalue.prisma) throughout.
+// - One credit account per company (`companyId @unique`) — a company either
+//   has Net-X terms configured or it doesn't; there's no concept of more
+//   than one receivable per company.
+// - `status` reuses WalletStatus (ACTIVE/FROZEN) rather than a new enum —
+//   freezing a credit account blocks further CHARGEs (a company with a
+//   billing dispute) while PAYMENT/ADJUST/WRITE_OFF still work, exactly
+//   mirroring Wallet's freeze semantics for debits vs credits.
+// - CompanyCreditTransaction.refType/refId are bare/generic (not FK'd),
+//   matching WalletTransaction's identical polymorphic-reference precedent —
+//   a CHARGE references the originating Cart (never re-pointed at the Order
+//   once one exists, same reasoning as StoredValueHold's own doc comment;
+//   CompleteCheckout's tender-resolution loop charges credit terms at the
+//   same point in the saga it places wallet/gift-card holds, before the
+//   Order exists yet).
+// - dueAt is computed from the account's CURRENT termsType at charge time and
+//   snapshotted onto the transaction row — a later terms change must never
+//   retroactively move an already-charged order's due date (same snapshot
+//   philosophy as Order.taxExempt from Phase 6).
 //
 // - Company.customerGroupId is a REAL Prisma relation (mirrors
 //   PriceList.customerGroup exactly) — a company IS an assignment into the
@@ -60,8 +85,9 @@ model Company {
   updatedAt           DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt           DateTime?     @map("deleted_at") @db.Timestamptz(6)
 
-  customerGroup CustomerGroup?    @relation(fields: [customerGroupId], references: [id])
+  customerGroup CustomerGroup?        @relation(fields: [customerGroupId], references: [id])
   members       CompanyCustomer[]
+  creditAccount CompanyCreditAccount?
 
   @@unique([websiteId, code], map: "uq_company_website_code")
   @@index([deletedAt])
@@ -96,4 +122,84 @@ model CompanyCustomer {
 
   @@index([companyId])
   @@map("company_customer")
+}
+
+/// A company's B2B Net-X receivable (plan/15 Phase 7) — see this file's
+/// header comment for the Wallet-mirrored, inverted-sign design. No
+/// deletedAt, same reasoning as Wallet (storedvalue.prisma): soft-deleting
+/// an account with nonzero `outstanding` would hide a real liability from
+/// every deletedAt-aware read (the global soft-delete Prisma extension hides
+/// those rows from findMany/count too) — a company with an unpaid balance
+/// must never be able to disappear from AR reporting this way.
+model CompanyCreditAccount {
+  id          BigInt          @id @default(autoincrement())
+  publicId    String          @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  companyId   BigInt          @unique @map("company_id")
+  creditLimit Decimal         @default(0) @map("credit_limit") @db.Decimal(18, 4)
+  outstanding Decimal         @default(0) @db.Decimal(18, 4)
+  currency    String          @db.Char(3)
+  termsType   CreditTermsType @default(NET_30) @map("terms_type")
+  status      WalletStatus    @default(ACTIVE)
+  /// Declared for schema-level parity with Wallet.version — not itself the
+  /// concurrency guard (the WHERE-guarded UPDATE inside charge()/adjust() is
+  /// what makes concurrent charges race-safe), same disclaimer as
+  /// Wallet.version's own doc comment.
+  version     Int             @default(0)
+  createdBy   BigInt?         @map("created_by")
+  updatedBy   BigInt?         @map("updated_by")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company      Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  transactions CompanyCreditTransaction[]
+
+  @@map("company_credit_account")
+}
+
+/// Append-only ledger — outstanding is a projection (a running balance), same
+/// shape as WalletTransaction. No updatedAt/deletedAt: immutable by design.
+model CompanyCreditTransaction {
+  id               BigInt               @id @default(autoincrement())
+  creditAccountId  BigInt               @map("credit_account_id")
+  type             CompanyCreditTxnType
+  /// Signed: CHARGE/a positive ADJUST are positive (increase outstanding);
+  /// PAYMENT/WRITE_OFF/a negative ADJUST are negative (decrease it) — same
+  /// signed-amount convention as WalletTransaction.amount.
+  amount           Decimal              @db.Decimal(18, 4)
+  outstandingAfter Decimal              @map("outstanding_after") @db.Decimal(18, 4)
+  currency         String               @db.Char(3)
+  /// Generic polymorphic reference, matching WalletTransaction.refType/refId
+  /// exactly — a CHARGE references the originating Cart, same StoredValueHold
+  /// precedent WalletTransaction/GiftCardTransaction follow (see this file's
+  /// header comment) and NEVER re-pointed at the Order once one exists (this
+  /// table is append-only, so unlike StoredValueHold it can't be re-pointed
+  /// even if it wanted to). Finding "the charge behind order X" therefore
+  /// always requires the two-hop join `order.cart_id -> (ref_type='CART',
+  /// ref_id=order.cart_id)`, never a direct `ref_id=order.id` lookup — see
+  /// PrismaCompanyCreditLedger.listOpenInvoices()/findChargeByRef() for the
+  /// only two call sites that need it. A WRITE_OFF reversing a charge
+  /// carries that SAME (CART) ref for traceability; PAYMENT/ADJUST carry no
+  /// ref at all — one payment can settle several orders at once (see
+  /// RecordCompanyCreditPayment), so there is no single order to point at.
+  refType          String?              @map("ref_type")
+  refId            BigInt?              @map("ref_id")
+  /// Set if and only if type=CHARGE (DB-enforced) — when payment is due,
+  /// computed from the account's termsType as of charge time. The aging
+  /// report's basis.
+  dueAt            DateTime?            @map("due_at") @db.Timestamptz(6)
+  idempotencyKey   String?              @map("idempotency_key")
+  actorId          BigInt?              @map("actor_id")
+  reason           String?
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  creditAccount CompanyCreditAccount @relation(fields: [creditAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([creditAccountId, idempotencyKey], map: "uq_credit_txn_account_idempotency")
+  @@index([creditAccountId, createdAt])
+  // No @@index([refType, refId]) here — raw SQL adds a partial version scoped
+  // to type='CHARGE' instead (the only rows this lookup ever targets), same
+  // "raw SQL supersedes, doesn't duplicate, the Prisma-declared shape"
+  // pattern StoredValueHold's own ref-based indexes follow (they're raw-SQL
+  // only too — schema-reviewer finding).
+  @@map("company_credit_transaction")
 }

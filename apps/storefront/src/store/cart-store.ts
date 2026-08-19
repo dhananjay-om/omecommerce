@@ -9,6 +9,8 @@ import {
   removeGiftCard as removeGiftCardRequest,
   applyWallet as applyWalletRequest,
   removeWallet as removeWalletRequest,
+  applyCreditTerms as applyCreditTermsRequest,
+  removeCreditTerms as removeCreditTermsRequest,
 } from '@/services/cart.service';
 import type { Cart } from '@/types/cart';
 
@@ -25,6 +27,8 @@ interface CartState {
   removeGiftCard: (giftCardPublicId: string) => Promise<void>;
   applyWallet: () => Promise<void>;
   removeWallet: () => Promise<void>;
+  applyCreditTerms: () => Promise<void>;
+  removeCreditTerms: () => Promise<void>;
 }
 
 export function countItems(cart: Cart | null): number {
@@ -70,6 +74,14 @@ export const useCartStore = create<CartState>((set) => ({
   },
   removeWallet: async () => {
     const cart = await removeWalletRequest();
+    set({ cart, itemCount: countItems(cart) });
+  },
+  applyCreditTerms: async () => {
+    const cart = await applyCreditTermsRequest();
+    set({ cart, itemCount: countItems(cart) });
+  },
+  removeCreditTerms: async () => {
+    const cart = await removeCreditTermsRequest();
     set({ cart, itemCount: countItems(cart) });
   },
 }));

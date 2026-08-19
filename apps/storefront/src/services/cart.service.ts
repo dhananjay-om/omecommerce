@@ -51,3 +51,14 @@ export async function removeWallet(): Promise<Cart> {
   const res = await api.delete<Cart>('/cart/wallet');
   return res.data;
 }
+
+/** requireCustomer-gated server-side — same-origin Route Handler resolves the caller's own session, no body needed. B2B "pay on account" (plan/15 Phase 7). */
+export async function applyCreditTerms(): Promise<Cart> {
+  const res = await api.post<Cart>('/cart/credit-terms');
+  return res.data;
+}
+
+export async function removeCreditTerms(): Promise<Cart> {
+  const res = await api.delete<Cart>('/cart/credit-terms');
+  return res.data;
+}

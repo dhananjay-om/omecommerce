@@ -1,4 +1,4 @@
-import type { CompanyStatus, CompanyMemberRole } from '@prisma/client';
+import type { CompanyStatus, CompanyMemberRole, CreditTermsType, CompanyCreditTxnType, WalletStatus } from '@prisma/client';
 
 export interface CreateCompanyCommand {
   websiteCode: string;
@@ -81,4 +81,63 @@ export interface AddCompanyMemberCommand {
 export interface MyCompanyView {
   company: CompanyView | null;
   myRole: CompanyMemberRole | null;
+}
+
+// --- Credit terms (plan/15 Phase 7) ---
+
+export interface SetCompanyCreditTermsCommand {
+  creditLimit?: string;
+  termsType?: CreditTermsType;
+}
+
+export interface CompanyCreditAccountView {
+  publicId: string;
+  creditLimit: string;
+  outstanding: string;
+  /** creditLimit - outstanding — never negative (the guarded charge() UPDATE can't let outstanding exceed creditLimit). */
+  available: string;
+  currency: string;
+  termsType: CreditTermsType;
+  status: WalletStatus;
+}
+
+export interface CompanyCreditTransactionView {
+  type: CompanyCreditTxnType;
+  amount: string;
+  outstandingAfter: string;
+  currency: string;
+  dueAt: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export type AgingBucketLabel = 'current' | '1-30' | '31-60' | '61-90' | '90+';
+
+export interface OpenInvoiceView {
+  orderPublicId: string;
+  orderNumber: string;
+  amount: string;
+  currency: string;
+  dueAt: string | null;
+  createdAt: string;
+  /** Days past dueAt, 0 if not yet due or no dueAt was ever set. */
+  daysOverdue: number;
+  bucket: AgingBucketLabel;
+}
+
+export interface AgingReportView {
+  buckets: Record<AgingBucketLabel, string>;
+  invoices: OpenInvoiceView[];
+}
+
+export interface RecordCompanyCreditPaymentCommand {
+  amount: string;
+  reason?: string;
+  /** Which open invoices this payment settles — each is flipped to PAID and fires OrderPaid. Orders not currently ON_ACCOUNT (or not this company's) are rejected individually, not silently skipped. */
+  orderPublicIds: string[];
+}
+
+export interface AdjustCompanyCreditCommand {
+  amount: string;
+  reason: string;
 }

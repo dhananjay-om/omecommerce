@@ -60,7 +60,10 @@ export interface CustomerLookup {
  * having to re-check status itself.
  */
 export interface CompanyMembershipLookup {
-  findActiveByCustomerId(customerId: bigint): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean } | null>;
+  /** creditAccountId is null when the company has no Net-X terms configured — CREDIT_TERMS simply isn't an available tender for that customer's cart (plan/15 Phase 7). */
+  findActiveByCustomerId(
+    customerId: bigint,
+  ): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean; creditAccountId: bigint | null } | null>;
 }
 
 /** plan/15 Phase 6 — admin/storefront order-detail "company" badge/link (own copy, not company module's own repository). */

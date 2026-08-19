@@ -9,7 +9,9 @@ import type { CreateInvoiceCommand, OrderViewDto } from './dto.js';
 import { toOrderDto } from './get-order.usecase.js';
 
 /** plan/15 Phase 1. An order must have been paid at least once before it can be invoiced — same guard FulfillOrder already uses. */
-const INVOICEABLE_FINANCIAL_STATUSES = new Set(['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED']);
+// ON_ACCOUNT (plan/15 Phase 7) is invoiceable too — a B2B buyer's invoice IS
+// the bill they'll settle later, not something that waits for settlement.
+const INVOICEABLE_FINANCIAL_STATUSES = new Set(['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'ON_ACCOUNT']);
 
 export class CreateInvoice {
   constructor(

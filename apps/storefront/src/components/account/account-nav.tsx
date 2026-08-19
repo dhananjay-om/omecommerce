@@ -12,6 +12,7 @@ const LINKS = [
   { href: '/account/rewards', label: 'Rewards' },
   { href: '/account/referrals', label: 'Referrals' },
   { href: '/account/company', label: 'Company' },
+  { href: '/account/company/credit', label: 'Company Credit' },
 ];
 
 export function AccountNav() {
@@ -19,7 +20,12 @@ export function AccountNav() {
   return (
     <nav className="flex w-full shrink-0 flex-row gap-1 overflow-x-auto md:w-48 md:flex-col">
       {LINKS.map((link) => {
-        const active = link.href === '/account' ? pathname === '/account' : pathname.startsWith(link.href);
+        // Exact-or-segment-boundary match — plain startsWith would also light up
+        // "Company" while on "Company Credit" since one href prefixes the other.
+        const active =
+          link.href === '/account'
+            ? pathname === '/account'
+            : pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}

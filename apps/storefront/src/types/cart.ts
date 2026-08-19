@@ -49,7 +49,7 @@ export interface Cart {
   tenderError: string | null;
 }
 
-export type TenderType = 'WALLET' | 'GIFT_CARD';
+export type TenderType = 'WALLET' | 'GIFT_CARD' | 'CREDIT_TERMS';
 
 export interface CartTender {
   tenderType: TenderType;

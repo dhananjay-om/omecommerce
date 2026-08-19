@@ -19,8 +19,10 @@ import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import { CouponField } from '@/components/cart/coupon-field';
 import { GiftCardField } from '@/components/cart/gift-card-field';
 import { WalletToggle } from '@/components/cart/wallet-toggle';
+import { CreditTermsToggle } from '@/components/cart/credit-terms-toggle';
 import type { Cart } from '@/types/cart';
 import type { ShippingMethod } from '@/types/order';
+import type { MyCompanyCredit } from '@/types/company';
 
 const TOTAL_STEPS = 5;
 
@@ -35,7 +37,22 @@ function blankToUndefined(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; shippingMethods: ShippingMethod[] }) {
+export function CheckoutPageClient({
+  cart,
+  shippingMethods,
+  myCredit,
+}: {
+  cart: Cart;
+  shippingMethods: ShippingMethod[];
+  /** null covers every non-eligible shopper (guest, no company, no credit terms) — the "pay on account" option and PO field just don't render. */
+  myCredit: MyCompanyCredit | null;
+}) {
+  const creditAccount =
+    myCredit?.account &&
+    myCredit.account.status === 'ACTIVE' &&
+    Number(myCredit.account.available) > 0
+      ? myCredit.account
+      : null;
   const router = useRouter();
   const hydrateCart = useCartStore((s) => s.hydrate);
   const storeCart = useCartStore((s) => s.cart);
@@ -53,12 +70,35 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       email: '',
-      shippingAddress: { name: '', line1: '', line2: '', city: '', region: '', stateCode: '', gstin: '', postalCode: '', country: '', phone: '' },
+      shippingAddress: {
+        name: '',
+        line1: '',
+        line2: '',
+        city: '',
+        region: '',
+        stateCode: '',
+        gstin: '',
+        postalCode: '',
+        country: '',
+        phone: '',
+      },
       sameAsShipping: true,
-      billingAddress: { name: '', line1: '', line2: '', city: '', region: '', stateCode: '', gstin: '', postalCode: '', country: '', phone: '' },
+      billingAddress: {
+        name: '',
+        line1: '',
+        line2: '',
+        city: '',
+        region: '',
+        stateCode: '',
+        gstin: '',
+        postalCode: '',
+        country: '',
+        phone: '',
+      },
       shippingMethodCode: shippingMethods[0]?.code ?? '',
       paymentMethod: 'test_card',
       testScenario: 'approve',
+      poNumber: '',
     },
   });
 
@@ -85,12 +125,17 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
   // method is picked.
   const estimatedGrandTotal =
     displayCart.estimatedTotal !== null
-      ? Number(displayCart.estimatedTotal) + (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0)
+      ? Number(displayCart.estimatedTotal) +
+        (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0)
       : null;
   // Same shipping-inclusive adjustment as estimatedGrandTotal above, applied
   // to amountDue (which — like estimatedTotal — is computed pre-shipping,
   // the only total known before a shipping method is picked).
-  const estimatedAmountDue = displayCart.amountDue !== null ? Number(displayCart.amountDue) + (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0) : null;
+  const estimatedAmountDue =
+    displayCart.amountDue !== null
+      ? Number(displayCart.amountDue) +
+        (selectedShippingMethod ? Number(selectedShippingMethod.flatRate) : 0)
+      : null;
 
   async function goNext() {
     // Step 2's billing fields are only required (and only rendered) when
@@ -138,11 +183,14 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
         shippingMethodCode: values.shippingMethodCode,
         paymentMethod: values.paymentMethod,
         testScenario: values.testScenario,
+        poNumber: blankToUndefined(values.poNumber),
       });
       hydrateCart(); // cart is now CONVERTED server-side; re-hydrate so the header badge reflects a fresh empty cart
       router.push(`/checkout/success/${order.publicId}`);
     } catch (err) {
-      const message = isAxiosError(err) ? (err.response?.data?.error ?? 'Checkout failed. Please try again.') : 'Checkout failed. Please try again.';
+      const message = isAxiosError(err)
+        ? (err.response?.data?.error ?? 'Checkout failed. Please try again.')
+        : 'Checkout failed. Please try again.';
       setSubmitError(message);
     }
   });
@@ -160,7 +208,9 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" {...register('email')} />
-                {errors.email ? <p className="text-xs text-destructive">{errors.email.message}</p> : null}
+                {errors.email ? (
+                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                ) : null}
               </div>
               <AddressFields prefix="shippingAddress" register={register} errors={errors} />
             </div>
@@ -170,10 +220,15 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             <div className="flex flex-col gap-4">
               <h2 className="font-semibold">Billing</h2>
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={sameAsShipping} onCheckedChange={(checked) => setValue('sameAsShipping', checked === true)} />
+                <Checkbox
+                  checked={sameAsShipping}
+                  onCheckedChange={(checked) => setValue('sameAsShipping', checked === true)}
+                />
                 Same as shipping address
               </label>
-              {!sameAsShipping ? <AddressFields prefix="billingAddress" register={register} errors={errors} /> : null}
+              {!sameAsShipping ? (
+                <AddressFields prefix="billingAddress" register={register} errors={errors} />
+              ) : null}
             </div>
           ) : null}
 
@@ -185,12 +240,21 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
               ) : (
                 <div className="flex flex-col gap-2">
                   {shippingMethods.map((method) => (
-                    <label key={method.code} className="flex cursor-pointer items-center justify-between rounded-lg border p-3 has-[:checked]:border-primary">
+                    <label
+                      key={method.code}
+                      className="flex cursor-pointer items-center justify-between rounded-lg border p-3 has-[:checked]:border-primary"
+                    >
                       <span className="flex items-center gap-2">
-                        <input type="radio" value={method.code} {...register('shippingMethodCode')} />
+                        <input
+                          type="radio"
+                          value={method.code}
+                          {...register('shippingMethodCode')}
+                        />
                         {method.name}
                       </span>
-                      <span className="font-medium">{formatPrice(method.flatRate, method.currency)}</span>
+                      <span className="font-medium">
+                        {formatPrice(method.flatRate, method.currency)}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -207,22 +271,37 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  This store uses a test payment gateway — no real card is charged. Card details aren&apos;t collected.
+                  This store uses a test payment gateway — no real card is charged. Card details
+                  aren&apos;t collected.
                 </p>
               )}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="paymentMethod">Payment method</Label>
-                <select id="paymentMethod" {...register('paymentMethod')} className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm">
+                <select
+                  id="paymentMethod"
+                  {...register('paymentMethod')}
+                  className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                >
                   <option value="test_card">Credit Card (test)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="testScenario">Simulate result (test gateway only)</Label>
-                <select id="testScenario" {...register('testScenario')} className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm">
+                <select
+                  id="testScenario"
+                  {...register('testScenario')}
+                  className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                >
                   <option value="approve">Approve payment</option>
                   <option value="decline">Decline payment</option>
                 </select>
               </div>
+              {creditAccount ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="poNumber">PO number (optional)</Label>
+                  <Input id="poNumber" placeholder="e.g. PO-10294" {...register('poNumber')} />
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -238,7 +317,9 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
                     <span>
                       {line.lineTotal ? formatPrice(line.lineTotal, displayCart.currency) : '—'}
                       {line.discountAmount && Number(line.discountAmount) > 0 ? (
-                        <span className="ml-1 text-success">(-{formatPrice(line.discountAmount, displayCart.currency)})</span>
+                        <span className="ml-1 text-success">
+                          (-{formatPrice(line.discountAmount, displayCart.currency)})
+                        </span>
                       ) : null}
                     </span>
                   </div>
@@ -246,7 +327,9 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
               </div>
               <div className="border-t pt-3 text-sm">
                 <p className="font-medium">Ship to</p>
-                <p className="text-muted-foreground">{watch('shippingAddress.line1')}, {watch('shippingAddress.city')}</p>
+                <p className="text-muted-foreground">
+                  {watch('shippingAddress.line1')}, {watch('shippingAddress.city')}
+                </p>
               </div>
               <div className="text-sm">
                 <p className="font-medium">Delivery</p>
@@ -282,7 +365,9 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
               <span>
-                {displayCart.subtotal ? formatPrice(displayCart.subtotal, displayCart.currency) : '—'}
+                {displayCart.subtotal
+                  ? formatPrice(displayCart.subtotal, displayCart.currency)
+                  : '—'}
                 {displayCart.subtotal && displayCart.pricesIncludeTax ? <TaxInclusiveNote /> : null}
               </span>
             </div>
@@ -294,10 +379,16 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             ) : null}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
-              <span>{selectedShippingMethod ? formatPrice(selectedShippingMethod.flatRate, selectedShippingMethod.currency) : '—'}</span>
+              <span>
+                {selectedShippingMethod
+                  ? formatPrice(selectedShippingMethod.flatRate, selectedShippingMethod.currency)
+                  : '—'}
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}</span>
+              <span className="text-muted-foreground">
+                Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}
+              </span>
               <span className={displayCart.pricesIncludeTax ? 'text-muted-foreground' : undefined}>
                 {displayCart.taxTotal
                   ? displayCart.pricesIncludeTax
@@ -310,12 +401,17 @@ export function CheckoutPageClient({ cart, shippingMethods }: { cart: Cart; ship
             </div>
             <div className="flex justify-between border-t pt-1.5 text-base font-bold">
               <span>Estimated Total</span>
-              <span>{estimatedGrandTotal !== null ? formatPrice(estimatedGrandTotal, displayCart.currency) : '—'}</span>
+              <span>
+                {estimatedGrandTotal !== null
+                  ? formatPrice(estimatedGrandTotal, displayCart.currency)
+                  : '—'}
+              </span>
             </div>
           </div>
           <CouponField cart={displayCart} />
           <GiftCardField cart={displayCart} />
           <WalletToggle cart={displayCart} />
+          {creditAccount ? <CreditTermsToggle cart={displayCart} account={creditAccount} /> : null}
           {displayCart.tenders.length > 0 && estimatedAmountDue !== null ? (
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Amount due</span>

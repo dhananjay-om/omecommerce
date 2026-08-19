@@ -273,6 +273,14 @@ enum FinancialStatus {
   VOIDED
   PARTIALLY_PAID
   FAILED
+  /// plan/15 Phase 7 — an order fully or partially settled by B2B Net-X credit
+  /// terms. Deliberately NOT `PAID` (would wrongly fire OrderPaid -> loyalty/
+  /// referral earning for money not yet collected) and NOT a stretch of
+  /// `PARTIALLY_PAID` (that value means "still collecting more via the normal
+  /// checkout tenders," not "billed to a receivable, collected later via
+  /// RecordCompanyCreditPayment"). Becomes PAID — and only then fires
+  /// OrderPaid — once the merchant records payment against the receivable.
+  ON_ACCOUNT
 }
 
 /// Order-level fulfillment progress (aggregate across all order_line rows).
@@ -333,6 +341,10 @@ enum CmsStatus {
 // Stored value: gift cards, wallet, store credit (plan/10-gift-cards-wallet-store-credit.md)
 // ---------------------------------------------------------------------------
 
+/// Also reused (not duplicated) by CompanyCreditAccount.status (plan/15
+/// Phase 7) — ACTIVE/FROZEN apply equivalently to both today, but a future
+/// Wallet-only value appended here becomes silently valid-but-unused for a
+/// credit account too, since Postgres enums aren't scoped per column.
 enum WalletStatus {
   ACTIVE
   FROZEN
@@ -385,6 +397,12 @@ enum WalletSource {
 enum TenderType {
   WALLET
   GIFT_CARD
+  /// plan/15 Phase 7 — B2B Net-X credit terms (pay on account). Unlike WALLET/
+  /// GIFT_CARD, resolving this tender at checkout is a single atomic guarded
+  /// charge (CompanyCreditLedger.charge()), not a two-phase hold — see
+  /// CompleteCheckout's own comment on why no StoredValueHold row exists for
+  /// this tender type.
+  CREDIT_TERMS
 }
 
 /// Same 4-state shape as ReservationStatus (inventory.prisma) — HELD is the
@@ -626,4 +644,30 @@ enum CompanyStatus {
 enum CompanyMemberRole {
   ADMIN
   BUYER
+}
+
+/// company.prisma's CompanyCreditAccount — how many days after an on-account
+/// order is placed payment is due. Snapshotted onto each
+/// CompanyCreditTransaction's dueAt at charge time (the aging report's
+/// basis), so a later terms change never retroactively moves an
+/// already-charged order's due date.
+enum CreditTermsType {
+  NET_15
+  NET_30
+  NET_45
+  NET_60
+}
+
+/// company.prisma's CompanyCreditTransaction — append-only ledger entry
+/// types, same shape as WalletTxnType. CHARGE increases outstanding (an
+/// on-account order placed); PAYMENT decreases it (the merchant recorded
+/// money actually received against the receivable); ADJUST is a signed
+/// manual correction; WRITE_OFF is the compensating reversal used when a
+/// charge never should have stuck — a checkout that failed downstream, or an
+/// order cancelled before it was ever settled (plan/15 Phase 7).
+enum CompanyCreditTxnType {
+  CHARGE
+  PAYMENT
+  ADJUST
+  WRITE_OFF
 }
