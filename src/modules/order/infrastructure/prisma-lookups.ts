@@ -70,13 +70,22 @@ export class PrismaCustomerGroupLookup implements CustomerGroupLookup {
 export class PrismaCompanyMembershipLookup implements CompanyMembershipLookup {
   constructor(private readonly db: Db) {}
 
-  async findActiveByCustomerId(customerId: bigint): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean } | null> {
+  async findActiveByCustomerId(
+    customerId: bigint,
+  ): Promise<{ companyId: bigint; customerGroupId: bigint | null; taxExempt: boolean; creditAccountId: bigint | null } | null> {
     const membership = await this.db.companyCustomer.findUnique({
       where: { customerId },
-      select: { company: { select: { id: true, status: true, customerGroupId: true, taxExempt: true, deletedAt: true } } },
+      select: {
+        company: { select: { id: true, status: true, customerGroupId: true, taxExempt: true, deletedAt: true, creditAccount: { select: { id: true } } } },
+      },
     });
     if (!membership || membership.company.deletedAt || membership.company.status !== 'ACTIVE') return null;
-    return { companyId: membership.company.id, customerGroupId: membership.company.customerGroupId, taxExempt: membership.company.taxExempt };
+    return {
+      companyId: membership.company.id,
+      customerGroupId: membership.company.customerGroupId,
+      taxExempt: membership.company.taxExempt,
+      creditAccountId: membership.company.creditAccount?.id ?? null,
+    };
   }
 }
 

@@ -1,9 +1,19 @@
-import type { VariantLookup, CartProductMediaLookup, CartLineView, WebsiteTaxConfigLookup, TaxClassLookup, CartTenderView, CustomerGroupLookup } from '../domain/repositories.js';
+import type {
+  VariantLookup,
+  CartProductMediaLookup,
+  CartLineView,
+  WebsiteTaxConfigLookup,
+  TaxClassLookup,
+  CartTenderView,
+  CustomerGroupLookup,
+  CompanyMembershipLookup,
+} from '../domain/repositories.js';
 import type { MediaUrlResolver } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { DiscountCalculator, DiscountLineInput } from '../../coupon/domain/repositories.js';
 import type { WalletLedger } from '../../wallet/domain/repositories.js';
 import type { GiftCardLedger } from '../../giftcard/domain/repositories.js';
+import type { CompanyCreditLedger } from '../../company/domain/repositories.js';
 import { DomainError } from '../../../shared/domain/errors.js';
 import { addMinor, subtractMinor, multiplyByQty, applyRate, extractTaxExclusive, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
 import type { CartLineDto, CartView, CartTenderDto } from './dto.js';
@@ -43,6 +53,8 @@ export class EnrichCartView {
     private readonly wallets: WalletLedger,
     private readonly giftCards: GiftCardLedger,
     private readonly customerGroups: CustomerGroupLookup,
+    private readonly companyCredit: CompanyCreditLedger,
+    private readonly companyMemberships: CompanyMembershipLookup,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -197,8 +209,11 @@ export class EnrichCartView {
       return { tenders: [], amountDue: null, tenderError: null };
     }
 
+    // Same 3-way priority as CompleteCheckout's real resolution loop —
+    // gift cards drain first, then wallet, then credit terms last.
+    const TENDER_PRIORITY: Record<CartTenderView['tenderType'], number> = { GIFT_CARD: 0, WALLET: 1, CREDIT_TERMS: 2 };
     const sorted = [...cart.tenders].sort((a, b) => {
-      if (a.tenderType !== b.tenderType) return a.tenderType === 'GIFT_CARD' ? -1 : 1;
+      if (a.tenderType !== b.tenderType) return TENDER_PRIORITY[a.tenderType] - TENDER_PRIORITY[b.tenderType];
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
 
@@ -218,7 +233,7 @@ export class EnrichCartView {
           const appliedAmount = appliedMinor > 0n ? fromMinorUnits(appliedMinor) : '0.0000';
           tenders.push({ tenderType: 'GIFT_CARD', giftCardLast4: giftCard.codeLast4, giftCardPublicId: giftCard.publicId, appliedAmount });
           remainingMinor = subtractMinor(remainingMinor, appliedMinor > 0n ? appliedMinor : 0n);
-        } else {
+        } else if (tender.tenderType === 'WALLET') {
           if (!cart.customerId) throw new DomainError('a wallet tender requires a signed-in customer', 'https://errors.ome/wallet-requires-customer', 409);
           const wallet = await this.wallets.getOrCreateWallet(cart.customerId, cart.websiteId, cart.currency);
           const snapshot = await this.wallets.findByPublicId(wallet.publicId);
@@ -228,6 +243,21 @@ export class EnrichCartView {
           const appliedMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
           const appliedAmount = appliedMinor > 0n ? fromMinorUnits(appliedMinor) : '0.0000';
           tenders.push({ tenderType: 'WALLET', giftCardLast4: null, giftCardPublicId: null, appliedAmount });
+          remainingMinor = subtractMinor(remainingMinor, appliedMinor > 0n ? appliedMinor : 0n);
+        } else {
+          if (!cart.customerId) throw new DomainError('a credit-terms tender requires a signed-in customer', 'https://errors.ome/credit-terms-requires-customer', 409);
+          const membership = await this.companyMemberships.findActiveByCustomerId(cart.customerId);
+          if (!membership?.creditAccountId) {
+            throw new DomainError('this customer has no B2B credit account', 'https://errors.ome/credit-account-not-found', 409);
+          }
+          const account = await this.companyCredit.findById(membership.creditAccountId);
+          if (!account) throw new DomainError('B2B credit account no longer exists', 'https://errors.ome/credit-account-not-found', 404);
+          if (account.status !== 'ACTIVE') throw new DomainError('B2B credit account is frozen', 'https://errors.ome/credit-account-frozen', 409);
+          if (account.currency !== cart.currency) throw new DomainError('credit account currency no longer matches the cart', 'https://errors.ome/currency-mismatch', 409);
+          const availableMinor = subtractMinor(toMinorUnits(account.creditLimit), toMinorUnits(account.outstanding));
+          const appliedMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
+          const appliedAmount = appliedMinor > 0n ? fromMinorUnits(appliedMinor) : '0.0000';
+          tenders.push({ tenderType: 'CREDIT_TERMS', giftCardLast4: null, giftCardPublicId: null, appliedAmount });
           remainingMinor = subtractMinor(remainingMinor, appliedMinor > 0n ? appliedMinor : 0n);
         }
       } catch (err) {

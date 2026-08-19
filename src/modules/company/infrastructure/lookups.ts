@@ -9,8 +9,8 @@ export class PrismaWebsiteLookup implements WebsiteLookup {
     return this.db.website.findFirst({ where: { code }, select: { id: true } });
   }
 
-  async byId(id: bigint): Promise<{ code: string } | null> {
-    return this.db.website.findFirst({ where: { id }, select: { code: true } });
+  async byId(id: bigint): Promise<{ code: string; baseCurrency: string } | null> {
+    return this.db.website.findFirst({ where: { id }, select: { code: true, baseCurrency: true } });
   }
 }
 

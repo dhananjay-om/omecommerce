@@ -307,8 +307,17 @@ export interface VariantStock {
   available: number;
 }
 
-export type OrderStatus = 'PENDING' | 'PROCESSING' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED' | 'CONFIRMED' | 'CLOSED';
-export type FinancialStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'VOIDED' | 'PARTIALLY_PAID' | 'FAILED';
+export type OrderStatus =
+  'PENDING' | 'PROCESSING' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED' | 'CONFIRMED' | 'CLOSED';
+export type FinancialStatus =
+  | 'PENDING'
+  | 'AUTHORIZED'
+  | 'PAID'
+  | 'PARTIALLY_REFUNDED'
+  | 'REFUNDED'
+  | 'VOIDED'
+  | 'PARTIALLY_PAID'
+  | 'FAILED';
 export type FulfillmentStatus = 'UNFULFILLED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'RETURNED';
 
 export interface OrderListItem {
@@ -600,7 +609,17 @@ export interface WidgetInstance {
 export type WalletStatus = 'ACTIVE' | 'FROZEN';
 export type WalletBucket = 'STORE_CREDIT' | 'PREPAID_TOPUP' | 'CASHBACK' | 'LOYALTY_CONVERSION';
 export type WalletTxnType = 'CREDIT' | 'DEBIT' | 'ADJUST' | 'EXPIRE';
-export type WalletSource = 'REFUND' | 'RETURN' | 'GOODWILL' | 'TOPUP' | 'CASHBACK' | 'LOYALTY' | 'GIFTCARD_LOAD' | 'PROMO' | 'ADMIN_ADJUST' | 'REFERRAL';
+export type WalletSource =
+  | 'REFUND'
+  | 'RETURN'
+  | 'GOODWILL'
+  | 'TOPUP'
+  | 'CASHBACK'
+  | 'LOYALTY'
+  | 'GIFTCARD_LOAD'
+  | 'PROMO'
+  | 'ADMIN_ADJUST'
+  | 'REFERRAL';
 
 export interface WalletView {
   publicId: string;
@@ -820,4 +839,50 @@ export interface CompanyMember {
   email: string;
   role: CompanyMemberRole;
   createdAt: string;
+}
+
+/** plan/reflective-prancing-sonnet Phase 7 — B2B Net-X credit terms (pay on account + settlement). */
+export type CreditTermsType = 'NET_15' | 'NET_30' | 'NET_45' | 'NET_60';
+export type CompanyCreditTxnType = 'CHARGE' | 'PAYMENT' | 'ADJUST' | 'WRITE_OFF';
+
+export interface CompanyCreditAccountView {
+  publicId: string;
+  creditLimit: string;
+  outstanding: string;
+  /** creditLimit - outstanding, never negative. */
+  available: string;
+  currency: string;
+  termsType: CreditTermsType;
+  status: 'ACTIVE' | 'FROZEN';
+}
+
+export interface CompanyCreditTransactionView {
+  type: CompanyCreditTxnType;
+  /** Signed: CHARGE/positive ADJUST positive, PAYMENT/WRITE_OFF/negative ADJUST negative. */
+  amount: string;
+  outstandingAfter: string;
+  currency: string;
+  /** ISO date, only set on CHARGE rows. */
+  dueAt: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export type AgingBucketLabel = 'current' | '1-30' | '31-60' | '61-90' | '90+';
+
+export interface OpenInvoiceView {
+  orderPublicId: string;
+  orderNumber: string;
+  amount: string;
+  currency: string;
+  dueAt: string | null;
+  createdAt: string;
+  daysOverdue: number;
+  bucket: AgingBucketLabel;
+}
+
+export interface AgingReportView {
+  /** Total amount per bucket. */
+  buckets: Record<AgingBucketLabel, string>;
+  invoices: OpenInvoiceView[];
 }

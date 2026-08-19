@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CompanyStatus, CompanyMemberRole } from '@prisma/client';
+import { CompanyStatus, CompanyMemberRole, CreditTermsType, WalletStatus } from '@prisma/client';
 
 /** Normalizes a whitespace-only or blank string to undefined before the real
  *  schema sees it — own-copy per module, same convention as store/order/catalog. */
@@ -57,4 +57,26 @@ export const addCompanyMemberSchema = z.object({
 
 export const updateCompanyMemberRoleSchema = z.object({
   role: z.nativeEnum(CompanyMemberRole),
+});
+
+// --- Credit terms (plan/15 Phase 7) ---
+
+export const setCompanyCreditTermsSchema = z.object({
+  creditLimit: z.string().min(1).optional(),
+  termsType: z.nativeEnum(CreditTermsType).optional(),
+});
+
+export const recordCompanyCreditPaymentSchema = z.object({
+  amount: z.string().min(1),
+  reason: blankToUndefined(z.string().max(1000).nullish()),
+  orderPublicIds: z.array(z.string().uuid()).min(1),
+});
+
+export const adjustCompanyCreditSchema = z.object({
+  amount: z.string().min(1),
+  reason: z.string().min(1).max(1000),
+});
+
+export const setCompanyCreditAccountStatusSchema = z.object({
+  status: z.nativeEnum(WalletStatus),
 });

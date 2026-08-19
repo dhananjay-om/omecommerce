@@ -24,6 +24,8 @@ export interface CheckoutInput {
   paymentMethod: string;
   /** Test-only seam mirroring TestPaymentGateway's own (plan/14 Phase 7 — no real payment processor exists). */
   testScenario?: 'approve' | 'decline';
+  /** A B2B buyer's purchase-order reference (plan/15 Phase 7) — print-only, snapshotted onto Order.poNumber regardless of whether credit terms are actually used on this order. */
+  poNumber?: string | null;
 }
 
 /**

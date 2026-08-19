@@ -6,8 +6,10 @@ import type { StockLedger, ReservationHandle } from '../../inventory/domain/repo
 import type { DiscountCalculator } from '../../coupon/domain/repositories.js';
 import type { WalletLedger, StoredValueHoldHandle as WalletHoldHandle } from '../../wallet/domain/repositories.js';
 import type { GiftCardLedger, StoredValueHoldHandle as GiftCardHoldHandle } from '../../giftcard/domain/repositories.js';
+import type { CompanyCreditLedger } from '../../company/domain/repositories.js';
 import { InsufficientAvailableBalanceError } from '../../wallet/domain/errors.js';
 import { InsufficientAvailableGiftCardBalanceError } from '../../giftcard/domain/errors.js';
+import { CreditLimitExceededError } from '../../company/domain/errors.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 import { PaymentDeclinedError } from '../domain/errors.js';
 import { addMinor, subtractMinor, multiplyByQty, toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
@@ -22,8 +24,19 @@ interface PricedLine {
   subtotalMinor: bigint;
 }
 
-/** One placed stored-value hold, tagged with which ledger placed it (so capture/release routes to the right one). */
-type TenderHold = { tenderType: 'WALLET'; hold: WalletHoldHandle } | { tenderType: 'GIFT_CARD'; hold: GiftCardHoldHandle };
+/**
+ * One placed stored-value hold, tagged with which ledger placed it (so
+ * capture/release routes to the right one). CREDIT_TERMS is deliberately
+ * NOT a two-phase hold (plan/15 Phase 7) — charge()'s guarded UPDATE is
+ * itself atomic and already-real the moment it succeeds, so this entry only
+ * carries what's needed to record a payment-transaction row on success or
+ * call reverseCharge() on failure, mirroring the other two tenders' shape
+ * closely enough to share the same array/loop.
+ */
+type TenderHold =
+  | { tenderType: 'WALLET'; hold: WalletHoldHandle }
+  | { tenderType: 'GIFT_CARD'; hold: GiftCardHoldHandle }
+  | { tenderType: 'CREDIT_TERMS'; creditAccountId: bigint; amountMinor: bigint };
 
 /**
  * The checkout saga (plan/08 §3). Sequence, matching the plan text precisely:
@@ -62,6 +75,7 @@ export class CompleteCheckout {
     private readonly wallets: WalletLedger,
     private readonly giftCards: GiftCardLedger,
     private readonly companyMemberships: CompanyMembershipLookup,
+    private readonly companyCredit: CompanyCreditLedger,
   ) {}
 
   async execute(cmd: CompleteCheckoutCommand): Promise<OrderViewDto> {
@@ -221,15 +235,18 @@ export class CompleteCheckout {
 
     // Step 4.5: resolve cart tenders live and place real holds, each capped
     // at what's still due — gift cards drain first (in application order),
-    // then wallet (plan/15 Phase 5). Mirrors step 3's inventory-reserve loop
-    // exactly: any failure here releases every hold already placed (via the
-    // outer catch in execute(), which now also calls releaseAllHolds).
-    // Order creation happens AFTER this so a failed hold never needs an
-    // order to roll back — same ordering reasoning as inventory reservation
-    // happening before order creation.
+    // then wallet (plan/15 Phase 5), then credit terms LAST (plan/15 Phase
+    // 7 — the entire reason Phase 5 had to come first: this slots into the
+    // same resolution loop as its final tender). Mirrors step 3's
+    // inventory-reserve loop exactly: any failure here releases/reverses
+    // everything already placed (via the outer catch in execute(), which
+    // now also calls releaseAllHolds). Order creation happens AFTER this so
+    // a failed hold never needs an order to roll back — same ordering
+    // reasoning as inventory reservation happening before order creation.
     let remainingMinor = grandTotalMinor;
+    const TENDER_PRIORITY: Record<CartTenderView['tenderType'], number> = { GIFT_CARD: 0, WALLET: 1, CREDIT_TERMS: 2 };
     const sortedTenders = [...cart.tenders].sort((a, b) => {
-      if (a.tenderType !== b.tenderType) return a.tenderType === 'GIFT_CARD' ? -1 : 1;
+      if (a.tenderType !== b.tenderType) return TENDER_PRIORITY[a.tenderType] - TENDER_PRIORITY[b.tenderType];
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
     for (const tender of sortedTenders) {
@@ -254,7 +271,7 @@ export class CompleteCheckout {
         } catch (err) {
           if (!(err instanceof InsufficientAvailableGiftCardBalanceError)) throw err;
         }
-      } else {
+      } else if (tender.tenderType === 'WALLET') {
         if (!cart.customerId) continue; // apply-wallet already requires a customer, but stay defensive
         const wallet = await this.wallets.getOrCreateWallet(cart.customerId, ctx.websiteId, cart.currency);
         const snapshot = await this.wallets.findByPublicId(wallet.publicId);
@@ -272,6 +289,29 @@ export class CompleteCheckout {
           remainingMinor = subtractMinor(remainingMinor, holdMinor);
         } catch (err) {
           if (!(err instanceof InsufficientAvailableBalanceError)) throw err;
+        }
+      } else {
+        // CREDIT_TERMS (plan/15 Phase 7) — a single atomic guarded charge,
+        // not a two-phase hold (see TenderHold's own doc comment on why).
+        // companyMembership was already resolved above for taxExempt; reused
+        // here rather than re-querying membership a second time.
+        if (!cart.customerId || !companyMembership?.creditAccountId) continue;
+        const account = await this.companyCredit.findById(companyMembership.creditAccountId);
+        if (!account || account.status !== 'ACTIVE' || account.currency !== cart.currency) continue;
+        const availableMinor = subtractMinor(toMinorUnits(account.creditLimit), toMinorUnits(account.outstanding));
+        if (availableMinor <= 0n) continue;
+        const chargeMinor = availableMinor < remainingMinor ? availableMinor : remainingMinor;
+        try {
+          // Same race-loss-degrades-gracefully reasoning as gift-card/wallet
+          // above — `availableMinor` is only a snapshot, charge()'s own
+          // guarded UPDATE is what's actually race-safe against concurrent
+          // checkouts drawing on the same credit limit (the 10-concurrent
+          // proof this phase's integration test repeats for the third time).
+          await this.companyCredit.charge(account.id, fromMinorUnits(chargeMinor), { refType: 'CART', refId: cart.id });
+          holds.push({ tenderType: 'CREDIT_TERMS', creditAccountId: account.id, amountMinor: chargeMinor });
+          remainingMinor = subtractMinor(remainingMinor, chargeMinor);
+        } catch (err) {
+          if (!(err instanceof CreditLimitExceededError)) throw err;
         }
       }
     }
@@ -424,8 +464,13 @@ export class CompleteCheckout {
       }
       // Capture every hold — writes the real ledger DEBIT/REDEEM row — and
       // records one PaymentTransaction per tender, same shape as the PSP
-      // capture above (method 'wallet'/'giftcard', gatewayRef = the hold's
-      // own publicId so a refund can trace straight back to it).
+      // capture above (method 'wallet'/'giftcard'/'credit_terms', gatewayRef
+      // = the hold's own publicId so a refund can trace straight back to
+      // it — CREDIT_TERMS has no such handle since it was never a two-phase
+      // hold, so gatewayRef is null there; nothing else needs a "capture"
+      // call, the guarded charge() already moved the real ledger balance
+      // when it was applied above).
+      let usedCreditTerms = false;
       for (const h of holds) {
         if (h.tenderType === 'GIFT_CARD') {
           await this.giftCards.captureHold(h.hold.publicId);
@@ -439,7 +484,7 @@ export class CompleteCheckout {
             status: 'SUCCEEDED',
             gatewayRef: h.hold.publicId,
           });
-        } else {
+        } else if (h.tenderType === 'WALLET') {
           await this.wallets.captureHold(h.hold.publicId);
           await this.orders.recordPayment({
             orderId: order.id,
@@ -451,24 +496,55 @@ export class CompleteCheckout {
             status: 'SUCCEEDED',
             gatewayRef: h.hold.publicId,
           });
+        } else {
+          usedCreditTerms = true;
+          await this.orders.recordPayment({
+            orderId: order.id,
+            method: 'credit_terms',
+            gateway: 'credit_terms',
+            type: 'CAPTURE',
+            amountMinor: h.amountMinor,
+            currency: cart.currency,
+            status: 'SUCCEEDED',
+            gatewayRef: null,
+          });
         }
       }
-      await this.orders.setFinancialStatus(order.id, 'PAID');
-      await this.orders.setOrderStatus(order.id, 'PROCESSING');
-      await this.outbox.write({
-        aggregateType: 'Order',
-        aggregateId: order.publicId,
-        eventType: 'OrderPaid',
-        payload: { orderNumber: order.orderNumber, grandTotal: fromMinorUnits(grandTotalMinor) },
-      });
-      await this.orders.recordHistory({
-        orderId: order.id,
-        eventType: 'PAYMENT_RECEIVED',
-        fromValue: 'PENDING',
-        toValue: 'PAID',
-        message: remainingMinor > 0n ? `Payment captured via ${cmd.paymentMethod}` : 'Payment fully covered by wallet/gift card tenders',
-        actorType: 'SYSTEM',
-      });
+      // plan/15 Phase 7 — an order funded (even partially) by credit terms
+      // becomes ON_ACCOUNT, not PAID, and OrderPaid is deliberately NOT fired
+      // here: firing it now would wrongly trigger loyalty earning/referral
+      // qualification for money not yet actually collected. It becomes PAID
+      // — and only then fires OrderPaid — once RecordCompanyCreditPayment
+      // settles the receivable.
+      if (usedCreditTerms) {
+        await this.orders.setFinancialStatus(order.id, 'ON_ACCOUNT');
+        await this.orders.setOrderStatus(order.id, 'PROCESSING');
+        await this.orders.recordHistory({
+          orderId: order.id,
+          eventType: 'PAYMENT_RECEIVED',
+          fromValue: 'PENDING',
+          toValue: 'ON_ACCOUNT',
+          message: 'Order placed on account — awaiting settlement of the credit-terms portion',
+          actorType: 'SYSTEM',
+        });
+      } else {
+        await this.orders.setFinancialStatus(order.id, 'PAID');
+        await this.orders.setOrderStatus(order.id, 'PROCESSING');
+        await this.outbox.write({
+          aggregateType: 'Order',
+          aggregateId: order.publicId,
+          eventType: 'OrderPaid',
+          payload: { orderNumber: order.orderNumber, grandTotal: fromMinorUnits(grandTotalMinor) },
+        });
+        await this.orders.recordHistory({
+          orderId: order.id,
+          eventType: 'PAYMENT_RECEIVED',
+          fromValue: 'PENDING',
+          toValue: 'PAID',
+          message: remainingMinor > 0n ? `Payment captured via ${cmd.paymentMethod}` : 'Payment fully covered by wallet/gift card tenders',
+          actorType: 'SYSTEM',
+        });
+      }
     } else {
       await this.releaseAll(reservations);
       await this.releaseAllHolds(holds);
@@ -508,8 +584,12 @@ export class CompleteCheckout {
     for (const h of holds) {
       if (h.tenderType === 'GIFT_CARD') {
         await this.giftCards.releaseHold(h.hold.publicId).catch(() => undefined);
-      } else {
+      } else if (h.tenderType === 'WALLET') {
         await this.wallets.releaseHold(h.hold.publicId).catch(() => undefined);
+      } else {
+        // reverseCharge() never throws (see its own "unguarded" contract),
+        // but caught defensively anyway for symmetry with the other two.
+        await this.companyCredit.reverseCharge(h.creditAccountId, fromMinorUnits(h.amountMinor)).catch(() => undefined);
       }
     }
   }

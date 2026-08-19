@@ -37,6 +37,8 @@ export const checkoutSchema = z
     shippingMethodCode: z.string().min(1, 'Select a shipping method.'),
     paymentMethod: z.string().min(1),
     testScenario: z.enum(['approve', 'decline']),
+    /** B2B purchase-order reference (plan/15 Phase 7) — print-only, optional even when paying on account. */
+    poNumber: z.string().optional(),
   })
   .superRefine((values, ctx) => {
     if (values.sameAsShipping) return;
@@ -62,9 +64,25 @@ export const checkoutSchema = z
 
 export type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
-export const STEP_FIELDS: Record<number, (keyof CheckoutFormValues | `${'shippingAddress' | 'billingAddress'}.${string}`)[]> = {
-  1: ['email', 'shippingAddress.name', 'shippingAddress.line1', 'shippingAddress.city', 'shippingAddress.postalCode', 'shippingAddress.country'],
-  2: ['billingAddress.name', 'billingAddress.line1', 'billingAddress.city', 'billingAddress.postalCode', 'billingAddress.country'],
+export const STEP_FIELDS: Record<
+  number,
+  (keyof CheckoutFormValues | `${'shippingAddress' | 'billingAddress'}.${string}`)[]
+> = {
+  1: [
+    'email',
+    'shippingAddress.name',
+    'shippingAddress.line1',
+    'shippingAddress.city',
+    'shippingAddress.postalCode',
+    'shippingAddress.country',
+  ],
+  2: [
+    'billingAddress.name',
+    'billingAddress.line1',
+    'billingAddress.city',
+    'billingAddress.postalCode',
+    'billingAddress.country',
+  ],
   3: ['shippingMethodCode'],
   4: ['paymentMethod'],
   5: [],
