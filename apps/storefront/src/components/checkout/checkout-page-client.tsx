@@ -23,8 +23,49 @@ import { CreditTermsToggle } from '@/components/cart/credit-terms-toggle';
 import type { Cart } from '@/types/cart';
 import type { ShippingMethod } from '@/types/order';
 import type { MyCompanyCredit } from '@/types/company';
+import type { CustomerAddress } from '@/types/customer';
 
 const TOTAL_STEPS = 5;
+
+/**
+ * Quick-fill cards above the shipping/billing address form for a signed-in
+ * shopper's saved address book (plan/16) — clicking one fills the form below
+ * via setValue rather than replacing the form entirely, so a shopper can
+ * still tweak a field (or type a brand new address) without losing the form
+ * altogether. Saved addresses carry no stateCode/gstin (those are checkout-
+ * only fields — see AddressFields), so picking one leaves whatever the
+ * shopper already typed there untouched instead of clobbering it.
+ */
+function SavedAddressPicker({
+  addresses,
+  onSelect,
+}: {
+  addresses: CustomerAddress[];
+  onSelect: (address: CustomerAddress) => void;
+}) {
+  if (addresses.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">Use a saved address</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {addresses.map((a) => (
+          <button
+            key={a.publicId}
+            type="button"
+            onClick={() => onSelect(a)}
+            className="rounded-lg border p-3 text-left text-sm transition-colors hover:border-primary"
+          >
+            <div className="font-medium">{a.name}</div>
+            <div className="text-muted-foreground">
+              {a.line1}, {a.city} {a.postalCode}
+            </div>
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">Or enter a different address below.</p>
+    </div>
+  );
+}
 
 /** An untouched optional field is '' (react-hook-form's default), and a stray
  *  space (accidental keystroke, browser autofill) is just as blank in intent
@@ -41,11 +82,14 @@ export function CheckoutPageClient({
   cart,
   shippingMethods,
   myCredit,
+  savedAddresses,
 }: {
   cart: Cart;
   shippingMethods: ShippingMethod[];
   /** null covers every non-eligible shopper (guest, no company, no credit terms) — the "pay on account" option and PO field just don't render. */
   myCredit: MyCompanyCredit | null;
+  /** Empty for a guest or a signed-in shopper with nothing saved yet — the picker just doesn't render (AddressFields' blank form still does). */
+  savedAddresses: CustomerAddress[];
 }) {
   const creditAccount =
     myCredit?.account &&
@@ -150,6 +194,20 @@ export function CheckoutPageClient({
     setStep((s) => Math.max(1, s - 1));
   }
 
+  function applySavedAddress(
+    prefix: 'shippingAddress' | 'billingAddress',
+    address: CustomerAddress,
+  ) {
+    setValue(`${prefix}.name`, address.name);
+    setValue(`${prefix}.line1`, address.line1);
+    setValue(`${prefix}.line2`, address.line2 ?? '');
+    setValue(`${prefix}.city`, address.city);
+    setValue(`${prefix}.region`, address.region ?? '');
+    setValue(`${prefix}.postalCode`, address.postalCode);
+    setValue(`${prefix}.country`, address.country);
+    setValue(`${prefix}.phone`, address.phone ?? '');
+  }
+
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     try {
@@ -212,6 +270,10 @@ export function CheckoutPageClient({
                   <p className="text-xs text-destructive">{errors.email.message}</p>
                 ) : null}
               </div>
+              <SavedAddressPicker
+                addresses={savedAddresses}
+                onSelect={(a) => applySavedAddress('shippingAddress', a)}
+              />
               <AddressFields prefix="shippingAddress" register={register} errors={errors} />
             </div>
           ) : null}
@@ -227,7 +289,13 @@ export function CheckoutPageClient({
                 Same as shipping address
               </label>
               {!sameAsShipping ? (
-                <AddressFields prefix="billingAddress" register={register} errors={errors} />
+                <>
+                  <SavedAddressPicker
+                    addresses={savedAddresses}
+                    onSelect={(a) => applySavedAddress('billingAddress', a)}
+                  />
+                  <AddressFields prefix="billingAddress" register={register} errors={errors} />
+                </>
               ) : null}
             </div>
           ) : null}
