@@ -1,4 +1,4 @@
-const STEPS = ['Shipping', 'Billing', 'Delivery', 'Payment', 'Review'];
+const STEPS = ['Shipping & Billing', 'Delivery', 'Payment & Review'];
 
 export function CheckoutSteps({ current }: { current: number }) {
   return (
@@ -19,7 +19,9 @@ export function CheckoutSteps({ current }: { current: number }) {
             >
               {step}
             </span>
-            <span className={state === 'upcoming' ? 'text-muted-foreground' : 'font-medium'}>{label}</span>
+            <span className={state === 'upcoming' ? 'text-muted-foreground' : 'font-medium'}>
+              {label}
+            </span>
             {step < STEPS.length ? <span className="text-muted-foreground">/</span> : null}
           </li>
         );

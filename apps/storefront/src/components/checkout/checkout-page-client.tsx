@@ -14,7 +14,12 @@ import { completeCheckout } from '@/services/checkout.service';
 import { useCartStore, countItems } from '@/store/cart-store';
 import { CheckoutSteps } from './checkout-steps';
 import { AddressFields } from './address-fields';
-import { checkoutSchema, STEP_FIELDS, type CheckoutFormValues } from './checkout-schema';
+import {
+  checkoutSchema,
+  STEP_FIELDS,
+  BILLING_ADDRESS_FIELDS,
+  type CheckoutFormValues,
+} from './checkout-schema';
 import { formatPrice } from '@/lib/format-price';
 import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import { CouponField } from '@/components/cart/coupon-field';
@@ -26,7 +31,7 @@ import type { ShippingMethod } from '@/types/order';
 import type { MyCompanyCredit } from '@/types/company';
 import type { CustomerAddress } from '@/types/customer';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 3;
 
 /**
  * A real radio group (not plain clickable cards) above the shipping/billing
@@ -220,10 +225,13 @@ export function CheckoutPageClient({
       : null;
 
   async function goNext() {
-    // Step 2's billing fields are only required (and only rendered) when
-    // "same as shipping" is unchecked — validating them while hidden would
-    // block advancing on fields the user was never shown.
-    const fields = step === 2 && sameAsShipping ? [] : (STEP_FIELDS[step] ?? []);
+    // Billing address fields are only required (and only rendered) when
+    // "same as shipping" is unchecked on step 1 — validating them while
+    // hidden would block advancing on fields the user was never shown.
+    const fields = [
+      ...(STEP_FIELDS[step] ?? []),
+      ...(step === 1 && !sameAsShipping ? BILLING_ADDRESS_FIELDS : []),
+    ];
     const valid = fields.length === 0 || (await trigger(fields as (keyof CheckoutFormValues)[]));
     if (valid) setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   }
@@ -302,50 +310,70 @@ export function CheckoutPageClient({
       <div className="flex flex-col gap-8 lg:flex-row">
         <form onSubmit={onSubmit} className="flex-1 rounded-lg border p-6">
           {step === 1 ? (
-            <div className="flex flex-col gap-4">
-              <h2 className="font-semibold">Shipping</h2>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" {...register('email')} />
-                {errors.email ? (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
+                <h2 className="font-semibold">Shipping</h2>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" {...register('email')} />
+                  {errors.email ? (
+                    <p className="text-xs text-destructive">{errors.email.message}</p>
+                  ) : null}
+                </div>
+                <SavedAddressPicker
+                  addresses={savedAddresses}
+                  groupName="saved-shipping-address"
+                  selectedId={selectedShippingAddressId}
+                  onSelect={(a) => applySavedAddress('shippingAddress', a)}
+                />
+                {selectedShippingAddressId ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedShippingAddressId(null)}
+                    className="self-start text-xs font-medium text-primary hover:underline"
+                  >
+                    Enter a different address instead
+                  </button>
+                ) : (
+                  <AddressFields prefix="shippingAddress" register={register} errors={errors} />
+                )}
+              </div>
+
+              <div className="flex flex-col gap-4 border-t pt-6">
+                <h2 className="font-semibold">Billing</h2>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={sameAsShipping}
+                    onCheckedChange={(checked) => setValue('sameAsShipping', checked === true)}
+                  />
+                  Same as shipping address
+                </label>
+                {!sameAsShipping ? (
+                  <>
+                    <SavedAddressPicker
+                      addresses={savedAddresses}
+                      groupName="saved-billing-address"
+                      selectedId={selectedBillingAddressId}
+                      onSelect={(a) => applySavedAddress('billingAddress', a)}
+                    />
+                    {selectedBillingAddressId ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBillingAddressId(null)}
+                        className="self-start text-xs font-medium text-primary hover:underline"
+                      >
+                        Enter a different address instead
+                      </button>
+                    ) : (
+                      <AddressFields prefix="billingAddress" register={register} errors={errors} />
+                    )}
+                  </>
                 ) : null}
               </div>
-              <SavedAddressPicker
-                addresses={savedAddresses}
-                groupName="saved-shipping-address"
-                selectedId={selectedShippingAddressId}
-                onSelect={(a) => applySavedAddress('shippingAddress', a)}
-              />
-              <AddressFields prefix="shippingAddress" register={register} errors={errors} />
             </div>
           ) : null}
 
           {step === 2 ? (
-            <div className="flex flex-col gap-4">
-              <h2 className="font-semibold">Billing</h2>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={sameAsShipping}
-                  onCheckedChange={(checked) => setValue('sameAsShipping', checked === true)}
-                />
-                Same as shipping address
-              </label>
-              {!sameAsShipping ? (
-                <>
-                  <SavedAddressPicker
-                    addresses={savedAddresses}
-                    groupName="saved-billing-address"
-                    selectedId={selectedBillingAddressId}
-                    onSelect={(a) => applySavedAddress('billingAddress', a)}
-                  />
-                  <AddressFields prefix="billingAddress" register={register} errors={errors} />
-                </>
-              ) : null}
-            </div>
-          ) : null}
-
-          {step === 3 ? (
             <div className="flex flex-col gap-4">
               <h2 className="font-semibold">Delivery</h2>
               {shippingMethods.length === 0 ? (
@@ -375,80 +403,80 @@ export function CheckoutPageClient({
             </div>
           ) : null}
 
-          {step === 4 ? (
-            <div className="flex flex-col gap-4">
-              <h2 className="font-semibold">Payment</h2>
-              {estimatedAmountDue !== null && estimatedAmountDue <= 0 ? (
-                <p className="text-sm text-success">
-                  Your wallet/gift card tenders cover the full total — no card payment is needed.
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  This store uses a test payment gateway — no real card is charged. Card details
-                  aren&apos;t collected.
-                </p>
-              )}
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="paymentMethod">Payment method</Label>
-                <select
-                  id="paymentMethod"
-                  {...register('paymentMethod')}
-                  className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                >
-                  <option value="test_card">Credit Card (test)</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="testScenario">Simulate result (test gateway only)</Label>
-                <select
-                  id="testScenario"
-                  {...register('testScenario')}
-                  className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                >
-                  <option value="approve">Approve payment</option>
-                  <option value="decline">Decline payment</option>
-                </select>
-              </div>
-              {creditAccount ? (
+          {step === 3 ? (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
+                <h2 className="font-semibold">Payment</h2>
+                {estimatedAmountDue !== null && estimatedAmountDue <= 0 ? (
+                  <p className="text-sm text-success">
+                    Your wallet/gift card tenders cover the full total — no card payment is needed.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    This store uses a test payment gateway — no real card is charged. Card details
+                    aren&apos;t collected.
+                  </p>
+                )}
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="poNumber">PO number (optional)</Label>
-                  <Input id="poNumber" placeholder="e.g. PO-10294" {...register('poNumber')} />
+                  <Label htmlFor="paymentMethod">Payment method</Label>
+                  <select
+                    id="paymentMethod"
+                    {...register('paymentMethod')}
+                    className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                  >
+                    <option value="test_card">Credit Card (test)</option>
+                  </select>
                 </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {step === 5 ? (
-            <div className="flex flex-col gap-4">
-              <h2 className="font-semibold">Review</h2>
-              <div className="flex flex-col gap-1 text-sm">
-                {displayCart.lines.map((line) => (
-                  <div key={line.id} className="flex justify-between">
-                    <span>
-                      {line.name} &times; {line.qty}
-                    </span>
-                    <span>
-                      {line.lineTotal ? formatPrice(line.lineTotal, displayCart.currency) : '—'}
-                      {line.discountAmount && Number(line.discountAmount) > 0 ? (
-                        <span className="ml-1 text-success">
-                          (-{formatPrice(line.discountAmount, displayCart.currency)})
-                        </span>
-                      ) : null}
-                    </span>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="testScenario">Simulate result (test gateway only)</Label>
+                  <select
+                    id="testScenario"
+                    {...register('testScenario')}
+                    className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                  >
+                    <option value="approve">Approve payment</option>
+                    <option value="decline">Decline payment</option>
+                  </select>
+                </div>
+                {creditAccount ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="poNumber">PO number (optional)</Label>
+                    <Input id="poNumber" placeholder="e.g. PO-10294" {...register('poNumber')} />
                   </div>
-                ))}
+                ) : null}
               </div>
-              <div className="border-t pt-3 text-sm">
-                <p className="font-medium">Ship to</p>
-                <p className="text-muted-foreground">
-                  {watch('shippingAddress.line1')}, {watch('shippingAddress.city')}
-                </p>
+
+              <div className="flex flex-col gap-4 border-t pt-6">
+                <h2 className="font-semibold">Review</h2>
+                <div className="flex flex-col gap-1 text-sm">
+                  {displayCart.lines.map((line) => (
+                    <div key={line.id} className="flex justify-between">
+                      <span>
+                        {line.name} &times; {line.qty}
+                      </span>
+                      <span>
+                        {line.lineTotal ? formatPrice(line.lineTotal, displayCart.currency) : '—'}
+                        {line.discountAmount && Number(line.discountAmount) > 0 ? (
+                          <span className="ml-1 text-success">
+                            (-{formatPrice(line.discountAmount, displayCart.currency)})
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium">Ship to</p>
+                  <p className="text-muted-foreground">
+                    {watch('shippingAddress.line1')}, {watch('shippingAddress.city')}
+                  </p>
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium">Delivery</p>
+                  <p className="text-muted-foreground">{selectedShippingMethod?.name ?? '—'}</p>
+                </div>
+                {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
               </div>
-              <div className="text-sm">
-                <p className="font-medium">Delivery</p>
-                <p className="text-muted-foreground">{selectedShippingMethod?.name ?? '—'}</p>
-              </div>
-              {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
             </div>
           ) : null}
 

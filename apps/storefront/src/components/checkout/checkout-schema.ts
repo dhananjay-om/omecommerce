@@ -64,6 +64,17 @@ export const checkoutSchema = z
 
 export type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
+/** Billing address fields are added conditionally by the caller (only when
+ *  `sameAsShipping` is false) — see checkout-page-client.tsx's goNext(),
+ *  which is why they're not baked into step 1's own list here. */
+export const BILLING_ADDRESS_FIELDS: `billingAddress.${string}`[] = [
+  'billingAddress.name',
+  'billingAddress.line1',
+  'billingAddress.city',
+  'billingAddress.postalCode',
+  'billingAddress.country',
+];
+
 export const STEP_FIELDS: Record<
   number,
   (keyof CheckoutFormValues | `${'shippingAddress' | 'billingAddress'}.${string}`)[]
@@ -76,14 +87,6 @@ export const STEP_FIELDS: Record<
     'shippingAddress.postalCode',
     'shippingAddress.country',
   ],
-  2: [
-    'billingAddress.name',
-    'billingAddress.line1',
-    'billingAddress.city',
-    'billingAddress.postalCode',
-    'billingAddress.country',
-  ],
-  3: ['shippingMethodCode'],
-  4: ['paymentMethod'],
-  5: [],
+  2: ['shippingMethodCode'],
+  3: ['paymentMethod'],
 };
