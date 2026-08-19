@@ -124,6 +124,7 @@ export function CheckoutPageClient({
   shippingMethods,
   myCredit,
   savedAddresses,
+  customerEmail,
 }: {
   cart: Cart;
   shippingMethods: ShippingMethod[];
@@ -131,6 +132,8 @@ export function CheckoutPageClient({
   myCredit: MyCompanyCredit | null;
   /** Empty for a guest or a signed-in shopper with nothing saved yet — the picker just doesn't render (AddressFields' blank form still does). */
   savedAddresses: CustomerAddress[];
+  /** null for a guest — the email field stays a plain editable input for them. A signed-in shopper's account email is already known, so it's shown read-only instead of asked for again. */
+  customerEmail: string | null;
 }) {
   const creditAccount =
     myCredit?.account &&
@@ -156,7 +159,7 @@ export function CheckoutPageClient({
   } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      email: '',
+      email: customerEmail ?? '',
       shippingAddress: {
         name: '',
         line1: '',
@@ -313,13 +316,20 @@ export function CheckoutPageClient({
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-4">
                 <h2 className="font-semibold">Shipping</h2>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" {...register('email')} />
-                  {errors.email ? (
-                    <p className="text-xs text-destructive">{errors.email.message}</p>
-                  ) : null}
-                </div>
+                {customerEmail ? (
+                  <p className="text-sm text-muted-foreground">
+                    Order confirmation goes to{' '}
+                    <span className="font-medium text-foreground">{customerEmail}</span>.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" {...register('email')} />
+                    {errors.email ? (
+                      <p className="text-xs text-destructive">{errors.email.message}</p>
+                    ) : null}
+                  </div>
+                )}
                 <SavedAddressPicker
                   addresses={savedAddresses}
                   groupName="saved-shipping-address"
