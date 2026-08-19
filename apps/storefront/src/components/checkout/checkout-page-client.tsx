@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,41 +29,76 @@ import type { CustomerAddress } from '@/types/customer';
 const TOTAL_STEPS = 5;
 
 /**
- * Quick-fill cards above the shipping/billing address form for a signed-in
- * shopper's saved address book (plan/16) — clicking one fills the form below
- * via setValue rather than replacing the form entirely, so a shopper can
- * still tweak a field (or type a brand new address) without losing the form
- * altogether. Saved addresses carry no stateCode/gstin (those are checkout-
- * only fields — see AddressFields), so picking one leaves whatever the
- * shopper already typed there untouched instead of clobbering it.
+ * A real radio group (not plain clickable cards) above the shipping/billing
+ * address form for a signed-in shopper's saved address book (plan/16) — the
+ * selected card gets a visible checked state, matching the shipping-method
+ * step's own radio-card pattern. Selecting a card fills the form below via
+ * setValue rather than replacing the form entirely, so a shopper can still
+ * tweak a field (or type a brand new address by leaving the group
+ * unselected) without losing the form altogether. Saved addresses carry no
+ * stateCode/gstin (those are checkout-only fields — see AddressFields), so
+ * picking one leaves whatever the shopper already typed there untouched
+ * instead of clobbering it.
+ *
+ * "Add or edit addresses" deliberately opens /account/addresses in a NEW TAB
+ * rather than navigating checkout away to it — this multi-step form's
+ * progress (which step, unsubmitted field values) lives only in client
+ * state, not the server-side cart, so a same-tab redirect would silently
+ * lose it. The shopper finishes managing addresses in the other tab, then
+ * comes back and re-opens this picker (Step back/forward re-fetches nothing,
+ * so a newly added address won't appear without a page refresh — an
+ * accepted, documented limitation, not a bug to chase).
  */
 function SavedAddressPicker({
   addresses,
+  groupName,
+  selectedId,
   onSelect,
 }: {
   addresses: CustomerAddress[];
+  groupName: string;
+  selectedId: string | null;
   onSelect: (address: CustomerAddress) => void;
 }) {
   if (addresses.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">Use a saved address</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Saved addresses</p>
+        <Link
+          href="/account/addresses"
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          Add or edit addresses
+        </Link>
+      </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {addresses.map((a) => (
-          <button
+          <label
             key={a.publicId}
-            type="button"
-            onClick={() => onSelect(a)}
-            className="rounded-lg border p-3 text-left text-sm transition-colors hover:border-primary"
+            className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm transition-colors has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"
           >
-            <div className="font-medium">{a.name}</div>
-            <div className="text-muted-foreground">
-              {a.line1}, {a.city} {a.postalCode}
-            </div>
-          </button>
+            <input
+              type="radio"
+              name={groupName}
+              className="mt-1"
+              checked={selectedId === a.publicId}
+              onChange={() => onSelect(a)}
+            />
+            <span>
+              <span className="block font-medium">{a.name}</span>
+              <span className="block text-muted-foreground">
+                {a.line1}, {a.city} {a.postalCode}
+              </span>
+            </span>
+          </label>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">Or enter a different address below.</p>
+      <p className="text-xs text-muted-foreground">
+        Or leave unselected and enter a different address below.
+      </p>
     </div>
   );
 }
@@ -103,6 +139,8 @@ export function CheckoutPageClient({
   const hydrated = useCartStore((s) => s.hydrated);
   const [step, setStep] = useState(1);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selectedShippingAddressId, setSelectedShippingAddressId] = useState<string | null>(null);
+  const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -198,6 +236,9 @@ export function CheckoutPageClient({
     prefix: 'shippingAddress' | 'billingAddress',
     address: CustomerAddress,
   ) {
+    (prefix === 'shippingAddress' ? setSelectedShippingAddressId : setSelectedBillingAddressId)(
+      address.publicId,
+    );
     setValue(`${prefix}.name`, address.name);
     setValue(`${prefix}.line1`, address.line1);
     setValue(`${prefix}.line2`, address.line2 ?? '');
@@ -272,6 +313,8 @@ export function CheckoutPageClient({
               </div>
               <SavedAddressPicker
                 addresses={savedAddresses}
+                groupName="saved-shipping-address"
+                selectedId={selectedShippingAddressId}
                 onSelect={(a) => applySavedAddress('shippingAddress', a)}
               />
               <AddressFields prefix="shippingAddress" register={register} errors={errors} />
@@ -292,6 +335,8 @@ export function CheckoutPageClient({
                 <>
                   <SavedAddressPicker
                     addresses={savedAddresses}
+                    groupName="saved-billing-address"
+                    selectedId={selectedBillingAddressId}
                     onSelect={(a) => applySavedAddress('billingAddress', a)}
                   />
                   <AddressFields prefix="billingAddress" register={register} errors={errors} />
