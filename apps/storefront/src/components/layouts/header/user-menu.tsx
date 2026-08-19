@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -46,7 +47,10 @@ export function UserMenu() {
         }
       />
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{firstName ? `Hi, ${firstName}` : 'My Account'}</DropdownMenuLabel>
+        {/* Base UI requires GroupLabel to live inside a Group — a bare Label crashed the whole menu on open. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{firstName ? `Hi, ${firstName}` : 'My Account'}</DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/account" />}>Account</DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/account/orders" />}>Orders</DropdownMenuItem>
