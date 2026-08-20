@@ -129,6 +129,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      # Same value as the storefront service's own SITE_URL below — only used
+      # here for a clickable "View Order Details" link inside order emails.
+      SITE_URL: https://${DOMAIN}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

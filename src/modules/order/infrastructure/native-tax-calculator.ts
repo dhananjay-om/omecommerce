@@ -30,7 +30,7 @@ export class PrismaWebsiteTaxConfigLookup implements WebsiteTaxConfigLookup {
   async byId(websiteId: bigint) {
     const row = await this.db.website.findFirst({
       where: { id: websiteId },
-      select: { name: true, gstin: true, originStateCode: true, pricesIncludeTax: true, address: true, logoMediaKey: true },
+      select: { name: true, gstin: true, originStateCode: true, pricesIncludeTax: true, address: true, logoMediaKey: true, supportEmail: true },
     });
     if (!row) return null;
     return {
@@ -40,6 +40,7 @@ export class PrismaWebsiteTaxConfigLookup implements WebsiteTaxConfigLookup {
       pricesIncludeTax: row.pricesIncludeTax,
       address: row.address,
       logoMediaKey: row.logoMediaKey,
+      supportEmail: row.supportEmail,
     };
   }
 }

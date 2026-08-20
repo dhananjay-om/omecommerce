@@ -183,6 +183,8 @@ export interface WebsiteTaxConfigLookup {
     address: string | null;
     /** S3 key for the invoice-letterhead logo — see store.prisma's Website.logoMediaKey doc comment. */
     logoMediaKey: string | null;
+    /** Store contact address shown in transactional emails' footer — see store.prisma's Website.supportEmail doc comment. */
+    supportEmail: string | null;
   } | null>;
 }
 
