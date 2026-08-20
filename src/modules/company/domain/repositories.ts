@@ -192,7 +192,11 @@ export interface CompanyCreditLedger {
  * until the receivable is actually collected.
  */
 export interface CompanyOrderSettlement {
-  /** Only matches an order that is ON_ACCOUNT and belongs to this company — a settled, cancelled, or otherwise-owned order returns null. */
-  findSettleableByPublicId(companyId: bigint, orderPublicId: string): Promise<{ id: bigint; publicId: string; orderNumber: string } | null>;
+  /** Only matches an order that is ON_ACCOUNT and belongs to this company — a settled, cancelled, or otherwise-owned order returns null.
+   *  grandTotal lets RecordCompanyCreditPayment validate a recorded payment actually covers every named order before marking them all settled. */
+  findSettleableByPublicId(
+    companyId: bigint,
+    orderPublicId: string,
+  ): Promise<{ id: bigint; publicId: string; orderNumber: string; grandTotal: string } | null>;
   markSettled(orderId: bigint): Promise<void>;
 }

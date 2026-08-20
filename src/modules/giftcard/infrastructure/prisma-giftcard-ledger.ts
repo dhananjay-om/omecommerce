@@ -176,11 +176,16 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
 
   async redeem(giftCardId: bigint, amount: string, opts: LedgerWriteOptions = {}): Promise<GiftCardSnapshot> {
     return this.db.$transaction(async (tx) => {
+      // Guarded against (balance - held_balance), not balance — same held-balance-aware
+      // guard as hold() below. Without this, redeeming a card into a wallet (or any other
+      // redeem caller) could spend value a concurrent checkout hold already earmarked, and
+      // the later captureHold() would then drive the card negative capturing money redeem()
+      // just took (plan/15 code-review finding: gift card double-spend via held_balance bypass).
       const rows = await tx.$queryRaw<GiftCardRow[]>`
         UPDATE gift_card
            SET balance = balance - ${amount}::numeric,
                status = CASE WHEN balance - ${amount}::numeric = 0 THEN 'REDEEMED'::"GiftCardStatus" ELSE status END
-         WHERE id = ${giftCardId} AND balance >= ${amount}::numeric AND status = 'ACTIVE'
+         WHERE id = ${giftCardId} AND (balance - held_balance) >= ${amount}::numeric AND status = 'ACTIVE'
          RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
       if (rows.length === 0) {
         throw new InsufficientGiftCardBalanceError(amount);
@@ -331,12 +336,19 @@ export class PrismaGiftCardLedger implements GiftCardLedger {
         throw new InvalidGiftCardHoldStateError(`gift card hold ${holdPublicId} is not HELD`);
       }
       const { gift_card_id, amount } = holdRows[0]!;
+      // Guarded the same as redeem()/hold() — a hold's held_balance should always be
+      // covered by the time it's captured, but this is the last line of defense against
+      // driving the card negative if that invariant was ever violated upstream (e.g. a
+      // manual DB correction, or a future bug in another mutation path).
       const rows = await tx.$queryRaw<GiftCardRow[]>`
         UPDATE gift_card
            SET balance = balance - ${amount}::numeric, held_balance = held_balance - ${amount}::numeric,
                status = CASE WHEN balance - ${amount}::numeric = 0 THEN 'REDEEMED'::"GiftCardStatus" ELSE status END
-         WHERE id = ${gift_card_id}
+         WHERE id = ${gift_card_id} AND balance >= ${amount}::numeric AND held_balance >= ${amount}::numeric
          RETURNING id, public_id, website_id, code_last4, initial_amount::text, balance::text, held_balance::text, currency, status::text, kind::text, source::text, expires_at`;
+      if (rows.length === 0) {
+        throw new InsufficientGiftCardBalanceError(amount);
+      }
       const snapshot = rows[0]!;
       await tx.$executeRaw`
         INSERT INTO gift_card_transaction (gift_card_id, type, amount, balance_after, currency, ref_type, ref_id)
