@@ -161,7 +161,19 @@ export function DashboardNav() {
   const activeHref = bestMatchingHref(pathname);
   const activeGroup = activeGroupKey(pathname);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // Kept populated through the close animation — clearing openKey alone (leaving this
+  // as-is) lets the panel slide/fade out still showing its last content, instead of
+  // the flyout going visually blank a beat before it finishes disappearing.
+  const [renderedGroup, setRenderedGroup] = useState<NavGroup | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  function openFlyout(group: NavGroup) {
+    setRenderedGroup(group);
+    setOpenKey(group.key);
+  }
+  function closeFlyout() {
+    setOpenKey(null);
+  }
 
   // Close on navigation — this layout persists across route changes (Link clicks
   // don't unmount it), so the flyout needs an explicit reset. Adjusted during
@@ -176,10 +188,10 @@ export function DashboardNav() {
   useEffect(() => {
     if (!openKey) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpenKey(null);
+      if (e.key === 'Escape') closeFlyout();
     }
     function onPointerDown(e: PointerEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpenKey(null);
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) closeFlyout();
     }
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('pointerdown', onPointerDown);
@@ -189,7 +201,7 @@ export function DashboardNav() {
     };
   }, [openKey]);
 
-  const openGroup = NAV_GROUPS.find((g) => g.key === openKey) ?? null;
+  const isOpen = openKey !== null;
 
   return (
     <nav className="flex flex-col items-center gap-1">
@@ -197,10 +209,11 @@ export function DashboardNav() {
         const Icon = group.icon;
         const active = group.key === activeGroup;
         const railButtonClass = cn(
-          'flex w-16 flex-col items-center gap-1 rounded-lg py-2.5 text-[10.5px] font-medium tracking-wide transition-colors',
+          'flex w-16 flex-col items-center gap-1 rounded-lg py-2.5 text-[10.5px] font-medium tracking-wide',
+          'transition-all duration-150 ease-out active:scale-90',
           active || group.key === openKey
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/55 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground',
+            : 'text-sidebar-foreground/55 hover:scale-105 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground',
         );
 
         if (group.href) {
@@ -218,7 +231,7 @@ export function DashboardNav() {
             type="button"
             className={railButtonClass}
             aria-expanded={group.key === openKey}
-            onClick={() => setOpenKey((k) => (k === group.key ? null : group.key))}
+            onClick={() => (openKey === group.key ? closeFlyout() : openFlyout(group))}
           >
             <Icon className="size-5" strokeWidth={2} />
             <span className="text-center leading-tight uppercase">{group.label}</span>
@@ -226,39 +239,53 @@ export function DashboardNav() {
         );
       })}
 
-      {openGroup ? (
-        <>
-          {/* Dims the page behind the flyout and catches outside clicks — panelRef's own
-              pointerdown listener above handles the actual close, this is just the visual scrim. */}
-          <div className="fixed inset-0 z-40 bg-black/20" aria-hidden="true" />
-          <div
-            ref={panelRef}
-            className="fixed top-0 bottom-0 left-16 z-50 w-[420px] overflow-y-auto bg-sidebar text-sidebar-foreground shadow-2xl"
-          >
-            <div className="flex items-center justify-between px-6 pt-6 pb-4">
-              <h2 className="text-xl font-bold tracking-tight">{openGroup.label}</h2>
+      {/* Backdrop + panel stay mounted permanently (rather than only while open) so
+          closing can play a real slide/fade transition instead of an instant unmount —
+          pointer-events are switched off while closed so the invisible panel never
+          blocks clicks on the page underneath. */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] transition-opacity duration-200 ease-out',
+          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        className={cn(
+          'fixed top-0 bottom-0 left-16 z-50 w-[600px] max-w-[calc(100vw-4rem)] overflow-y-auto bg-sidebar text-sidebar-foreground shadow-2xl',
+          'transition-all duration-200 ease-out',
+          isOpen ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-6 opacity-0',
+        )}
+      >
+        {renderedGroup ? (
+          <>
+            <div className="flex items-center justify-between px-8 pt-7 pb-5">
+              <h2 className="text-2xl font-bold tracking-tight">{renderedGroup.label}</h2>
               <button
                 type="button"
-                onClick={() => setOpenKey(null)}
+                onClick={closeFlyout}
                 aria-label="Close menu"
-                className="rounded-md p-1 text-sidebar-foreground/50 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground"
+                className="rounded-md p-1.5 text-sidebar-foreground/50 transition-all duration-150 hover:scale-110 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground active:scale-95"
               >
                 <X className="size-5" />
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-0.5 px-4 pb-6 sm:grid-cols-2">
-              {openGroup.items.map((item) => {
+            <div className="grid grid-cols-1 gap-x-8 gap-y-1 px-6 pb-8 sm:grid-cols-2">
+              {renderedGroup.items.map((item, i) => {
                 const itemActive = item.href === activeHref;
                 const ItemIcon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    style={isOpen ? { transitionDelay: `${Math.min(i, 8) * 20}ms` } : undefined}
                     className={cn(
-                      'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+                      'flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm transition-all duration-200 ease-out',
+                      isOpen ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0',
                       itemActive
                         ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground'
-                        : 'font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground',
+                        : 'font-medium text-sidebar-foreground/70 hover:translate-x-0.5 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground',
                     )}
                   >
                     <ItemIcon className="size-4 shrink-0" strokeWidth={2} />
@@ -267,9 +294,9 @@ export function DashboardNav() {
                 );
               })}
             </div>
-          </div>
-        </>
-      ) : null}
+          </>
+        ) : null}
+      </div>
     </nav>
   );
 }
