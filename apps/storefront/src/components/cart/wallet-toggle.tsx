@@ -16,6 +16,11 @@ export function WalletToggle({
   walletBalance,
 }: {
   cart: Cart;
+  /** null covers a guest AND a signed-in shopper with a stale/invalid session (see
+   *  loadForSignedInShopper) — either way there's no usable wallet to pay with right
+   *  now, so nothing renders at all rather than a checkbox that would just fail on
+   *  click with a confusing "session expired" message a guest never had a session to
+   *  expire in the first place. */
   walletBalance: string | null;
 }) {
   const applyWallet = useCartStore((s) => s.applyWallet);
@@ -24,6 +29,8 @@ export function WalletToggle({
   const [error, setError] = useState<FriendlyTenderError | null>(null);
 
   const walletTender = cart.tenders.find((t) => t.tenderType === 'WALLET');
+
+  if (walletBalance === null) return null;
 
   // Admin-configured rule blocking the tender entirely right now (store-wide
   // disabled, or this cart doesn't clear the configured minimum order value)
@@ -68,14 +75,13 @@ export function WalletToggle({
           ) : null}
         </Label>
       </div>
-      {walletBalance !== null ? (
-        // Shown unconditionally, including a genuine ₹0.00 — a shopper
-        // deciding whether to check this box needs to know their balance
-        // either way, not just once it's already been applied.
-        <p className="pl-6 text-xs text-muted-foreground">
-          Available balance: {formatPrice(walletBalance, cart.currency)}
-        </p>
-      ) : null}
+      {/* Shown unconditionally once we're past the walletBalance === null early
+          return above, including a genuine ₹0.00 — a shopper deciding whether
+          to check this box needs to know their balance either way, not just
+          once it's already been applied. */}
+      <p className="pl-6 text-xs text-muted-foreground">
+        Available balance: {formatPrice(walletBalance, cart.currency)}
+      </p>
       {error ? (
         <p className="text-sm text-destructive">
           {error.message}
