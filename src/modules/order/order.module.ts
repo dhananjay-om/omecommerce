@@ -7,6 +7,7 @@ import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-reso
 import { PrismaStockLedger } from '../inventory/infrastructure/prisma-stock-ledger.js';
 import { PrismaCartRepository } from './infrastructure/prisma-cart.repository.js';
 import { PrismaOrderRepository } from './infrastructure/prisma-order.repository.js';
+import type { OrderRepository } from './domain/repositories.js';
 import {
   PrismaVariantLookup,
   PrismaWarehouseResolver,
@@ -72,6 +73,9 @@ import { GetPackingSlipPdfUrl } from './application/get-packing-slip-pdf-url.use
 import { SendOrderEmail } from './application/send-order-email.usecase.js';
 import { GetEmailLog } from './application/get-email-log.usecase.js';
 import { SimulatedEmailSender } from './infrastructure/simulated-email-sender.js';
+import { SmtpEmailSender } from './infrastructure/smtp-email-sender.js';
+import type { EmailSender } from './domain/ports.js';
+import { env } from '../../config/env.js';
 import { CloseOrder } from './application/close-order.usecase.js';
 import { ExportOrders } from './application/export-orders.usecase.js';
 import { GetCustomerOrder } from './application/get-customer-order.usecase.js';
@@ -121,6 +125,42 @@ import { applyCouponSchema } from '../coupon/interface/http/schemas.js';
 export interface OrderRouters {
   admin: Router;
   store: Router;
+}
+
+/**
+ * Real SMTP only when both SMTP_USER/SMTP_PASS are configured — same
+ * "absent credentials -> simulated adapter" fallback TestPaymentGateway
+ * established for payments (see SimulatedEmailSender's own doc comment).
+ * Shared by createOrderModule (the HTTP composition root, for the manual
+ * "Send Email" admin action) and createOrderEmailDeps below (the worker
+ * composition root, for automatic order-lifecycle emails) so both paths
+ * always send through the exact same adapter.
+ */
+function createEmailSender(): EmailSender {
+  if (env.SMTP_USER && env.SMTP_PASS) {
+    return new SmtpEmailSender({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+      from: env.SMTP_FROM ?? env.SMTP_USER,
+    });
+  }
+  return new SimulatedEmailSender();
+}
+
+/**
+ * Deps for the worker-side automatic order-lifecycle emails (order-
+ * notification.worker.ts) — same "own small composition, independent of the
+ * Express app's createOrderModule" pattern as loyalty.module.ts's
+ * createLoyaltyEarnDeps, since a BullMQ worker process never runs
+ * createOrderModule's HTTP routes.
+ */
+export function createOrderEmailDeps(db: Db): { sendOrderEmail: SendOrderEmail; orders: OrderRepository } {
+  const orders = new PrismaOrderRepository(db);
+  const adminUsers = new PrismaAdminUserLookup(db);
+  const emailSender = createEmailSender();
+  return { sendOrderEmail: new SendOrderEmail(orders, adminUsers, emailSender), orders };
 }
 
 /**
@@ -311,7 +351,7 @@ export function createOrderModule(
     websiteTaxConfigLookup,
   );
   const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
-  const emailSender = new SimulatedEmailSender();
+  const emailSender = createEmailSender();
   const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
   const getEmailLog = new GetEmailLog(orders);
   const closeOrder = new CloseOrder(orders, outbox);
