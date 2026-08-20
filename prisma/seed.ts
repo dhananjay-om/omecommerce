@@ -5,6 +5,7 @@
  */
 import { PrismaClient, ProductType, ProductStatus } from '@prisma/client';
 import { ScryptPasswordHasher } from '../src/modules/auth/infrastructure/scrypt-password-hasher.js';
+import { ALL_PERMISSIONS, SUPER_ADMIN_ROLE_CODE } from '../src/modules/auth/domain/permission-catalog.js';
 
 const prisma = new PrismaClient();
 const hasher = new ScryptPasswordHasher();
@@ -99,34 +100,18 @@ async function main() {
   });
 
   // --- RBAC: permissions, a super-admin role, and a default dev admin user ---
-  const PERMISSIONS = [
-    { code: 'admin:manage', description: 'Create/manage admin users' },
-    { code: 'orders:view', description: 'View orders, order history, and add order notes' },
-    { code: 'orders:fulfill', description: 'Create shipments/fulfillments for orders' },
-    { code: 'orders:refund', description: 'Issue order refunds' },
-    { code: 'orders:cancel', description: 'Cancel orders' },
-    { code: 'orders:invoice', description: 'Create, view, and email order invoices' },
-    { code: 'orders:email', description: 'Send order-related emails to customers' },
-    { code: 'orders:close', description: 'Close completed orders' },
-    { code: 'orders:export', description: 'Export the order grid to CSV/Excel' },
-    { code: 'inventory:adjust', description: 'Adjust warehouse stock levels' },
-    { code: 'catalog:manage', description: 'Manage attribute sets, attributes, and bulk product import' },
-    { code: 'cms:manage', description: 'Manage CMS pages and blocks' },
-    { code: 'banner:manage', description: 'Manage marketing banners (hero slider, promo grid)' },
-    { code: 'widget:manage', description: 'Manage placeable content widgets and their layout placement' },
-    { code: 'wallet:manage', description: 'Manage customer wallets, store credit, and gift cards' },
-    { code: 'loyalty:manage', description: 'Manage loyalty programs, tiers, and customer point balances' },
-    { code: 'referral:manage', description: 'Manage referral programs' },
-    { code: 'coupon:manage', description: 'Manage discount coupons' },
-    { code: 'company:manage', description: 'Manage B2B companies and their members' },
-  ];
-  for (const p of PERMISSIONS) {
+  // Permission definitions live in src/modules/auth/domain/permission-catalog.ts —
+  // SyncPermissions (Stores > Admin Permissions in the admin UI) runs this exact
+  // same upsert-and-grant logic against an ALREADY-seeded database, so a
+  // permission added after go-live reaches existing admins without needing to
+  // re-run this whole seed script (which also touches unrelated demo data).
+  for (const p of ALL_PERMISSIONS) {
     await prisma.permission.upsert({ where: { code: p.code }, update: {}, create: p });
   }
   const superAdminRole = await prisma.role.upsert({
-    where: { code: 'super-admin' },
+    where: { code: SUPER_ADMIN_ROLE_CODE },
     update: {},
-    create: { code: 'super-admin', name: 'Super Admin' },
+    create: { code: SUPER_ADMIN_ROLE_CODE, name: 'Super Admin' },
   });
   const allPermissions = await prisma.permission.findMany({ select: { id: true } });
   await prisma.rolePermission.createMany({

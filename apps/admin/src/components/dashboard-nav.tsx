@@ -29,6 +29,7 @@ import {
   Wallet,
   UsersRound,
   RefreshCw,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -92,6 +93,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/stores/gst-settings', label: 'GST Settings', icon: Landmark },
       { href: '/stores/wallet-settings', label: 'Wallet Settings', icon: Wallet },
       { href: '/stores/search-index', label: 'Search Index', icon: RefreshCw },
+      { href: '/stores/permissions', label: 'Admin Permissions', icon: ShieldCheck },
     ],
   },
 ];
