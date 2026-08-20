@@ -27,7 +27,7 @@ import { GiftCardField } from '@/components/cart/gift-card-field';
 import { WalletToggle } from '@/components/cart/wallet-toggle';
 import { CreditTermsToggle } from '@/components/cart/credit-terms-toggle';
 import type { Cart } from '@/types/cart';
-import type { ShippingMethod } from '@/types/order';
+import type { ShippingMethod, PaymentMethod } from '@/types/order';
 import type { MyCompanyCredit } from '@/types/company';
 import type { CustomerAddress } from '@/types/customer';
 
@@ -122,6 +122,7 @@ function blankToUndefined(value: string | undefined): string | undefined {
 export function CheckoutPageClient({
   cart,
   shippingMethods,
+  paymentMethods,
   myCredit,
   savedAddresses,
   customerEmail,
@@ -129,6 +130,9 @@ export function CheckoutPageClient({
 }: {
   cart: Cart;
   shippingMethods: ShippingMethod[];
+  /** Admin-configured (Stores > Payment Methods) — COD works today, ONLINE methods
+   *  all currently route through the same test gateway (plan/16). */
+  paymentMethods: PaymentMethod[];
   /** null covers every non-eligible shopper (guest, no company, no credit terms) — the "pay on account" option and PO field just don't render. */
   myCredit: MyCompanyCredit | null;
   /** Empty for a guest or a signed-in shopper with nothing saved yet — the picker just doesn't render (AddressFields' blank form still does). */
@@ -189,7 +193,7 @@ export function CheckoutPageClient({
         phone: '',
       },
       shippingMethodCode: shippingMethods[0]?.code ?? '',
-      paymentMethod: 'test_card',
+      paymentMethod: paymentMethods[0]?.code ?? 'test_card',
       testScenario: 'approve',
       poNumber: '',
     },
@@ -222,6 +226,9 @@ export function CheckoutPageClient({
   const sameAsShipping = watch('sameAsShipping');
   const selectedShippingMethodCode = watch('shippingMethodCode');
   const selectedShippingMethod = shippingMethods.find((m) => m.code === selectedShippingMethodCode);
+  const selectedPaymentMethodCode = watch('paymentMethod');
+  const selectedPaymentMethod = paymentMethods.find((m) => m.code === selectedPaymentMethodCode);
+  const isCod = selectedPaymentMethod?.type === 'COD';
 
   // Display-only preview — the authoritative total (exact bigint math, tax
   // finalized against the real shipping state) is computed server-side when
@@ -437,6 +444,10 @@ export function CheckoutPageClient({
                   <p className="text-sm text-success">
                     Your wallet/gift card tenders cover the full total — no card payment is needed.
                   </p>
+                ) : isCod ? (
+                  <p className="text-sm text-muted-foreground">
+                    Pay in cash when your order is delivered — no card details are collected now.
+                  </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     This store uses a test payment gateway — no real card is charged. Card details
@@ -450,20 +461,30 @@ export function CheckoutPageClient({
                     {...register('paymentMethod')}
                     className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
                   >
-                    <option value="test_card">Credit Card (test)</option>
+                    {paymentMethods.length > 0 ? (
+                      paymentMethods.map((m) => (
+                        <option key={m.code} value={m.code}>
+                          {m.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="test_card">Credit Card (test)</option>
+                    )}
                   </select>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="testScenario">Simulate result (test gateway only)</Label>
-                  <select
-                    id="testScenario"
-                    {...register('testScenario')}
-                    className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                  >
-                    <option value="approve">Approve payment</option>
-                    <option value="decline">Decline payment</option>
-                  </select>
-                </div>
+                {!isCod ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="testScenario">Simulate result (test gateway only)</Label>
+                    <select
+                      id="testScenario"
+                      {...register('testScenario')}
+                      className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                    >
+                      <option value="approve">Approve payment</option>
+                      <option value="decline">Decline payment</option>
+                    </select>
+                  </div>
+                ) : null}
                 {creditAccount ? (
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="poNumber">PO number (optional)</Label>

@@ -5,6 +5,12 @@ export interface ShippingMethod {
   currency: string;
 }
 
+export interface PaymentMethod {
+  code: string;
+  name: string;
+  type: 'COD' | 'ONLINE';
+}
+
 export interface OrderLineView {
   sku: string;
   name: string;

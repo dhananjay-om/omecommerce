@@ -141,6 +141,22 @@ export const updateShippingMethodSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const createPaymentMethodSchema = z.object({
+  code: z.string().min(1).max(64),
+  name: z.string().min(1).max(256),
+  type: z.enum(['COD', 'ONLINE']),
+});
+
+export const updatePaymentMethodSchema = z.object({
+  name: z.string().min(1).max(256).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const markOrderPaidSchema = z.object({
+  amount: z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount'),
+  note: z.string().max(1000).optional(),
+});
+
 export const listOrdersQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().optional(),

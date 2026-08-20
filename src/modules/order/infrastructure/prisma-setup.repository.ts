@@ -1,5 +1,12 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { TaxClassRepository, TaxClassAdminInfo, ShippingMethodRepository, ShippingMethodAdminInfo } from '../domain/repositories.js';
+import type {
+  TaxClassRepository,
+  TaxClassAdminInfo,
+  ShippingMethodRepository,
+  ShippingMethodAdminInfo,
+  PaymentMethodRepository,
+  PaymentMethodAdminInfo,
+} from '../domain/repositories.js';
 import { toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
 
 // Prisma's Decimal.toString() strips trailing zeros ("0.1800" -> "0.18"); this
@@ -110,5 +117,54 @@ export class PrismaShippingMethodRepository implements ShippingMethodRepository 
     // Remapped into an UPDATE deletedAt = now() by the shared soft-delete extension, same as
     // PrismaTaxClassRepository.softDelete above.
     await this.db.shippingMethod.delete({ where: { code } });
+  }
+}
+
+function toPaymentAdminInfo(row: {
+  publicId: string;
+  code: string;
+  name: string;
+  type: PaymentMethodAdminInfo['type'];
+  isActive: boolean;
+}): PaymentMethodAdminInfo {
+  return { publicId: row.publicId, code: row.code, name: row.name, type: row.type, isActive: row.isActive };
+}
+
+export class PrismaPaymentMethodRepository implements PaymentMethodRepository {
+  constructor(private readonly db: Db) {}
+
+  async create(input: { code: string; name: string; type: PaymentMethodAdminInfo['type'] }): Promise<{ publicId: string; code: string }> {
+    const row = await this.db.paymentMethod.create({ data: input });
+    return { publicId: row.publicId, code: row.code };
+  }
+
+  async findByCode(code: string): Promise<PaymentMethodAdminInfo | null> {
+    const row = await this.db.paymentMethod.findFirst({ where: { code } });
+    return row ? toPaymentAdminInfo(row) : null;
+  }
+
+  async list(): Promise<Array<{ code: string; name: string; type: PaymentMethodAdminInfo['type'] }>> {
+    const rows = await this.db.paymentMethod.findMany({
+      where: { isActive: true },
+      select: { code: true, name: true, type: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows;
+  }
+
+  async listAll(): Promise<PaymentMethodAdminInfo[]> {
+    const rows = await this.db.paymentMethod.findMany({ orderBy: { createdAt: 'desc' } });
+    return rows.map(toPaymentAdminInfo);
+  }
+
+  async update(code: string, input: { name?: string; isActive?: boolean }): Promise<PaymentMethodAdminInfo> {
+    const row = await this.db.paymentMethod.update({ where: { code }, data: input });
+    return toPaymentAdminInfo(row);
+  }
+
+  async softDelete(code: string): Promise<void> {
+    // Remapped into an UPDATE deletedAt = now() by the shared soft-delete extension, same as
+    // PrismaTaxClassRepository.softDelete above.
+    await this.db.paymentMethod.delete({ where: { code } });
   }
 }

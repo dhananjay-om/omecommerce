@@ -26,6 +26,7 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   giftcard: 'Gift Card',
   credit_terms: 'Credit Terms',
   original: 'Original Payment Method',
+  COD: 'Cash on Delivery',
 };
 
 function paymentMethodLabel(method: string): string {
@@ -162,7 +163,11 @@ export default async function OrderInformationPage({
           <div>
             <div className="text-sm font-semibold">Payment Information</div>
             {order.payments.length === 0 ? (
-              <div className="mt-2 text-sm text-muted-foreground">No payment recorded yet.</div>
+              <div className="mt-2 text-sm text-muted-foreground">
+                {order.paymentMethodCode
+                  ? `${paymentMethodLabel(order.paymentMethodCode)} — awaiting payment.`
+                  : 'No payment recorded yet.'}
+              </div>
             ) : (
               // One row per tender — an order can be split across several
               // (card + gift card, wallet + credit terms, ...) since Phase 5's

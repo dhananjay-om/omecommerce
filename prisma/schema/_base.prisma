@@ -291,6 +291,20 @@ enum FulfillmentStatus {
   RETURNED
 }
 
+/// Distinguishes how CompleteCheckout should treat a PaymentMethod row (plan/16
+/// payment methods admin). COD collects nothing at checkout — the PSP is never
+/// called and the order stays FinancialStatus.PENDING until an admin records the
+/// cash via MarkOrderPaidManually, same "don't fire OrderPaid for money not yet
+/// collected" reasoning FinancialStatus.ON_ACCOUNT already documents above.
+/// ONLINE goes through the existing PaymentGateway port exactly as every method
+/// did before this table existed — real gateway routing per online method (e.g.
+/// CCAvenue vs PayU) is future work; today every ONLINE method uses the same
+/// TestPaymentGateway.
+enum PaymentMethodType {
+  COD
+  ONLINE
+}
+
 /// A single fulfillment/shipment record's own lifecycle (distinct from the
 /// order-level FulfillmentStatus aggregate above). PACKED appended plan/15
 /// Phase 0a (see OrderStatus's comment on why appended, not inserted).

@@ -31,6 +31,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Truck,
+  Banknote,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -92,6 +93,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/stores/currencies', label: 'Currency Setup', icon: Coins },
       { href: '/stores/tax-classes', label: 'Tax Classes', icon: Receipt },
       { href: '/stores/shipping-methods', label: 'Shipping Methods', icon: Truck },
+      { href: '/stores/payment-methods', label: 'Payment Methods', icon: Banknote },
       { href: '/stores/gst-settings', label: 'GST Settings', icon: Landmark },
       { href: '/stores/wallet-settings', label: 'Wallet Settings', icon: Wallet },
       { href: '/stores/search-index', label: 'Search Index', icon: RefreshCw },

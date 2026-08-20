@@ -276,6 +276,7 @@ export interface OrderViewDto {
   shippingTotal: string;
   grandTotal: string;
   shippingMethodCode: string | null;
+  paymentMethodCode: string | null;
   couponCode: string | null;
   customerIp: string | null;
   /** plan/15 Phase 6 — snapshotted at checkout; companyPublicId/companyName are

@@ -80,6 +80,27 @@ model ShippingMethod {
   @@map("shipping_method")
 }
 
+/// Admin-configurable checkout payment methods (plan/16) — starts with just Cash
+/// on Delivery functionally wired up; ONLINE rows (a future CCAvenue/PayU/...)
+/// can be registered here today but all route through the same TestPaymentGateway
+/// until a real per-gateway adapter exists. `code` is what Cart/Order snapshot as
+/// paymentMethod — same free-text column that already existed, now with a real
+/// admin-managed row (and a `type`) behind it instead of a hardcoded "test_card".
+model PaymentMethod {
+  id        BigInt            @id @default(autoincrement())
+  publicId  String            @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  code      String            @unique @db.Citext
+  name      String
+  type      PaymentMethodType
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([deletedAt])
+  @@map("payment_method")
+}
+
 /// Guarded per-website order-number sequence (plan/08 §5). One row per website;
 /// `nextNumber` is advanced via a race-safe UPDATE...RETURNING (next_order_number()
 /// in raw SQL), same pattern as the inventory/wallet ledgers.
@@ -210,6 +231,13 @@ model Order {
   shippingTotal      Decimal           @map("shipping_total") @db.Decimal(18, 4)
   grandTotal         Decimal           @map("grand_total") @db.Decimal(18, 4)
   shippingMethodCode String?           @map("shipping_method_code") // snapshot, not FK
+  /// The PaymentMethod.code chosen at checkout — snapshot, not FK, same reasoning as
+  /// shippingMethodCode: a PaymentMethod later renamed/deactivated/deleted must never
+  /// change what an already-placed order displays. Distinct from OrderListItem.paymentMethod
+  /// (derived from the most recent PaymentTransaction row) — that reflects how money actually
+  /// moved; this reflects what the customer chose, which is all that exists for a COD order
+  /// until MarkOrderPaidManually eventually records its own PaymentTransaction.
+  paymentMethodCode  String?           @map("payment_method_code")
   couponCode         String?           @map("coupon_code") @db.Citext // snapshot, not FK — same reasoning as shippingMethodCode; Citext matches Cart.couponCode/Coupon.code
   customerIp         String?           @map("customer_ip") // plan/15 Phase 0a — req.ip captured at checkout, admin detail page's "Order Information" section
   placedAt           DateTime          @default(now()) @map("placed_at") @db.Timestamptz(6)

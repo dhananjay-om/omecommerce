@@ -78,6 +78,7 @@ export class PrismaOrderRepository implements OrderRepository {
           shippingTotal: fromMinorUnits(input.shippingTotalMinor),
           grandTotal: fromMinorUnits(input.grandTotalMinor),
           shippingMethodCode: input.shippingMethodCode,
+          paymentMethodCode: input.paymentMethodCode,
           couponCode: input.couponCode,
         },
       });
@@ -486,6 +487,7 @@ function toView(order: OrderDetailRow): OrderView {
     shippingTotal: formatDecimal(order.shippingTotal),
     grandTotal: formatDecimal(order.grandTotal),
     shippingMethodCode: order.shippingMethodCode,
+    paymentMethodCode: order.paymentMethodCode,
     couponCode: order.couponCode,
     customerIp: order.customerIp,
     placedAt: order.placedAt,

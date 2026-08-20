@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { ensureCart } from '@/lib/cart-server';
 import { apiGet } from '@/lib/api-client';
 import { loadForSignedInShopper } from '@/lib/load-for-signed-in-shopper';
-import { listShippingMethods } from '@/services/order.service';
+import { listShippingMethods, listPaymentMethods } from '@/services/order.service';
 import { getMyCompanyCredit } from '@/services/company.service';
 import { getMyAddresses } from '@/services/address.service';
 import { getMyWallet } from '@/services/wallet.service';
@@ -21,9 +21,10 @@ export default async function CheckoutPage() {
   // only ever fetched for a signed-in shopper — a guest can't belong to a
   // B2B company, has no address book, no account email to prefill, and no
   // wallet.
-  const [shippingMethods, myCredit, savedAddresses, customerEmail, walletBalance] =
+  const [shippingMethods, paymentMethods, myCredit, savedAddresses, customerEmail, walletBalance] =
     await Promise.all([
       listShippingMethods(cart.currency),
+      listPaymentMethods(),
       loadForSignedInShopper<MyCompanyCredit | null>(getMyCompanyCredit, null),
       loadForSignedInShopper<CustomerAddress[]>(getMyAddresses, []),
       loadForSignedInShopper<string | null>(
@@ -37,6 +38,7 @@ export default async function CheckoutPage() {
     <CheckoutPageClient
       cart={cart}
       shippingMethods={shippingMethods}
+      paymentMethods={paymentMethods}
       myCredit={myCredit}
       savedAddresses={savedAddresses}
       customerEmail={customerEmail}

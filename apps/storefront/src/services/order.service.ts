@@ -1,10 +1,14 @@
 import 'server-only';
 import { apiGet, buildQuery } from '@/lib/api-client';
-import type { ShippingMethod, OrderView, OrderTracking } from '@/types/order';
+import type { ShippingMethod, PaymentMethod, OrderView, OrderTracking } from '@/types/order';
 
 /** Server Component reads only — direct to Express. */
 export function listShippingMethods(currency: string): Promise<ShippingMethod[]> {
   return apiGet<ShippingMethod[]>(`/store/v1/shipping-methods${buildQuery({ currency })}`);
+}
+
+export function listPaymentMethods(): Promise<PaymentMethod[]> {
+  return apiGet<PaymentMethod[]>('/store/v1/payment-methods');
 }
 
 export function getOrder(publicId: string): Promise<OrderView> {

@@ -28,6 +28,7 @@ import { TestPaymentGateway } from './infrastructure/test-payment-gateway.js';
 import {
   PrismaTaxClassRepository,
   PrismaShippingMethodRepository,
+  PrismaPaymentMethodRepository,
 } from './infrastructure/prisma-setup.repository.js';
 import { S3MediaUrlResolver } from './infrastructure/s3-media-url-resolver.js';
 import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
@@ -52,7 +53,13 @@ import {
   ListShippingMethodsAdmin,
   UpdateShippingMethod,
   DeleteShippingMethod,
+  CreatePaymentMethod,
+  ListPaymentMethods,
+  ListPaymentMethodsAdmin,
+  UpdatePaymentMethod,
+  DeletePaymentMethod,
 } from './application/setup.usecases.js';
+import { MarkOrderPaidManually } from './application/mark-order-paid-manually.usecase.js';
 import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
 import { GetOrderHistory } from './application/get-order-history.usecase.js';
 import { AddOrderNote } from './application/add-order-note.usecase.js';
@@ -103,6 +110,9 @@ import {
   updateTaxClassSchema,
   createShippingMethodSchema,
   updateShippingMethodSchema,
+  createPaymentMethodSchema,
+  updatePaymentMethodSchema,
+  markOrderPaidSchema,
   listOrdersQuerySchema,
   exportOrdersQuerySchema,
 } from './interface/http/schemas.js';
@@ -149,6 +159,7 @@ export function createOrderModule(
   const paymentGateway = new TestPaymentGateway();
   const taxClasses = new PrismaTaxClassRepository(db);
   const shippingMethods = new PrismaShippingMethodRepository(db);
+  const paymentMethods = new PrismaPaymentMethodRepository(db);
   const outbox = new OutboxWriter(db);
   const cartProductMedia = new PrismaCartProductMediaLookup(db);
   const mediaUrlResolver = new S3MediaUrlResolver();
@@ -237,6 +248,7 @@ export function createOrderModule(
     companyMemberships,
     companyCredit,
     walletSettings,
+    paymentMethods,
   );
   const getOrder = new GetOrder(orders, companies);
   const listOrders = new ListOrders(orders);
@@ -274,6 +286,12 @@ export function createOrderModule(
   const listShippingMethodsAdmin = new ListShippingMethodsAdmin(shippingMethods);
   const updateShippingMethod = new UpdateShippingMethod(shippingMethods);
   const deleteShippingMethod = new DeleteShippingMethod(shippingMethods);
+  const createPaymentMethod = new CreatePaymentMethod(paymentMethods);
+  const listPaymentMethods = new ListPaymentMethods(paymentMethods);
+  const listPaymentMethodsAdmin = new ListPaymentMethodsAdmin(paymentMethods);
+  const updatePaymentMethod = new UpdatePaymentMethod(paymentMethods);
+  const deletePaymentMethod = new DeletePaymentMethod(paymentMethods);
+  const markOrderPaidManually = new MarkOrderPaidManually(orders, adminUsers, outbox);
   const getOrderHistory = new GetOrderHistory(orders);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
   const createInvoice = new CreateInvoice(
@@ -359,6 +377,42 @@ export function createOrderModule(
     '/shipping-methods/:code',
     asyncHandler(async (req, res) => {
       await deleteShippingMethod.execute(req.params.code!);
+      res.status(204).send();
+    }),
+  );
+  admin.post(
+    '/payment-methods',
+    asyncHandler(async (req, res) => {
+      const body = parse(createPaymentMethodSchema, req.body);
+      res.status(201).json({ data: await createPaymentMethod.execute(body) });
+    }),
+  );
+  admin.get(
+    '/payment-methods',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listPaymentMethodsAdmin.execute() });
+    }),
+  );
+  admin.patch(
+    '/payment-methods/:code',
+    asyncHandler(async (req, res) => {
+      const body = parse(updatePaymentMethodSchema, req.body);
+      res.json({ data: await updatePaymentMethod.execute(req.params.code!, body) });
+    }),
+  );
+  admin.delete(
+    '/payment-methods/:code',
+    asyncHandler(async (req, res) => {
+      await deletePaymentMethod.execute(req.params.code!);
+      res.status(204).send();
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/actions/mark-paid',
+    authorize('orders:refund'),
+    asyncHandler(async (req, res) => {
+      const body = parse(markOrderPaidSchema, req.body);
+      await markOrderPaidManually.execute(req.params.publicId!, body, req.adminUser?.adminUserPublicId);
       res.status(204).send();
     }),
   );
@@ -698,6 +752,12 @@ export function createOrderModule(
     asyncHandler(async (req, res) => {
       const currency = typeof req.query.currency === 'string' ? req.query.currency : 'USD';
       res.json({ data: await listShippingMethods.execute(currency) });
+    }),
+  );
+  store.get(
+    '/payment-methods',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listPaymentMethods.execute() });
     }),
   );
   store.get(

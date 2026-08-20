@@ -9,6 +9,7 @@ import { CancelDialog } from '../cancel-dialog';
 import { CreateInvoiceDialog } from '../create-invoice-dialog';
 import { SendEmailDialog } from '../send-email-dialog';
 import { CloseOrderDialog } from '../close-order-dialog';
+import { MarkPaidDialog } from '../mark-paid-dialog';
 import { OrderViewNav } from '../order-view-nav';
 
 /**
@@ -44,6 +45,7 @@ export default async function OrderDetailLayout({ children, params }: { children
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <MarkPaidDialog order={order} />
           <FulfillDialog orderPublicId={order.publicId} lines={order.lines} />
           <RefundDialog orderPublicId={order.publicId} lines={order.lines} />
           <CreateInvoiceDialog orderPublicId={order.publicId} lines={order.lines} invoices={order.invoices} />
