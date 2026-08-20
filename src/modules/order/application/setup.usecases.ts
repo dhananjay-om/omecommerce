@@ -1,4 +1,4 @@
-import type { TaxClassRepository, TaxClassAdminInfo, ShippingMethodRepository } from '../domain/repositories.js';
+import type { TaxClassRepository, TaxClassAdminInfo, ShippingMethodRepository, ShippingMethodAdminInfo } from '../domain/repositories.js';
 import { ConflictError, NotFoundError } from '../../../shared/domain/errors.js';
 
 export class CreateTaxClass {
@@ -47,5 +47,36 @@ export class CreateShippingMethod {
       throw new ConflictError(`shipping method code already exists: ${cmd.code}`);
     }
     return this.shippingMethods.create(cmd);
+  }
+}
+
+export class ListShippingMethodsAdmin {
+  constructor(private readonly shippingMethods: ShippingMethodRepository) {}
+
+  async execute(): Promise<ShippingMethodAdminInfo[]> {
+    return this.shippingMethods.listAll();
+  }
+}
+
+export class UpdateShippingMethod {
+  constructor(private readonly shippingMethods: ShippingMethodRepository) {}
+
+  async execute(
+    code: string,
+    cmd: { name?: string; flatRate?: string; isActive?: boolean },
+  ): Promise<ShippingMethodAdminInfo> {
+    if (!(await this.shippingMethods.findByCode(code))) throw new NotFoundError('ShippingMethod', code);
+    return this.shippingMethods.update(code, cmd);
+  }
+}
+
+/** Soft-delete only — a deleted method simply stops being offered at checkout; any order that
+ *  already used it keeps its own snapshotted shippingMethodCode/amount unaffected. */
+export class DeleteShippingMethod {
+  constructor(private readonly shippingMethods: ShippingMethodRepository) {}
+
+  async execute(code: string): Promise<void> {
+    if (!(await this.shippingMethods.findByCode(code))) throw new NotFoundError('ShippingMethod', code);
+    await this.shippingMethods.softDelete(code);
   }
 }

@@ -257,6 +257,15 @@ export interface TaxClass {
   isActive: boolean;
 }
 
+export interface ShippingMethod {
+  publicId: string;
+  code: string;
+  name: string;
+  flatRate: string;
+  currency: string;
+  isActive: boolean;
+}
+
 export interface Website {
   publicId: string;
   code: string;

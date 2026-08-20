@@ -166,6 +166,11 @@ export interface ShippingMethodInfo {
   currency: string;
 }
 
+export interface ShippingMethodAdminInfo extends ShippingMethodInfo {
+  publicId: string;
+  isActive: boolean;
+}
+
 export interface ShippingMethodRepository {
   create(input: {
     code: string;
@@ -174,8 +179,14 @@ export interface ShippingMethodRepository {
     currency: string;
   }): Promise<{ publicId: string; code: string }>;
   findByCode(code: string): Promise<{ id: bigint; code: string } | null>;
-  /** Storefront checkout needs to show real options, not a blind code (plan/14 Phase 7a). */
+  /** Storefront checkout needs to show real options, not a blind code (plan/14 Phase 7a) — active only. */
   list(currency: string): Promise<ShippingMethodInfo[]>;
+  /** Admin list — every currency, including inactive ones (so they can be reactivated). */
+  listAll(): Promise<ShippingMethodAdminInfo[]>;
+  update(code: string, input: { name?: string; flatRate?: string; isActive?: boolean }): Promise<ShippingMethodAdminInfo>;
+  /** Soft-delete only, same shape as DeleteTaxClass: a deleted method just stops being offered;
+   *  any order that already used it keeps its own snapshotted shippingMethodCode/amount. */
+  softDelete(code: string): Promise<void>;
 }
 
 // --- Cart ---
