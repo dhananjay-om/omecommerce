@@ -1,5 +1,6 @@
 import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
+import { logger } from '../../shared/infrastructure/logger.js';
 import { getOpenSearchClient } from '../../shared/infrastructure/search/opensearch-client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaProductAttributeStore } from '../catalog/infrastructure/product-attribute.store.js';
@@ -24,10 +25,17 @@ export interface SearchModule {
   admin: Router;
   store: Router;
   indexProduct: IndexProduct;
+  /** Runs a full reindex only if the index is currently empty while the catalog isn't
+   *  (see its own doc comment) — call once at process boot. Never throws: OpenSearch
+   *  being briefly unreachable at startup must not prevent the API server from booting. */
+  reindexIfEmpty: () => Promise<void>;
 }
 
 /** Composition root for Search (plan/06). */
-export function createSearchModule(db: Db, authorize: (permission: string) => RequestHandler): SearchModule {
+export function createSearchModule(
+  db: Db,
+  authorize: (permission: string) => RequestHandler,
+): SearchModule {
   const client = getOpenSearchClient();
   const index = new OpenSearchIndex(client);
 
@@ -57,6 +65,35 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
   const searchProducts = new SearchProducts(index, mediaUrlResolver);
   const reindexAll = new ReindexAll(products, index, indexProduct);
 
+  /**
+   * OpenSearch's index doesn't reliably survive a container restart the way
+   * Postgres does in dev (no guaranteed persistent volume) — every prior
+   * reindex was manual, discovered only after a shopper hit an empty PLP.
+   * Runs a full ReindexAll automatically at boot, but ONLY when the index is
+   * empty while the catalog genuinely has active products — never on every
+   * `tsx watch` hot-reload restart (which happens on every file save in dev;
+   * an unconditional reindex there would recrawl the whole catalog on every
+   * edit, real cost for no benefit once the index is already populated).
+   * Swallows any error (a slow-to-start OpenSearch container, a transient
+   * network blip) rather than ever blocking the API server from listening —
+   * search staying momentarily stale is far better than the whole app
+   * refusing to boot over it; worst case, the next manual reindex (or the
+   * next restart) catches up.
+   */
+  async function reindexIfEmpty(): Promise<void> {
+    try {
+      const [indexedIds, activeProducts] = await Promise.all([
+        index.listAllProductIds(),
+        products.allActive(),
+      ]);
+      if (indexedIds.length > 0 || activeProducts.length === 0) return;
+      const result = await reindexAll.execute();
+      logger.info({ ...result }, 'search index was empty at boot — auto-reindexed');
+    } catch (err) {
+      logger.warn({ err }, 'search auto-reindex-if-empty failed at boot — continuing without it');
+    }
+  }
+
   const admin = Router();
   admin.post(
     '/search/reindex',
@@ -71,7 +108,10 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
     '/search',
     asyncHandler(async (req, res) => {
       const query = parse(searchQuerySchema, req.query);
-      const filters = typeof req.query.filter === 'object' && req.query.filter !== null ? (req.query.filter as Record<string, string>) : {};
+      const filters =
+        typeof req.query.filter === 'object' && req.query.filter !== null
+          ? (req.query.filter as Record<string, string>)
+          : {};
       res.json({
         data: await searchProducts.execute({
           storeViewId: query.storeViewId,
@@ -88,5 +128,5 @@ export function createSearchModule(db: Db, authorize: (permission: string) => Re
     }),
   );
 
-  return { admin, store, indexProduct };
+  return { admin, store, indexProduct, reindexIfEmpty };
 }
