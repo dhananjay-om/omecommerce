@@ -25,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      <aside className="relative z-30 flex w-16 flex-col items-center bg-sidebar text-sidebar-foreground">
+      <aside className="relative z-30 flex w-20 flex-col items-center bg-sidebar text-sidebar-foreground">
         <Link href="/dashboard" className="flex h-16 w-full items-center justify-center" title="OMEcommerce">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
             <ShoppingBag className="size-4.5 text-primary-foreground" strokeWidth={2.25} />
