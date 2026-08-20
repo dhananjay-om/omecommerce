@@ -5,6 +5,9 @@ export interface CartLine {
   sku: string;
   name: string;
   price: string | null;
+  /** "MRP" / compare-at price for this line's unit price — null when unset, or when
+   *  the resolved price came from a qty tier. */
+  mrp: string | null;
   imageUrl: string | null;
   lineTotal: string | null;
   /** This line's share of the applied coupon's discount — null when no coupon is

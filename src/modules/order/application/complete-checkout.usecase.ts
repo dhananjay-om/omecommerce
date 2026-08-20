@@ -47,6 +47,9 @@ interface PricedLine {
   variantId: bigint;
   qty: number;
   unitPriceMinor: bigint;
+  /** "MRP" / compare-at price, snapshotted onto the OrderLine below — never part of
+   *  any total, purely carried through for display (see ResolvedPrice.mrp). */
+  mrpMinor: bigint | null;
   subtotalMinor: bigint;
 }
 
@@ -143,6 +146,7 @@ export class CompleteCheckout {
         variantId: line.variantId,
         qty: line.qty,
         unitPriceMinor,
+        mrpMinor: resolved.mrp !== null ? toMinorUnits(resolved.mrp) : null,
         subtotalMinor: multiplyByQty(unitPriceMinor, line.qty),
       });
     }
@@ -442,6 +446,7 @@ export class CompleteCheckout {
         name: variant.nameDefault ?? variant.sku,
         qty: line.qty,
         unitPriceMinor: line.unitPriceMinor,
+        mrpMinor: line.mrpMinor,
         taxAmountMinor: tax.amountMinor,
         discountAmountMinor: discountByVariant.get(line.variantId.toString()) ?? 0n,
         rowTotalMinor: addMinor(line.subtotalMinor, tax.amountMinor),

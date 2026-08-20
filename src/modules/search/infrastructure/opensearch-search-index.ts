@@ -106,6 +106,7 @@ export class OpenSearchIndex implements SearchIndex {
       sku: h._source.sku,
       name: h._source.name,
       priceDisplay: h._source.priceDisplay,
+      mrpDisplay: h._source.mrpDisplay,
       currency: h._source.currency,
       imageKey: h._source.imageKey,
     }));

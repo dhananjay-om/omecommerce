@@ -74,6 +74,7 @@ export class IndexProduct {
 
       let price: number | null = null;
       let priceDisplay: string | null = null;
+      let mrpDisplay: string | null = null;
       if (variantId) {
         const resolvedPrice = await this.priceResolver.resolve({
           variantId,
@@ -86,6 +87,7 @@ export class IndexProduct {
         if (resolvedPrice) {
           price = Number(resolvedPrice.price);
           priceDisplay = resolvedPrice.price;
+          mrpDisplay = resolvedPrice.mrp;
         }
       }
 
@@ -100,6 +102,7 @@ export class IndexProduct {
         isInStock,
         price,
         priceDisplay,
+        mrpDisplay,
         currency: priceDisplay ? sv.currency : null,
         imageKey,
         facets,

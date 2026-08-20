@@ -233,7 +233,16 @@ export default async function OrderInformationPage({
                     <div className="text-xs text-muted-foreground">SKU: {line.sku}</div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{line.hsnCode ?? '—'}</TableCell>
-                  <TableCell>{formatPrice(line.unitPrice, order.currency)}</TableCell>
+                  <TableCell>
+                    <span className="flex items-center gap-2">
+                      {formatPrice(line.unitPrice, order.currency)}
+                      {line.mrp && Number(line.mrp) > Number(line.unitPrice) ? (
+                        <span className="text-xs text-muted-foreground line-through">
+                          {formatPrice(line.mrp, order.currency)}
+                        </span>
+                      ) : null}
+                    </span>
+                  </TableCell>
                   <TableCell>{line.qty}</TableCell>
                   <TableCell>{invoicedQty(order, line.sku)}</TableCell>
                   <TableCell>{line.fulfilledQty}</TableCell>

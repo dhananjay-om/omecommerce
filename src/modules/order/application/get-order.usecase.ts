@@ -48,6 +48,7 @@ export function toOrderDto(order: OrderView): OrderViewDto {
       name: l.name,
       qty: l.qty,
       unitPrice: l.unitPrice,
+      mrp: l.mrp,
       taxAmount: l.taxAmount,
       discountAmount: l.discountAmount,
       rowTotal: l.rowTotal,

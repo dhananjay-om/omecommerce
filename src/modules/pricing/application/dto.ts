@@ -49,12 +49,14 @@ export interface VariantPriceView {
   priceListName: string;
   currency: string;
   price: string | null;
+  mrp: string | null;
 }
 
 export interface SetProductPriceCommand {
   priceListCode: string;
   variantPublicId: string;
   price: string;
+  mrp?: string | null;
 }
 
 export interface SetPriceTierCommand {
@@ -76,4 +78,5 @@ export interface ResolvedPriceView {
   price: string;
   priceListCode: string;
   source: 'tier' | 'base';
+  mrp: string | null;
 }

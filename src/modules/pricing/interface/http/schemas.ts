@@ -34,6 +34,9 @@ export const updatePriceListSchema = z.object({
 export const setProductPriceSchema = z.object({
   variantId: z.string().uuid(),
   price: decimalString,
+  /** "MRP" / compare-at price — optional, and an explicit `null` clears a
+   *  previously-set one (an emptied MRP field on the admin form). */
+  mrp: decimalString.nullish(),
 });
 
 export const setPriceTierSchema = z.object({

@@ -83,11 +83,11 @@ export class PrismaPriceListRepository implements PriceListRepository {
     });
   }
 
-  async setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void> {
+  async setProductPrice(priceListId: bigint, variantId: bigint, price: string, mrp: string | null): Promise<void> {
     await this.db.productPrice.upsert({
       where: { priceListId_variantId: { priceListId, variantId } },
-      update: { price },
-      create: { priceListId, variantId, price },
+      update: { price, mrp },
+      create: { priceListId, variantId, price, mrp },
     });
   }
 
@@ -104,10 +104,16 @@ export class PrismaPriceListRepository implements PriceListRepository {
     // has no price in yet still shows up, with price: null — "not priced
     // here" is a visible state, not an absent row.
     const rows = await this.db.$queryRaw<
-      Array<{ price_list_code: string; price_list_name: string; currency: string; price: string | null }>
+      Array<{
+        price_list_code: string;
+        price_list_name: string;
+        currency: string;
+        price: string | null;
+        mrp: string | null;
+      }>
     >`
       SELECT pl.code AS price_list_code, pl.name AS price_list_name, pl.currency,
-             pp.price::text AS price
+             pp.price::text AS price, pp.mrp::text AS mrp
         FROM price_list pl
         LEFT JOIN product_price pp ON pp.price_list_id = pl.id AND pp.variant_id = ${variantId}
        WHERE pl.deleted_at IS NULL AND pl.is_active = true
@@ -117,6 +123,7 @@ export class PrismaPriceListRepository implements PriceListRepository {
       priceListName: row.price_list_name,
       currency: row.currency,
       price: row.price,
+      mrp: row.mrp,
     }));
   }
 }

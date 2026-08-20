@@ -37,6 +37,7 @@ export const PRODUCT_INDEX_MAPPING = {
       isInStock: { type: 'boolean' },
       price: { type: 'double' },
       priceDisplay: { type: 'keyword' },
+      mrpDisplay: { type: 'keyword' },
       currency: { type: 'keyword' },
       imageKey: { type: 'keyword' },
       facets: {

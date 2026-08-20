@@ -83,6 +83,12 @@ model ProductPrice {
   priceListId BigInt   @map("price_list_id")
   variantId   BigInt   @map("variant_id")
   price       Decimal  @db.Decimal(18, 4)
+  /// "MRP" / compare-at price (nullable — most price lists just have `price`). Purely
+  /// additive display data: `price` stays the sole charged/taxed/totaled amount
+  /// everywhere; `mrp` only ever drives a strikethrough + "X% off" when mrp > price.
+  /// Deliberately NOT added to PriceTier — a "compare at MRP" against a wholesale/
+  /// qty-tier price doesn't read as a retail-catalog concept the way a base price does.
+  mrp         Decimal? @db.Decimal(18, 4)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

@@ -237,6 +237,8 @@ export interface VariantPrice {
   priceListName: string;
   currency: string;
   price: string | null;
+  /** "MRP" / compare-at price — shown as a strikethrough next to `price` when set. */
+  mrp: string | null;
 }
 
 export interface Currency {
@@ -378,6 +380,8 @@ export interface OrderLine {
   name: string;
   qty: number;
   unitPrice: string;
+  /** "MRP" / compare-at price snapshotted at checkout time — null when the resolved price had none. */
+  mrp: string | null;
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;

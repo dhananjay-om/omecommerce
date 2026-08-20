@@ -288,6 +288,11 @@ model OrderLine {
   name           String
   qty            Int
   unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 4)
+  /// MRP snapshot at checkout time (nullable — see ProductPrice.mrp's doc comment for
+  /// the display-only contract). Snapshotted, not live-looked-up, same reasoning as
+  /// sku/name/unitPrice on this row: a later catalog price change must never alter
+  /// what a placed order shows for "was ₹X".
+  mrp            Decimal? @db.Decimal(18, 4)
   taxAmount      Decimal  @default(0) @map("tax_amount") @db.Decimal(18, 4)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 4)
   rowTotal       Decimal  @map("row_total") @db.Decimal(18, 4)

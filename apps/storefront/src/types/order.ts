@@ -16,6 +16,8 @@ export interface OrderLineView {
   name: string;
   qty: number;
   unitPrice: string;
+  /** "MRP" / compare-at price snapshotted at checkout time — null when the resolved price had none. */
+  mrp: string | null;
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;

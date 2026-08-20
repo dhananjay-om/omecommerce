@@ -18,6 +18,9 @@ export interface CartLineDto {
   sku: string;
   name: string;
   price: string | null;
+  /** "MRP" / compare-at price for this line's unit price — null when unset, or when
+   *  the resolved price came from a qty tier (see ResolvedPrice.mrp's doc comment). */
+  mrp: string | null;
   imageUrl: string | null;
   /** `price * qty`, or null when price is null (no price configured for this variant). */
   lineTotal: string | null;
@@ -158,6 +161,8 @@ export interface OrderLineViewDto {
   name: string;
   qty: number;
   unitPrice: string;
+  /** "MRP" / compare-at price, snapshotted at checkout time — null when the resolved price had none. */
+  mrp: string | null;
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;

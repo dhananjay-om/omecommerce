@@ -96,6 +96,10 @@ export interface StoreProductVariantView {
   status: string;
   position: number;
   price: string | null;
+  /** "MRP" / compare-at price — null when unset, or when the resolved price came from
+   *  a qty tier (see pricing's ResolvedPrice.mrp doc comment). Drives the PDP's
+   *  strikethrough + "X% off" display when mrp > price. */
+  mrp: string | null;
   inStock: boolean;
   /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — powers the
    * storefront's variant picker. Empty for a SIMPLE/DIGITAL/VIRTUAL product's single implicit variant. */
@@ -111,6 +115,8 @@ export interface StoreProductVariantView {
 export interface StoreProductDetailView extends ProductForStoreView {
   /** The first-by-position variant's price — a representative default for multi-variant products, not a price range. */
   price: string | null;
+  /** The first-by-position variant's MRP — same "representative default" caveat as `price` above. */
+  mrp: string | null;
   inStock: boolean;
   media: ProductMediaView[];
   variants: StoreProductVariantView[];

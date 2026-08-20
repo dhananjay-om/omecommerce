@@ -77,6 +77,8 @@ export interface VariantPriceRow {
   currency: string;
   /** null when no ProductPrice row exists yet for this variant in this list. */
   price: string | null;
+  /** "MRP" / compare-at price — null when unset, or when there's no price row at all. */
+  mrp: string | null;
 }
 
 export interface PriceListRepository {
@@ -88,7 +90,8 @@ export interface PriceListRepository {
    *  do even for a price list with prices set — PriceResolver already filters is_active/deleted_at, and
    *  ProductPrice/PriceTier rows are kept (not cascaded), so reactivating restores the same prices. */
   softDelete(id: bigint): Promise<void>;
-  setProductPrice(priceListId: bigint, variantId: bigint, price: string): Promise<void>;
+  /** mrp: null clears it (an empty MRP field on the "Set Price" form) — every call sets both fields, same as `price`. */
+  setProductPrice(priceListId: bigint, variantId: bigint, price: string, mrp: string | null): Promise<void>;
   setPriceTier(priceListId: bigint, variantId: bigint, minQty: number, price: string): Promise<void>;
   /** Every active price list's price for one variant (product-edit page) — lists not yet priced for this variant still appear, with price: null. */
   listPricesForVariant(variantId: bigint): Promise<VariantPriceRow[]>;
@@ -108,6 +111,10 @@ export interface ResolvedPrice {
   priceListId: bigint;
   priceListCode: string;
   source: 'tier' | 'base';
+  /** "MRP" / compare-at price — only ever surfaced when `source === 'base'` (a tier
+   *  price winning means this qty broke into wholesale pricing, which has no MRP
+   *  concept of its own; see PriceTier's doc comment). Null when unset either way. */
+  mrp: string | null;
 }
 
 /**

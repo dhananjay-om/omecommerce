@@ -97,6 +97,10 @@ export function SetPriceDialog({ priceListCode }: { priceListCode: string }) {
               <Label htmlFor="sp-price">Price</Label>
               <Input id="sp-price" name="price" required placeholder="e.g. 19.99" />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="sp-mrp">MRP (optional)</Label>
+              <Input id="sp-mrp" name="mrp" placeholder="e.g. 24.99 — shown struck through when higher than Price" />
+            </div>
             {setPriceState.error ? <p className="text-sm text-destructive">{setPriceState.error}</p> : null}
             <DialogFooter className="gap-2 sm:justify-between">
               <Button type="button" variant="ghost" onClick={() => setConfirmedProduct(null)}>

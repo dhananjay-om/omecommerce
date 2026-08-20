@@ -294,6 +294,8 @@ export interface OrderLineInput {
   name: string;
   qty: number;
   unitPriceMinor: bigint;
+  /** "MRP" / compare-at price, snapshotted at checkout time — see OrderLine.mrp's schema doc comment. Null when the resolved price had none. */
+  mrpMinor: bigint | null;
   taxAmountMinor: bigint;
   /** This line's share of the order's coupon discount (allocateProportionally,
    *  shared/domain/decimal.ts) — 0 for lines a coupon didn't apply to, or when no
@@ -371,6 +373,7 @@ export interface OrderLineView {
   name: string;
   qty: number;
   unitPrice: string;
+  mrp: string | null;
   taxAmount: string;
   discountAmount: string;
   rowTotal: string;

@@ -12,7 +12,19 @@ import type { SearchHit } from '@/types/product';
  * per PLP grid, and a JS-driven animation on every card would cost far more
  * than the visual payoff over a transform/shadow transition.
  */
+/** Whole-percent discount for the "X% off" badge — only shown when mrp is a genuine
+ *  compare-at price above the selling price, same `mrp > price` gate every other MRP
+ *  display in this system uses. */
+function discountPercent(price: string, mrp: string): number | null {
+  const priceNum = Number(price);
+  const mrpNum = Number(mrp);
+  if (!(mrpNum > priceNum) || mrpNum <= 0) return null;
+  return Math.round(((mrpNum - priceNum) / mrpNum) * 100);
+}
+
 export function ProductCard({ hit }: { hit: SearchHit }) {
+  const percentOff =
+    hit.priceDisplay && hit.mrpDisplay ? discountPercent(hit.priceDisplay, hit.mrpDisplay) : null;
   return (
     <Link
       href={`/products/${hit.productId}`}
@@ -32,8 +44,18 @@ export function ProductCard({ hit }: { hit: SearchHit }) {
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
         <span className="line-clamp-2 text-sm font-medium">{hit.name}</span>
-        <span className="mt-auto text-sm font-semibold text-foreground">
-          {hit.priceDisplay && hit.currency ? formatPrice(hit.priceDisplay, hit.currency) : 'Price unavailable'}
+        <span className="mt-auto flex flex-wrap items-baseline gap-1.5">
+          <span className="text-sm font-semibold text-foreground">
+            {hit.priceDisplay && hit.currency ? formatPrice(hit.priceDisplay, hit.currency) : 'Price unavailable'}
+          </span>
+          {percentOff !== null && hit.currency ? (
+            <>
+              <span className="text-xs text-muted-foreground line-through">
+                {formatPrice(hit.mrpDisplay!, hit.currency)}
+              </span>
+              <span className="text-xs font-medium text-success">{percentOff}% off</span>
+            </>
+          ) : null}
         </span>
       </div>
     </Link>
