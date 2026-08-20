@@ -152,6 +152,23 @@ export const updatePaymentMethodSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const updateEmailSettingsSchema = z.object({
+  host: z.string().min(1).max(256),
+  port: z.number().int().positive().max(65535),
+  username: z.string().min(1).max(320),
+  // Blank/omitted keeps the currently-saved password unchanged — see
+  // UpdateEmailSettings' own doc comment. blankToUndefined so a form
+  // resubmit with an empty (untouched) password field doesn't accidentally
+  // try to overwrite it with ''.
+  password: blankToUndefined(z.string().min(1).max(512).optional()),
+  fromName: z.string().max(256).nullish(),
+  fromEmail: z.string().email().max(320).nullish(),
+});
+
+export const sendTestEmailSchema = z.object({
+  to: z.string().email(),
+});
+
 export const markOrderPaidSchema = z.object({
   amount: z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount'),
   note: z.string().max(1000).optional(),

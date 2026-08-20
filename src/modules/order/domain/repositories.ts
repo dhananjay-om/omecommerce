@@ -91,6 +91,40 @@ export interface AdminUserLookup {
   findByPublicId(publicId: string): Promise<{ id: bigint; email: string } | null>;
 }
 
+/** The one (or zero) EmailSettings row — see prisma/schema/system.prisma's
+ *  EmailSettings doc comment for the singleton/plaintext-password reasoning. */
+export interface EmailSettingsRecord {
+  id: bigint;
+  publicId: string;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  fromName: string | null;
+  fromEmail: string | null;
+  updatedAt: Date;
+}
+
+export interface UpsertEmailSettingsInput {
+  host: string;
+  port: number;
+  username: string;
+  /** Omitted keeps the currently-stored password unchanged. */
+  password?: string;
+  fromName: string | null;
+  fromEmail: string | null;
+  /** Only ever written on the first-ever create — ignored on every later update, same as the column's own "who initially configured this" purpose. */
+  createdBy: bigint | null;
+  updatedBy: bigint | null;
+}
+
+export interface EmailSettingsRepository {
+  /** Null when no row has ever been saved (env vars / simulated sender still apply). */
+  get(): Promise<EmailSettingsRecord | null>;
+  /** Upsert against the one singleton row — creates it on the first call, updates it every time after. */
+  upsert(input: UpsertEmailSettingsInput): Promise<EmailSettingsRecord>;
+}
+
 export interface TaxClassInfo {
   code: string;
   rateMinor: bigint;
