@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { DashboardNav } from '@/components/dashboard-nav';
@@ -24,23 +25,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      <aside className="flex w-64 flex-col bg-sidebar text-sidebar-foreground">
-        <div className="flex h-16 items-center gap-2.5 px-5">
+      <aside className="relative z-30 flex w-16 flex-col items-center bg-sidebar text-sidebar-foreground">
+        <Link href="/dashboard" className="flex h-16 w-full items-center justify-center" title="OMEcommerce">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
             <ShoppingBag className="size-4.5 text-primary-foreground" strokeWidth={2.25} />
           </div>
-          <span className="text-lg leading-none font-bold tracking-tight">
-            <span className="text-sidebar-foreground">OME</span>
-            <span className="text-primary">commerce</span>
-          </span>
-        </div>
-        <div className="flex-1 overflow-y-auto px-3 py-2">
+        </Link>
+        <div className="flex-1 overflow-y-auto py-2">
           <DashboardNav />
-        </div>
-        <div className="border-t border-sidebar-border px-5 py-4">
-          <p className="text-[11px] font-medium tracking-wider text-sidebar-foreground/35 uppercase">
-            OrangeMantra · OMEcommerce
-          </p>
         </div>
       </aside>
       <div className="flex flex-1 flex-col overflow-hidden">

@@ -3,24 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { logout } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
-
-const SECTION_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard',
-  products: 'Products',
-  inventory: 'Inventory',
-  pricing: 'Pricing',
-  orders: 'Orders',
-  customers: 'Customers',
-  'gift-cards': 'Gift Cards',
-  loyalty: 'Loyalty Program',
-  referrals: 'Referrals',
-  companies: 'Companies',
-};
+import { sectionLabelForPath } from '@/components/dashboard-nav';
 
 export function TopHeader() {
   const pathname = usePathname();
-  const section = pathname.split('/')[1] ?? '';
-  const label = SECTION_LABELS[section] ?? 'Dashboard';
+  const label = sectionLabelForPath(pathname);
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-8">
