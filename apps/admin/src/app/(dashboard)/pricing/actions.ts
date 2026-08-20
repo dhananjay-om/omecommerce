@@ -31,7 +31,10 @@ export interface FindProductState {
 
 /** Same SKU-search UX as Inventory's "Adjust Stock" — Set Price otherwise needs a
  *  raw variant public ID, which is exactly the friction that dialog used to have. */
-export async function findProductForPricing(_prevState: FindProductState, formData: FormData): Promise<FindProductState> {
+export async function findProductForPricing(
+  _prevState: FindProductState,
+  formData: FormData,
+): Promise<FindProductState> {
   const sku = String(formData.get('sku') ?? '').trim();
   if (!sku) {
     return { error: 'Enter a SKU.', product: null };
@@ -64,18 +67,26 @@ export async function findProductForPricing(_prevState: FindProductState, formDa
       sku: detail.sku,
       name: detail.name,
       variants,
-      preselectedVariantId: exactVariant?.publicId ?? (variants.length === 1 ? variants[0].publicId : null),
+      preselectedVariantId:
+        exactVariant?.publicId ?? (variants.length === 1 ? variants[0].publicId : null),
     },
   };
 }
 
-export async function createPriceList(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function createPriceList(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const code = String(formData.get('code') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
-  const currency = String(formData.get('currency') ?? '').trim().toUpperCase();
+  const currency = String(formData.get('currency') ?? '')
+    .trim()
+    .toUpperCase();
   const type = String(formData.get('type') ?? '') as PriceListType | '';
   const priorityRaw = String(formData.get('priority') ?? '').trim();
   const priority = priorityRaw ? Number(priorityRaw) : undefined;
+  const customerGroupCodeRaw = String(formData.get('customerGroupCode') ?? '').trim();
+  const customerGroupCode = customerGroupCodeRaw === '__none__' ? '' : customerGroupCodeRaw;
 
   if (!code || !name || currency.length !== 3) {
     return { error: 'Code, name, and a 3-letter currency code are required.', success: false };
@@ -88,6 +99,7 @@ export async function createPriceList(_prevState: ActionState, formData: FormDat
       currency,
       type: type || undefined,
       priority,
+      customerGroupCode: customerGroupCode || undefined,
     });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
@@ -118,10 +130,15 @@ export async function setPrice(_prevState: ActionState, formData: FormData): Pro
   return { error: null, success: true };
 }
 
-export async function updatePriceList(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function updatePriceList(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const code = String(formData.get('code') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
-  const currency = String(formData.get('currency') ?? '').trim().toUpperCase();
+  const currency = String(formData.get('currency') ?? '')
+    .trim()
+    .toUpperCase();
   const type = String(formData.get('type') ?? '') as PriceListType | '';
   const priorityRaw = String(formData.get('priority') ?? '').trim();
   const isActive = String(formData.get('isActive') ?? 'true') === 'true';
@@ -147,7 +164,10 @@ export async function updatePriceList(_prevState: ActionState, formData: FormDat
   return { error: null, success: true };
 }
 
-export async function deletePriceList(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function deletePriceList(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const code = String(formData.get('code') ?? '').trim();
   if (!code) {
     return { error: 'Missing price list code.', success: false };

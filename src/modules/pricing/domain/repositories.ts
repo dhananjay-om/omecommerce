@@ -25,6 +25,7 @@ export interface CustomerGroupInfo {
   publicId: string;
   code: string;
   name: string;
+  isDefault: boolean;
 }
 
 export interface CreateCustomerGroupInput {
@@ -36,6 +37,7 @@ export interface CreateCustomerGroupInput {
 export interface CustomerGroupRepository {
   create(input: CreateCustomerGroupInput): Promise<CustomerGroupInfo>;
   findByCode(code: string): Promise<CustomerGroupInfo | null>;
+  list(): Promise<CustomerGroupInfo[]>;
 }
 
 export interface PriceListInfo {

@@ -10,6 +10,7 @@ export interface CustomerGroupView {
   publicId: string;
   code: string;
   name: string;
+  isDefault: boolean;
 }
 
 export interface CreatePriceListCommand {

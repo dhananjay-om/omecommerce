@@ -212,6 +212,13 @@ export interface WarehouseStockItem {
   available: number;
 }
 
+export interface CustomerGroup {
+  publicId: string;
+  code: string;
+  name: string;
+  isDefault: boolean;
+}
+
 export type PriceListType = 'BASE' | 'WHOLESALE' | 'B2B' | 'SPECIAL';
 
 export interface PriceList {

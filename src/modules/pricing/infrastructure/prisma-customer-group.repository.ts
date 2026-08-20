@@ -15,13 +15,22 @@ export class PrismaCustomerGroupRepository implements CustomerGroupRepository {
     const row = await this.db.customerGroup.create({
       data: { code: input.code, name: input.name, isDefault: input.isDefault },
     });
-    return { id: row.id, publicId: row.publicId, code: row.code, name: row.name };
+    return toInfo(row);
   }
 
   async findByCode(code: string): Promise<CustomerGroupInfo | null> {
     const row = await this.db.customerGroup.findFirst({ where: { code } });
-    return row ? { id: row.id, publicId: row.publicId, code: row.code, name: row.name } : null;
+    return row ? toInfo(row) : null;
   }
+
+  async list(): Promise<CustomerGroupInfo[]> {
+    const rows = await this.db.customerGroup.findMany({ where: { deletedAt: null }, orderBy: { code: 'asc' } });
+    return rows.map(toInfo);
+  }
+}
+
+function toInfo(row: { id: bigint; publicId: string; code: string; name: string; isDefault: boolean }): CustomerGroupInfo {
+  return { id: row.id, publicId: row.publicId, code: row.code, name: row.name, isDefault: row.isDefault };
 }
 
 /** Read-only cross-module lookup: resolves a catalog variant's publicId. */
