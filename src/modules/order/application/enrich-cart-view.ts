@@ -467,6 +467,7 @@ export class EnrichCartView {
       sku: variant?.sku ?? line.variantPublicId,
       name: variant?.nameDefault ?? variant?.sku ?? line.variantPublicId,
       price,
+      mrp: resolvedPrice?.mrp ?? null,
       imageUrl,
       lineTotal,
       discountAmount: null, // filled in by execute() once the coupon evaluation is known

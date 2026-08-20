@@ -18,6 +18,9 @@ export interface ProductVariant {
   status: string;
   position: number;
   price: string | null;
+  /** "MRP" / compare-at price — null when unset, or when the resolved price came from
+   *  a qty tier. Drives a strikethrough + "X% off" next to `price` when mrp > price. */
+  mrp: string | null;
   inStock: boolean;
   /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — powers the
    * variant picker on the PDP. Empty for a SIMPLE/DIGITAL/VIRTUAL product's single variant. */
@@ -38,6 +41,8 @@ export interface ProductDetail {
   pricesIncludeTax: boolean;
   attributes: Record<string, unknown>;
   price: string | null;
+  /** The first-by-position variant's MRP — same "representative default" caveat as `price`. */
+  mrp: string | null;
   inStock: boolean;
   media: ProductMedia[];
   variants: ProductVariant[];
@@ -50,6 +55,8 @@ export interface SearchHit {
   sku: string;
   name: string;
   priceDisplay: string | null;
+  /** "MRP" / compare-at price display string — null when unset, or when the resolved price came from a qty tier. */
+  mrpDisplay: string | null;
   currency: string | null;
   imageUrl: string | null;
 }

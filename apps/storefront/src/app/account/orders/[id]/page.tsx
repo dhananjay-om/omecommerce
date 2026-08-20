@@ -110,6 +110,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <td className="px-4 py-3">
                   <div className="font-medium">{line.name}</div>
                   <div className="text-xs text-muted-foreground">SKU: {line.sku}</div>
+                  {line.mrp && Number(line.mrp) > Number(line.unitPrice) ? (
+                    <div className="text-xs text-muted-foreground">
+                      {formatPrice(line.unitPrice, order.currency)} each, was{' '}
+                      <span className="line-through">{formatPrice(line.mrp, order.currency)}</span>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3">{line.qty}</td>
                 <td className="px-4 py-3 text-right">{formatPrice(line.rowTotal, order.currency)}</td>

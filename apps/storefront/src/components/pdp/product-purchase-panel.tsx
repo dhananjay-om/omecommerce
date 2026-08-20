@@ -66,12 +66,25 @@ export function ProductPurchasePanel({
   }, [variants, axes, selection]);
 
   const priceNumber = selectedVariant?.price ? Number(selectedVariant.price) : null;
+  const mrpNumber = selectedVariant?.mrp ? Number(selectedVariant.mrp) : null;
+  const percentOff =
+    priceNumber !== null && mrpNumber !== null && mrpNumber > priceNumber
+      ? Math.round(((mrpNumber - priceNumber) / mrpNumber) * 100)
+      : null;
   const inStock = selectedVariant?.inStock ?? false;
 
   return (
     <div>
-      <p className="text-3xl font-bold">
-        {priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}
+      <p className="flex flex-wrap items-baseline gap-2">
+        <span className="text-3xl font-bold">
+          {priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}
+        </span>
+        {percentOff !== null ? (
+          <>
+            <span className="text-lg text-muted-foreground line-through">{formatPrice(mrpNumber!, currency)}</span>
+            <span className="text-sm font-semibold text-success">{percentOff}% off</span>
+          </>
+        ) : null}
         {priceNumber !== null && pricesIncludeTax ? <TaxInclusiveNote /> : null}
       </p>
       <p className={`mt-1 text-sm font-medium ${selectedVariant ? (inStock ? 'text-success' : 'text-destructive') : 'text-muted-foreground'}`}>

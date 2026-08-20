@@ -44,6 +44,11 @@ export class ResolvePrice {
     if (!resolved) {
       throw new NotFoundError('Price', `no price configured for variant ${query.variantPublicId}`);
     }
-    return { price: resolved.price, priceListCode: resolved.priceListCode, source: resolved.source };
+    return {
+      price: resolved.price,
+      priceListCode: resolved.priceListCode,
+      source: resolved.source,
+      mrp: resolved.mrp,
+    };
   }
 }

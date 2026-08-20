@@ -6,6 +6,7 @@ interface ResolvedRow {
   price_list_code: string;
   price: string;
   source: 'tier' | 'base';
+  mrp: string | null;
 }
 
 /**
@@ -22,7 +23,7 @@ export class PrismaPriceResolver implements PriceResolver {
 
   async resolve(input: ResolvePriceInput): Promise<ResolvedPrice | null> {
     const rows = await this.db.$queryRaw<ResolvedRow[]>`
-      SELECT price_list_id, price_list_code, price, source FROM (
+      SELECT price_list_id, price_list_code, price, source, mrp FROM (
         SELECT
           pl.id AS price_list_id,
           pl.code AS price_list_code,
@@ -37,7 +38,16 @@ export class PrismaPriceResolver implements PriceResolver {
           CASE WHEN EXISTS (
             SELECT 1 FROM price_tier pt
              WHERE pt.price_list_id = pl.id AND pt.variant_id = ${input.variantId} AND pt.min_qty <= ${input.qty}
-          ) THEN 'tier' ELSE 'base' END AS source
+          ) THEN 'tier' ELSE 'base' END AS source,
+          -- Only surfaced when a tier price did NOT win this round — a tier/wholesale
+          -- price has no MRP concept of its own (see PriceTier's doc comment).
+          CASE WHEN EXISTS (
+            SELECT 1 FROM price_tier pt
+             WHERE pt.price_list_id = pl.id AND pt.variant_id = ${input.variantId} AND pt.min_qty <= ${input.qty}
+          ) THEN NULL ELSE (
+            SELECT pp.mrp::text FROM product_price pp
+             WHERE pp.price_list_id = pl.id AND pp.variant_id = ${input.variantId}
+          ) END AS mrp
         FROM price_list pl
         WHERE pl.is_active
           AND pl.deleted_at IS NULL
@@ -58,6 +68,7 @@ export class PrismaPriceResolver implements PriceResolver {
       priceListId: row.price_list_id,
       priceListCode: row.price_list_code,
       source: row.source,
+      mrp: row.mrp,
     };
   }
 }

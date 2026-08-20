@@ -114,13 +114,14 @@ export async function setPrice(_prevState: ActionState, formData: FormData): Pro
   const priceListCode = String(formData.get('priceListCode') ?? '').trim();
   const variantId = String(formData.get('variantId') ?? '').trim();
   const price = String(formData.get('price') ?? '').trim();
+  const mrp = String(formData.get('mrp') ?? '').trim();
 
   if (!priceListCode || !variantId || !price) {
     return { error: 'Variant and price are required.', success: false };
   }
 
   try {
-    await apiPut(`/admin/v1/price-lists/${priceListCode}/prices`, { variantId, price });
+    await apiPut(`/admin/v1/price-lists/${priceListCode}/prices`, { variantId, price, mrp: mrp || null });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

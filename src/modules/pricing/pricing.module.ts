@@ -111,6 +111,7 @@ export function createPricingModule(db: Db): PricingRouters {
         priceListCode: req.params.code!,
         variantPublicId: body.variantId,
         price: body.price,
+        mrp: body.mrp,
       });
       res.status(204).send();
     }),

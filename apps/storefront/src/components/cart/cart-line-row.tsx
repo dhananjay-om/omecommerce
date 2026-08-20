@@ -51,8 +51,11 @@ export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLi
         <div>
           <p className="font-medium">{line.name}</p>
           <p className="text-xs text-muted-foreground">SKU: {line.sku}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 flex items-baseline gap-1.5 text-sm text-muted-foreground">
             {line.price ? `${formatPrice(line.price, currency)} each` : 'Price unavailable'}
+            {line.price && line.mrp && Number(line.mrp) > Number(line.price) ? (
+              <span className="line-through">{formatPrice(line.mrp, currency)}</span>
+            ) : null}
           </p>
         </div>
 

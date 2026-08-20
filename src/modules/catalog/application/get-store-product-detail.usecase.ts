@@ -72,6 +72,7 @@ export class GetStoreProductDetail {
           status: v.status,
           position: v.position,
           price: resolvedPrice?.price ?? null,
+          mrp: resolvedPrice?.mrp ?? null,
           inStock,
           axisValues: v.axisValues.map((a) => ({
             attributeCode: a.attributeCode,
@@ -101,6 +102,7 @@ export class GetStoreProductDetail {
     return {
       ...base,
       price: first?.price ?? null,
+      mrp: first?.mrp ?? null,
       inStock: first?.inStock ?? false,
       media,
       variants,

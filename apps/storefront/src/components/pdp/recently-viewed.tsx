@@ -13,6 +13,7 @@ function toSearchHit(product: ProductDetail): SearchHit {
     sku: product.sku,
     name: product.name ?? product.sku,
     priceDisplay: product.price,
+    mrpDisplay: product.mrp,
     currency: product.currency,
     imageUrl: product.media[0]?.url ?? null,
   };

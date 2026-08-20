@@ -15,6 +15,6 @@ export class SetProductPrice {
     const variant = await this.variants.byPublicId(cmd.variantPublicId);
     if (!variant) throw new NotFoundError('ProductVariant', cmd.variantPublicId);
 
-    await this.priceLists.setProductPrice(priceList.id, variant.id, cmd.price);
+    await this.priceLists.setProductPrice(priceList.id, variant.id, cmd.price, cmd.mrp ?? null);
   }
 }

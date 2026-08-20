@@ -20,6 +20,10 @@ export interface ProductDocument {
   isInStock: boolean;
   price: number | null;
   priceDisplay: string | null;
+  /** "MRP" / compare-at price display string — null when unset, or when the resolved
+   *  price came from a qty tier (see pricing's ResolvedPrice.mrp doc comment). Not a
+   *  filterable/sortable numeric field, unlike `price`, so no `mrp` counterpart to it. */
+  mrpDisplay: string | null;
   currency: string | null;
   /** Storage key of the lowest-position media asset, not a URL — see ProductMediaLookup's doc comment. */
   imageKey: string | null;
@@ -55,7 +59,7 @@ export interface SearchResult {
   total: number;
   page: number;
   pageSize: number;
-  hits: Array<{ productId: string; sku: string; name: string; priceDisplay: string | null; currency: string | null; imageKey: string | null }>;
+  hits: Array<{ productId: string; sku: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null }>;
   facets: Record<string, FacetBucket[]>;
 }
 

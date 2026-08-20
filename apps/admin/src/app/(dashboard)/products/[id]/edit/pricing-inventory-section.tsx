@@ -67,6 +67,15 @@ function SetPriceRowDialog({
               placeholder="e.g. 19.99"
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor={`mrp-${row.priceListCode}`}>MRP (optional)</Label>
+            <Input
+              id={`mrp-${row.priceListCode}`}
+              name="mrp"
+              defaultValue={row.mrp ?? ''}
+              placeholder="e.g. 24.99 — shown struck through when higher than Price"
+            />
+          </div>
           {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -225,7 +234,18 @@ export function PricingInventorySection({
                   <TableCell>{row.priceListName}</TableCell>
                   <TableCell>{row.currency}</TableCell>
                   <TableCell>
-                    {row.price ? formatPrice(row.price, row.currency) : <span className="text-muted-foreground">Not set</span>}
+                    {row.price ? (
+                      <span className="flex items-center gap-2">
+                        {formatPrice(row.price, row.currency)}
+                        {row.mrp && Number(row.mrp) > Number(row.price) ? (
+                          <span className="text-xs text-muted-foreground line-through">
+                            {formatPrice(row.mrp, row.currency)}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Not set</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <SetPriceRowDialog productPublicId={productPublicId} variantId={variantId} row={row} />

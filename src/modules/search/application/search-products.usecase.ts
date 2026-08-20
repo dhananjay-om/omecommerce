@@ -18,6 +18,7 @@ export interface SearchProductHit {
   sku: string;
   name: string;
   priceDisplay: string | null;
+  mrpDisplay: string | null;
   currency: string | null;
   imageUrl: string | null;
 }
