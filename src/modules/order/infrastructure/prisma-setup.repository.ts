@@ -1,5 +1,5 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { TaxClassRepository, TaxClassAdminInfo, ShippingMethodRepository } from '../domain/repositories.js';
+import type { TaxClassRepository, TaxClassAdminInfo, ShippingMethodRepository, ShippingMethodAdminInfo } from '../domain/repositories.js';
 import { toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
 
 // Prisma's Decimal.toString() strips trailing zeros ("0.1800" -> "0.18"); this
@@ -50,6 +50,24 @@ export class PrismaTaxClassRepository implements TaxClassRepository {
   }
 }
 
+function toShippingAdminInfo(row: {
+  publicId: string;
+  code: string;
+  name: string;
+  flatRate: { toString(): string };
+  currency: string;
+  isActive: boolean;
+}): ShippingMethodAdminInfo {
+  return {
+    publicId: row.publicId,
+    code: row.code,
+    name: row.name,
+    flatRate: formatDecimal(row.flatRate),
+    currency: row.currency,
+    isActive: row.isActive,
+  };
+}
+
 export class PrismaShippingMethodRepository implements ShippingMethodRepository {
   constructor(private readonly db: Db) {}
 
@@ -69,10 +87,28 @@ export class PrismaShippingMethodRepository implements ShippingMethodRepository 
 
   async list(currency: string): Promise<Array<{ code: string; name: string; flatRate: string; currency: string }>> {
     const rows = await this.db.shippingMethod.findMany({
-      where: { currency },
+      // isActive filtered explicitly — deactivating a method in the admin (isActive: false)
+      // must actually stop offering it at checkout, not just hide it from the admin list.
+      where: { currency, isActive: true },
       select: { code: true, name: true, flatRate: true, currency: true },
       orderBy: { flatRate: 'asc' },
     });
     return rows.map((r) => ({ code: r.code, name: r.name, flatRate: r.flatRate.toString(), currency: r.currency }));
+  }
+
+  async listAll(): Promise<ShippingMethodAdminInfo[]> {
+    const rows = await this.db.shippingMethod.findMany({ orderBy: { createdAt: 'desc' } });
+    return rows.map(toShippingAdminInfo);
+  }
+
+  async update(code: string, input: { name?: string; flatRate?: string; isActive?: boolean }): Promise<ShippingMethodAdminInfo> {
+    const row = await this.db.shippingMethod.update({ where: { code }, data: input });
+    return toShippingAdminInfo(row);
+  }
+
+  async softDelete(code: string): Promise<void> {
+    // Remapped into an UPDATE deletedAt = now() by the shared soft-delete extension, same as
+    // PrismaTaxClassRepository.softDelete above.
+    await this.db.shippingMethod.delete({ where: { code } });
   }
 }

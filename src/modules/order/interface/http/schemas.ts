@@ -135,6 +135,12 @@ export const createShippingMethodSchema = z.object({
   currency: z.string().length(3),
 });
 
+export const updateShippingMethodSchema = z.object({
+  name: z.string().min(1).max(256).optional(),
+  flatRate: z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount').optional(),
+  isActive: z.boolean().optional(),
+});
+
 export const listOrdersQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().optional(),

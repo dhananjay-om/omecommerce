@@ -49,6 +49,9 @@ import {
   UpdateTaxClass,
   DeleteTaxClass,
   CreateShippingMethod,
+  ListShippingMethodsAdmin,
+  UpdateShippingMethod,
+  DeleteShippingMethod,
 } from './application/setup.usecases.js';
 import { ListShippingMethods } from './application/list-shipping-methods.usecase.js';
 import { GetOrderHistory } from './application/get-order-history.usecase.js';
@@ -99,6 +102,7 @@ import {
   createTaxClassSchema,
   updateTaxClassSchema,
   createShippingMethodSchema,
+  updateShippingMethodSchema,
   listOrdersQuerySchema,
   exportOrdersQuerySchema,
 } from './interface/http/schemas.js';
@@ -267,6 +271,9 @@ export function createOrderModule(
   const updateTaxClass = new UpdateTaxClass(taxClasses);
   const deleteTaxClass = new DeleteTaxClass(taxClasses);
   const createShippingMethod = new CreateShippingMethod(shippingMethods);
+  const listShippingMethodsAdmin = new ListShippingMethodsAdmin(shippingMethods);
+  const updateShippingMethod = new UpdateShippingMethod(shippingMethods);
+  const deleteShippingMethod = new DeleteShippingMethod(shippingMethods);
   const getOrderHistory = new GetOrderHistory(orders);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
   const createInvoice = new CreateInvoice(
@@ -333,6 +340,26 @@ export function createOrderModule(
     asyncHandler(async (req, res) => {
       const body = parse(createShippingMethodSchema, req.body);
       res.status(201).json({ data: await createShippingMethod.execute(body) });
+    }),
+  );
+  admin.get(
+    '/shipping-methods',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listShippingMethodsAdmin.execute() });
+    }),
+  );
+  admin.patch(
+    '/shipping-methods/:code',
+    asyncHandler(async (req, res) => {
+      const body = parse(updateShippingMethodSchema, req.body);
+      res.json({ data: await updateShippingMethod.execute(req.params.code!, body) });
+    }),
+  );
+  admin.delete(
+    '/shipping-methods/:code',
+    asyncHandler(async (req, res) => {
+      await deleteShippingMethod.execute(req.params.code!);
+      res.status(204).send();
     }),
   );
   admin.get(
