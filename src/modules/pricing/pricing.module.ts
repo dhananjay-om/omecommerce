@@ -10,6 +10,7 @@ import {
 import { PrismaPriceListRepository } from './infrastructure/prisma-price-list.repository.js';
 import { PrismaPriceResolver } from './infrastructure/prisma-price-resolver.js';
 import { CreateCustomerGroup } from './application/create-customer-group.usecase.js';
+import { ListCustomerGroups } from './application/list-customer-groups.usecase.js';
 import { CreatePriceList } from './application/create-price-list.usecase.js';
 import { UpdatePriceList } from './application/update-price-list.usecase.js';
 import { DeletePriceList } from './application/delete-price-list.usecase.js';
@@ -41,6 +42,7 @@ export function createPricingModule(db: Db): PricingRouters {
   const resolver = new PrismaPriceResolver(db);
 
   const createCustomerGroup = new CreateCustomerGroup(customerGroups);
+  const listCustomerGroups = new ListCustomerGroups(customerGroups);
   const createPriceList = new CreatePriceList(priceLists, customerGroups, websites, currencies);
   const updatePriceList = new UpdatePriceList(priceLists, currencies);
   const deletePriceList = new DeletePriceList(priceLists);
@@ -58,6 +60,13 @@ export function createPricingModule(db: Db): PricingRouters {
       const body = parse(createCustomerGroupSchema, req.body);
       const view = await createCustomerGroup.execute(body);
       res.status(201).json({ data: view });
+    }),
+  );
+
+  admin.get(
+    '/customer-groups',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listCustomerGroups.execute() });
     }),
   );
 

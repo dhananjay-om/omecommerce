@@ -11,6 +11,6 @@ export class CreateCustomerGroup {
       throw new ConflictError(`customer group code already exists: ${code}`);
     }
     const g = await this.groups.create({ code, name: cmd.name, isDefault: cmd.isDefault });
-    return { publicId: g.publicId, code: g.code, name: g.name };
+    return { publicId: g.publicId, code: g.code, name: g.name, isDefault: g.isDefault };
   }
 }

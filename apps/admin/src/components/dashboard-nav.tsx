@@ -27,6 +27,7 @@ import {
   Share2,
   Building2,
   Wallet,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
       { href: '/inventory', label: 'Inventory', icon: Boxes },
       { href: '/inventory/warehouses', label: 'Warehouses', icon: Warehouse },
       { href: '/pricing', label: 'Pricing', icon: Tag },
+      { href: '/customer-groups', label: 'Customer Groups', icon: UsersRound },
       { href: '/categories', label: 'Categories', icon: FolderTree },
       { href: '/attribute-sets', label: 'Attribute Sets', icon: ListTree },
       { href: '/attributes', label: 'Attributes', icon: SlidersHorizontal },
