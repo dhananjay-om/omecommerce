@@ -207,11 +207,16 @@ export function DashboardNav() {
     <nav className="flex flex-col items-center gap-1">
       {NAV_GROUPS.map((group) => {
         const Icon = group.icon;
-        const active = group.key === activeGroup;
+        // Only one rail item highlighted at a time: while a flyout is open, it alone
+        // is highlighted (which page you're actually on takes a back seat) — otherwise
+        // the current page's group is. Without isOpen gating this, clicking a
+        // different section's rail button while still on e.g. /dashboard highlighted
+        // both Dashboard (current page) and the newly-opened group simultaneously.
+        const highlighted = isOpen ? group.key === openKey : group.key === activeGroup;
         const railButtonClass = cn(
           'flex w-20 flex-col items-center gap-1.5 rounded-lg py-3 text-[11px] font-medium tracking-wide',
           'transition-all duration-150 ease-out active:scale-90',
-          active || group.key === openKey
+          highlighted
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-sidebar-foreground/55 hover:scale-105 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground',
         );
