@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { isAxiosError } from 'axios';
+import Link from 'next/link';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useCartStore } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
+import { friendlyTenderError, type FriendlyTenderError } from '@/lib/friendly-tender-error';
 import type { Cart } from '@/types/cart';
 
 /** No code to type (unlike GiftCardField) — a signed-in customer's own wallet
@@ -20,7 +21,7 @@ export function WalletToggle({
   const applyWallet = useCartStore((s) => s.applyWallet);
   const removeWallet = useCartStore((s) => s.removeWallet);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyTenderError | null>(null);
 
   const walletTender = cart.tenders.find((t) => t.tenderType === 'WALLET');
 
@@ -42,11 +43,7 @@ export function WalletToggle({
       if (checked) await applyWallet();
       else await removeWallet();
     } catch (err) {
-      setError(
-        isAxiosError(err)
-          ? (err.response?.data?.error ?? 'Could not update your wallet tender.')
-          : 'Could not update your wallet tender.',
-      );
+      setError(friendlyTenderError(err, 'Could not update your wallet tender.'));
     } finally {
       setPending(false);
     }
@@ -79,7 +76,20 @@ export function WalletToggle({
           Available balance: {formatPrice(walletBalance, cart.currency)}
         </p>
       ) : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-destructive">
+          {error.message}
+          {error.sessionExpired ? (
+            <>
+              {' '}
+              <Link href="/login" target="_blank" rel="noreferrer" className="underline">
+                Log in again
+              </Link>
+              , then check the box once more.
+            </>
+          ) : null}
+        </p>
+      ) : null}
     </div>
   );
 }
