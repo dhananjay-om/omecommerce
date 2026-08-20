@@ -541,6 +541,12 @@ export class CompleteCheckout {
         // declining payment) over a discount nobody explicitly asked for.
         const reverted = await this.orders.revertDiscount(order.id);
         grandTotalMinor = reverted.grandTotalMinor;
+        // revertDiscount() adds discount_total back onto the order's grand_total (exactly
+        // discount.discountAmountMinor, the same value that shrank grandTotalMinor when
+        // remainingMinor was first computed above) — without bumping remainingMinor by the
+        // same amount here, the PSP charge below stays at the pre-revert (discounted) amount
+        // while the order now reflects full price, silently undercharging the customer.
+        remainingMinor = addMinor(remainingMinor, discount.discountAmountMinor);
       }
     }
 

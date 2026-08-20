@@ -130,10 +130,15 @@ export class PrismaWalletLedger implements WalletLedger {
   ): Promise<WalletSnapshot> {
     const txnType = opts.txnType ?? 'DEBIT';
     return this.db.$transaction(async (tx) => {
+      // Guarded against (balance - held_balance), not balance — same held-balance-aware
+      // guard as hold() below. Without this, a debit (admin adjust, referral clawback)
+      // could spend value a concurrent checkout hold already earmarked, and the later
+      // captureHold() would then drive the wallet negative capturing money debit() just
+      // took (plan/15 code-review finding: wallet double-spend via held_balance bypass).
       const rows = await tx.$queryRaw<WalletRow[]>`
         UPDATE wallet
            SET balance = balance - ${amount}::numeric
-         WHERE id = ${walletId} AND balance >= ${amount}::numeric AND status = 'ACTIVE'
+         WHERE id = ${walletId} AND (balance - held_balance) >= ${amount}::numeric AND status = 'ACTIVE'
          RETURNING id, public_id, balance::text, held_balance::text, currency, status::text`;
       if (rows.length === 0) {
         throw new InsufficientBalanceError(amount);
@@ -217,11 +222,18 @@ export class PrismaWalletLedger implements WalletLedger {
         throw new InvalidWalletHoldStateError(`wallet hold ${holdPublicId} is not HELD`);
       }
       const { wallet_id, amount } = holdRows[0]!;
+      // Guarded the same as debit()/hold() — a hold's held_balance should always be
+      // covered by the time it's captured, but this is the last line of defense against
+      // driving the wallet negative if that invariant was ever violated upstream (e.g. a
+      // manual DB correction, or a future bug in another mutation path).
       const rows = await tx.$queryRaw<WalletRow[]>`
         UPDATE wallet
            SET balance = balance - ${amount}::numeric, held_balance = held_balance - ${amount}::numeric
-         WHERE id = ${wallet_id}
+         WHERE id = ${wallet_id} AND balance >= ${amount}::numeric AND held_balance >= ${amount}::numeric
          RETURNING id, public_id, balance::text, held_balance::text, currency, status::text`;
+      if (rows.length === 0) {
+        throw new InsufficientBalanceError(amount);
+      }
       const snapshot = rows[0]!;
       await tx.$executeRaw`
         INSERT INTO wallet_transaction (wallet_id, bucket, type, amount, balance_after, currency, source, ref_type, ref_id)

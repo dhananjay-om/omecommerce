@@ -19,12 +19,17 @@ export class PrismaCompanyOrderSettlement implements CompanyOrderSettlement {
     this.outbox = new OutboxWriter(db);
   }
 
-  async findSettleableByPublicId(companyId: bigint, orderPublicId: string): Promise<{ id: bigint; publicId: string; orderNumber: string } | null> {
+  async findSettleableByPublicId(
+    companyId: bigint,
+    orderPublicId: string,
+  ): Promise<{ id: bigint; publicId: string; orderNumber: string; grandTotal: string } | null> {
     const order = await this.db.order.findFirst({
       where: { publicId: orderPublicId, companyId, financialStatus: 'ON_ACCOUNT' },
-      select: { id: true, publicId: true, orderNumber: true },
+      select: { id: true, publicId: true, orderNumber: true, grandTotal: true },
     });
-    return order ? { id: order.id, publicId: order.publicId, orderNumber: order.orderNumber.toString() } : null;
+    return order
+      ? { id: order.id, publicId: order.publicId, orderNumber: order.orderNumber.toString(), grandTotal: fromMinorUnits(toMinorUnits(order.grandTotal.toString())) }
+      : null;
   }
 
   async markSettled(orderId: bigint): Promise<void> {

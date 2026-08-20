@@ -1,7 +1,7 @@
 import type { CreditTermsType, WalletStatus } from '@prisma/client';
 import type { CompanyRepository, WebsiteLookup, CustomerLookup, CompanyCreditLedger, CompanyOrderSettlement, OpenInvoiceRow } from '../domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
-import { fromMinorUnits, toMinorUnits, subtractMinor } from '../../../shared/domain/decimal.js';
+import { fromMinorUnits, toMinorUnits, subtractMinor, addMinor } from '../../../shared/domain/decimal.js';
 import type {
   SetCompanyCreditTermsCommand,
   CompanyCreditAccountView,
@@ -177,6 +177,21 @@ export class RecordCompanyCreditPayment {
       const order = await this.settlement.findSettleableByPublicId(company.id, orderPublicId);
       if (!order) throw new NotFoundError('on-account order', orderPublicId);
       orders.push(order);
+    }
+
+    // The recorded payment must cover every named order's full grand total — markSettled()
+    // below flips each one to PAID and fires OrderPaid (granting loyalty/referral rewards),
+    // so a payment that's short would otherwise mark orders "paid" for money never actually
+    // collected, silently dropping the shortfall out of the aging/outstanding report.
+    const orderTotalMinor = orders.reduce((sum, o) => addMinor(sum, toMinorUnits(o.grandTotal)), 0n);
+    const paymentMinor = toMinorUnits(cmd.amount);
+    if (paymentMinor < orderTotalMinor) {
+      throw new ValidationError('payment amount does not cover the named orders', [
+        {
+          path: 'amount',
+          message: `${cmd.amount} is less than the combined total of the named orders (${fromMinorUnits(orderTotalMinor)}) — settle fewer orders, or record the full amount`,
+        },
+      ]);
     }
 
     const updated = await this.creditLedger.recordPayment(account.id, cmd.amount, { reason: cmd.reason, actorId });
