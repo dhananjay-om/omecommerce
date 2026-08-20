@@ -1,13 +1,26 @@
-import { apiGet } from '@/lib/api-client';
+import { notFound } from 'next/navigation';
+import { apiGet, ApiError } from '@/lib/api-client';
 import type { CustomerDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 
-/** The "Overview" tab — name/email/status chrome now lives in the shared [id]/layout.tsx. */
+/**
+ * The "Overview" tab — name/email/status chrome now lives in the shared
+ * [id]/layout.tsx, which already 404s first for a deleted/nonexistent
+ * customer; this guard is just defense in depth for the same identical
+ * call (see the layout's own header comment on Next's fetch dedup).
+ */
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const customer = await apiGet<CustomerDetail>(`/admin/v1/customers/${id}`);
+
+  let customer: CustomerDetail;
+  try {
+    customer = await apiGet<CustomerDetail>(`/admin/v1/customers/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) notFound();
+    throw err;
+  }
   const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ');
 
   return (
