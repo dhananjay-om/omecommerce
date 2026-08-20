@@ -14,6 +14,7 @@ import { AddCustomerAddress, ListCustomerAddresses, DeleteCustomerAddress } from
 import { ListCustomerOrders } from './application/list-customer-orders.usecase.js';
 import { ListCustomers } from './application/list-customers.usecase.js';
 import { GetCustomerDetail } from './application/get-customer-detail.usecase.js';
+import { DeleteCustomer } from './application/delete-customer.usecase.js';
 import { authenticateCustomer } from './interface/http/customer.middleware.js';
 import {
   registerCustomerSchema,
@@ -59,6 +60,7 @@ export function createCustomerModule(db: Db): CustomerModule {
   const listCustomerOrders = new ListCustomerOrders(customers, orders);
   const listCustomers = new ListCustomers(customers);
   const getCustomerDetail = new GetCustomerDetail(customers, addresses);
+  const deleteCustomer = new DeleteCustomer(customers);
 
   const requireCustomer = authenticateCustomer(tokens);
 
@@ -128,6 +130,13 @@ export function createCustomerModule(db: Db): CustomerModule {
     '/customers/:publicId',
     asyncHandler(async (req, res) => {
       res.json({ data: await getCustomerDetail.execute(req.params.publicId!) });
+    }),
+  );
+  admin.delete(
+    '/customers/:publicId',
+    asyncHandler(async (req, res) => {
+      await deleteCustomer.execute(req.params.publicId!);
+      res.status(204).send();
     }),
   );
 

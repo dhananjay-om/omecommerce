@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { DeleteCustomerDialog } from './delete-customer-dialog';
 
 const PAGE_SIZE = 20;
 
@@ -46,12 +47,13 @@ export default async function CustomersPage({
               <TableHead>Name</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {list.customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   No customers found.
                 </TableCell>
               </TableRow>
@@ -68,6 +70,9 @@ export default async function CustomersPage({
                     <Badge variant={c.isActive ? 'success' : 'secondary'}>{c.isActive ? 'Active' : 'Inactive'}</Badge>
                   </TableCell>
                   <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">
+                    <DeleteCustomerDialog publicId={c.publicId} email={c.email} />
+                  </TableCell>
                 </TableRow>
               ))
             )}

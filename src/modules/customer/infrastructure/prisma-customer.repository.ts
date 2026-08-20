@@ -45,6 +45,13 @@ export class PrismaCustomerRepository implements CustomerRepository {
     });
   }
 
+  async softDelete(id: bigint): Promise<void> {
+    await this.db.customer.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+  }
+
   async list(filter: ListCustomersFilter): Promise<CustomerListResult> {
     const where: Prisma.CustomerWhereInput = {
       deletedAt: null,

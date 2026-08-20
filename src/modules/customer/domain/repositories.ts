@@ -45,6 +45,11 @@ export interface CustomerRepository {
   findByPublicId(publicId: string): Promise<CustomerRecord | null>;
   create(input: CreateCustomerInput): Promise<CustomerRecord>;
   list(filter: ListCustomersFilter): Promise<CustomerListResult>;
+  /** Soft-delete only, same as PriceListRepository.softDelete: sets deletedAt + isActive=false.
+   *  Never guarded — a deleted customer just stops appearing in list()/login (LoginCustomer already
+   *  checks isActive) and drops out of new B2B/order flows, but every order they ever placed keeps
+   *  its own snapshot of name/email, and existing wallet/loyalty/referral rows are kept, not cascaded. */
+  softDelete(id: bigint): Promise<void>;
 }
 
 export interface CustomerAddressRecord {
