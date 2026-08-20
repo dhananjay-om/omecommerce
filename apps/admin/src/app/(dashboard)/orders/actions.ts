@@ -100,6 +100,25 @@ export async function closeOrder(orderPublicId: string, _prevState: ActionState)
   return { error: null, success: true };
 }
 
+export async function markOrderPaid(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const amount = String(formData.get('amount') ?? '').trim();
+  const note = String(formData.get('note') ?? '').trim();
+
+  if (!amount) {
+    return { error: 'Amount collected is required.', success: false };
+  }
+
+  try {
+    await apiPost(`/admin/v1/orders/${orderPublicId}/actions/mark-paid`, { amount, note: note || undefined });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath(`/orders/${orderPublicId}`);
+  return { error: null, success: true };
+}
+
 export async function createInvoice(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
   const lines = parseLines(formData);
 

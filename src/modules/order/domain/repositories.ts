@@ -13,6 +13,7 @@ import type {
   EmailLogStatus,
   OrderEmailType,
   TenderType,
+  PaymentMethodType,
 } from '@prisma/client';
 import type { WalletSettings } from './wallet-rules.js';
 
@@ -189,6 +190,31 @@ export interface ShippingMethodRepository {
   softDelete(code: string): Promise<void>;
 }
 
+export interface PaymentMethodInfo {
+  code: string;
+  name: string;
+  type: PaymentMethodType;
+}
+
+export interface PaymentMethodAdminInfo extends PaymentMethodInfo {
+  publicId: string;
+  isActive: boolean;
+}
+
+export interface PaymentMethodRepository {
+  create(input: { code: string; name: string; type: PaymentMethodType }): Promise<{ publicId: string; code: string }>;
+  findByCode(code: string): Promise<PaymentMethodAdminInfo | null>;
+  /** Storefront checkout — active only, no currency scope (unlike shipping, a payment
+   *  method isn't tied to one currency). */
+  list(): Promise<PaymentMethodInfo[]>;
+  /** Admin list — every method, including inactive ones (so they can be reactivated). */
+  listAll(): Promise<PaymentMethodAdminInfo[]>;
+  update(code: string, input: { name?: string; isActive?: boolean }): Promise<PaymentMethodAdminInfo>;
+  /** Soft-delete only — a deleted method just stops being offered; any order that already
+   *  used it keeps its own snapshotted paymentMethod code untouched. */
+  softDelete(code: string): Promise<void>;
+}
+
 // --- Cart ---
 
 export interface CartLineView {
@@ -328,6 +354,10 @@ export interface CreateOrderInput {
   shippingTotalMinor: bigint;
   grandTotalMinor: bigint;
   shippingMethodCode: string;
+  /** The PaymentMethod.code chosen at checkout, or null for a zero-due (fully tender-settled)
+   *  order where cmd.paymentMethod was never required. Snapshot, not FK — see the schema
+   *  column's own comment for why. */
+  paymentMethodCode: string | null;
   couponCode: string | null;
   lines: OrderLineInput[];
   addresses: OrderAddressInput[];
@@ -549,6 +579,7 @@ export interface OrderView {
   shippingTotal: string;
   grandTotal: string;
   shippingMethodCode: string | null;
+  paymentMethodCode: string | null;
   couponCode: string | null;
   customerIp: string | null;
   placedAt: Date;

@@ -266,6 +266,16 @@ export interface ShippingMethod {
   isActive: boolean;
 }
 
+export type PaymentMethodType = 'COD' | 'ONLINE';
+
+export interface PaymentMethod {
+  publicId: string;
+  code: string;
+  name: string;
+  type: PaymentMethodType;
+  isActive: boolean;
+}
+
 export interface Website {
   publicId: string;
   code: string;
@@ -505,6 +515,7 @@ export interface OrderDetail {
   shippingTotal: string;
   grandTotal: string;
   shippingMethodCode: string | null;
+  paymentMethodCode: string | null;
   couponCode: string | null;
   customerIp: string | null;
   placedAt: string;

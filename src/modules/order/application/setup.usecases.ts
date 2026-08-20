@@ -1,4 +1,13 @@
-import type { TaxClassRepository, TaxClassAdminInfo, ShippingMethodRepository, ShippingMethodAdminInfo } from '../domain/repositories.js';
+import type {
+  TaxClassRepository,
+  TaxClassAdminInfo,
+  ShippingMethodRepository,
+  ShippingMethodAdminInfo,
+  PaymentMethodRepository,
+  PaymentMethodAdminInfo,
+  PaymentMethodInfo,
+} from '../domain/repositories.js';
+import type { PaymentMethodType } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../shared/domain/errors.js';
 
 export class CreateTaxClass {
@@ -78,5 +87,53 @@ export class DeleteShippingMethod {
   async execute(code: string): Promise<void> {
     if (!(await this.shippingMethods.findByCode(code))) throw new NotFoundError('ShippingMethod', code);
     await this.shippingMethods.softDelete(code);
+  }
+}
+
+export class CreatePaymentMethod {
+  constructor(private readonly paymentMethods: PaymentMethodRepository) {}
+
+  async execute(cmd: { code: string; name: string; type: PaymentMethodType }): Promise<{ publicId: string; code: string }> {
+    if (await this.paymentMethods.findByCode(cmd.code)) {
+      throw new ConflictError(`payment method code already exists: ${cmd.code}`);
+    }
+    return this.paymentMethods.create(cmd);
+  }
+}
+
+/** Storefront checkout — active methods only, in admin-chosen order. */
+export class ListPaymentMethods {
+  constructor(private readonly paymentMethods: PaymentMethodRepository) {}
+
+  async execute(): Promise<PaymentMethodInfo[]> {
+    return this.paymentMethods.list();
+  }
+}
+
+export class ListPaymentMethodsAdmin {
+  constructor(private readonly paymentMethods: PaymentMethodRepository) {}
+
+  async execute(): Promise<PaymentMethodAdminInfo[]> {
+    return this.paymentMethods.listAll();
+  }
+}
+
+export class UpdatePaymentMethod {
+  constructor(private readonly paymentMethods: PaymentMethodRepository) {}
+
+  async execute(code: string, cmd: { name?: string; isActive?: boolean }): Promise<PaymentMethodAdminInfo> {
+    if (!(await this.paymentMethods.findByCode(code))) throw new NotFoundError('PaymentMethod', code);
+    return this.paymentMethods.update(code, cmd);
+  }
+}
+
+/** Soft-delete only — a deleted method simply stops being offered at checkout; any order that
+ *  already used it keeps its own snapshotted paymentMethod code unaffected. */
+export class DeletePaymentMethod {
+  constructor(private readonly paymentMethods: PaymentMethodRepository) {}
+
+  async execute(code: string): Promise<void> {
+    if (!(await this.paymentMethods.findByCode(code))) throw new NotFoundError('PaymentMethod', code);
+    await this.paymentMethods.softDelete(code);
   }
 }

@@ -6,6 +6,7 @@ import type {
   CartTenderView,
   CompanyMembershipLookup,
   WalletSettingsLookup,
+  PaymentMethodRepository,
 } from '../domain/repositories.js';
 import {
   walletBlockReason,
@@ -102,6 +103,7 @@ export class CompleteCheckout {
     private readonly companyMemberships: CompanyMembershipLookup,
     private readonly companyCredit: CompanyCreditLedger,
     private readonly walletSettings: WalletSettingsLookup,
+    private readonly paymentMethods: PaymentMethodRepository,
   ) {}
 
   async execute(cmd: CompleteCheckoutCommand): Promise<OrderViewDto> {
@@ -497,6 +499,7 @@ export class CompleteCheckout {
         shippingTotalMinor: shipping.amountMinor,
         grandTotalMinor,
         shippingMethodCode: shipping.methodCode,
+        paymentMethodCode: cmd.paymentMethod ?? null,
         couponCode: discount?.code ?? null,
         lines,
         addresses: [
@@ -553,8 +556,17 @@ export class CompleteCheckout {
     // Step 5: attempt payment for whatever's still due after tenders — zero
     // due (fully tender-settled) skips the PSP entirely, matching a
     // guest-checkout-style "nothing to charge" outcome (plan/15 Phase 5).
+    // COD (plan/16) skips it too, but for a different reason: no card exists
+    // to charge at all — the order proceeds and stays PENDING/no PaymentTransaction
+    // until an admin records the cash via MarkOrderPaidManually, same
+    // don't-fire-OrderPaid-for-uncollected-money reasoning ON_ACCOUNT already uses
+    // below. A paymentMethod code that isn't a registered COD row (including the
+    // unregistered "test_card") goes through the PSP exactly as it always has.
+    const chosenMethod = cmd.paymentMethod ? await this.paymentMethods.findByCode(cmd.paymentMethod) : null;
+    const isCod = chosenMethod?.type === 'COD';
+
     const payment =
-      remainingMinor > 0n
+      remainingMinor > 0n && !isCod
         ? await this.paymentGateway.capture({
             orderId: order.id,
             amountMinor: remainingMinor,
@@ -564,7 +576,7 @@ export class CompleteCheckout {
           })
         : { status: 'SUCCEEDED' as const, gatewayRef: null, raw: undefined };
 
-    if (remainingMinor > 0n) {
+    if (remainingMinor > 0n && !isCod) {
       await this.orders.recordPayment({
         orderId: order.id,
         method: cmd.paymentMethod!,
@@ -645,6 +657,20 @@ export class CompleteCheckout {
           fromValue: 'PENDING',
           toValue: 'ON_ACCOUNT',
           message: 'Order placed on account — awaiting settlement of the credit-terms portion',
+          actorType: 'SYSTEM',
+        });
+      } else if (isCod && remainingMinor > 0n) {
+        // Stays at its PENDING default (no PaymentTransaction recorded, OrderPaid
+        // not fired) until an admin records the cash via MarkOrderPaidManually —
+        // exactly the ON_ACCOUNT reasoning above, applied to cash-on-delivery
+        // instead of a B2B receivable.
+        await this.orders.setOrderStatus(order.id, 'PROCESSING');
+        await this.orders.recordHistory({
+          orderId: order.id,
+          eventType: 'PAYMENT_RECEIVED',
+          fromValue: 'PENDING',
+          toValue: 'PENDING',
+          message: `Order placed — ${fromMinorUnits(remainingMinor)} ${cart.currency} due on delivery (${cmd.paymentMethod})`,
           actorType: 'SYSTEM',
         });
       } else {
