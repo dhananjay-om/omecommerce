@@ -119,6 +119,16 @@ services:
       S3_BUCKET: ${S3_BUCKET}
       JWT_SECRET: ${JWT_SECRET}
       GIFT_CARD_HMAC_SECRET: ${GIFT_CARD_HMAC_SECRET}
+      # Order transactional email (order confirmation, shipment, cancellation,
+      # refund) — real SMTP only once SMTP_USER/SMTP_PASS are both set;
+      # otherwise falls back to a log-only simulated sender (see
+      # order.module.ts's createEmailSender). SMTP_HOST/PORT default to
+      # Gmail's own settings in code, so they're optional here too.
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

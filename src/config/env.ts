@@ -33,6 +33,22 @@ const EnvSchema = z.object({
   // practice (unlike the customer-token/JWT_SECRET reuse decision, which was
   // justified by a payload-shape check being the real boundary there).
   GIFT_CARD_HMAC_SECRET: z.string().min(16, 'GIFT_CARD_HMAC_SECRET must be at least 16 characters'),
+  // Order transactional email (plan/15 Phase 3 originally shipped only a
+  // SimulatedEmailSender — logs, never actually sends — since no provider
+  // credentials existed yet). All optional, same "absent = fall back to the
+  // simulated adapter" precedent as S3_*: SMTP_USER/SMTP_PASS are the real
+  // gate (see order.module.ts's createEmailSender), the rest default to
+  // Gmail/Google Workspace's own published SMTP settings so a Google
+  // Workspace account only has to supply the address + an App Password
+  // (Google requires one for SMTP — a normal account password is rejected).
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  // Shown as the "From" address/name — defaults to SMTP_USER (the
+  // authenticated account) when unset, which is also the only address Gmail
+  // SMTP will accept in "From" without extra "Send As" configuration.
+  SMTP_FROM: z.string().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

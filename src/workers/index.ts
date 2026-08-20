@@ -3,7 +3,7 @@ import { OutboxRelay } from '../shared/infrastructure/outbox/outbox-relay.js';
 import { DOMAIN_EVENTS_QUEUE, MAINTENANCE_QUEUE, getDomainEventsQueue } from '../shared/infrastructure/queue/queues.js';
 import { getQueueConnectionOptions } from '../shared/infrastructure/queue/connection.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
-import { handleOrderConfirmation } from './order-confirmation.worker.js';
+import { createOrderNotificationHandler } from './order-confirmation.worker.js';
 import { createReservationSweepHandler, scheduleReservationSweep } from './reservation-sweep.worker.js';
 import { createStoredValueHoldSweepHandler, scheduleStoredValueHoldSweep } from './stored-value-hold-sweep.worker.js';
 import { createSearchIndexHandler } from './search-indexer.worker.js';
@@ -31,7 +31,7 @@ export interface WorkerHandles {
  */
 function startDomainEventsWorker(): Worker {
   const handlers: Array<(job: Job) => Promise<void>> = [
-    handleOrderConfirmation,
+    createOrderNotificationHandler(),
     createSearchIndexHandler(),
     createLoyaltyEarnHandler(),
     createReferralQualifyHandler(),
