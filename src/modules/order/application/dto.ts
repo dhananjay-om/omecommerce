@@ -430,3 +430,29 @@ export interface SendOrderEmailCommand {
   body?: string;
   sentBy?: string | null;
 }
+
+/** Never carries the real password — see GetEmailSettings' doc comment. */
+export interface EmailSettingsView {
+  host: string;
+  port: number;
+  username: string;
+  hasPassword: boolean;
+  fromName: string | null;
+  fromEmail: string | null;
+  updatedAt: string | null;
+}
+
+export interface UpdateEmailSettingsCommand {
+  host: string;
+  port: number;
+  username: string;
+  /** Omitted/blank keeps the currently-saved password unchanged — see UpdateEmailSettings' doc comment. */
+  password?: string;
+  fromName?: string | null;
+  fromEmail?: string | null;
+  updatedBy?: string | null;
+}
+
+export interface SendTestEmailCommand {
+  to: string;
+}

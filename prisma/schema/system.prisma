@@ -153,3 +153,52 @@ model AdminUserRole {
   @@index([roleId])
   @@map("admin_user_role")
 }
+
+/// Admin-configurable SMTP for order transactional email (confirmation/
+/// shipment/cancellation/refund — see order-email-templates.ts), replacing the
+/// SMTP_* env vars as the live source of truth once a row exists (see
+/// order.module.ts's DynamicEmailSender: this row wins over env vars when
+/// present, so changing it here takes effect on the very next email, no
+/// redeploy/restart needed — the whole point of moving this into the admin UI).
+/// A true singleton — at most one row ever exists (upserted, never created a
+/// second time; enforced at the application layer, not a DB constraint, same
+/// as this project has no other genuine 0-or-1-row tables to copy a precedent
+/// from). No soft-delete, same reasoning as Role above: this is live config,
+/// not a historical/financial record — "removing" it means clearing the
+/// fields, not leaving a deleted row behind.
+///
+/// `password` is stored in plaintext, not hashed — unlike GiftCard.codeHash,
+/// this can't be one-way-hashed: the app must present the ORIGINAL password to
+/// the SMTP server on every send, so only reversible storage (plaintext, or
+/// symmetric encryption behind a key this project doesn't yet have anywhere)
+/// is possible. This is a REAL exposure delta worth stating plainly, not
+/// glossed over: unlike JWT_SECRET/GIFT_CARD_HMAC_SECRET (env vars — never in
+/// the OLTP database, never in a pg_dump/replica/staging restore), this column
+/// rides along in every backup and read replica, and — since `host` defaults
+/// to Gmail — is very likely a real third-party account credential; a leak
+/// here lets an attacker send spoofed mail from the merchant's own domain,
+/// not just forge a token inside this app. Mitigated today only at the API
+/// layer (GetEmailSettings never returns this column's value, only whether
+/// one is set); excluding this table from any backup/export that flows to a
+/// lower environment, and symmetric at-rest encryption, are tracked as
+/// legitimate near-term follow-ups, not dismissed as unnecessary.
+model EmailSettings {
+  id        BigInt   @id @default(autoincrement())
+  publicId  String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  host      String   @default("smtp.gmail.com")
+  port      Int      @default(587)
+  username  String
+  password  String
+  /// Shown as the email's "From" display name — e.g. "Your Store" alongside
+  /// username as the actual address. Optional; falls back to just the address.
+  fromName  String?  @map("from_name")
+  /// Defaults to `username` when unset — the only address Gmail SMTP accepts
+  /// in "From" without extra "Send As" configuration on the account anyway.
+  fromEmail String?  @map("from_email")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+
+  @@map("email_settings")
+}

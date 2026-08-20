@@ -921,3 +921,15 @@ export interface AgingReportView {
   buckets: Record<AgingBucketLabel, string>;
   invoices: OpenInvoiceView[];
 }
+
+/** GET /admin/v1/email-settings — never carries the real password, only
+ *  whether one is set (see GetEmailSettings' own doc comment). */
+export interface EmailSettings {
+  host: string;
+  port: number;
+  username: string;
+  hasPassword: boolean;
+  fromName: string | null;
+  fromEmail: string | null;
+  updatedAt: string | null;
+}

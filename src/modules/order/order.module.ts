@@ -72,6 +72,11 @@ import { RegenerateInvoice } from './application/regenerate-invoice.usecase.js';
 import { GetPackingSlipPdfUrl } from './application/get-packing-slip-pdf-url.usecase.js';
 import { SendOrderEmail } from './application/send-order-email.usecase.js';
 import { GetEmailLog } from './application/get-email-log.usecase.js';
+import { GetEmailSettings } from './application/get-email-settings.usecase.js';
+import { UpdateEmailSettings } from './application/update-email-settings.usecase.js';
+import { SendTestEmail } from './application/send-test-email.usecase.js';
+import { PrismaEmailSettingsRepository } from './infrastructure/prisma-email-settings.repository.js';
+import { DynamicEmailSender } from './infrastructure/dynamic-email-sender.js';
 import { SimulatedEmailSender } from './infrastructure/simulated-email-sender.js';
 import { SmtpEmailSender } from './infrastructure/smtp-email-sender.js';
 import type { EmailSender } from './domain/ports.js';
@@ -119,6 +124,8 @@ import {
   markOrderPaidSchema,
   listOrdersQuerySchema,
   exportOrdersQuerySchema,
+  updateEmailSettingsSchema,
+  sendTestEmailSchema,
 } from './interface/http/schemas.js';
 import { applyCouponSchema } from '../coupon/interface/http/schemas.js';
 
@@ -128,15 +135,16 @@ export interface OrderRouters {
 }
 
 /**
- * Real SMTP only when both SMTP_USER/SMTP_PASS are configured — same
- * "absent credentials -> simulated adapter" fallback TestPaymentGateway
- * established for payments (see SimulatedEmailSender's own doc comment).
- * Shared by createOrderModule (the HTTP composition root, for the manual
- * "Send Email" admin action) and createOrderEmailDeps below (the worker
- * composition root, for automatic order-lifecycle emails) so both paths
- * always send through the exact same adapter.
+ * The env-var-only fallback layer: real SMTP once both SMTP_USER/SMTP_PASS
+ * are configured — same "absent credentials -> simulated adapter" precedent
+ * TestPaymentGateway established for payments — else the log-only
+ * SimulatedEmailSender. Wrapped by createEmailSender() below, which layers
+ * the admin-configurable EmailSettings row (DynamicEmailSender) on TOP of
+ * this: the DB row wins when present, this is what runs when it's not —
+ * e.g. a deployment configured only via deploy/set-smtp-credentials.sh that
+ * has never touched the admin "Email (SMTP)" settings page at all.
  */
-function createEmailSender(): EmailSender {
+function createEnvEmailSender(): EmailSender {
   if (env.SMTP_USER && env.SMTP_PASS) {
     return new SmtpEmailSender({
       host: env.SMTP_HOST,
@@ -150,6 +158,18 @@ function createEmailSender(): EmailSender {
 }
 
 /**
+ * Shared by createOrderModule (the HTTP composition root, for both the
+ * manual "Send Email" admin action and the "Send Test Email" settings-page
+ * action) and createOrderEmailDeps below (the worker composition root, for
+ * automatic order-lifecycle emails) so every path always sends through the
+ * exact same adapter, and a settings change made in the admin UI is picked
+ * up by all of them on the very next email — no restart.
+ */
+function createEmailSender(db: Db): EmailSender {
+  return new DynamicEmailSender(db, createEnvEmailSender());
+}
+
+/**
  * Deps for the worker-side automatic order-lifecycle emails (order-
  * notification.worker.ts) — same "own small composition, independent of the
  * Express app's createOrderModule" pattern as loyalty.module.ts's
@@ -159,7 +179,7 @@ function createEmailSender(): EmailSender {
 export function createOrderEmailDeps(db: Db): { sendOrderEmail: SendOrderEmail; orders: OrderRepository } {
   const orders = new PrismaOrderRepository(db);
   const adminUsers = new PrismaAdminUserLookup(db);
-  const emailSender = createEmailSender();
+  const emailSender = createEmailSender(db);
   return { sendOrderEmail: new SendOrderEmail(orders, adminUsers, emailSender), orders };
 }
 
@@ -351,9 +371,13 @@ export function createOrderModule(
     websiteTaxConfigLookup,
   );
   const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
-  const emailSender = createEmailSender();
+  const emailSender = createEmailSender(db);
   const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
   const getEmailLog = new GetEmailLog(orders);
+  const emailSettings = new PrismaEmailSettingsRepository(db);
+  const getEmailSettings = new GetEmailSettings(emailSettings);
+  const updateEmailSettings = new UpdateEmailSettings(emailSettings, adminUsers);
+  const sendTestEmail = new SendTestEmail(emailSender);
   const closeOrder = new CloseOrder(orders, outbox);
   const exportOrders = new ExportOrders(orders);
   const getCustomerOrder = new GetCustomerOrder(orders, customers, companies);
@@ -615,6 +639,32 @@ export function createOrderModule(
     authorize('orders:email'),
     asyncHandler(async (req, res) => {
       res.json({ data: await getEmailLog.execute(req.params.publicId!) });
+    }),
+  );
+  admin.get(
+    '/email-settings',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await getEmailSettings.execute() });
+    }),
+  );
+  admin.put(
+    '/email-settings',
+    asyncHandler(async (req, res) => {
+      const body = parse(updateEmailSettingsSchema, req.body);
+      res.json({
+        data: await updateEmailSettings.execute({
+          ...body,
+          updatedBy: req.adminUser?.adminUserPublicId,
+        }),
+      });
+    }),
+  );
+  admin.post(
+    '/email-settings/test',
+    asyncHandler(async (req, res) => {
+      const body = parse(sendTestEmailSchema, req.body);
+      await sendTestEmail.execute(body);
+      res.status(204).send();
     }),
   );
   admin.post(
