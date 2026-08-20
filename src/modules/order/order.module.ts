@@ -180,7 +180,14 @@ export function createOrderEmailDeps(db: Db): { sendOrderEmail: SendOrderEmail; 
   const orders = new PrismaOrderRepository(db);
   const adminUsers = new PrismaAdminUserLookup(db);
   const emailSender = createEmailSender(db);
-  return { sendOrderEmail: new SendOrderEmail(orders, adminUsers, emailSender), orders };
+  const websiteTaxConfig = new PrismaWebsiteTaxConfigLookup(db);
+  const variants = new PrismaVariantLookup(db);
+  const productMedia = new PrismaCartProductMediaLookup(db);
+  const mediaUrls = new S3MediaUrlResolver();
+  return {
+    sendOrderEmail: new SendOrderEmail(orders, adminUsers, emailSender, websiteTaxConfig, variants, productMedia, mediaUrls),
+    orders,
+  };
 }
 
 /**
@@ -372,7 +379,15 @@ export function createOrderModule(
   );
   const getPackingSlipPdfUrl = new GetPackingSlipPdfUrl(orders, mediaUrlResolver);
   const emailSender = createEmailSender(db);
-  const sendOrderEmail = new SendOrderEmail(orders, adminUsers, emailSender);
+  const sendOrderEmail = new SendOrderEmail(
+    orders,
+    adminUsers,
+    emailSender,
+    websiteTaxConfigLookup,
+    variants,
+    cartProductMedia,
+    mediaUrlResolver,
+  );
   const getEmailLog = new GetEmailLog(orders);
   const emailSettings = new PrismaEmailSettingsRepository(db);
   const getEmailSettings = new GetEmailSettings(emailSettings);

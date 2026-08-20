@@ -49,6 +49,12 @@ const EnvSchema = z.object({
   // authenticated account) when unset, which is also the only address Gmail
   // SMTP will accept in "From" without extra "Send As" configuration.
   SMTP_FROM: z.string().optional(),
+  // The storefront's own public URL — already set on the storefront service
+  // itself (docker-compose.prod.yml, for metadataBase/OpenGraph/sitemap);
+  // the API needs its own copy too, only for building a clickable "View
+  // Order Details" / storefront link inside a transactional email. Optional
+  // — a missing value just means that link is omitted, not a boot failure.
+  SITE_URL: z.string().url().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
