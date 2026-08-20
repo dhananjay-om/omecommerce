@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { isAxiosError } from 'axios';
+import Link from 'next/link';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useCartStore } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
+import { friendlyTenderError, type FriendlyTenderError } from '@/lib/friendly-tender-error';
 import type { Cart } from '@/types/cart';
 import type { CompanyCreditAccount } from '@/types/company';
 
@@ -34,7 +35,7 @@ export function CreditTermsToggle({
   const applyCreditTerms = useCartStore((s) => s.applyCreditTerms);
   const removeCreditTerms = useCartStore((s) => s.removeCreditTerms);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyTenderError | null>(null);
 
   const tender = cart.tenders.find((t) => t.tenderType === 'CREDIT_TERMS');
 
@@ -45,11 +46,7 @@ export function CreditTermsToggle({
       if (checked) await applyCreditTerms();
       else await removeCreditTerms();
     } catch (err) {
-      setError(
-        isAxiosError(err)
-          ? (err.response?.data?.error ?? 'Could not update your account terms.')
-          : 'Could not update your account terms.',
-      );
+      setError(friendlyTenderError(err, 'Could not update your account terms.'));
     } finally {
       setPending(false);
     }
@@ -77,7 +74,20 @@ export function CreditTermsToggle({
       <p className="pl-6 text-xs text-muted-foreground">
         Available credit: {formatPrice(account.available, account.currency)}
       </p>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-destructive">
+          {error.message}
+          {error.sessionExpired ? (
+            <>
+              {' '}
+              <Link href="/login" target="_blank" rel="noreferrer" className="underline">
+                Log in again
+              </Link>
+              , then check the box once more.
+            </>
+          ) : null}
+        </p>
+      ) : null}
     </div>
   );
 }
