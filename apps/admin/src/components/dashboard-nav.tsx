@@ -245,7 +245,10 @@ export function DashboardNav() {
           blocks clicks on the page underneath. */}
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] transition-opacity duration-200 ease-out',
+          // left-20 (not inset-0) — starts after the rail, so the dim/blur never
+          // covers the rail itself; it should stay fully visible and clickable
+          // while a flyout is open, e.g. to switch straight to another section.
+          'fixed inset-y-0 left-20 right-0 z-40 bg-black/25 backdrop-blur-[1px] transition-opacity duration-200 ease-out',
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         aria-hidden="true"
