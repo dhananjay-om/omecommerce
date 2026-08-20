@@ -209,7 +209,7 @@ export function DashboardNav() {
         const Icon = group.icon;
         const active = group.key === activeGroup;
         const railButtonClass = cn(
-          'flex w-16 flex-col items-center gap-1 rounded-lg py-2.5 text-[10.5px] font-medium tracking-wide',
+          'flex w-20 flex-col items-center gap-1.5 rounded-lg py-3 text-[11px] font-medium tracking-wide',
           'transition-all duration-150 ease-out active:scale-90',
           active || group.key === openKey
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -253,7 +253,8 @@ export function DashboardNav() {
       <div
         ref={panelRef}
         className={cn(
-          'fixed top-0 bottom-0 left-16 z-50 w-[600px] max-w-[calc(100vw-4rem)] overflow-y-auto bg-sidebar text-sidebar-foreground shadow-2xl',
+          'fixed top-0 left-20 z-50 max-h-[calc(100vh-2rem)] w-[640px] max-w-[calc(100vw-5rem)] overflow-y-auto',
+          'rounded-b-2xl bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-white/5',
           'transition-all duration-200 ease-out',
           isOpen ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-6 opacity-0',
         )}
@@ -271,7 +272,12 @@ export function DashboardNav() {
                 <X className="size-5" />
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-1 px-6 pb-8 sm:grid-cols-2">
+            <div
+              className={cn(
+                'grid grid-cols-1 gap-x-8 gap-y-1 px-6 pb-8',
+                renderedGroup.items.length > 4 ? 'sm:grid-cols-2' : '',
+              )}
+            >
               {renderedGroup.items.map((item, i) => {
                 const itemActive = item.href === activeHref;
                 const ItemIcon = item.icon;
