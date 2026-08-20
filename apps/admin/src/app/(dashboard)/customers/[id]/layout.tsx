@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { apiGet } from '@/lib/api-client';
+import { notFound } from 'next/navigation';
+import { apiGet, ApiError } from '@/lib/api-client';
 import type { CustomerDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { CustomerViewNav } from '../customer-view-nav';
@@ -9,10 +10,21 @@ import { CustomerViewNav } from '../customer-view-nav';
  * Referrals) — name/email + status badge, plus the left "Customer View"
  * sidebar nav. Same pattern as orders/[id]/layout.tsx; `apiGet`'s fetch is
  * deduped by Next.js against the identical call each child page also makes.
+ *
+ * A deleted (or never-existent) customer 404s here — same notFound()-on-404
+ * pattern as content/pages/[id]/edit — so this shows Next's not-found page
+ * instead of an uncaught ApiError crashing to a 500.
  */
 export default async function CustomerDetailLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const customer = await apiGet<CustomerDetail>(`/admin/v1/customers/${id}`);
+
+  let customer: CustomerDetail;
+  try {
+    customer = await apiGet<CustomerDetail>(`/admin/v1/customers/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) notFound();
+    throw err;
+  }
   const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ');
 
   return (
