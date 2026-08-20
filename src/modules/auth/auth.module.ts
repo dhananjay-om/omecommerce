@@ -3,11 +3,13 @@ import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { env } from '../../config/env.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaAdminUserRepository } from './infrastructure/prisma-admin-user.repository.js';
+import { PrismaPermissionRepository } from './infrastructure/prisma-permission.repository.js';
 import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher.js';
 import { JwtTokenService } from './infrastructure/jwt-token.service.js';
 import { Login } from './application/login.usecase.js';
 import { CreateAdminUser } from './application/create-admin-user.usecase.js';
 import { GetCurrentAdmin } from './application/get-current-admin.usecase.js';
+import { SyncPermissions } from './application/sync-permissions.usecase.js';
 import { authenticate, authorize } from './interface/http/auth.middleware.js';
 import { loginSchema, createAdminUserSchema } from './interface/http/schemas.js';
 
@@ -24,12 +26,14 @@ export interface AuthModule {
 /** Composition root for Auth/RBAC. */
 export function createAuthModule(db: Db): AuthModule {
   const adminUsers = new PrismaAdminUserRepository(db);
+  const permissions = new PrismaPermissionRepository(db);
   const hasher = new ScryptPasswordHasher();
   const tokens = new JwtTokenService(env.JWT_SECRET);
 
   const login = new Login(adminUsers, hasher, tokens);
   const createAdminUser = new CreateAdminUser(adminUsers, hasher);
   const getCurrentAdmin = new GetCurrentAdmin(adminUsers);
+  const syncPermissions = new SyncPermissions(permissions);
 
   const publicRouter = Router();
   publicRouter.post(
@@ -55,6 +59,13 @@ export function createAuthModule(db: Db): AuthModule {
     asyncHandler(async (req, res) => {
       const body = parse(createAdminUserSchema, req.body);
       res.status(201).json({ data: await createAdminUser.execute(body) });
+    }),
+  );
+  admin.post(
+    '/auth/sync-permissions',
+    authorize('admin:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await syncPermissions.execute() });
     }),
   );
 
