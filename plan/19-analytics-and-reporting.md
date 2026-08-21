@@ -454,18 +454,18 @@ truth, and any drift between the two is surfaced, not hidden.
 
 ## 13. Development roadmap
 
-| Phase | Deliverable | Depends on |
-|---|---|---|
-| 19.1 | `analytics.prisma` schema (§4) + migration, reviewed by `schema-reviewer` + `db-migration-verifier` (this repo's standing convention for every schema change) | — |
-| 19.2 | Close the event gaps in §3 (add the missing `outbox.write()` calls) | 19.1 |
-| 19.3 | `analytics-projector.worker.ts` (incremental) + `analytics-refresh.worker.ts` (nightly batch/reconciliation, §12) | 19.1, 19.2 |
-| 19.4 | `src/modules/analytics/` REST module (§9) | 19.3 |
-| 19.5 | Executive + Sales + Order dashboards (admin UI) | 19.4 |
-| 19.6 | Product + Customer + Inventory dashboards, RFM (§5) | 19.4 |
-| 19.7 | Reports/export (§7) | 19.4 |
-| 19.8 | Alert engine (§10) | 19.4 |
-| 19.9 | Live verification (curl + Puppeteer, this session's standing discipline) + integration tests | 19.5–19.8 |
-| 19.10 | Deploy script (`deploy/deploy-analytics-*.sh`, following this repo's per-feature deploy-script convention) | 19.9 |
+| Phase | Deliverable | Depends on | Status |
+|---|---|---|---|
+| 19.1 | `analytics.prisma` schema (§4) + migration, reviewed by `schema-reviewer` + `db-migration-verifier` (this repo's standing convention for every schema change) | — | **Done** |
+| 19.2 | Close the event gaps in §3 (add the missing `outbox.write()` calls) | 19.1 | **Done** (ProductUpdated/ProductPriceChanged/StockChanged/CustomerRegistered — via multi-agent Workflow, independently verified) |
+| 19.3 | `analytics-projector.worker.ts` (incremental) + `analytics-refresh.worker.ts` (nightly batch/reconciliation, §12) | 19.1, 19.2 | **Done** — live-verified end-to-end (real checkout → cancel/refund → summary tables correct; one real bug found and fixed: stale `summary_order_status_daily` rows on a status transition) |
+| 19.4 | `src/modules/analytics/` REST module (§9) | 19.3 | **Done** — 10 read endpoints + AlertRule CRUD/history, gated on the 4 new permission codes |
+| 19.5 | Executive + Sales + Order dashboards (admin UI) | 19.4 | Not started |
+| 19.6 | Product + Customer + Inventory dashboards, RFM (§5) | 19.4 | Not started |
+| 19.7 | Reports/export (§7) | 19.4 | Not started |
+| 19.8 | Alert engine (§10) | 19.4 | **Partly done** — the evaluation engine (`EvaluateAlertRules`, runs nightly) and AlertRule CRUD API are live and verified; the admin config UI and real notification delivery (email — an explicit open question, §16) are not started |
+| 19.9 | Live verification (curl + Puppeteer, this session's standing discipline) + integration tests | 19.5–19.8 | Done for 19.1–19.4 (curl-verified end-to-end); still needed for 19.5–19.8 once built |
+| 19.10 | Deploy script (`deploy/deploy-analytics-*.sh`, following this repo's per-feature deploy-script convention) | 19.9 | **Done** — `deploy/deploy-analytics-reporting.sh` covers 19.1–19.4; a later script will cover the dashboard UI once built |
 
 Phase 2 (blocked on §16 decisions, not scheduled until they resolve):
 UTM/session-tracking capture → Marketing dashboard + conversion funnel;
