@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react';
-import { apiGet } from '@/lib/api-client';
+import { notFound } from 'next/navigation';
+import { apiGet, ApiError } from '@/lib/api-client';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass, Variant, VariantPrice, VariantStock } from '@/lib/types';
 import { SITE_URL } from '@/lib/config';
 import { Button } from '@/components/ui/button';
@@ -14,8 +15,20 @@ export interface VariantPricingEntry {
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, attributeSets, categories, taxClasses] = await Promise.all([
-    apiGet<ProductDetail>(`/admin/v1/products/${id}`),
+
+  // Fetched alone first (not folded into the Promise.all below) specifically
+  // so a 404 HERE — the one case that means "this product genuinely doesn't
+  // exist" — can be told apart from any other of this page's many fetches
+  // failing. Same pattern as the sibling product detail page.
+  let product: ProductDetail;
+  try {
+    product = await apiGet<ProductDetail>(`/admin/v1/products/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) notFound();
+    throw err;
+  }
+
+  const [attributeSets, categories, taxClasses] = await Promise.all([
     apiGet<AttributeSet[]>('/admin/v1/attribute-sets'),
     apiGet<Category[]>('/admin/v1/categories'),
     apiGet<TaxClass[]>('/admin/v1/tax-classes'),
