@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { apiGet, ApiError } from '@/lib/api-client';
 import type { Banner } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { BannerForm } from '../../banner-form';
 
 export default async function EditBannerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,8 @@ export default async function EditBannerPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">Edit Banner — {banner.title}</h1>
+      <BackLink href="/content/banners" label="Back to Banners" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">Edit Banner — {banner.title}</h1>
       <div className="mt-6">
         <BannerForm banner={banner} />
       </div>

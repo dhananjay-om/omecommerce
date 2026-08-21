@@ -1,5 +1,6 @@
 import { apiGet } from '@/lib/api-client';
 import type { Attribute, Category } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { CouponForm } from '../coupon-form';
 
 export default async function NewCouponPage() {
@@ -10,7 +11,8 @@ export default async function NewCouponPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">New Coupon</h1>
+      <BackLink href="/coupons" label="Back to Coupons" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">New Coupon</h1>
       <div className="mt-6">
         <CouponForm attributes={attributes} categories={categories} />
       </div>

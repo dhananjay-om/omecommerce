@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { apiGet } from '@/lib/api-client';
 import type { Attribute, Category, Coupon } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { CouponForm } from '../../coupon-form';
 
 export default async function EditCouponPage({ params }: { params: Promise<{ code: string }> }) {
@@ -18,7 +19,8 @@ export default async function EditCouponPage({ params }: { params: Promise<{ cod
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">Edit Coupon — {coupon.code}</h1>
+      <BackLink href="/coupons" label="Back to Coupons" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">Edit Coupon — {coupon.code}</h1>
       <div className="mt-6">
         <CouponForm coupon={coupon} attributes={attributes} categories={categories} />
       </div>

@@ -3,6 +3,7 @@ import { apiGet } from '@/lib/api-client';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass, Variant, VariantPrice, VariantStock } from '@/lib/types';
 import { SITE_URL } from '@/lib/config';
 import { Button } from '@/components/ui/button';
+import { BackLink } from '@/components/back-link';
 import { EditProductForm } from './edit-product-form';
 
 export interface VariantPricingEntry {
@@ -41,7 +42,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <BackLink href={`/products/${id}`} label={`Back to ${product.name ?? product.sku}`} />
+      <div className="mt-2 flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
         <Button
           variant="outline"
