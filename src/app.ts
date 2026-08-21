@@ -57,6 +57,7 @@ export function createApp(): Express {
 
   const store = createStoreModule(prisma);
   app.use('/admin/v1', store.admin);
+  app.use('/store/v1', store.store);
 
   const inventory = createInventoryModule(prisma, auth.authorize);
   app.use('/admin/v1', inventory.admin);

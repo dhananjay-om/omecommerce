@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import type { Website } from '@/types/website';
 
 const linkColumns = [
   {
@@ -28,13 +29,20 @@ const linkColumns = [
 const socialLinks = ['Facebook', 'Instagram', 'X', 'YouTube'];
 const paymentMethods = ['Visa', 'Mastercard', 'Amex', 'PayPal', 'UPI'];
 
-export function Footer() {
+export function Footer({ website }: { website: Website }) {
   return (
     <footer className="mt-16 border-t bg-foreground text-background">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Link href="/" className="text-xl font-bold">
-            OME<span className="text-cta">Shop</span>
+            {website.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
+              <img src={website.logoUrl} alt={website.name} className="h-8 w-auto object-contain" />
+            ) : (
+              <>
+                OME<span className="text-cta">Shop</span>
+              </>
+            )}
           </Link>
           <p className="mt-3 max-w-xs text-sm text-background/70">
             Everything you need, delivered fast. Quality products, honest prices.

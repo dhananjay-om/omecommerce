@@ -12,6 +12,7 @@ import { UpdateWebsiteTaxSettings } from './application/update-website-tax-setti
 import { UpdateWebsiteGeneralSettings } from './application/update-website-general-settings.usecase.js';
 import { UpdateWebsiteWalletSettings } from './application/update-website-wallet-settings.usecase.js';
 import { RequestWebsiteLogoUpload } from './application/request-logo-upload.usecase.js';
+import { GetPublicWebsite } from './application/get-public-website.usecase.js';
 import {
   createCurrencySchema,
   updateCurrencySchema,
@@ -19,10 +20,12 @@ import {
   updateWebsiteGeneralSettingsSchema,
   updateWebsiteWalletSettingsSchema,
   requestLogoUploadSchema,
+  getPublicWebsiteQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface StoreRouters {
   admin: Router;
+  store: Router;
 }
 
 /** Composition root for the Store module ("Stores" nav section — General
@@ -42,6 +45,7 @@ export function createStoreModule(db: Db): StoreRouters {
   const updateWebsiteGeneralSettings = new UpdateWebsiteGeneralSettings(websites);
   const updateWebsiteWalletSettings = new UpdateWebsiteWalletSettings(websites);
   const requestWebsiteLogoUpload = new RequestWebsiteLogoUpload(websites);
+  const getPublicWebsite = new GetPublicWebsite(websites);
 
   const admin = Router();
 
@@ -121,5 +125,15 @@ export function createStoreModule(db: Db): StoreRouters {
     }),
   );
 
-  return { admin };
+  const store = Router();
+
+  store.get(
+    '/website',
+    asyncHandler(async (req, res) => {
+      const query = parse(getPublicWebsiteQuerySchema, req.query);
+      res.json({ data: await getPublicWebsite.execute(query.code) });
+    }),
+  );
+
+  return { admin, store };
 }
