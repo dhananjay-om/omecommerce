@@ -52,9 +52,9 @@ fi
 
 echo
 echo "=================================================================="
-echo "2b. Same request, straight to the api container internally (node has"
-echo "    no curl, using its built-in fetch) — shows the exact error body"
-echo "    and traceId to match against the api logs below"
+echo "2b. Same request, straight to the api container internally, using"
+echo "    storeViewId=1 (node has no curl, using its built-in fetch) —"
+echo "    isolates whether the api itself is fine when asked directly"
 echo "=================================================================="
 $COMPOSE exec -T api node -e "
   fetch('http://localhost:3000/store/v1/products/by-slug/${SLUG}?storeViewId=1')
@@ -64,18 +64,43 @@ $COMPOSE exec -T api node -e "
 
 echo
 echo "=================================================================="
-echo "3. storefront container logs (last 40 lines) — just the client-side"
-echo "   \"ApiError: Internal Server Error\" this always logs; the REAL"
-echo "   cause is on the api side, step 4 below"
+echo "2c. The storefront container's ACTUAL env vars for this — if"
+echo "    STORE_VIEW_ID here isn't '1', that's very likely the bug"
 echo "=================================================================="
-$COMPOSE logs storefront --tail 40
+$COMPOSE exec -T storefront sh -c 'echo "API_BASE_URL=$API_BASE_URL"; echo "WEBSITE_CODE=$WEBSITE_CODE"; echo "STORE_VIEW_ID=$STORE_VIEW_ID"'
 
 echo
 echo "=================================================================="
-echo "4. api container logs (last 150 lines) — THIS is where the real"
-echo "   Prisma/backend stack trace for the 500 will be"
+echo "2d. THE EXACT SAME CALL the storefront's own code makes — run FROM"
+echo "    INSIDE the storefront container, using ITS real API_BASE_URL"
+echo "    and STORE_VIEW_ID (not hardcoded) — this should reproduce the"
+echo "    failure if it's env/container-specific"
 echo "=================================================================="
-$COMPOSE logs api --tail 150
+$COMPOSE exec -T storefront sh -c "
+  node -e \"
+    const base = process.env.API_BASE_URL;
+    const sv = process.env.STORE_VIEW_ID || '1';
+    const url = base + '/store/v1/products/by-slug/${SLUG}?storeViewId=' + sv;
+    console.log('Requesting:', url);
+    fetch(url)
+      .then(async (r) => { console.log('status:', r.status); console.log(await r.text()); })
+      .catch((e) => console.error('fetch failed:', e.message));
+  \"
+"
+
+echo
+echo "=================================================================="
+echo "3. storefront container logs, filtered to just errors (last 200"
+echo "   raw lines, grepped down)"
+echo "=================================================================="
+$COMPOSE logs storefront --tail 200 | grep -iE "error|fail|slug" || echo "(no matching lines)"
+
+echo
+echo "=================================================================="
+echo "4. api container logs, filtered to just by-slug requests and errors"
+echo "   (last 300 raw lines, grepped down — /health noise excluded)"
+echo "=================================================================="
+$COMPOSE logs api --tail 300 | grep -iE "by-slug|error|prisma" || echo "(no matching lines)"
 
 echo
 echo "=================================================================="
