@@ -33,6 +33,7 @@ Medusa, commercetools).
 | 9 | `09-deployment-architecture.md` | Docker, scaling, caching, CDN, observability |
 | 10 | `10-gift-cards-wallet-store-credit.md` | Stored value: gift cards, customer wallet, store credit (ledger-based) |
 | 11 | `11-loyalty-and-referral.md` | Loyalty points/tiers + referral program (built on the stored-value ledger) |
+| 19 | `19-analytics-and-reporting.md` | Analytics/reporting read-model (the "Analytics" bounded context from §3, finally built): dashboards, reports, alerts — reuses the outbox/BullMQ pipeline, no new infra |
 
 > **Build order recommendation:** 1 → 2 → 7 (inventory ledger) → 8 (orders) →
 > 3/5 (APIs) → 6 (search) → 4 (admin) → 10 (stored value) → 11 (loyalty/referral) →
