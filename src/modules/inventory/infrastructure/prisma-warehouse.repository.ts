@@ -109,4 +109,12 @@ export class PrismaVariantLookup implements VariantLookup {
     });
     return row;
   }
+
+  async bySku(sku: string): Promise<{ id: bigint; publicId: string; sku: string } | null> {
+    const row = await this.db.productVariant.findFirst({
+      where: { sku, deletedAt: null },
+      select: { id: true, publicId: true, sku: true },
+    });
+    return row;
+  }
 }

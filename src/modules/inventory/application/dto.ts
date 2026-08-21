@@ -72,3 +72,33 @@ export interface VariantStockItemView {
   reserved: number;
   available: number;
 }
+
+/** Bulk stock import (Magento-style "update qty by SKU" CSV) — set/execute
+ *  ONE row's on-hand quantity to an absolute value, not a delta. Reused by
+ *  both a possible future single-row admin action and the bulk-import
+ *  worker (which calls this once per CSV row). */
+export interface SetStockQuantityCommand {
+  sku: string;
+  warehouseCode: string;
+  /** The new on-hand total, not a change amount. */
+  quantity: number;
+  note?: string;
+}
+
+export interface BulkStockRow {
+  sku: string;
+  quantity: number;
+}
+
+export interface BulkStockRowError {
+  row: number;
+  sku: string;
+  message: string;
+}
+
+export interface BulkStockResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  errors: BulkStockRowError[];
+}
