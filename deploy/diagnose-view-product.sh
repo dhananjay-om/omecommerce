@@ -52,9 +52,30 @@ fi
 
 echo
 echo "=================================================================="
-echo "3. storefront container logs (last 100 lines)"
+echo "2b. Same request, straight to the api container internally (node has"
+echo "    no curl, using its built-in fetch) — shows the exact error body"
+echo "    and traceId to match against the api logs below"
 echo "=================================================================="
-$COMPOSE logs storefront --tail 100
+$COMPOSE exec -T api node -e "
+  fetch('http://localhost:3000/store/v1/products/by-slug/${SLUG}?storeViewId=1')
+    .then(async (r) => { console.log('status:', r.status); console.log(await r.text()); })
+    .catch((e) => console.error('fetch failed:', e.message));
+"
+
+echo
+echo "=================================================================="
+echo "3. storefront container logs (last 40 lines) — just the client-side"
+echo "   \"ApiError: Internal Server Error\" this always logs; the REAL"
+echo "   cause is on the api side, step 4 below"
+echo "=================================================================="
+$COMPOSE logs storefront --tail 40
+
+echo
+echo "=================================================================="
+echo "4. api container logs (last 150 lines) — THIS is where the real"
+echo "   Prisma/backend stack trace for the 500 will be"
+echo "=================================================================="
+$COMPOSE logs api --tail 150
 
 echo
 echo "=================================================================="
