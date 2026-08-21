@@ -36,7 +36,7 @@ deferred:
 |---|---|---|
 | Shopify/Magento/ERP/CRM/Salesforce connectors, webhook ingestion layer | OMEcommerce owns the source data directly | Direct read of the OLTP tables + the existing outbox event stream |
 | Kafka / Azure Service Bus | This project already has a working, tested event backbone | Existing `OutboxWriter` + `OutboxRelay` (2s poll, `FOR UPDATE SKIP LOCKED`) → BullMQ `domain-events` queue |
-| Separate analytics data warehouse (ClickHouse/BigQuery/Snowflake) | No evidence of the volume that would justify one (see §12); the master plan already earmarked `analytics_events` for *partitioning*, not a separate store | A dedicated `analytics` Postgres schema (same instance) — materialized views + summary tables, revisited only if real production volume proves it's needed |
+| Separate analytics data warehouse (ClickHouse/BigQuery/Snowflake) | No evidence of the volume that would justify one (see §12); the master plan already earmarked `analytics_events` for *partitioning*, not a separate store | Same `public` Postgres schema (same instance) as everything else — `fact_`/`dim_`/`summary_` table-name prefixes provide the logical grouping; revisited only if real production volume proves it's needed |
 | New authentication/session system | One already exists and is fully wired into every admin page | Existing `Role`/`Permission`/`RolePermission`/`AdminUserRole` (§8) |
 | New CSV/Excel export mechanism | One already exists, tested, and used in production (`orders:export`) | Same same-origin-proxy + `csv-stringify`/`exceljs` pattern, applied to new report types |
 | Google Ads / Meta Ads / GA4 / email-platform integrations | Zero tracking infrastructure exists on the storefront today (confirmed: no gtag, no pixel, no UTM capture anywhere) — these aren't "connect an API," they're "build a tracking layer from zero first" | Explicitly **Phase 2, decision required** (§16) — the data model is designed to receive this later without a redesign, but it is not buildable from what exists today |
@@ -114,8 +114,8 @@ silently assumed, per §16.
                                                                      │
                                                                      ▼
                                             ┌─────────────────────────────┐
-                                            │  analytics Postgres schema   │
-                                            │  (same DB instance)          │
+                                            │  same `public` Postgres      │
+                                            │  schema (same DB instance)   │
                                             │  - dim_* / fact_* tables     │
                                             │  - daily summary tables      │
                                             │  - materialized views        │
@@ -186,11 +186,16 @@ which is a perfectly fine MVP posture, not a hack.
 
 ## 4. Data model
 
-New schema file `prisma/schema/analytics.prisma`, mapped to a dedicated
-Postgres schema (`analytics`, via Prisma's `@@schema` multi-schema
-support) so it's operationally separable later (a read replica, or a real
-warehouse migration) without touching the OLTP schema. Follows every
-existing convention from `00-master-plan.md` §4 exactly: `BIGINT IDENTITY`
+New schema file `prisma/schema/analytics.prisma`, same `public` Postgres
+schema as every other table in this project (this repo's Prisma setup
+does not have the `multiSchema` preview feature enabled — confirmed in
+`_base.prisma`'s `generator` block — so a genuinely separate Postgres
+schema is not a drop-in option today without first taking on that preview
+feature as its own decision; not done here). Table-name prefixes
+(`fact_`/`dim_`/`summary_`) provide the logical grouping instead, and
+nothing stops a real schema-per-namespace split later if `multiSchema` is
+adopted project-wide. Follows every existing convention from
+`00-master-plan.md` §4 exactly: `BIGINT IDENTITY`
 PK + `publicId UUID v7`, `NUMERIC(18,4)` + `CHAR(3)` currency for money,
 BRIN on time columns, no soft-delete on append-only facts (same rule
 `StockMovement`/`PaymentTransaction` already follow).
@@ -494,7 +499,7 @@ data first).
 
 | Decision | Chosen | Alternative | Why |
 |---|---|---|---|
-| Analytics store | Same Postgres instance, dedicated schema | Separate warehouse (ClickHouse/BigQuery) | No volume evidence justifies the operational cost yet; multi-schema Prisma keeps a clean migration path if that changes |
+| Analytics store | Same Postgres instance, same `public` schema, prefixed table names | Separate warehouse (ClickHouse/BigQuery) | No volume evidence justifies the operational cost yet; migrating out later is a table-by-table move, not a rewrite, whenever that's actually warranted |
 | Event backbone | Existing Outbox + BullMQ | Kafka | Already built, tested, and proven under this project's other async features; introducing a second event system for one bounded context is pure duplication |
 | Ingestion model | Direct OLTP read + own event stream | Webhook ingestion from an external platform | OMEcommerce is the source system, not a consumer of one |
 | RFM/segmentation | Rule-based quintile scoring, nightly | ML-based predictive scoring | Matches this project's stated "don't pay complexity tax by default" principle (`00-master-plan.md` §1.7-adjacent CQRS note); revisit if the merchant specifically wants predictive CLV |
