@@ -6,6 +6,7 @@ import { getSession } from '@/lib/session';
 import { DashboardNav } from '@/components/dashboard-nav';
 import { TopHeader } from '@/components/top-header';
 import { Toaster } from '@/components/ui/sonner';
+import { SITE_URL } from '@/lib/config';
 
 /**
  * Best-effort UX redirect for the common "never logged in" case — fast path
@@ -36,7 +37,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         </div>
       </aside>
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader />
+        <TopHeader siteUrl={SITE_URL} />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1600px] p-8">{children}</div>
         </main>
