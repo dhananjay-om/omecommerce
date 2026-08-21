@@ -2,6 +2,8 @@ export interface ProductCoreInfo {
   id: bigint;
   publicId: string;
   sku: string;
+  /** Storefront canonical URL is /{slug}.html — see Product.slug's schema doc comment. */
+  slug: string;
   name: string | null;
   type: string;
   status: string;

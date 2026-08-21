@@ -9,7 +9,7 @@ INSERT INTO store(website_id,code,name) VALUES (1,'main','Main Store');
 INSERT INTO store_view(store_id,code,language_id,currency) VALUES (1,'en',1,'USD');
 INSERT INTO attribute_set(code,name,is_default) VALUES ('electronics','Electronics',true);
 INSERT INTO attribute(code,label,data_type,input_type) VALUES ('ram','RAM','NUMBER','NUMBER');
-INSERT INTO product(type,sku,attribute_set_id,name_default,status) VALUES ('SIMPLE','SKU-1',1,'Phone A','ACTIVE');
+INSERT INTO product(type,sku,slug,attribute_set_id,name_default,status) VALUES ('SIMPLE','SKU-1','phone-a',1,'Phone A','ACTIVE');
 INSERT INTO product_attribute_value(product_id,attribute_id,scope,value_int) VALUES (1,1,'GLOBAL',8);
 INSERT INTO product_attribute_value(product_id,attribute_id,scope,store_view_id,value_int) VALUES (1,1,'STORE_VIEW',1,16);
 

@@ -27,7 +27,7 @@ export function ProductCard({ hit }: { hit: SearchHit }) {
     hit.priceDisplay && hit.mrpDisplay ? discountPercent(hit.priceDisplay, hit.mrpDisplay) : null;
   return (
     <Link
-      href={`/products/${hit.productId}`}
+      href={`/${hit.slug}.html`}
       className="group flex flex-col overflow-hidden rounded-lg border bg-background transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
     >
       <div className="aspect-square overflow-hidden bg-muted">

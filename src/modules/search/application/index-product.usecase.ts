@@ -95,6 +95,7 @@ export class IndexProduct {
         productId: product.publicId,
         storeViewId: sv.id.toString(),
         sku: product.sku,
+        slug: product.slug,
         name: product.name ?? product.sku,
         type: product.type,
         status: product.status,

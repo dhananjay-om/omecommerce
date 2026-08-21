@@ -18,12 +18,13 @@ export class PrismaWishlistItemRepository implements WishlistItemRepository {
   async listByWishlistId(wishlistId: bigint): Promise<WishlistItemInfo[]> {
     const rows = await this.db.wishlistItem.findMany({
       where: { wishlistId },
-      select: { addedAt: true, product: { select: { publicId: true, sku: true, nameDefault: true } } },
+      select: { addedAt: true, product: { select: { publicId: true, sku: true, slug: true, nameDefault: true } } },
       orderBy: { addedAt: 'desc' },
     });
     return rows.map((r) => ({
       productPublicId: r.product.publicId,
       sku: r.product.sku,
+      slug: r.product.slug,
       name: r.product.nameDefault,
       addedAt: r.addedAt,
     }));

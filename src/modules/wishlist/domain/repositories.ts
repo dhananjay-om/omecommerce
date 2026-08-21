@@ -13,6 +13,8 @@ export interface WishlistRepository {
 export interface WishlistItemInfo {
   productPublicId: string;
   sku: string;
+  /** Storefront canonical URL is /{slug}.html — see Product.slug's schema doc comment. */
+  slug: string;
   name: string | null;
   addedAt: Date;
 }

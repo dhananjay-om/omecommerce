@@ -22,7 +22,7 @@ describe.skipIf(!process.env.INTEGRATION)('brand API (live DB)', () => {
       create: { code: 'brand-test-set', name: 'Brand Test Set' },
     });
     const product = await prisma.product.create({
-      data: { type: 'SIMPLE', sku: `BRAND-TEST-${Date.now()}`, attributeSetId: set.id, status: 'DRAFT', visibility: 'BOTH' },
+      data: { type: 'SIMPLE', sku: `BRAND-TEST-${Date.now()}`, slug: `brand-test-${Date.now()}`, attributeSetId: set.id, status: 'DRAFT', visibility: 'BOTH' },
     });
     productPublicId = product.publicId;
     admin = adminRequest(app, await getAdminToken(app));

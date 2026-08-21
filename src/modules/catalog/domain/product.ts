@@ -6,6 +6,11 @@ export interface ProductProps {
   publicId: string | null;
   type: ProductType;
   sku: string;
+  /** URL-safe storefront identifier (/{slug}.html) — resolved by CreateProduct
+   *  BEFORE this constructor runs (uniqueSlug() needs an async repository
+   *  lookup, which a pure domain factory can't do), same division of labor
+   *  Category's slug already has between CreateCategory and Category.create(). */
+  slug: string;
   attributeSetId: bigint;
   status: ProductStatus;
   visibility: ProductVisibility;
@@ -26,6 +31,7 @@ export interface ProductProps {
 export interface CreateProductInput {
   type: ProductType;
   sku: string;
+  slug: string;
   attributeSetId: bigint;
   status?: ProductStatus;
   visibility?: ProductVisibility;
@@ -52,11 +58,14 @@ export class Product {
     if (!Object.values(ProductType).includes(input.type)) {
       throw new ValidationError('invalid product type', [{ path: 'type', message: 'invalid' }]);
     }
+    const slug = input.slug?.trim();
+    if (!slug) throw new ValidationError('slug is required', [{ path: 'slug', message: 'required' }]);
     return new Product({
       id: null,
       publicId: null,
       type: input.type,
       sku,
+      slug,
       attributeSetId: input.attributeSetId,
       status: input.status ?? ProductStatus.DRAFT,
       visibility: input.visibility ?? ProductVisibility.BOTH,

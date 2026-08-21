@@ -30,6 +30,7 @@ export const PRODUCT_INDEX_MAPPING = {
       productId: { type: 'keyword' },
       storeViewId: { type: 'keyword' },
       sku: { type: 'text', fields: { keyword: { type: 'keyword' } } },
+      slug: { type: 'keyword' },
       name: { type: 'text', fields: { keyword: { type: 'keyword' } } },
       type: { type: 'keyword' },
       status: { type: 'keyword' },

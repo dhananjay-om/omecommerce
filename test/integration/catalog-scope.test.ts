@@ -57,7 +57,7 @@ describe.skipIf(!process.env.INTEGRATION)('catalog scope resolution (live DB)', 
     const product = await prisma.product.upsert({
       where: { sku: 'SKU-INT-1' },
       update: {},
-      create: { type: 'SIMPLE', sku: 'SKU-INT-1', attributeSetId: set.id, status: 'ACTIVE' },
+      create: { type: 'SIMPLE', sku: 'SKU-INT-1', slug: 'sku-int-1', attributeSetId: set.id, status: 'ACTIVE' },
     });
 
     // GLOBAL default 8, STORE_VIEW override 16

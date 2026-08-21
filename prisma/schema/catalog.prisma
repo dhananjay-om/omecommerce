@@ -137,6 +137,15 @@ model Product {
   publicId       String            @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
   type           ProductType
   sku            String            @unique @db.Citext
+  /// URL-safe identifier for the storefront PDP (/{slug}.html) — auto-generated
+  /// from nameDefault (falling back to sku) at creation time and never changed
+  /// afterward (same "generated once, then permanent" precedent as Category.slug/
+  /// Brand.slug — see those doc comments). Real index is partial (`WHERE
+  /// deleted_at IS NULL`, built correctly from the start this time — see
+  /// migration 20260817100000_category_slug_soft_delete_reuse /
+  /// 20260818100000_brand_slug_soft_delete_reuse for the defect class this
+  /// avoids) so a deleted product's slug can be reused.
+  slug           String            @unique(map: "ix_product_slug_active")
   attributeSetId BigInt            @map("attribute_set_id")
   status         ProductStatus     @default(DRAFT)
   visibility     ProductVisibility @default(BOTH)
