@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { createWidget, updateWidget, type ActionState } from './actions';
 import { CmsBlockConfigField, LimitConfigField, ItemPickerConfigField, WhyChooseUsConfigField, TestimonialConfigField } from './widget-config-fields';
 import type { WidgetInstance, WidgetType, WidgetSection, CmsBlock, Category, Brand } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -244,11 +244,13 @@ export function WidgetForm({
         </div>
       </SectionCard>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      {state.success ? <p className="text-sm text-success">Saved.</p> : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? 'Saving…' : isEdit ? 'Save Widget' : 'Create Widget'}
-      </Button>
+      <StickyFormActions
+        pending={pending}
+        label={isEdit ? 'Save Widget' : 'Create Widget'}
+        pendingLabel="Saving…"
+        error={state.error}
+        extra={state.success ? <p className="text-sm text-success">Saved.</p> : null}
+      />
     </form>
   );
 }

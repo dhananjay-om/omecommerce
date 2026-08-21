@@ -6,6 +6,7 @@ import { issueGiftCard, type IssueGiftCardState } from './actions';
 import type { Website, GiftCardKind } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -130,10 +131,7 @@ export function GiftCardForm({ websites }: { websites: Website[] }) {
         </div>
       </SectionCard>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? 'Issuing…' : 'Issue Gift Card'}
-      </Button>
+      <StickyFormActions pending={pending} label="Issue Gift Card" pendingLabel="Issuing…" error={state.error} />
     </form>
   );
 }

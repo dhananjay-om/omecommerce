@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { createPage, updatePage, type ActionState } from './actions';
 import { slugifyHandle } from './slugify';
 import type { CmsPage } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,11 +91,13 @@ export function CmsPageForm({ page }: { page?: CmsPage }) {
         <BodyEditor id="cms-page-body" name="body" defaultValue={page?.body ?? ''} />
       </SectionCard>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      {state.success ? <p className="text-sm text-success">Saved.</p> : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? 'Saving…' : isEdit ? 'Save Page' : 'Create Page'}
-      </Button>
+      <StickyFormActions
+        pending={pending}
+        label={isEdit ? 'Save Page' : 'Create Page'}
+        pendingLabel="Saving…"
+        error={state.error}
+        extra={state.success ? <p className="text-sm text-success">Saved.</p> : null}
+      />
     </form>
   );
 }

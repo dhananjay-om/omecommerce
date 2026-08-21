@@ -11,8 +11,8 @@ import { PricingInventorySection } from './pricing-inventory-section';
 import { VariantsSection } from './variants-section';
 import type { VariantPricingEntry } from './page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -55,7 +55,7 @@ export function EditProductForm({
 
   return (
     <div className="space-y-6">
-      <form action={formAction} className="space-y-6">
+      <form id="edit-product-form" action={formAction} className="space-y-6">
         <SectionCard title="Basic Information">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
@@ -166,12 +166,6 @@ export function EditProductForm({
         <SectionCard title="Categories">
           <CategoryPicker categories={categories} selectedIds={product.categoryIds} />
         </SectionCard>
-
-        {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Saving…' : 'Save Changes'}
-        </Button>
       </form>
 
       {/* Variants and Pricing & Inventory each save independently via their own dialogs/forms
@@ -217,6 +211,18 @@ export function EditProductForm({
       <SectionCard title="Images">
         <ImageUploadField productPublicId={product.publicId} media={product.media} />
       </SectionCard>
+
+      {/* Submits the <form> above via its `form` attribute even though it
+          renders after Variants/Pricing/Images — see StickyFormActions'
+          own doc comment. Stays visible while scrolling through ALL of
+          those sections, not just the form fields. */}
+      <StickyFormActions
+        pending={pending}
+        label="Save Changes"
+        pendingLabel="Saving…"
+        error={state.error}
+        formId="edit-product-form"
+      />
     </div>
   );
 }
