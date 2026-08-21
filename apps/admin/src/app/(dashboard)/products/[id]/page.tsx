@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
-import { apiGet } from '@/lib/api-client';
+import { apiGet, ApiError } from '@/lib/api-client';
 import type { ProductDetail } from '@/lib/types';
 import { SITE_URL } from '@/lib/config';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +14,21 @@ import { cn } from '@/lib/utils';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const product = await apiGet<ProductDetail>(`/admin/v1/products/${id}`);
+
+  // Same "404 cleanly, re-throw anything else" pattern every other detail
+  // page in this app already uses (customers/[id], coupons/[code]/edit,
+  // content/*/[id]/edit, categories/[id]/edit) — this page was the one
+  // outlier still doing a bare unguarded apiGet(), which meant a
+  // deleted/bad-id product crashed the whole page instead of showing a
+  // clean 404. Anything other than a 404 still re-throws — now caught by
+  // (dashboard)/error.tsx instead of crashing the connection outright.
+  let product: ProductDetail;
+  try {
+    product = await apiGet<ProductDetail>(`/admin/v1/products/${id}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) notFound();
+    throw err;
+  }
   const attributeEntries = Object.entries(product.attributes);
 
   return (
