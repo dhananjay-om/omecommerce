@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { createCoupon, updateCoupon, type ActionState } from './actions';
 import type { Attribute, Category, Coupon, CouponDiscountType, CouponTargetType } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -198,11 +198,12 @@ export function CouponForm({
         </div>
       </SectionCard>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-
-      <Button type="submit" disabled={pending}>
-        {pending ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Coupon'}
-      </Button>
+      <StickyFormActions
+        pending={pending}
+        label={isEdit ? 'Save Changes' : 'Create Coupon'}
+        pendingLabel={isEdit ? 'Saving…' : 'Creating…'}
+        error={state.error}
+      />
     </form>
   );
 }

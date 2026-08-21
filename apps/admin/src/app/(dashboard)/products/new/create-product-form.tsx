@@ -6,7 +6,7 @@ import type { AttributeSet, AttributeSetDetail, Category, TaxClass } from '@/lib
 import { AttributeFieldsSection } from '../attribute-fields-section';
 import { DEFAULT_ATTRIBUTE_GROUPS } from '../default-attribute-groups';
 import { CategoryPicker } from '../category-picker';
-import { Button } from '@/components/ui/button';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -153,11 +153,7 @@ export function CreateProductForm({
         <CategoryPicker categories={categories} selectedIds={[]} />
       </SectionCard>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-
-      <Button type="submit" disabled={pending}>
-        {pending ? 'Creating…' : 'Create Product'}
-      </Button>
+      <StickyFormActions pending={pending} label="Create Product" pendingLabel="Creating…" error={state.error} />
     </form>
   );
 }

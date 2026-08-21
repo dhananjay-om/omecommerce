@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { createBanner, updateBanner, type ActionState } from './actions';
 import { BannerImageUploadField } from './banner-image-upload-field';
 import type { Banner, BannerGroup } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -137,11 +137,13 @@ export function BannerForm({ banner }: { banner?: Banner }) {
         </div>
       </SectionCard>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      {state.success ? <p className="text-sm text-success">Saved.</p> : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? 'Saving…' : isEdit ? 'Save Banner' : 'Create Banner'}
-      </Button>
+      <StickyFormActions
+        pending={pending}
+        label={isEdit ? 'Save Banner' : 'Create Banner'}
+        pendingLabel="Saving…"
+        error={state.error}
+        extra={state.success ? <p className="text-sm text-success">Saved.</p> : null}
+      />
     </form>
   );
 }
