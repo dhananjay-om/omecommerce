@@ -41,4 +41,8 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { code: 'referral:manage', description: 'Manage referral programs' },
   { code: 'coupon:manage', description: 'Manage discount coupons' },
   { code: 'company:manage', description: 'Manage B2B companies and their members' },
+  { code: 'analytics:view', description: 'View analytics dashboards and KPIs' },
+  { code: 'reports:export', description: 'Export analytics reports to CSV/Excel' },
+  { code: 'reports:schedule', description: 'Schedule recurring report deliveries' },
+  { code: 'alerts:manage', description: 'Configure analytics alert rules' },
 ];

@@ -1,5 +1,6 @@
 import type { ProductRepository, BrandRepository } from '../domain/repositories.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { toView } from './create-product.usecase.js';
 import type { UpdateProductCommand, ProductView } from './dto.js';
 
@@ -20,6 +21,7 @@ export class UpdateProduct {
   constructor(
     private readonly products: ProductRepository,
     private readonly brands: BrandRepository,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: UpdateProductCommand): Promise<ProductView> {
@@ -46,6 +48,13 @@ export class UpdateProduct {
       brandId,
       taxClassId: cmd.taxClassId !== undefined ? (cmd.taxClassId === null ? null : parseNumericId(cmd.taxClassId, 'taxClassId')) : undefined,
       hsnCode: cmd.hsnCode,
+    });
+
+    await this.outbox.write({
+      aggregateType: 'Product',
+      aggregateId: cmd.publicId,
+      eventType: 'ProductUpdated',
+      payload: { sku: updated.props.sku },
     });
     return toView(updated);
   }

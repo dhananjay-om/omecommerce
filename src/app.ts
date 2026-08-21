@@ -25,6 +25,7 @@ import { createGiftCardModule } from './modules/giftcard/giftcard.module.js';
 import { createLoyaltyModule } from './modules/loyalty/loyalty.module.js';
 import { createReferralModule } from './modules/referral/referral.module.js';
 import { createCompanyModule } from './modules/company/company.module.js';
+import { createAnalyticsModule } from './modules/analytics/analytics.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -118,6 +119,9 @@ export function createApp(): Express {
   const company = createCompanyModule(prisma, auth.authorize, customer.authenticateCustomer);
   app.use('/admin/v1', company.admin);
   app.use('/store/v1', company.store);
+
+  const analytics = createAnalyticsModule(prisma, auth.authorize);
+  app.use('/admin/v1', analytics.admin);
 
   app.use(notFound);
   app.use(errorHandler);

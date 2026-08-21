@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
+import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import {
   PrismaCustomerGroupRepository,
   PrismaVariantLookup,
@@ -40,6 +41,7 @@ export function createPricingModule(db: Db): PricingRouters {
   const currencies = new PrismaCurrencyLookup(db);
   const priceLists = new PrismaPriceListRepository(db);
   const resolver = new PrismaPriceResolver(db);
+  const outbox = new OutboxWriter(db);
 
   const createCustomerGroup = new CreateCustomerGroup(customerGroups);
   const listCustomerGroups = new ListCustomerGroups(customerGroups);
@@ -47,7 +49,7 @@ export function createPricingModule(db: Db): PricingRouters {
   const updatePriceList = new UpdatePriceList(priceLists, currencies);
   const deletePriceList = new DeletePriceList(priceLists);
   const listPriceLists = new ListPriceLists(priceLists);
-  const setProductPrice = new SetProductPrice(priceLists, variants);
+  const setProductPrice = new SetProductPrice(priceLists, variants, outbox);
   const setPriceTier = new SetPriceTier(priceLists, variants);
   const resolvePrice = new ResolvePrice(resolver, variants, customerGroups, websites);
   const listVariantPrices = new ListVariantPrices(priceLists, variants);
