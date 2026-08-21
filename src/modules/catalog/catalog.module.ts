@@ -115,7 +115,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const variantStock = new PrismaVariantStockLookup(db);
   const priceResolver = new PrismaPriceResolver(db);
 
-  const createProduct = new CreateProduct(products, outbox);
+  const createProduct = new CreateProduct(products, outbox, attributes, attrStore);
   const updateProduct = new UpdateProduct(products, brands);
   const deleteProduct = new DeleteProduct(products, outbox);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);

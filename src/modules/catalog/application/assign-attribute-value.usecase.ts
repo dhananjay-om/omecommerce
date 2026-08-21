@@ -5,6 +5,7 @@ import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js
 import type { CacheAside } from '../../../shared/infrastructure/cache/cache-aside.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { pdpCachePrefix } from './get-product-for-store-view.usecase.js';
+import { URL_KEY_ATTRIBUTE_CODE, syncProductSlugFromUrlKey } from './url-key.js';
 import type { AssignAttributeValueCommand } from './dto.js';
 
 export function parseId(value: string | null | undefined): bigint | null {
@@ -62,7 +63,14 @@ export class AssignAttributeValue {
     if (!attribute) throw new NotFoundError('Attribute', cmd.attributeCode);
 
     const targets = resolveScopeTargets(cmd);
-    const columns = toColumns(attribute.dataType, cmd.value);
+    // See AssignAttributeValues' identical branch / url-key.ts's own doc
+    // comment — url_key also drives Product.slug, the storefront's actual
+    // routing key.
+    const value =
+      cmd.attributeCode === URL_KEY_ATTRIBUTE_CODE && cmd.scope === ScopeType.GLOBAL
+        ? await syncProductSlugFromUrlKey(this.products, product.props.id!, String(cmd.value))
+        : cmd.value;
+    const columns = toColumns(attribute.dataType, value);
 
     await this.store.upsertScopedValue({
       productId: product.props.id!,

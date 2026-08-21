@@ -68,13 +68,6 @@ export function EditProductForm({
               <Input value={product.type} disabled />
             </div>
             <div className="space-y-2">
-              <Label>URL Slug</Label>
-              <Input value={`/${product.slug}.html`} disabled />
-              <p className="text-xs text-muted-foreground">
-                Auto-generated from the name at creation — can&apos;t be changed afterward.
-              </p>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="attributeSetId">Attribute set</Label>
               <Select name="attributeSetId" value={attributeSetId} onValueChange={(value) => setAttributeSetId(String(value))}>
                 <SelectTrigger id="attributeSetId" className="w-full">

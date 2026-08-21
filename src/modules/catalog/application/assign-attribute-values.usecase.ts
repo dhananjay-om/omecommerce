@@ -6,6 +6,7 @@ import type { CacheAside } from '../../../shared/infrastructure/cache/cache-asid
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { pdpCachePrefix } from './get-product-for-store-view.usecase.js';
 import { resolveScopeTargets } from './assign-attribute-value.usecase.js';
+import { URL_KEY_ATTRIBUTE_CODE, syncProductSlugFromUrlKey } from './url-key.js';
 import type { AssignAttributeValuesCommand } from './dto.js';
 
 /**
@@ -40,7 +41,18 @@ export class AssignAttributeValues {
 
       const scope = item.scope ?? ScopeType.GLOBAL;
       const targets = resolveScopeTargets({ ...item, scope });
-      const columns = toColumns(attribute.dataType, item.value);
+
+      // The one attribute code that isn't "just save whatever was typed" —
+      // see url-key.ts's own doc comment on why this single field also
+      // drives Product.slug (the storefront's actual routing key). Both
+      // stores end up with the SAME normalized value: what's written into
+      // product_attribute_value below is syncProductSlugFromUrlKey's
+      // slugified return value, not the raw typed input.
+      const value =
+        item.attributeCode === URL_KEY_ATTRIBUTE_CODE && scope === ScopeType.GLOBAL
+          ? await syncProductSlugFromUrlKey(this.products, product.props.id!, String(item.value))
+          : item.value;
+      const columns = toColumns(attribute.dataType, value);
 
       inputs.push({
         productId: product.props.id!,

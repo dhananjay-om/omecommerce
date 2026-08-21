@@ -75,6 +75,8 @@ export interface ProductRepository {
   findByPublicId(publicId: string): Promise<Product | null>;
   /** Storefront PDP (/{slug}.html) — filters deletedAt: null itself, same as findByPublicId, so a soft-deleted product's slug reads as free (matching the partial unique index). */
   findBySlug(slug: string): Promise<Product | null>;
+  /** The one way Product.slug ever changes after creation — the admin editing the "URL Key" attribute (see url-key.ts's syncProductSlugFromUrlKey). Not part of the generic update() below: this is a narrowly-guarded write (slugified + uniqueness-checked first), not a plain field update. */
+  updateSlug(id: bigint, slug: string): Promise<void>;
   update(publicId: string, input: UpdateProductInput): Promise<Product>;
   list(filter: ListProductsFilter): Promise<ProductListResult>;
   /** Storefront PDP (plan/14 Phase 0c) — the assigned brand's slug, if any. A small cross-aggregate convenience read, same precedent as sumStockByProduct's raw joins. */
