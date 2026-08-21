@@ -1,6 +1,7 @@
 import type { CustomerRepository, WebsiteLookup } from '../domain/repositories.js';
 import type { PasswordHasher } from '../../auth/domain/ports.js';
 import { ConflictError, NotFoundError } from '../../../shared/domain/errors.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { RegisterCustomerCommand, CustomerView } from './dto.js';
 
 export class RegisterCustomer {
@@ -8,6 +9,7 @@ export class RegisterCustomer {
     private readonly customers: CustomerRepository,
     private readonly websites: WebsiteLookup,
     private readonly hasher: PasswordHasher,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: RegisterCustomerCommand): Promise<CustomerView> {
@@ -27,6 +29,14 @@ export class RegisterCustomer {
       firstName: cmd.firstName ?? null,
       lastName: cmd.lastName ?? null,
     });
+
+    await this.outbox.write({
+      aggregateType: 'Customer',
+      aggregateId: customer.publicId,
+      eventType: 'CustomerRegistered',
+      payload: { email: customer.email },
+    });
+
     return {
       publicId: customer.publicId,
       email: customer.email,

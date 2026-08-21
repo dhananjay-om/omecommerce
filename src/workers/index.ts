@@ -10,6 +10,8 @@ import { createSearchIndexHandler } from './search-indexer.worker.js';
 import { startBulkImportWorker } from './bulk-import.worker.js';
 import { createLoyaltyEarnHandler } from './loyalty-earn.worker.js';
 import { createReferralQualifyHandler } from './referral-qualify.worker.js';
+import { createAnalyticsProjectorHandler } from './analytics-projector.worker.js';
+import { createAnalyticsRefreshHandler, scheduleAnalyticsRefresh } from './analytics-refresh.worker.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 export interface WorkerHandles {
@@ -35,6 +37,7 @@ function startDomainEventsWorker(): Worker {
     createSearchIndexHandler(),
     createLoyaltyEarnHandler(),
     createReferralQualifyHandler(),
+    createAnalyticsProjectorHandler(),
   ];
 
   const worker = new Worker(
@@ -60,7 +63,11 @@ function startDomainEventsWorker(): Worker {
  * Worker instances competing for the same queue's jobs.
  */
 function startMaintenanceWorker(): Worker {
-  const handlers: Array<(job: Job) => Promise<void>> = [createReservationSweepHandler(), createStoredValueHoldSweepHandler()];
+  const handlers: Array<(job: Job) => Promise<void>> = [
+    createReservationSweepHandler(),
+    createStoredValueHoldSweepHandler(),
+    createAnalyticsRefreshHandler(),
+  ];
 
   const worker = new Worker(
     MAINTENANCE_QUEUE,
@@ -94,9 +101,10 @@ export async function startWorkers(): Promise<WorkerHandles> {
   const bulkImportWorker = startBulkImportWorker();
   await scheduleReservationSweep();
   await scheduleStoredValueHoldSweep();
+  await scheduleAnalyticsRefresh();
 
   logger.info(
-    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify], maintenance [reservation sweep, stored-value hold sweep], bulk import)',
+    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify, analytics projector], maintenance [reservation sweep, stored-value hold sweep, analytics nightly refresh], bulk import)',
   );
 
   return {

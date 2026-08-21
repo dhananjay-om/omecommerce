@@ -1,0 +1,341 @@
+// =============================================================================
+// OMEcommerce — Analytics & Reporting (plan/19)
+// -----------------------------------------------------------------------------
+// A read model, not a source of truth. Every table here is DERIVED from the
+// OLTP tables (order, order_line, payment_transaction, stock_item, customer)
+// by the analytics projector/refresh workers — nothing outside those workers
+// ever writes here. Same `public` schema as everything else (this repo does
+// not have Prisma's multiSchema preview feature enabled); `summary_`/`fact_`/
+// `alert_`/`reconciliation_` name prefixes provide the logical grouping.
+//
+// Deliberately NOT built as denormalized copies of Product/Customer/Category/
+// Warehouse (no dim_product, dim_customer, etc.) — those OLTP tables are
+// already small, indexed, and cheap to join live; duplicating them here would
+// just be sync risk with no real query-performance win at this project's
+// scale. What IS expensive to compute on every dashboard load — daily sums/
+// counts over order_line/payment_transaction/stock_item — is what these
+// tables pre-aggregate.
+//
+// FK columns pointing at OLTP tables (orderId, productId, variantId,
+// categoryId, customerId, warehouseId) are plain BigInt scalars with NO
+// Prisma `@relation` back into Order/Product/Customer/Warehouse — same
+// established convention as Order's own websiteId/storeId scope columns
+// (see order.prisma's header comment): keeps those models' relation lists
+// free of analytics-only back-references. Real FK constraints (ON DELETE
+// RESTRICT — a derived row should never silently orphan) are added via raw
+// SQL, not declared here — this migration embeds that raw SQL directly in
+// its own migration.sql (no separate prisma/sql/0017_analytics_raw.sql file;
+// this project's newer migrations are self-contained, unlike 0001-0016).
+//
+// CURRENCY: every money-bearing row here also carries `currency CHAR(3)` and
+// is keyed by it (schema-reviewer finding — a Website can have multiple Store
+// Views transacting in different currencies; collapsing them into one
+// currency-less row would silently mix amounts). One real consequence: a
+// (day, website) with two currencies produces TWO summary_sales_daily rows,
+// not one — dashboards sum/display per currency, never across currencies.
+//
+// RECONCILIATION SCOPE (schema-reviewer finding, resolves the plan/19 §12
+// drift): the plan's original per-row fact_order_items/fact_payments/
+// fact_returns/fact_inventory_snapshot tables were cut in favor of the
+// summary_* tables below. Nightly reconciliation (19.3) therefore compares
+// AGGREGATES (SUM/COUNT) against OrderLine/PaymentTransaction/OrderReturn/
+// StockItem directly, not row-for-row — proves the totals agree, not that
+// every individual row has a mirror. plan/19 §12 will be updated to match
+// once this ships.
+//
+// LIVE-QUERY EXCEPTION: the ORDER_STUCK alert and the Order dashboard's
+// average-processing/shipping-time metric both need per-order state
+// durations, which no summary table stores (a daily count can't answer
+// "which orders, right now"). Both are the one deliberate exception to "the
+// alert engine only reads summary tables" (plan/19 §10) — they query `Order`/
+// `Fulfillment` directly, bounded by an indexed status/date filter. Every
+// other MVP alert and dashboard metric reads only the tables below.
+// =============================================================================
+
+/// One row per (day, website, currency) — the Executive/Sales dashboards'
+/// primary source. `dateKey` is YYYYMMDD (matches this project's chosen
+/// star-schema convention; cheap to range-filter, no separate dim_date table
+/// needed at this scale — date-arithmetic for chart labels happens in the
+/// query/app layer via to_date(date_key::text, 'YYYYMMDD')).
+model SummarySalesDaily {
+  id               BigInt   @id @default(autoincrement())
+  dateKey          Int      @map("date_key")
+  websiteId        BigInt   @map("website_id")
+  currency         String   @db.Char(3)
+  grossRevenue     Decimal  @default(0) @map("gross_revenue") @db.Decimal(18, 4)
+  discountTotal    Decimal  @default(0) @map("discount_total") @db.Decimal(18, 4)
+  taxTotal         Decimal  @default(0) @map("tax_total") @db.Decimal(18, 4)
+  shippingTotal    Decimal  @default(0) @map("shipping_total") @db.Decimal(18, 4)
+  refundTotal      Decimal  @default(0) @map("refund_total") @db.Decimal(18, 4)
+  /// grossRevenue - refundTotal. Not "net of COGS" — no cost data exists yet
+  /// (plan/19 §1/§16) — this is "net of refunds" only, named precisely so it
+  /// is never mistaken for profit on a dashboard.
+  netRevenue       Decimal  @default(0) @map("net_revenue") @db.Decimal(18, 4)
+  orderCount       Int      @default(0) @map("order_count")
+  unitsSold        Int      @default(0) @map("units_sold")
+  newCustomerCount Int      @default(0) @map("new_customer_count")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, currency], map: "ux_summary_sales_daily_date_website_currency")
+  @@index([websiteId, dateKey])
+  @@map("summary_sales_daily")
+}
+
+/// Order-status funnel over time — the Order dashboard's status breakdown +
+/// cancellation-rate trend. One row per (day, website, status). Status
+/// counts aren't money, so no currency dimension needed here.
+model SummaryOrderStatusDaily {
+  id         BigInt   @id @default(autoincrement())
+  dateKey    Int      @map("date_key")
+  websiteId  BigInt   @map("website_id")
+  /// String, not the OrderStatus enum — a summary table must never fail to
+  /// write because a NEW status value was appended to the enum after this
+  /// schema shipped (this codebase's own enums are append-only by
+  /// convention, but this table shouldn't even need a migration to keep up).
+  status     String
+  orderCount Int      @default(0) @map("order_count")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, status], map: "ux_summary_order_status_daily")
+  @@index([websiteId, dateKey])
+  @@map("summary_order_status_daily")
+}
+
+/// Best-sellers / slow-movers — the Product dashboard. One row per (day,
+/// website, currency, product) — websiteId/currency added per schema-review
+/// finding: without them, two websites (or two currencies) selling the same
+/// SKU on the same day would collapse into one row. Product-level, not
+/// variant-level, for MVP (most catalog items in this store are SIMPLE
+/// products with one implicit variant; a summary_variant_daily table is a
+/// straightforward later addition if configurable-product variant-level
+/// drill-down is ever needed).
+model SummaryProductDaily {
+  id         BigInt   @id @default(autoincrement())
+  dateKey    Int      @map("date_key")
+  websiteId  BigInt   @map("website_id")
+  currency   String   @db.Char(3)
+  productId  BigInt   @map("product_id")
+  unitsSold  Int      @default(0) @map("units_sold")
+  revenue    Decimal  @default(0) @map("revenue") @db.Decimal(18, 4)
+  orderCount Int      @default(0) @map("order_count")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, currency, productId], map: "ux_summary_product_daily")
+  @@index([productId, dateKey])
+  @@map("summary_product_daily")
+}
+
+/// Category performance — the Product dashboard's Category rollup + the
+/// Executive dashboard's "top categories" chart. A product can sit in
+/// multiple categories (product_category is many-to-many); every one of a
+/// line's categories gets credited, matching how the storefront's own PLP
+/// category filtering already treats multi-category membership.
+model SummaryCategoryDaily {
+  id         BigInt   @id @default(autoincrement())
+  dateKey    Int      @map("date_key")
+  websiteId  BigInt   @map("website_id")
+  currency   String   @db.Char(3)
+  categoryId BigInt   @map("category_id")
+  unitsSold  Int      @default(0) @map("units_sold")
+  revenue    Decimal  @default(0) @map("revenue") @db.Decimal(18, 4)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, currency, categoryId], map: "ux_summary_category_daily")
+  @@index([categoryId, dateKey])
+  @@map("summary_category_daily")
+}
+
+/// Payment success/failure by method — the Payment-failure alert (plan/19
+/// §10) and the Executive dashboard's "payment failures" widget both read
+/// this. `method`/`gateway` are plain strings, same as
+/// PaymentTransaction.method/gateway themselves (never FK'd — see
+/// order.prisma's own comment on paymentMethodCode being a snapshot).
+model SummaryPaymentMethodDaily {
+  id             BigInt   @id @default(autoincrement())
+  dateKey        Int      @map("date_key")
+  websiteId      BigInt   @map("website_id")
+  currency       String   @db.Char(3)
+  method         String
+  gateway        String
+  successCount   Int      @default(0) @map("success_count")
+  failedCount    Int      @default(0) @map("failed_count")
+  successAmount  Decimal  @default(0) @map("success_amount") @db.Decimal(18, 4)
+  refundedAmount Decimal  @default(0) @map("refunded_amount") @db.Decimal(18, 4)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, currency, method, gateway], map: "ux_summary_payment_method_daily")
+  @@index([websiteId, dateKey])
+  @@map("summary_payment_method_daily")
+}
+
+/// Returns/refunds — the Returns dashboard's trend + the return-rate alert.
+model SummaryReturnDaily {
+  id           BigInt   @id @default(autoincrement())
+  dateKey      Int      @map("date_key")
+  websiteId    BigInt   @map("website_id")
+  currency     String   @db.Char(3)
+  returnCount  Int      @default(0) @map("return_count")
+  returnQty    Int      @default(0) @map("return_qty")
+  returnAmount Decimal  @default(0) @map("return_amount") @db.Decimal(18, 4)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, currency], map: "ux_summary_return_daily")
+  @@index([websiteId, dateKey])
+  @@map("summary_return_daily")
+}
+
+/// Daily stock snapshot — the Inventory dashboard's turnover trend. The
+/// "what's low-stock RIGHT NOW" widget queries stock_item directly (already
+/// indexed, always current) rather than this table — this is for the
+/// historical trend line only, snapshotted nightly. No stored
+/// `daysOfSupply` column (schema-reviewer finding, deliberate): it would go
+/// stale the moment the trailing sales rate it depends on changes, so it's
+/// computed at query time instead, joining this table's `onHand` against
+/// `summary_product_daily`'s trailing sales — a stored, potentially-stale
+/// number would be worse than none. No currency dimension — physical stock
+/// counts, not money.
+model SummaryInventoryDaily {
+  id           BigInt   @id @default(autoincrement())
+  dateKey      Int      @map("date_key")
+  variantId    BigInt   @map("variant_id")
+  warehouseId  BigInt   @map("warehouse_id")
+  onHand       Int      @default(0) @map("on_hand")
+  reserved     Int      @default(0) @map("reserved")
+  available    Int      @default(0) @map("available")
+  reorderPoint Int?     @map("reorder_point")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, variantId, warehouseId], map: "ux_summary_inventory_daily")
+  @@index([variantId, dateKey])
+  @@map("summary_inventory_daily")
+}
+
+/// Order fulfillment-speed trend — the Order dashboard's average processing/
+/// shipping/delivery time chart. Computed nightly from Order/Fulfillment
+/// directly (an aggregate over a bounded day's orders, not a per-order
+/// store) — this is NOT the ORDER_STUCK alert, which needs live per-order
+/// state and is the documented live-query exception above.
+model SummaryFulfillmentDaily {
+  id                 BigInt   @id @default(autoincrement())
+  dateKey            Int      @map("date_key")
+  websiteId          BigInt   @map("website_id")
+  ordersProcessed    Int      @default(0) @map("orders_processed")
+  avgProcessingHours Decimal? @map("avg_processing_hours") @db.Decimal(10, 2)
+  avgShippingHours   Decimal? @map("avg_shipping_hours") @db.Decimal(10, 2)
+  avgDeliveryHours   Decimal? @map("avg_delivery_hours") @db.Decimal(10, 2)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId], map: "ux_summary_fulfillment_daily")
+  @@index([websiteId, dateKey])
+  @@map("summary_fulfillment_daily")
+}
+
+/// New-vs-returning trend + per-customer daily activity — the Customer
+/// dashboard. `isFirstOrderDay` marks the day a customer's OWN first order
+/// landed (computed once at write time, never recomputed retroactively —
+/// same "snapshot, don't reinterpret history" discipline as OrderLine's own
+/// price/name snapshots). Currency omitted deliberately: this table answers
+/// "how many orders / how much (in the customer's own transaction currency,
+/// summed loosely)" for trend purposes only — precise multi-currency
+/// customer revenue is a CustomerRfm.monetary concern (single currency per
+/// customer in practice, since a customer belongs to one website today).
+model FactCustomerDaily {
+  id              BigInt   @id @default(autoincrement())
+  dateKey         Int      @map("date_key")
+  customerId      BigInt   @map("customer_id")
+  ordersPlaced    Int      @default(0) @map("orders_placed")
+  revenue         Decimal  @default(0) @map("revenue") @db.Decimal(18, 4)
+  isFirstOrderDay Boolean  @default(false) @map("is_first_order_day")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, customerId], map: "ux_fact_customer_daily")
+  @@index([customerId, dateKey])
+  @@map("fact_customer_daily")
+}
+
+/// RFM segmentation (plan/19 §5) — a current-state snapshot, not a time
+/// series (recomputed in place nightly against the whole customer
+/// population; segment thresholds live in application code, not this
+/// schema, so tuning them never needs a migration). `@updatedAt` added
+/// (schema-reviewer finding) so an upsert that forgets to set it explicitly
+/// still gets a correct timestamp — this table's whole workload is
+/// upsert-in-place, exactly the case that convention exists for.
+model CustomerRfm {
+  customerId     BigInt   @id @map("customer_id")
+  recencyDays    Int      @map("recency_days")
+  frequency      Int
+  monetary       Decimal  @db.Decimal(18, 4)
+  recencyScore   Int      @map("recency_score")
+  frequencyScore Int      @map("frequency_score")
+  monetaryScore  Int      @map("monetary_score")
+  /// Fixed vocabulary, enforced in application code (CHAMPION/LOYAL/
+  /// AT_RISK/NEW/LOST/...) — not a DB enum, so tuning the segmentation
+  /// model never needs a migration either.
+  segment        String
+  computedAt     DateTime @default(now()) @updatedAt @map("computed_at") @db.Timestamptz(6)
+
+  @@index([segment])
+  @@map("customer_rfm")
+}
+
+/// Alert engine (plan/19 §10) — a configured rule.
+model AlertRule {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  /// Fixed vocabulary in application code (REVENUE_DROP/LOW_STOCK/
+  /// OUT_OF_STOCK/PAYMENT_FAILURE_RATE/RETURN_RATE/ORDER_STUCK/...).
+  metricCode      String    @map("metric_code")
+  comparator      String    @map("comparator") // 'gt' | 'lt' | 'gte' | 'lte'
+  thresholdValue  Decimal   @map("threshold_value") @db.Decimal(18, 4)
+  windowDays      Int       @default(1) @map("window_days")
+  recipientEmails String[]  @map("recipient_emails")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  history AlertHistory[]
+
+  @@index([deletedAt])
+  @@map("alert_rule")
+}
+
+/// Append-only fired-alert log — never soft-deleted, same append-only
+/// posture as StockMovement/PaymentTransaction (it's an audit trail).
+/// `onDelete: Restrict` (schema-reviewer finding — was Cascade, which would
+/// silently destroy this audit trail if an AlertRule were ever hard-deleted;
+/// matches the Wallet/GiftCard/LoyaltyAccount ledger-child precedent).
+model AlertHistory {
+  id             BigInt    @id @default(autoincrement())
+  alertRuleId    BigInt    @map("alert_rule_id")
+  firedAt        DateTime  @default(now()) @map("fired_at") @db.Timestamptz(6)
+  metricValue    Decimal   @map("metric_value") @db.Decimal(18, 4)
+  thresholdValue Decimal   @map("threshold_value") @db.Decimal(18, 4)
+  message        String
+  notifiedAt     DateTime? @map("notified_at") @db.Timestamptz(6)
+
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
+
+  @@index([alertRuleId, firedAt])
+  @@map("alert_history")
+}
+
+/// Nightly OLTP-vs-analytics consistency check (plan/19 §12) — append-only.
+/// `dateKey Int` (not `Date`), matching every other table in this file
+/// (schema-reviewer finding) so a reconciliation row joins/compares cleanly
+/// against the summary tables it's checking.
+model ReconciliationLog {
+  id             BigInt   @id @default(autoincrement())
+  dateKey        Int      @map("date_key")
+  tableName      String   @map("table_name")
+  expectedCount  Int      @map("expected_count")
+  actualCount    Int      @map("actual_count")
+  expectedAmount Decimal? @map("expected_amount") @db.Decimal(18, 4)
+  actualAmount   Decimal? @map("actual_amount") @db.Decimal(18, 4)
+  diffCount      Int      @map("diff_count")
+  diffAmount     Decimal? @map("diff_amount") @db.Decimal(18, 4)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([dateKey, tableName])
+  @@map("reconciliation_log")
+}

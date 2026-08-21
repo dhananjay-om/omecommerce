@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { env } from '../../config/env.js';
+import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { ScryptPasswordHasher } from '../auth/infrastructure/scrypt-password-hasher.js';
 import { PrismaCustomerRepository, PrismaWebsiteLookup } from './infrastructure/prisma-customer.repository.js';
@@ -50,8 +51,9 @@ export function createCustomerModule(db: Db): CustomerModule {
   const orders = new PrismaCustomerOrderLookup(db);
   const hasher = new ScryptPasswordHasher();
   const tokens = new JwtCustomerTokenService(env.JWT_SECRET);
+  const outbox = new OutboxWriter(db);
 
-  const registerCustomer = new RegisterCustomer(customers, websites, hasher);
+  const registerCustomer = new RegisterCustomer(customers, websites, hasher, outbox);
   const loginCustomer = new LoginCustomer(customers, websites, hasher, tokens);
   const getCustomerProfile = new GetCustomerProfile(customers);
   const addCustomerAddress = new AddCustomerAddress(customers, addresses);

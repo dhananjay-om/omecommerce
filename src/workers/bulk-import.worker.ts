@@ -56,7 +56,7 @@ export function startBulkImportWorker(): Worker {
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(prisma);
   const createProduct = new CreateProduct(products, outbox, attributes, attrStore);
-  const updateProduct = new UpdateProduct(products, brands);
+  const updateProduct = new UpdateProduct(products, brands, outbox);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
   const setProductCategories = new SetProductCategories(products, categories, productCategories);
 
@@ -67,7 +67,7 @@ export function startBulkImportWorker(): Worker {
 
   const priceLists = new PrismaPriceListRepository(prisma);
   const pricingVariants = new PrismaPricingVariantLookup(prisma);
-  const setProductPrice = new SetProductPrice(priceLists, pricingVariants);
+  const setProductPrice = new SetProductPrice(priceLists, pricingVariants, outbox);
 
   const upsertDeps: BulkUpsertDeps = {
     products,

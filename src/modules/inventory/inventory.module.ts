@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { getBulkJobsQueue } from '../../shared/infrastructure/queue/queues.js';
+import { OutboxWriter } from '../../shared/infrastructure/outbox/outbox-writer.js';
 import { PrismaWarehouseRepository, PrismaVariantLookup } from './infrastructure/prisma-warehouse.repository.js';
 import { PrismaStockLedger } from './infrastructure/prisma-stock-ledger.js';
 import { CreateWarehouse } from './application/create-warehouse.usecase.js';
@@ -34,6 +35,7 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
   const warehouses = new PrismaWarehouseRepository(db);
   const variants = new PrismaVariantLookup(db);
   const ledger = new PrismaStockLedger(db);
+  const outbox = new OutboxWriter(db);
 
   const createWarehouse = new CreateWarehouse(warehouses);
   const updateWarehouse = new UpdateWarehouse(warehouses);
@@ -41,7 +43,7 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
   const listWarehouses = new ListWarehouses(warehouses);
   const listWarehouseStock = new ListWarehouseStock(warehouses, ledger);
   const listVariantStock = new ListVariantStock(variants, ledger);
-  const adjustStock = new AdjustStock(variants, warehouses, ledger);
+  const adjustStock = new AdjustStock(variants, warehouses, ledger, outbox);
   const getStock = new GetStock(variants, warehouses, ledger);
   const reserveStock = new ReserveStock(variants, warehouses, ledger);
   const commitReservation = new CommitReservation(ledger);
