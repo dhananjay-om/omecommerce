@@ -39,6 +39,8 @@ export interface WarehouseRepository {
 /** Resolves a catalog variant's publicId to its internal id (read-only cross-module lookup). */
 export interface VariantLookup {
   byPublicId(publicId: string): Promise<{ id: bigint; sku: string } | null>;
+  /** Bulk stock import's real key — an admin's CSV addresses rows by SKU, never a publicId. */
+  bySku(sku: string): Promise<{ id: bigint; publicId: string; sku: string } | null>;
 }
 
 export interface StockSnapshot {

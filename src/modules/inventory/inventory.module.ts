@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
+import { getBulkJobsQueue } from '../../shared/infrastructure/queue/queues.js';
 import { PrismaWarehouseRepository, PrismaVariantLookup } from './infrastructure/prisma-warehouse.repository.js';
 import { PrismaStockLedger } from './infrastructure/prisma-stock-ledger.js';
 import { CreateWarehouse } from './application/create-warehouse.usecase.js';
@@ -21,6 +22,7 @@ import {
   adjustStockSchema,
   getStockQuerySchema,
   reserveStockSchema,
+  bulkSetStockSchema,
 } from './interface/http/schemas.js';
 
 export interface InventoryRouters {
@@ -164,6 +166,25 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
     asyncHandler(async (_req, res) => {
       const result = await releaseExpiredReservations.execute();
       res.json({ data: result });
+    }),
+  );
+
+  admin.post(
+    '/inventory/bulk-set-stock',
+    authorize('inventory:adjust'),
+    asyncHandler(async (req, res) => {
+      // Magento-style "set qty by SKU" CSV import — same shape as
+      // POST /products/bulk-import (catalog module): enqueue on the shared
+      // bulk-jobs queue, processed row-by-row by
+      // src/workers/bulk-import.worker.ts's 'bulk-set-stock' branch, polled
+      // via the already-generic GET /admin/v1/jobs/:jobId (no duplicate
+      // job-status route needed here).
+      const body = parse(bulkSetStockSchema, req.body);
+      const job = await getBulkJobsQueue().add('bulk-set-stock', {
+        warehouseCode: body.warehouseCode,
+        rows: body.rows,
+      });
+      res.status(202).json({ data: { jobId: job.id } });
     }),
   );
 

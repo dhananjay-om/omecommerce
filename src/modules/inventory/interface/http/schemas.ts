@@ -39,3 +39,17 @@ export const reserveStockSchema = z.object({
   // Allows non-positive TTLs for tests to construct an already-expired reservation.
   ttlSeconds: z.number().int().max(86_400).optional(),
 });
+
+const bulkStockRowSchema = z.object({
+  sku: z.string().min(1).max(128),
+  // Absolute on-hand quantity, not a delta — zero is a valid target ("set to
+  // out of stock"), negative is not.
+  quantity: z.number().int().min(0),
+});
+
+// Same 10_000-row cap as bulkImportProductsSchema (catalog module) — matches
+// the precedent, not an arbitrary new number.
+export const bulkSetStockSchema = z.object({
+  warehouseCode: z.string().min(1),
+  rows: z.array(bulkStockRowSchema).min(1).max(10_000),
+});

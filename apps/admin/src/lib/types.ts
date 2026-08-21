@@ -214,6 +214,32 @@ export interface WarehouseStockItem {
   available: number;
 }
 
+/** Row-level result of a bulk stock (or product) import job — same shape
+ *  for both job types, matching the backend's BulkStockRowError/
+ *  BulkImportRowError. */
+export interface BulkJobRowError {
+  row: number;
+  sku: string;
+  message: string;
+}
+
+export interface BulkJobResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  errors: BulkJobRowError[];
+}
+
+/** Mirrors GET /admin/v1/jobs/:jobId's response — the generic BullMQ
+ *  job-status reader shared by every job type on the bulk-jobs queue. */
+export interface BulkJobStatus {
+  jobId: string;
+  status: 'completed' | 'failed' | 'active' | 'waiting' | 'delayed' | 'paused' | 'unknown' | string;
+  progress: number | object;
+  result?: BulkJobResult;
+  error?: string;
+}
+
 export interface CustomerGroup {
   publicId: string;
   code: string;

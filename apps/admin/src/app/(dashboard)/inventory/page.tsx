@@ -24,6 +24,9 @@ export default async function InventoryPage({
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
         <div className="flex items-center gap-2">
+          <Link href="/inventory/bulk-update" className={cn(buttonVariants({ variant: 'outline' }))}>
+            Bulk Update Stock
+          </Link>
           <Link href="/inventory/warehouses" className={cn(buttonVariants({ variant: 'outline' }))}>
             Manage Warehouses
           </Link>

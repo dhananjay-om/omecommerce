@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
-import type { Warehouse, WarehouseType, ProductDetail } from '@/lib/types';
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
+import type { Warehouse, WarehouseType, ProductDetail, BulkJobStatus } from '@/lib/types';
 import { resolveProductBySkuCascade } from '@/lib/resolve-product-by-sku';
 
 export interface ActionState {
@@ -160,4 +160,49 @@ export async function adjustStock(_prevState: ActionState, formData: FormData): 
 
   revalidatePath('/inventory');
   return { error: null, success: true };
+}
+
+export interface BulkStockRowInput {
+  sku: string;
+  quantity: number;
+}
+
+export interface BulkSubmitState {
+  error: string | null;
+  jobId: string | null;
+}
+
+/**
+ * Submits a parsed CSV (already parsed client-side into rows — see
+ * bulk-update-form.tsx) as one bulk-set-stock job. Called imperatively from
+ * a plain client event handler, not bound via useActionState/<form> — a
+ * 'use server' function doesn't require either, and this one needs to
+ * return the jobId immediately so the caller can start polling
+ * getBulkStockJobStatus, which useActionState's redirect-oriented state
+ * model doesn't fit.
+ */
+export async function submitBulkSetStock(warehouseCode: string, rows: BulkStockRowInput[]): Promise<BulkSubmitState> {
+  if (!warehouseCode) {
+    return { error: 'Select a warehouse.', jobId: null };
+  }
+  if (rows.length === 0) {
+    return { error: 'The CSV has no valid SKU/quantity rows.', jobId: null };
+  }
+
+  try {
+    const { jobId } = await apiPost<{ jobId: string }>('/admin/v1/inventory/bulk-set-stock', { warehouseCode, rows });
+    return { error: null, jobId };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, jobId: null };
+    throw err;
+  }
+}
+
+/** Polled repeatedly by the client while a bulk-set-stock job is in flight. */
+export async function getBulkStockJobStatus(jobId: string): Promise<BulkJobStatus> {
+  const status = await apiGet<BulkJobStatus>(`/admin/v1/jobs/${jobId}`);
+  if (status.status === 'completed') {
+    revalidatePath('/inventory');
+  }
+  return status;
 }
