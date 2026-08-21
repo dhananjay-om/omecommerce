@@ -27,7 +27,7 @@ export function startBulkImportWorker(): Worker {
   const attrStore = new PrismaProductAttributeStore(prisma);
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(prisma);
-  const createProduct = new CreateProduct(products, outbox);
+  const createProduct = new CreateProduct(products, outbox, attributes, attrStore);
   const assignAttributeValue = new AssignAttributeValue(products, attributes, attrStore, cache, outbox);
 
   const worker = new Worker(

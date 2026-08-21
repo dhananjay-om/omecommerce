@@ -1,38 +1,11 @@
 import { Product } from '../domain/product.js';
-import type { ProductRepository } from '../domain/repositories.js';
+import type { ProductRepository, AttributeRepository, ProductAttributeStore } from '../domain/repositories.js';
+import { toColumns } from '../domain/attribute-value.js';
 import { ConflictError, ValidationError } from '../../../shared/domain/errors.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import { uniqueSlug } from './slugify.js';
+import { URL_KEY_ATTRIBUTE_CODE, RESERVED_SLUGS } from './url-key.js';
 import type { CreateProductCommand, ProductView } from './dto.js';
-
-/** Top-level storefront routes a product's root-level /{slug}.html URL must
- *  never collide with (apps/storefront/src/app/*, plus sitemap.ts's own
- *  STATIC_PAGES list) — treated as "already taken" so uniqueSlug()'s normal
- *  -2/-3/... suffix loop resolves the collision the same way a real slug
- *  clash would. Next.js itself would actually still route e.g. /cart
- *  correctly (a static segment always wins over the root [slug] dynamic
- *  route), but a product silently unreachable at its own canonical URL
- *  would be a confusing, hard-to-notice bug — worth avoiding outright. */
-const RESERVED_SLUGS = new Set([
-  'products',
-  'brands',
-  'collections',
-  'offers',
-  'about',
-  'contact',
-  'cart',
-  'checkout',
-  'login',
-  'register',
-  'account',
-  'search',
-  'pages',
-  'api',
-  'sitemap.xml',
-  'robots.txt',
-  'favicon.ico',
-  'manifest.json',
-]);
 
 function parseId(value: string, field: string): bigint {
   if (!/^\d+$/.test(value)) {
@@ -45,6 +18,8 @@ export class CreateProduct {
   constructor(
     private readonly products: ProductRepository,
     private readonly outbox: OutboxWriter,
+    private readonly attributes: AttributeRepository,
+    private readonly store: ProductAttributeStore,
   ) {}
 
   async execute(cmd: CreateProductCommand): Promise<ProductView> {
@@ -69,6 +44,24 @@ export class CreateProduct {
       hsnCode: cmd.hsnCode ?? null,
     });
     const saved = await this.products.create(product);
+
+    // Auto-fills the admin's "URL Key" SEO field with the same value Product.slug
+    // just got — same "generate it, but let the admin see/edit it in one obvious
+    // place" behavior Magento's url_key has. Best-effort: a fresh/non-seeded DB
+    // missing the url_key Attribute row must never block product creation itself.
+    const urlKeyAttribute = await this.attributes.findByCode(URL_KEY_ATTRIBUTE_CODE);
+    if (urlKeyAttribute) {
+      await this.store.upsertScopedValue({
+        productId: saved.props.id!,
+        attributeId: urlKeyAttribute.id,
+        scope: 'GLOBAL',
+        websiteId: null,
+        storeId: null,
+        storeViewId: null,
+        columns: toColumns(urlKeyAttribute.dataType, slug),
+      });
+    }
+
     // Catalog's first outbox event (Stage 4) — consumed by the search indexer.
     // Not written in the same transaction as product.create() (that repository
     // call is a single-statement insert, not a multi-step transaction like

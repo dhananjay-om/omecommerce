@@ -111,6 +111,10 @@ export class PrismaProductRepository implements ProductRepository {
     return Product.fromPersistence(toDomainProps(row));
   }
 
+  async updateSlug(id: bigint, slug: string): Promise<void> {
+    await this.db.product.update({ where: { id }, data: { slug } });
+  }
+
   async softDelete(id: bigint): Promise<void> {
     await this.db.product.update({ where: { id }, data: { deletedAt: new Date() } });
   }
