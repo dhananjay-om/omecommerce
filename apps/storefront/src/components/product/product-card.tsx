@@ -25,9 +25,15 @@ function discountPercent(price: string, mrp: string): number | null {
 export function ProductCard({ hit }: { hit: SearchHit }) {
   const percentOff =
     hit.priceDisplay && hit.mrpDisplay ? discountPercent(hit.priceDisplay, hit.mrpDisplay) : null;
+  // Falls back to the old id-based URL (itself now a permanent redirect to
+  // the slug URL — see app/products/[id]/page.tsx) for a search hit indexed
+  // before this field existed — a rolling deploy has a real window where an
+  // OpenSearch document hasn't been reindexed yet; this keeps that window's
+  // links working instead of ever rendering "/undefined.html".
+  const href = hit.slug ? `/${hit.slug}.html` : `/products/${hit.productId}`;
   return (
     <Link
-      href={`/${hit.slug}.html`}
+      href={href}
       className="group flex flex-col overflow-hidden rounded-lg border bg-background transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
     >
       <div className="aspect-square overflow-hidden bg-muted">
