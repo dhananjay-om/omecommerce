@@ -230,13 +230,26 @@ export interface BulkJobResult {
   errors: BulkJobRowError[];
 }
 
+/** Result shape of the Magento-style "Add/Update" product CSV import job —
+ *  created/updated instead of a single succeeded count, since telling the
+ *  two apart matters to an admin reviewing the outcome. */
+export interface BulkProductImportResult {
+  total: number;
+  created: number;
+  updated: number;
+  failed: number;
+  errors: BulkJobRowError[];
+}
+
 /** Mirrors GET /admin/v1/jobs/:jobId's response — the generic BullMQ
- *  job-status reader shared by every job type on the bulk-jobs queue. */
-export interface BulkJobStatus {
+ *  job-status reader shared by every job type on the bulk-jobs queue.
+ *  Generic over the result shape since different job types return
+ *  different summary fields (BulkJobResult vs BulkProductImportResult). */
+export interface BulkJobStatus<TResult = BulkJobResult> {
   jobId: string;
   status: 'completed' | 'failed' | 'active' | 'waiting' | 'delayed' | 'paused' | 'unknown' | string;
   progress: number | object;
-  result?: BulkJobResult;
+  result?: TResult;
   error?: string;
 }
 

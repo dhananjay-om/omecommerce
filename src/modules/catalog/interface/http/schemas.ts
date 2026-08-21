@@ -168,6 +168,34 @@ export const bulkImportProductsSchema = z.object({
   rows: z.array(bulkImportRowSchema).min(1).max(10_000),
 });
 
+// CONFIGURABLE/BUNDLE are deliberately excluded — a flat CSV row can't carry
+// variant-axis or bundle-component data (see BulkProductImportRow's doc comment).
+const IMPORTABLE_PRODUCT_TYPES = [ProductType.SIMPLE, ProductType.DIGITAL, ProductType.VIRTUAL] as const;
+
+const bulkUpsertRowSchema = z.object({
+  sku: z.string().min(1).max(128),
+  type: z.enum(IMPORTABLE_PRODUCT_TYPES).optional(),
+  attributeSetCode: z.string().min(1).max(128).optional(),
+  nameDefault: z.string().max(512).nullish(),
+  status: z.nativeEnum(ProductStatus).optional(),
+  visibility: z.nativeEnum(ProductVisibility).optional(),
+  weight: decimalString.nullish(),
+  price: decimalString.nullish(),
+  mrp: decimalString.nullish(),
+  qty: z.number().int().min(0).nullish(),
+  categorySlugs: z.array(z.string().min(1)).optional(),
+  attributes: z.record(z.string()).optional(),
+});
+
+export const bulkUpsertProductsSchema = z.object({
+  // Job-level, applies to every row that sets price/qty — one price list and
+  // one warehouse per import, same scope cut the bulk-set-stock feature
+  // already made (no per-row warehouse/price-list column).
+  priceListCode: z.string().min(1).optional(),
+  warehouseCode: z.string().min(1).optional(),
+  rows: z.array(bulkUpsertRowSchema).min(1).max(10_000),
+});
+
 export const createCategorySchema = z.object({
   parentId: z.string().uuid().nullish(),
   nameDefault: z.string().max(512).nullish(),

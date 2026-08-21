@@ -71,6 +71,9 @@ export interface UpdateProductInput {
 /** Persistence port for the Product aggregate (implemented in infrastructure). */
 export interface ProductRepository {
   existsBySku(sku: string): Promise<boolean>;
+  /** Lean lookup (just enough to route to UpdateProduct.execute()) — the CSV bulk-import/update's
+   *  real key is SKU, not publicId; existsBySku alone can't tell the worker WHICH product to update. */
+  findBySku(sku: string): Promise<{ publicId: string } | null>;
   create(product: Product): Promise<Product>;
   findByPublicId(publicId: string): Promise<Product | null>;
   /** Storefront PDP (/{slug}.html) — filters deletedAt: null itself, same as findByPublicId, so a soft-deleted product's slug reads as free (matching the partial unique index). */

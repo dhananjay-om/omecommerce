@@ -79,6 +79,7 @@ import {
   updateAttributeSchema,
   assignAttributeToGroupSchema,
   bulkImportProductsSchema,
+  bulkUpsertProductsSchema,
   createCategorySchema,
   updateCategorySchema,
   reparentCategorySchema,
@@ -487,6 +488,25 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       // Processed async by src/workers/bulk-import.worker.ts.
       const body = parse(bulkImportProductsSchema, req.body);
       const job = await getBulkJobsQueue().add('bulk-import-products', { rows: body.rows });
+      res.status(202).json({ data: { jobId: job.id } });
+    }),
+  );
+  admin.post(
+    '/products/bulk-upsert',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      // Magento-style "Add/Update" CSV import: creates a product for an
+      // unrecognized SKU, patches an existing one otherwise — one job type
+      // (`bulk-upsert-products`) on the SAME shared bulk-jobs queue as
+      // bulk-import-products above, dispatched from the SAME worker (BullMQ
+      // delivers each job to exactly one Worker per queue name). Polled via
+      // the same generic GET /admin/v1/jobs/:jobId below.
+      const body = parse(bulkUpsertProductsSchema, req.body);
+      const job = await getBulkJobsQueue().add('bulk-upsert-products', {
+        priceListCode: body.priceListCode,
+        warehouseCode: body.warehouseCode,
+        rows: body.rows,
+      });
       res.status(202).json({ data: { jobId: job.id } });
     }),
   );

@@ -2,8 +2,8 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPatch, apiPut, apiDelete, ApiError } from '@/lib/api-client';
-import type { ProductDetail } from '@/lib/types';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, ApiError } from '@/lib/api-client';
+import type { ProductDetail, BulkProductImportResult, BulkJobStatus } from '@/lib/types';
 
 export interface CreateProductFormState {
   error: string | null;
@@ -173,4 +173,62 @@ export async function deleteProduct(_prevState: ActionState, formData: FormData)
 
   revalidatePath('/products');
   return { error: null, success: true };
+}
+
+export interface BulkProductRowInput {
+  sku: string;
+  type?: string;
+  attributeSetCode?: string;
+  nameDefault?: string | null;
+  status?: string;
+  visibility?: string;
+  weight?: string | null;
+  price?: string | null;
+  mrp?: string | null;
+  qty?: number | null;
+  categorySlugs?: string[];
+  attributes?: Record<string, string>;
+}
+
+export interface BulkProductSubmitState {
+  error: string | null;
+  jobId: string | null;
+}
+
+/**
+ * Submits a parsed product CSV (Magento-style "Add/Update" by SKU) as one
+ * bulk-upsert job. Called imperatively from a plain client event handler —
+ * same pattern as inventory's submitBulkSetStock — not bound through
+ * useActionState, since the caller needs the jobId back immediately to
+ * start polling getBulkProductJobStatus.
+ */
+export async function submitBulkUpsertProducts(
+  priceListCode: string | null,
+  warehouseCode: string | null,
+  rows: BulkProductRowInput[],
+): Promise<BulkProductSubmitState> {
+  if (rows.length === 0) {
+    return { error: 'The CSV has no valid rows.', jobId: null };
+  }
+
+  try {
+    const { jobId } = await apiPost<{ jobId: string }>('/admin/v1/products/bulk-upsert', {
+      priceListCode: priceListCode || undefined,
+      warehouseCode: warehouseCode || undefined,
+      rows,
+    });
+    return { error: null, jobId };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, jobId: null };
+    throw err;
+  }
+}
+
+/** Polled repeatedly by the client while a bulk-upsert-products job is in flight. */
+export async function getBulkProductJobStatus(jobId: string): Promise<BulkJobStatus<BulkProductImportResult>> {
+  const status = await apiGet<BulkJobStatus<BulkProductImportResult>>(`/admin/v1/jobs/${jobId}`);
+  if (status.status === 'completed') {
+    revalidatePath('/products');
+  }
+  return status;
 }

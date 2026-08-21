@@ -60,6 +60,11 @@ export class PrismaProductRepository implements ProductRepository {
     return found !== null;
   }
 
+  async findBySku(sku: string): Promise<{ publicId: string } | null> {
+    const found = await this.db.product.findFirst({ where: { sku, deletedAt: null }, select: { publicId: true } });
+    return found;
+  }
+
   async create(product: Product): Promise<Product> {
     const p = product.props;
     try {
