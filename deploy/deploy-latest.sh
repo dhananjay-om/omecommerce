@@ -55,7 +55,7 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
     api node -e '
       const email = process.env.ADMIN_EMAIL;
       const password = process.env.ADMIN_PASSWORD;
-      fetch("http://localhost:4100/admin/v1/auth/login", {
+      fetch("http://localhost:3000/admin/v1/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -64,7 +64,7 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         .then((body) => {
           const token = body?.data?.token;
           if (!token) throw new Error("login failed: " + JSON.stringify(body));
-          return fetch("http://localhost:4100/admin/v1/search/reindex", {
+          return fetch("http://localhost:3000/admin/v1/search/reindex", {
             method: "POST",
             headers: { authorization: "Bearer " + token },
           });
