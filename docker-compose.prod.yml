@@ -153,6 +153,10 @@ services:
     restart: unless-stopped
     environment:
       API_BASE_URL: http://api:3000
+      # Same value as the storefront/api services' own SITE_URL — only used
+      # here for the "View Store" header link and a product's "View Product"
+      # link (both open the real public storefront in a new tab).
+      SITE_URL: https://${DOMAIN}
     depends_on:
       api: { condition: service_healthy }
     networks: [ome]

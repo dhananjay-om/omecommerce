@@ -1,11 +1,16 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { ExternalLink } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import { sectionLabelForPath } from '@/components/dashboard-nav';
 
-export function TopHeader() {
+/** siteUrl is passed down from layout.tsx (a Server Component — see its own
+ *  comment) rather than read here directly: it comes from a plain, non-
+ *  `NEXT_PUBLIC_` env var (lib/config.ts), which only resolves correctly on
+ *  the server. */
+export function TopHeader({ siteUrl }: { siteUrl: string }) {
   const pathname = usePathname();
   const label = sectionLabelForPath(pathname);
 
@@ -15,6 +20,10 @@ export function TopHeader() {
         Admin <span className="text-foreground">/ {label}</span>
       </span>
       <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" render={<a href={siteUrl} target="_blank" rel="noreferrer" />}>
+          View Store
+          <ExternalLink className="size-3.5" />
+        </Button>
         <div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
           A
         </div>

@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { apiGet } from '@/lib/api-client';
 import type { ProductDetail } from '@/lib/types';
+import { SITE_URL } from '@/lib/config';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
@@ -25,9 +27,19 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <h1 className="text-3xl font-bold tracking-tight">{product.name ?? product.sku}</h1>
             <Badge variant={statusBadgeVariant(product.status)}>{product.status}</Badge>
           </div>
-          <Link href={`/products/${product.publicId}/edit`} className={cn(buttonVariants())}>
-            Edit
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={`${SITE_URL}/${product.slug}.html`} target="_blank" rel="noreferrer" />}
+            >
+              View Product
+              <ExternalLink className="size-3.5" />
+            </Button>
+            <Link href={`/products/${product.publicId}/edit`} className={cn(buttonVariants())}>
+              Edit
+            </Link>
+          </div>
         </div>
       </div>
 
