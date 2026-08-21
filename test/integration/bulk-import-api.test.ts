@@ -149,4 +149,128 @@ describe.skipIf(!process.env.INTEGRATION)('bulk product import API (live DB)', (
       expect(stock.body.data).toEqual({ onHand: 42, reserved: 0, available: 42 });
     });
   });
+
+  describe('bulk product upsert (Magento-style Add/Update CSV, bulk-upsert-products job)', () => {
+    const warehouseCode = 'WH-BULK-UPSERT';
+    let priceListCode = '';
+    let categorySlug = '';
+
+    beforeAll(async () => {
+      await prisma.warehouse.upsert({
+        where: { code: warehouseCode },
+        update: {},
+        create: { code: warehouseCode, name: 'Bulk Upsert Test Warehouse' },
+      });
+
+      const colorAttr = await prisma.attribute.upsert({
+        where: { code: 'bulk-upsert-color' },
+        update: {},
+        create: { code: 'bulk-upsert-color', label: 'Color', dataType: 'SELECT', inputType: 'DROPDOWN' },
+      });
+      const existingOption = await prisma.attributeOption.findFirst({ where: { attributeId: colorAttr.id, value: 'RED' } });
+      if (!existingOption) {
+        await prisma.attributeOption.create({ data: { attributeId: colorAttr.id, value: 'RED', label: 'Red' } });
+      }
+
+      const priceListRes = await admin.post('/admin/v1/price-lists').send({
+        code: 'PL-BULK-UPSERT-TEST',
+        name: 'Bulk Upsert Test Price List',
+        currency: 'INR',
+      });
+      priceListCode = (priceListRes.body.data?.code as string) ?? 'PL-BULK-UPSERT-TEST';
+
+      const categoryRes = await admin.post('/admin/v1/categories').send({ nameDefault: 'Bulk Upsert Test Category' });
+      categorySlug = categoryRes.body.data.slug as string;
+    });
+
+    it('rejects an empty rows array with 422', async () => {
+      const res = await admin.post('/admin/v1/products/bulk-upsert').send({ rows: [] });
+      expect(res.status).toBe(422);
+    });
+
+    it('creates a new SKU with attributes/category/price/qty in one row, then updates the same SKU on a second import', async () => {
+      const createEnqueue = await admin.post('/admin/v1/products/bulk-upsert').send({
+        priceListCode,
+        warehouseCode,
+        rows: [
+          {
+            sku: 'UPSERT-SKU-1',
+            type: 'SIMPLE',
+            attributeSetCode: 'bulk-import-test-set',
+            nameDefault: 'Upsert Test Product',
+            status: 'ACTIVE',
+            price: '100.00',
+            mrp: '150.00',
+            qty: 10,
+            categorySlugs: [categorySlug],
+            attributes: { 'bulk-upsert-color': 'Red' },
+          },
+          { sku: 'UPSERT-BAD-SET', type: 'SIMPLE', attributeSetCode: 'does-not-exist-code' }, // row 1: unknown set
+        ],
+      });
+      expect(createEnqueue.status).toBe(202);
+      const created = await pollJob(createEnqueue.body.data.jobId as string);
+      expect(created.result).toMatchObject({ total: 2, created: 1, updated: 0, failed: 1 });
+      const createErrors = (created.result as { errors: Array<{ row: number; sku: string; message: string }> }).errors;
+      expect(createErrors).toEqual([{ row: 1, sku: 'UPSERT-BAD-SET', message: expect.stringContaining('does-not-exist-code') }]);
+
+      const product = await prisma.product.findFirstOrThrow({ where: { sku: 'UPSERT-SKU-1' } });
+      expect(product.nameDefault).toBe('Upsert Test Product');
+      const variant = await prisma.productVariant.findFirstOrThrow({ where: { productId: product.id } });
+
+      const stock = await admin.get('/admin/v1/inventory/stock').query({ variantId: variant.publicId, warehouseCode });
+      expect(stock.body.data).toEqual({ onHand: 10, reserved: 0, available: 10 });
+
+      const prices = await admin.get(`/admin/v1/variants/${variant.publicId}/prices`);
+      const ourPrice = (prices.body.data as Array<{ priceListCode: string; price: string; mrp: string }>).find(
+        (p) => p.priceListCode === priceListCode,
+      );
+      expect(ourPrice).toMatchObject({ price: '100.0000', mrp: '150.0000' });
+
+      const colorValue = await prisma.productAttributeValue.findFirst({
+        where: { product: { sku: 'UPSERT-SKU-1' }, attribute: { code: 'bulk-upsert-color' } },
+      });
+      expect(colorValue?.valueInt).not.toBeNull();
+
+      // Second import of the SAME sku: no type/attributeSetCode this time (patch semantics) —
+      // must update, not error or re-create.
+      const updateEnqueue = await admin.post('/admin/v1/products/bulk-upsert').send({
+        priceListCode,
+        warehouseCode,
+        rows: [{ sku: 'UPSERT-SKU-1', nameDefault: 'Upsert Test Product UPDATED', price: '200.00', qty: 5 }],
+      });
+      const updated = await pollJob(updateEnqueue.body.data.jobId as string);
+      expect(updated.result).toMatchObject({ total: 1, created: 0, updated: 1, failed: 0 });
+
+      const productAfter = await prisma.product.findFirstOrThrow({ where: { sku: 'UPSERT-SKU-1' } });
+      expect(productAfter.nameDefault).toBe('Upsert Test Product UPDATED');
+
+      const stockAfter = await admin.get('/admin/v1/inventory/stock').query({ variantId: variant.publicId, warehouseCode });
+      expect(stockAfter.body.data.onHand).toBe(5); // absolute set (10 -> 5), not a delta
+
+      const pricesAfter = await admin.get(`/admin/v1/variants/${variant.publicId}/prices`);
+      const ourPriceAfter = (pricesAfter.body.data as Array<{ priceListCode: string; price: string }>).find(
+        (p) => p.priceListCode === priceListCode,
+      );
+      expect(ourPriceAfter?.price).toBe('200.0000');
+    });
+
+    it('requires type and attributeSetCode to create a brand-new SKU', async () => {
+      const enqueue = await admin.post('/admin/v1/products/bulk-upsert').send({
+        rows: [{ sku: 'UPSERT-NEVER-CREATED', nameDefault: 'Missing type/set' }],
+      });
+      const finished = await pollJob(enqueue.body.data.jobId as string);
+      expect(finished.result).toMatchObject({ total: 1, created: 0, updated: 0, failed: 1 });
+      const exists = await prisma.product.findFirst({ where: { sku: 'UPSERT-NEVER-CREATED' } });
+      expect(exists).toBeNull();
+    });
+
+    it('fails a row needing price/qty when the job has no price list / warehouse selected', async () => {
+      const enqueue = await admin.post('/admin/v1/products/bulk-upsert').send({
+        rows: [{ sku: 'UPSERT-SKU-1', price: '1.00' }],
+      });
+      const finished = await pollJob(enqueue.body.data.jobId as string);
+      expect(finished.result).toMatchObject({ total: 1, created: 0, updated: 0, failed: 1 });
+    });
+  });
 });

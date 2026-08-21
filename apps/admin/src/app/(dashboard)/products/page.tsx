@@ -78,9 +78,14 @@ export default async function ProductsPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Products</h1>
-        <Link href="/products/new" className={cn(buttonVariants())}>
-          New Product
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/products/import" className={cn(buttonVariants({ variant: 'outline' }))}>
+            Import
+          </Link>
+          <Link href="/products/new" className={cn(buttonVariants())}>
+            New Product
+          </Link>
+        </div>
       </div>
 
       <form className="mt-6 flex flex-wrap items-center gap-2" action="/products">

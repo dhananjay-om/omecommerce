@@ -309,6 +309,55 @@ export interface BulkImportResult {
   errors: BulkImportRowError[];
 }
 
+/**
+ * One row of a Magento-style "Add/Update" product CSV import — create a
+ * NEW product if `sku` doesn't exist yet, otherwise patch the existing one
+ * (matching UpdateProduct's own patch semantics: only fields present here
+ * are touched). Scoped to non-configurable product types — a CONFIGURABLE/
+ * BUNDLE product needs variant-axis/component data this flat row shape
+ * can't express; that stays a form-only operation.
+ *
+ * `attributeSetCode`/`categorySlugs` are CSV-friendly identifiers (never
+ * raw internal ids) — resolved to the real ids inside the worker. `price`/
+ * `mrp`/`qty` are optional per-row overlays onto the job-level `priceListCode`/
+ * `warehouseCode` (see BulkUpsertProductsCommand) — a row can skip them
+ * entirely to leave pricing/stock untouched.
+ */
+export interface BulkProductImportRow {
+  sku: string;
+  /** Required only when creating (no existing product with this SKU). */
+  type?: ProductType;
+  /** AttributeSet.code — required only when creating; optional on update (reassigns the set if given). */
+  attributeSetCode?: string;
+  nameDefault?: string | null;
+  status?: ProductStatus;
+  visibility?: ProductVisibility;
+  weight?: string | null;
+  price?: string | null;
+  mrp?: string | null;
+  qty?: number | null;
+  /** Category.slug values. `undefined` = don't touch. `[]` = clear all assigned categories
+   *  (the CSV column was present but the cell was empty for this row). */
+  categorySlugs?: string[];
+  /** Attribute code -> raw CSV cell text, parsed per the attribute's own dataType
+   *  (see bulk-import.worker.ts's parseAttributeCell). GLOBAL scope only. */
+  attributes?: Record<string, string>;
+}
+
+export interface BulkProductImportRowError {
+  row: number;
+  sku: string;
+  message: string;
+}
+
+export interface BulkProductImportResult {
+  total: number;
+  created: number;
+  updated: number;
+  failed: number;
+  errors: BulkProductImportRowError[];
+}
+
 export interface VariantAxisValueView {
   attributeCode: string;
   attributeLabel: string;
