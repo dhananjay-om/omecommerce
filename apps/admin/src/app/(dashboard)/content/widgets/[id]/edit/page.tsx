@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { apiGet, ApiError } from '@/lib/api-client';
 import type { WidgetInstance, CmsBlock, Category, Brand } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { WidgetForm } from '../../widget-form';
 
 export default async function EditWidgetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +22,8 @@ export default async function EditWidgetPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">Edit Widget — {widget.title ?? widget.type}</h1>
+      <BackLink href="/content/widgets" label="Back to Widgets" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">Edit Widget — {widget.title ?? widget.type}</h1>
       <div className="mt-6">
         <WidgetForm widget={widget} blocks={blocks} categories={categories} brands={brands} />
       </div>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { apiGet } from '@/lib/api-client';
 import type { Category } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { CategoryEditForm } from '../../category-edit-form';
 
 export default async function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +15,8 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">Edit Category — {category.nameDefault ?? '(untitled)'}</h1>
+      <BackLink href="/categories" label="Back to Categories" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">Edit Category — {category.nameDefault ?? '(untitled)'}</h1>
       <div className="mt-6">
         <CategoryEditForm category={category} categories={categories} />
       </div>

@@ -1,5 +1,6 @@
 import { apiGet } from '@/lib/api-client';
 import type { AttributeSet, AttributeSetDetail, Category, TaxClass } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { CreateProductForm } from './create-product-form';
 
 export default async function NewProductPage() {
@@ -16,7 +17,8 @@ export default async function NewProductPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">New Product</h1>
+      <BackLink href="/products" label="Back to Products" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">New Product</h1>
       <div className="mt-6">
         <CreateProductForm
           attributeSets={attributeSets}

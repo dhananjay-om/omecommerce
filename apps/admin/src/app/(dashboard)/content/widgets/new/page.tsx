@@ -1,5 +1,6 @@
 import { apiGet } from '@/lib/api-client';
 import type { CmsBlock, Category, Brand } from '@/lib/types';
+import { BackLink } from '@/components/back-link';
 import { WidgetForm } from '../widget-form';
 
 export default async function NewWidgetPage() {
@@ -11,7 +12,8 @@ export default async function NewWidgetPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">New Widget</h1>
+      <BackLink href="/content/widgets" label="Back to Widgets" />
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">New Widget</h1>
       <div className="mt-6">
         <WidgetForm blocks={blocks} categories={categories} brands={brands} />
       </div>
