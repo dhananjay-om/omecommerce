@@ -28,6 +28,7 @@ import { AssignAttributeValue } from './application/assign-attribute-value.useca
 import { AssignAttributeValues } from './application/assign-attribute-values.usecase.js';
 import { GetProductForStoreView } from './application/get-product-for-store-view.usecase.js';
 import { GetStoreProductDetail } from './application/get-store-product-detail.usecase.js';
+import { GetStoreProductDetailBySlug } from './application/get-store-product-detail-by-slug.usecase.js';
 import { CreateAttributeSet } from './application/create-attribute-set.usecase.js';
 import { CreateAttributeSetGroup } from './application/create-attribute-set-group.usecase.js';
 import { CreateAttribute } from './application/create-attribute.usecase.js';
@@ -131,6 +132,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     storeContext,
     getProductForStoreView,
   );
+  const getStoreProductDetailBySlug = new GetStoreProductDetailBySlug(products, getStoreProductDetail);
   const createAttributeSet = new CreateAttributeSet(attributeSets);
   const createAttributeSetGroup = new CreateAttributeSetGroup(attributeSets);
   const createAttribute = new CreateAttribute(attributes);
@@ -520,6 +522,19 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
         productPublicId: req.params.publicId!,
         storeViewId: query.storeViewId,
       });
+      res.json({ data: view });
+    }),
+  );
+  // The PDP's real entry point (/{slug}.html) — kept as a distinct route
+  // rather than overloading :publicId above (a publicId is always a UUID; a
+  // slug never is, so making one param accept both is an avoidable ambiguity,
+  // not a real simplification) — same "separate slug route" precedent
+  // /collections/:slug and /brands/:slug already use.
+  store.get(
+    '/products/by-slug/:slug',
+    asyncHandler(async (req, res) => {
+      const query = parse(storeViewQuerySchema, req.query);
+      const view = await getStoreProductDetailBySlug.execute(req.params.slug!, query.storeViewId);
       res.json({ data: view });
     }),
   );

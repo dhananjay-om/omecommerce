@@ -104,6 +104,7 @@ export class OpenSearchIndex implements SearchIndex {
     const hits = body.hits.hits.map((h) => ({
       productId: h._source.productId,
       sku: h._source.sku,
+      slug: h._source.slug,
       name: h._source.name,
       priceDisplay: h._source.priceDisplay,
       mrpDisplay: h._source.mrpDisplay,

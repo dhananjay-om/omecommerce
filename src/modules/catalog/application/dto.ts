@@ -42,6 +42,8 @@ export interface UpdateProductCommand {
 export interface ProductView {
   publicId: string;
   sku: string;
+  /** Storefront canonical URL is /{slug}.html — auto-generated once at creation, never edited afterward (see Product.slug's schema doc comment). */
+  slug: string;
   type: ProductType;
   status: ProductStatus;
   visibility: ProductVisibility;

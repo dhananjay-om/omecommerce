@@ -18,14 +18,14 @@ export class PrismaProductLookup implements ProductLookup {
   async byPublicId(publicId: string): Promise<ProductCoreInfo | null> {
     return this.db.product.findFirst({
       where: { publicId, deletedAt: null },
-      select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, visibility: true, attributeSetId: true },
+      select: { id: true, publicId: true, sku: true, slug: true, nameDefault: true, type: true, status: true, visibility: true, attributeSetId: true },
     }).then((r) => (r ? toCore(r) : null));
   }
 
   async allActive(): Promise<ProductCoreInfo[]> {
     const rows = await this.db.product.findMany({
       where: { status: 'ACTIVE', deletedAt: null },
-      select: { id: true, publicId: true, sku: true, nameDefault: true, type: true, status: true, visibility: true, attributeSetId: true },
+      select: { id: true, publicId: true, sku: true, slug: true, nameDefault: true, type: true, status: true, visibility: true, attributeSetId: true },
     });
     return rows.map(toCore);
   }
@@ -44,6 +44,7 @@ function toCore(row: {
   id: bigint;
   publicId: string;
   sku: string;
+  slug: string;
   nameDefault: string | null;
   type: string;
   status: string;
@@ -54,6 +55,7 @@ function toCore(row: {
     id: row.id,
     publicId: row.publicId,
     sku: row.sku,
+    slug: row.slug,
     name: row.nameDefault,
     type: row.type,
     status: row.status,

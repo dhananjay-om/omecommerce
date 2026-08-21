@@ -16,6 +16,8 @@ export interface SearchProductsQuery {
 export interface SearchProductHit {
   productId: string;
   sku: string;
+  /** Storefront canonical URL is /{slug}.html — see Product.slug's schema doc comment. */
+  slug: string;
   name: string;
   priceDisplay: string | null;
   mrpDisplay: string | null;

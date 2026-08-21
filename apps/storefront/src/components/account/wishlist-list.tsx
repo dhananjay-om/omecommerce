@@ -40,7 +40,7 @@ export function WishlistList({ initialItems }: { initialItems: WishlistItem[] })
         {items.map((item) => (
           <div key={item.productId} className="flex items-center justify-between rounded-lg border p-4">
             <div>
-              <Link href={`/products/${item.productId}`} className="font-medium hover:underline">
+              <Link href={`/${item.slug}.html`} className="font-medium hover:underline">
                 {item.name ?? item.sku}
               </Link>
               <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>

@@ -8,6 +8,11 @@ export function getProduct(publicId: string): Promise<ProductDetail> {
   return apiGet<ProductDetail>(`/store/v1/products/${publicId}${buildQuery({ storeViewId: STORE_VIEW_ID })}`);
 }
 
+/** The PDP's real entry point (/{slug}.html) — see catalog.module.ts's /products/by-slug/:slug route. */
+export function getProductBySlug(slug: string): Promise<ProductDetail> {
+  return apiGet<ProductDetail>(`/store/v1/products/by-slug/${slug}${buildQuery({ storeViewId: STORE_VIEW_ID })}`);
+}
+
 export function searchProducts(params: SearchParams = {}): Promise<SearchResult> {
   let qs = buildQuery({
     storeViewId: STORE_VIEW_ID,

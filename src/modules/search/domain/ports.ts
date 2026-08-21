@@ -13,6 +13,8 @@ export interface ProductDocument {
   productId: string;
   storeViewId: string;
   sku: string;
+  /** Storefront canonical URL is /{slug}.html — see Product.slug's schema doc comment. */
+  slug: string;
   name: string;
   type: string;
   status: string;
@@ -59,7 +61,7 @@ export interface SearchResult {
   total: number;
   page: number;
   pageSize: number;
-  hits: Array<{ productId: string; sku: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null }>;
+  hits: Array<{ productId: string; sku: string; slug: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null }>;
   facets: Record<string, FacetBucket[]>;
 }
 

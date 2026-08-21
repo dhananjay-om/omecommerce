@@ -11,6 +11,7 @@ function toSearchHit(product: ProductDetail): SearchHit {
   return {
     productId: product.publicId,
     sku: product.sku,
+    slug: product.slug,
     name: product.name ?? product.sku,
     priceDisplay: product.price,
     mrpDisplay: product.mrp,

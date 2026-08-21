@@ -25,7 +25,7 @@ describe.skipIf(!process.env.INTEGRATION)('media API (live DB + MinIO)', () => {
       create: { code: 'media-test-set', name: 'Media Test Set' },
     });
     const product = await prisma.product.create({
-      data: { type: 'SIMPLE', sku: `MEDIA-TEST-${Date.now()}`, attributeSetId: set.id, status: 'DRAFT', visibility: 'BOTH' },
+      data: { type: 'SIMPLE', sku: `MEDIA-TEST-${Date.now()}`, slug: `media-test-${Date.now()}`, attributeSetId: set.id, status: 'DRAFT', visibility: 'BOTH' },
     });
     productPublicId = product.publicId;
     admin = adminRequest(app, await getAdminToken(app));
@@ -157,7 +157,7 @@ describe.skipIf(!process.env.INTEGRATION)('media API (live DB + MinIO)', () => {
 
   it('404s setting a thumbnail on a media row that belongs to a different product', async () => {
     const otherProduct = await prisma.product.create({
-      data: { type: 'SIMPLE', sku: `MEDIA-TEST-OTHER-${Date.now()}`, attributeSetId: (await prisma.attributeSet.findFirstOrThrow({ where: { code: 'media-test-set' } })).id, status: 'DRAFT', visibility: 'BOTH' },
+      data: { type: 'SIMPLE', sku: `MEDIA-TEST-OTHER-${Date.now()}`, slug: `media-test-other-${Date.now()}`, attributeSetId: (await prisma.attributeSet.findFirstOrThrow({ where: { code: 'media-test-set' } })).id, status: 'DRAFT', visibility: 'BOTH' },
     });
     const upload = await admin.post('/admin/v1/media/uploads').send({ filename: 'mismatched.jpg', mimeType: 'image/jpeg' });
     const asset = await admin.post('/admin/v1/media').send({ storageKey: upload.body.data.storageKey, mimeType: 'image/jpeg', bytes: 100 });

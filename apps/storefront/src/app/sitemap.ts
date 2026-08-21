@@ -33,7 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const productEntries: MetadataRoute.Sitemap = products.hits.map((p) => ({
-    url: `${SITE_URL}/products/${p.productId}`,
+    url: `${SITE_URL}/${p.slug}.html`,
     changeFrequency: 'daily',
     priority: 0.8,
   }));

@@ -31,6 +31,7 @@ function toDomainProps(row: PrismaProductRow) {
     publicId: row.publicId,
     type: row.type,
     sku: row.sku,
+    slug: row.slug,
     attributeSetId: row.attributeSetId,
     status: row.status,
     visibility: row.visibility,
@@ -67,6 +68,7 @@ export class PrismaProductRepository implements ProductRepository {
           data: {
             type: p.type,
             sku: p.sku,
+            slug: p.slug,
             attributeSetId: p.attributeSetId,
             status: p.status,
             visibility: p.visibility,
@@ -99,6 +101,12 @@ export class PrismaProductRepository implements ProductRepository {
 
   async findByPublicId(publicId: string): Promise<Product | null> {
     const row = await this.db.product.findFirst({ where: { publicId, deletedAt: null } });
+    if (!row) return null;
+    return Product.fromPersistence(toDomainProps(row));
+  }
+
+  async findBySlug(slug: string): Promise<Product | null> {
+    const row = await this.db.product.findFirst({ where: { slug, deletedAt: null } });
     if (!row) return null;
     return Product.fromPersistence(toDomainProps(row));
   }

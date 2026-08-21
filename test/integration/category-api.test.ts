@@ -24,7 +24,7 @@ describe.skipIf(!process.env.INTEGRATION)('category API (live DB)', () => {
       create: { code: 'cat-test-set', name: 'Category Test Set' },
     });
     const product = await prisma.product.create({
-      data: { type: 'SIMPLE', sku: `CAT-TEST-${Date.now()}`, attributeSetId: set.id, status: 'DRAFT', visibility: 'BOTH' },
+      data: { type: 'SIMPLE', sku: `CAT-TEST-${Date.now()}`, slug: `cat-test-${Date.now()}`, attributeSetId: set.id, status: 'DRAFT', visibility: 'BOTH' },
     });
     productPublicId = product.publicId;
     admin = adminRequest(app, await getAdminToken(app));

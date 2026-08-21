@@ -22,7 +22,7 @@ export class ListWishlists {
         return {
           publicId: w.publicId,
           name: w.name,
-          items: rows.map((r) => ({ productId: r.productPublicId, sku: r.sku, name: r.name, addedAt: r.addedAt.toISOString() })),
+          items: rows.map((r) => ({ productId: r.productPublicId, sku: r.sku, slug: r.slug, name: r.name, addedAt: r.addedAt.toISOString() })),
         };
       }),
     );

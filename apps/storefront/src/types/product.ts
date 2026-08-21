@@ -30,6 +30,8 @@ export interface ProductVariant {
 export interface ProductDetail {
   publicId: string;
   sku: string;
+  /** Canonical storefront URL is /{slug}.html. */
+  slug: string;
   type: string;
   status: string;
   visibility: string;
@@ -53,6 +55,8 @@ export interface ProductDetail {
 export interface SearchHit {
   productId: string;
   sku: string;
+  /** Canonical storefront URL is /{slug}.html. */
+  slug: string;
   name: string;
   priceDisplay: string | null;
   /** "MRP" / compare-at price display string — null when unset, or when the resolved price came from a qty tier. */

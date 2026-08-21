@@ -87,7 +87,7 @@ async function main() {
     where: { sku: 'SKU-1' },
     update: {},
     create: {
-      type: ProductType.SIMPLE, sku: 'SKU-1', attributeSetId: set.id,
+      type: ProductType.SIMPLE, sku: 'SKU-1', slug: 'phone-a', attributeSetId: set.id,
       status: ProductStatus.ACTIVE, nameDefault: 'Phone A',
     },
   });

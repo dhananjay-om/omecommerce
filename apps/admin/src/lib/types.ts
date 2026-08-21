@@ -49,6 +49,8 @@ export interface ProductMedia {
 export interface ProductDetail {
   publicId: string;
   sku: string;
+  /** Storefront canonical URL is /{slug}.html — auto-generated once at creation, never editable afterward. */
+  slug: string;
   type: ProductType;
   status: ProductStatus;
   visibility: ProductVisibility;

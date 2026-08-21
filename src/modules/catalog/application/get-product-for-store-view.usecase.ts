@@ -62,6 +62,7 @@ export class GetProductForStoreView {
     return {
       publicId: p.publicId!,
       sku: p.sku,
+      slug: p.slug,
       type: p.type,
       status: p.status,
       visibility: p.visibility,

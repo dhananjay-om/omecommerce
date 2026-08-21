@@ -47,6 +47,8 @@ export interface SessionInfo {
 export interface WishlistItem {
   productId: string;
   sku: string;
+  /** Canonical storefront URL is /{slug}.html. */
+  slug: string;
   name: string | null;
   addedAt: string;
 }

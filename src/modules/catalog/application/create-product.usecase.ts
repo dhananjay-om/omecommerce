@@ -2,7 +2,37 @@ import { Product } from '../domain/product.js';
 import type { ProductRepository } from '../domain/repositories.js';
 import { ConflictError, ValidationError } from '../../../shared/domain/errors.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
+import { uniqueSlug } from './slugify.js';
 import type { CreateProductCommand, ProductView } from './dto.js';
+
+/** Top-level storefront routes a product's root-level /{slug}.html URL must
+ *  never collide with (apps/storefront/src/app/*, plus sitemap.ts's own
+ *  STATIC_PAGES list) — treated as "already taken" so uniqueSlug()'s normal
+ *  -2/-3/... suffix loop resolves the collision the same way a real slug
+ *  clash would. Next.js itself would actually still route e.g. /cart
+ *  correctly (a static segment always wins over the root [slug] dynamic
+ *  route), but a product silently unreachable at its own canonical URL
+ *  would be a confusing, hard-to-notice bug — worth avoiding outright. */
+const RESERVED_SLUGS = new Set([
+  'products',
+  'brands',
+  'collections',
+  'offers',
+  'about',
+  'contact',
+  'cart',
+  'checkout',
+  'login',
+  'register',
+  'account',
+  'search',
+  'pages',
+  'api',
+  'sitemap.xml',
+  'robots.txt',
+  'favicon.ico',
+  'manifest.json',
+]);
 
 function parseId(value: string, field: string): bigint {
   if (!/^\d+$/.test(value)) {
@@ -21,9 +51,15 @@ export class CreateProduct {
     if (await this.products.existsBySku(cmd.sku.trim())) {
       throw new ConflictError(`sku already exists: ${cmd.sku}`);
     }
+    const slug = await uniqueSlug(
+      (s) => (RESERVED_SLUGS.has(s) ? Promise.resolve(true) : this.products.findBySlug(s)),
+      cmd.nameDefault,
+      cmd.sku,
+    );
     const product = Product.create({
       type: cmd.type,
       sku: cmd.sku,
+      slug,
       attributeSetId: parseId(cmd.attributeSetId, 'attributeSetId'),
       status: cmd.status,
       visibility: cmd.visibility,
@@ -53,6 +89,7 @@ export function toView(product: Product): ProductView {
   return {
     publicId: p.publicId!,
     sku: p.sku,
+    slug: p.slug,
     type: p.type,
     status: p.status,
     visibility: p.visibility,
