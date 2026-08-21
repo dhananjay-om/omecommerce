@@ -64,3 +64,7 @@ export const updateWebsiteWalletSettingsSchema = z.object({
   walletMinOrderValue: blankToUndefined(z.string().nullish()),
   walletMaxAmountPerOrder: blankToUndefined(z.string().nullish()),
 });
+
+export const getPublicWebsiteQuerySchema = z.object({
+  code: z.string().min(1),
+});

@@ -61,6 +61,11 @@ export class PrismaWebsiteRepository implements WebsiteRepository {
     return rows.map(toWebsiteInfo);
   }
 
+  async findByCode(code: string): Promise<WebsiteInfo | null> {
+    const row = await this.db.website.findFirst({ where: { code }, select: SELECT });
+    return row ? toWebsiteInfo(row) : null;
+  }
+
   async update(
     code: string,
     input: {

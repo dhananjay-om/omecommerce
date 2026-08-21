@@ -5,13 +5,14 @@ import { HeartIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { buildCategoryTree } from '@/lib/category-tree';
 import type { Category } from '@/types/category';
+import type { Website } from '@/types/website';
 import { MegaMenu } from './mega-menu';
 import { SearchBar } from './search-bar';
 import { UserMenu } from './user-menu';
 import { MiniCart } from './mini-cart';
 import { MobileMenu } from './mobile-menu';
 
-export function MainHeader({ categories }: { categories: Category[] }) {
+export function MainHeader({ categories, website }: { categories: Category[]; website: Website }) {
   // Nav-only visibility filter — excluding a category here also drops its
   // whole subtree, since buildCategoryTree groups children by parentId and a
   // hidden parent's children simply won't match anything in the filtered
@@ -26,7 +27,14 @@ export function MainHeader({ categories }: { categories: Category[] }) {
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
         <MobileMenu tree={tree} />
         <Link href="/" className="shrink-0 text-xl font-bold text-primary">
-          OME<span className="text-cta">Shop</span>
+          {website.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
+            <img src={website.logoUrl} alt={website.name} className="h-8 w-auto object-contain" />
+          ) : (
+            <>
+              OME<span className="text-cta">Shop</span>
+            </>
+          )}
         </Link>
         <SearchBar className="hidden flex-1 md:block" />
         <div className="ml-auto flex items-center gap-1">

@@ -117,4 +117,40 @@ describe.skipIf(!process.env.INTEGRATION)('store API (live DB)', () => {
     expect(res.status).toBe(409);
     expect(res.body.title).toMatch(/still in use/i);
   });
+
+  describe('public website read (header/footer logo)', () => {
+    const testCode = 'zzz_logo_test_site';
+
+    beforeAll(async () => {
+      await prisma.website.upsert({
+        where: { code: testCode },
+        update: { name: 'Logo Test Site', logoMediaKey: null },
+        create: { code: testCode, name: 'Logo Test Site', baseCurrency: 'USD' },
+      });
+    });
+
+    it('404s an unknown website code', async () => {
+      const res = await admin.get('/store/v1/website').query({ code: 'does-not-exist' });
+      expect(res.status).toBe(404);
+    });
+
+    it('400s a missing code query param', async () => {
+      const res = await admin.get('/store/v1/website');
+      expect(res.status).toBe(422);
+    });
+
+    it('returns the name and a null logoUrl when no logo is set', async () => {
+      const res = await admin.get('/store/v1/website').query({ code: testCode });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ name: 'Logo Test Site', logoUrl: null });
+    });
+
+    it('returns a live-presigned logoUrl once a logo is set', async () => {
+      await prisma.website.update({ where: { code: testCode }, data: { logoMediaKey: 'website-logos/test-logo.png' } });
+      const res = await admin.get('/store/v1/website').query({ code: testCode });
+      expect(res.status).toBe(200);
+      expect(res.body.data.name).toBe('Logo Test Site');
+      expect(res.body.data.logoUrl).toEqual(expect.stringContaining('website-logos/test-logo.png'));
+    });
+  });
 });

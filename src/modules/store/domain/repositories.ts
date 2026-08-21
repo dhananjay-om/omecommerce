@@ -78,6 +78,10 @@ export interface WebsiteInfo {
  *  carry unrelated fields. Not full Website CRUD. */
 export interface WebsiteRepository {
   list(): Promise<WebsiteInfo[]>;
+  /** Storefront's public branding read (name/logo) — the storefront addresses a
+   *  website by its code (WEBSITE_CODE env), same convention as the storefront's
+   *  own login/register calls' websiteCode field. */
+  findByCode(code: string): Promise<WebsiteInfo | null>;
   update(
     code: string,
     input: {

@@ -75,3 +75,10 @@ export interface LogoUploadUrl {
   uploadUrl: string;
   logoMediaKey: string;
 }
+
+/** Storefront-safe subset of WebsiteView — just enough to render a header/
+ *  footer logo, nothing admin-internal (gstin, address, wallet rules, etc). */
+export interface PublicWebsiteView {
+  name: string;
+  logoUrl: string | null;
+}
