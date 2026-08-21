@@ -29,7 +29,7 @@ export function MainHeader({ categories, website }: { categories: Category[]; we
         <Link href="/" className="shrink-0 text-xl font-bold text-primary">
           {website.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
-            <img src={website.logoUrl} alt={website.name} className="h-8 w-auto object-contain" />
+            <img src={website.logoUrl} alt={website.name} className="h-14 w-auto max-w-[220px] object-contain" />
           ) : (
             <>
               OME<span className="text-cta">Shop</span>

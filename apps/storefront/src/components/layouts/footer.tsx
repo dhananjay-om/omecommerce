@@ -37,7 +37,7 @@ export function Footer({ website }: { website: Website }) {
           <Link href="/" className="text-xl font-bold">
             {website.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
-              <img src={website.logoUrl} alt={website.name} className="h-8 w-auto object-contain" />
+              <img src={website.logoUrl} alt={website.name} className="h-12 w-auto max-w-[200px] object-contain" />
             ) : (
               <>
                 OME<span className="text-cta">Shop</span>
