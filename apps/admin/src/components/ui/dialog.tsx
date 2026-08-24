@@ -31,7 +31,11 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        // Darker/blurrier than before (bg-black/10 barely dimmed the page
+        // behind a dialog) — matches the mock's own overlay-scrim
+        // (rgba(8,9,12,0.5) + blur), so the dialog actually reads as
+        // modal/focused instead of floating over a still-legible page.
+        "fixed inset-0 isolate z-50 bg-black/45 backdrop-blur-[1px] duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -53,7 +57,14 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Wider (max-w-sm/384px felt cramped for anything but a 1-field
+          // confirm dialog — most of this app's dialogs are small forms)
+          // and with a real shadow instead of just a thin ring, matching
+          // the mock's own modal-center (600px, shadow-lg) more closely —
+          // still capped narrower by default since most of these dialogs
+          // ARE simple confirms; pass a wider `className` (e.g. max-w-lg)
+          // for the few genuinely form-heavy ones (Fulfill, Create Invoice).
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -65,7 +76,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute top-3 right-3"
                 size="icon-sm"
               />
             }
@@ -84,7 +95,12 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      // Full-bleed border under the title (same negative-margin trick
+      // DialogFooter already uses to reach the popup's edges past its own
+      // p-4) — matches the mock's `.card-head` divider convention used
+      // everywhere else in this revamp, instead of the title just floating
+      // with no separation from the form below it.
+      className={cn("-mx-4 -mt-4 flex flex-col gap-1 border-b px-4 pt-4 pb-3.5", className)}
       {...props}
     />
   )
@@ -122,7 +138,10 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-base leading-none font-medium",
+        // Bold, matching the mock's card-title weight (700-800) used
+        // everywhere else in this revamp, instead of a lighter font-medium
+        // title that read as an afterthought.
+        "font-heading text-base leading-none font-bold",
         className
       )}
       {...props}
