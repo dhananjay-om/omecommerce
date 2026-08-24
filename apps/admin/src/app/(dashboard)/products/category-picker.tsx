@@ -53,7 +53,12 @@ export function CategoryPicker({ categories, selectedIds }: { categories: Catego
       {categories.length === 0 ? (
         <p className="text-sm text-muted-foreground">No categories yet.</p>
       ) : (
-        <div className="max-h-64 overflow-y-auto rounded-md border p-2">
+        // No height cap/inner scroll here — every other section on this page
+        // (Attributes, Variants, Pricing) just grows naturally with the
+        // page's own scroll instead of getting its own cramped nested
+        // scrollbar; capping this one at 256px left a small scrolling box
+        // sitting on top of a large empty gap before the sticky Save bar.
+        <div className="rounded-md border p-2">
           {tree.map((node) => (
             <TreeRow key={node.category.publicId} node={node} depth={0} selectedIds={selected} />
           ))}
