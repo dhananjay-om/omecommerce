@@ -3,6 +3,7 @@ import { apiGet } from '@/lib/api-client';
 import type { OrderDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { statusBadgeVariant } from '@/lib/status-badge';
+import { NavTabs } from '@/components/nav-tabs';
 import { FulfillDialog } from '../fulfill-dialog';
 import { RefundDialog } from '../refund-dialog';
 import { CancelDialog } from '../cancel-dialog';
@@ -10,15 +11,17 @@ import { CreateInvoiceDialog } from '../create-invoice-dialog';
 import { SendEmailDialog } from '../send-email-dialog';
 import { CloseOrderDialog } from '../close-order-dialog';
 import { MarkPaidDialog } from '../mark-paid-dialog';
-import { OrderViewNav } from '../order-view-nav';
 
 /**
  * Shared chrome for every /orders/[id]/* tab (Information/Invoices/Shipments/
- * Emails/History) — order number + status badges + the action bar, plus the
- * left "Order View" sidebar nav. `getOrder`'s fetch is deduped by Next.js
- * against the identical call each child page also makes (same URL+options,
- * same request pass), so fetching the full order here too costs no extra
- * network round trip.
+ * Emails/History) — order number + status badges + the action bar, plus a
+ * horizontal `NavTabs` strip (admin UI revamp, Phase 2 — replaces the old
+ * left-rail `OrderViewNav`, migrated first as the pattern-setter since this
+ * is the smallest of the app's 3 tabbed detail views; Customers and Reports
+ * follow the same shape). `getOrder`'s fetch is deduped by Next.js against
+ * the identical call each child page also makes (same URL+options, same
+ * request pass), so fetching the full order here too costs no extra network
+ * round trip.
  */
 export default async function OrderDetailLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -55,9 +58,17 @@ export default async function OrderDetailLayout({ children, params }: { children
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[220px_1fr]">
-        <OrderViewNav orderPublicId={order.publicId} />
-        <div className="min-w-0">{children}</div>
+      <div className="mt-6">
+        <NavTabs
+          items={[
+            { href: `/orders/${order.publicId}`, label: 'Information' },
+            { href: `/orders/${order.publicId}/invoices`, label: 'Invoices' },
+            { href: `/orders/${order.publicId}/shipments`, label: 'Shipments' },
+            { href: `/orders/${order.publicId}/emails`, label: 'Emails' },
+            { href: `/orders/${order.publicId}/history`, label: 'Comments History' },
+          ]}
+        />
+        <div className="mt-6 min-w-0">{children}</div>
       </div>
     </div>
   );

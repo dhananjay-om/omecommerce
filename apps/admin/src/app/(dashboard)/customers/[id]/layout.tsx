@@ -3,13 +3,14 @@ import { notFound } from 'next/navigation';
 import { apiGet, ApiError } from '@/lib/api-client';
 import type { CustomerDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { CustomerViewNav } from '../customer-view-nav';
+import { NavTabs } from '@/components/nav-tabs';
 
 /**
  * Shared chrome for every /customers/[id]/* tab (Overview/Wallet/Loyalty/
- * Referrals) — name/email + status badge, plus the left "Customer View"
- * sidebar nav. Same pattern as orders/[id]/layout.tsx; `apiGet`'s fetch is
- * deduped by Next.js against the identical call each child page also makes.
+ * Referrals) — name/email + status badge, plus a horizontal `NavTabs` strip
+ * (admin UI revamp, Phase 2 — replaces the old left-rail `CustomerViewNav`,
+ * same migration as orders/[id]/layout.tsx). `apiGet`'s fetch is deduped by
+ * Next.js against the identical call each child page also makes.
  *
  * A deleted (or never-existent) customer 404s here — same notFound()-on-404
  * pattern as content/pages/[id]/edit — so this shows Next's not-found page
@@ -38,9 +39,16 @@ export default async function CustomerDetailLayout({ children, params }: { child
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{customer.email}</p>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[220px_1fr]">
-        <CustomerViewNav customerPublicId={customer.publicId} />
-        <div className="min-w-0">{children}</div>
+      <div className="mt-6">
+        <NavTabs
+          items={[
+            { href: `/customers/${customer.publicId}`, label: 'Overview' },
+            { href: `/customers/${customer.publicId}/wallet`, label: 'Wallet' },
+            { href: `/customers/${customer.publicId}/loyalty`, label: 'Loyalty' },
+            { href: `/customers/${customer.publicId}/referrals`, label: 'Referrals' },
+          ]}
+        />
+        <div className="mt-6 min-w-0">{children}</div>
       </div>
     </div>
   );

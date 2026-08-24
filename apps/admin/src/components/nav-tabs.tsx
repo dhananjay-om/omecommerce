@@ -20,11 +20,19 @@ export interface NavTabItem {
  *  one shared component per the admin-UI-revamp plan. */
 export function NavTabs({ items }: { items: NavTabItem[] }) {
   const pathname = usePathname();
+  // Longest-prefix-match, same "one winner" logic as nav-data.ts's
+  // bestMatchingNavItem — without it, a base route like "Information"
+  // (href .../orders/{id}) would ALSO match every one of its own sibling
+  // sub-routes' pathnames (.../orders/{id}/invoices starts with
+  // .../orders/{id}/ too), so more than one tab would show active at once.
+  const activeHref = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <div className="flex items-center gap-1 border-b border-border">
       {items.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = item.href === activeHref;
         return (
           <Link
             key={item.href}
