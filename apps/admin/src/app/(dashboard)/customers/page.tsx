@@ -1,12 +1,13 @@
 import Link from 'next/link';
+import Form from 'next/form';
+import { Search } from 'lucide-react';
 import { apiGet, buildQuery } from '@/lib/api-client';
 import type { CustomerList } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { DeleteCustomerDialog } from './delete-customer-dialog';
+import { PageBreadcrumb } from '@/components/page-breadcrumb';
+import { CustomersTable } from './customers-table';
 
 const PAGE_SIZE = 20;
 
@@ -18,71 +19,56 @@ export default async function CustomersPage({
   const params = await searchParams;
   const page = params.page ? Number(params.page) : 1;
 
-  const list = await apiGet<CustomerList>(
-    `/admin/v1/customers${buildQuery({ page, pageSize: PAGE_SIZE, search: params.search })}`,
-  );
+  const list = await apiGet<CustomerList>(`/admin/v1/customers${buildQuery({ page, pageSize: PAGE_SIZE, search: params.search })}`);
   const totalPages = Math.max(1, Math.ceil(list.total / list.pageSize));
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+      <PageBreadcrumb items={[{ label: 'Commerce', href: '/customers' }, { label: 'Customers' }]} />
 
-      <form className="mt-6 flex gap-2" action="/customers">
-        <Input name="search" placeholder="Search by name or email…" defaultValue={params.search} className="max-w-sm" />
-        <Button type="submit" variant="outline">
-          Search
+      <div className="mt-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Customers</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {list.total} customer{list.total === 1 ? '' : 's'}
+          </p>
+        </div>
+      </div>
+
+      {/* Single search box — matches the mock's clean filter-bar shape
+          (Orders/Products use the same convention). No status filter here:
+          the customers list API (listCustomersQuerySchema) only accepts
+          page/pageSize/search, so an isActive dropdown would look
+          functional in the URL but silently do nothing on the backend —
+          not added, same "don't fake a working filter" rule as everywhere
+          else in this revamp. The mock's own columns also carry Orders/
+          Revenue/AOV/Last Order/Segment/LTV, none of which this API
+          returns either (no order aggregation joined in) — not faked.
+          next/form: a plain <form action="/customers"> doesn't respect
+          this app's /admin basePath, the same pre-existing bug already
+          fixed on Orders/Products. */}
+      <Form id="customers-filters" className="mt-6 flex flex-wrap items-center gap-2" action="/customers">
+        <div className="relative max-w-[320px] flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input key={params.search ?? ''} name="search" placeholder="Search name or email…" defaultValue={params.search} className="pl-8" />
+        </div>
+        <Button type="submit" size="sm">
+          Apply
         </Button>
         {params.search ? (
-          <Link href="/customers" className={cn(buttonVariants({ variant: 'ghost' }))}>
+          <Link href="/customers" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Clear
           </Link>
         ) : null}
-      </form>
+      </Form>
 
-      <div className="mt-6 rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.customers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  No customers found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              list.customers.map((c) => (
-                <TableRow key={c.publicId}>
-                  <TableCell className="font-medium">
-                    <Link href={`/customers/${c.publicId}`} className="hover:underline">
-                      {c.email}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{[c.firstName, c.lastName].filter(Boolean).join(' ') || '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant={c.isActive ? 'success' : 'secondary'}>{c.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </TableCell>
-                  <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <DeleteCustomerDialog publicId={c.publicId} email={c.email} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="mt-6">
+        <CustomersTable customers={list.customers} />
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          {list.total} customer{list.total === 1 ? '' : 's'} · page {list.page} of {totalPages}
+          Showing {list.customers.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{(page - 1) * PAGE_SIZE + list.customers.length} of {list.total}
         </span>
         <div className="flex gap-2">
           {page <= 1 ? (
@@ -90,22 +76,19 @@ export default async function CustomersPage({
               Previous
             </Button>
           ) : (
-            <Link
-              href={`/customers${buildQuery({ page: page - 1, search: params.search })}`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-            >
+            <Link href={`/customers${buildQuery({ page: page - 1, search: params.search })}`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Previous
             </Link>
           )}
+          <span className="px-1">
+            {page} / {totalPages}
+          </span>
           {page >= totalPages ? (
             <Button variant="outline" size="sm" disabled>
               Next
             </Button>
           ) : (
-            <Link
-              href={`/customers${buildQuery({ page: page + 1, search: params.search })}`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-            >
+            <Link href={`/customers${buildQuery({ page: page + 1, search: params.search })}`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Next
             </Link>
           )}

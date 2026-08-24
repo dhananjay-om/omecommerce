@@ -16,8 +16,23 @@ import { Trash2 } from 'lucide-react';
 
 const initialState: ActionState = { error: null, success: false };
 
-export function DeleteCustomerDialog({ publicId, email }: { publicId: string; email: string }) {
-  const [open, setOpen] = useState(false);
+export function DeleteCustomerDialog({
+  publicId,
+  email,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  publicId: string;
+  email: string;
+  /** When provided, this dialog is externally controlled (e.g. opened from
+   *  the customers table's row "..." menu) and renders no trigger of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const [state, formAction, pending] = useActionState(deleteCustomer, initialState);
   const [handledState, setHandledState] = useState(state);
 
@@ -28,18 +43,20 @@ export function DeleteCustomerDialog({ publicId, email }: { publicId: string; em
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-            aria-label={`Delete ${email}`}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        }
-      />
+      {!isControlled ? (
+        <DialogTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+              aria-label={`Delete ${email}`}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          }
+        />
+      ) : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Customer — {email}</DialogTitle>
