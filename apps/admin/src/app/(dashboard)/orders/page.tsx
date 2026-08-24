@@ -79,7 +79,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {list.total} order{list.total === 1 ? '' : 's'}
+          </p>
+        </div>
         <div className="flex gap-2">
           <a href={`/admin/api/orders/export${buildQuery({ ...exportFilters, format: 'csv' })}`} className={cn(buttonVariants({ variant: 'outline' }))}>
             Export CSV
