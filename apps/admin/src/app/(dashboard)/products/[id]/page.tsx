@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { statusBadgeVariant } from '@/lib/status-badge';
 import { cn } from '@/lib/utils';
+import { ProductDetailHeader } from '../product-detail-header';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,16 +34,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href="/products" className="text-sm text-muted-foreground hover:underline">
-          ← Back to Products
-        </Link>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">{product.name ?? product.sku}</h1>
-            <Badge variant={statusBadgeVariant(product.status)}>{product.status}</Badge>
-          </div>
-          <div className="flex items-center gap-2">
+      <ProductDetailHeader
+        product={product}
+        actions={
+          <>
             <Button
               variant="outline"
               size="sm"
@@ -51,12 +46,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               View Product
               <ExternalLink className="size-3.5" />
             </Button>
-            <Link href={`/products/${product.publicId}/edit`} className={cn(buttonVariants())}>
+            <Link href={`/products/${product.publicId}/edit`} className={cn(buttonVariants({ size: 'sm' }))}>
               Edit
             </Link>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>

@@ -22,16 +22,22 @@ const VISIBILITIES = ['BOTH', 'CATALOG', 'SEARCH', 'NOT_VISIBLE'];
 
 const initialState: UpdateProductFormState = { error: null };
 
+/** Matches the mock's `.card-head`/`.card-title` sizing (0.88rem/700)
+ *  instead of the default `CardTitle`'s larger 16px/medium weight. */
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
       <CardHeader className="border-b pb-4">
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle className="text-[0.88rem] font-bold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-2">{children}</CardContent>
     </Card>
   );
 }
+
+/** Matches the mock's `.field label` — 0.72rem, bold, uppercase, letter-
+ *  spaced — instead of the default `Label`'s 14px/medium/sentence-case. */
+const fieldLabelClass = 'text-[0.72rem] font-bold tracking-wide text-muted-foreground uppercase';
 
 export function EditProductForm({
   product,
@@ -59,16 +65,18 @@ export function EditProductForm({
         <SectionCard title="Basic Information">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label>SKU</Label>
+              <Label className={fieldLabelClass}>SKU</Label>
               <Input value={product.sku} disabled />
               <p className="text-xs text-muted-foreground">SKU can&apos;t be changed after creation.</p>
             </div>
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label className={fieldLabelClass}>Type</Label>
               <Input value={product.type} disabled />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="attributeSetId">Attribute set</Label>
+              <Label htmlFor="attributeSetId" className={fieldLabelClass}>
+                Attribute set
+              </Label>
               <Select name="attributeSetId" value={attributeSetId} onValueChange={(value) => setAttributeSetId(String(value))}>
                 <SelectTrigger id="attributeSetId" className="w-full">
                   <SelectValue placeholder="Select an attribute set">
@@ -85,11 +93,15 @@ export function EditProductForm({
               </Select>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="nameDefault">Name</Label>
+              <Label htmlFor="nameDefault" className={fieldLabelClass}>
+                Name
+              </Label>
               <Input id="nameDefault" name="nameDefault" defaultValue={product.name ?? ''} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weight">Weight (kg)</Label>
+              <Label htmlFor="weight" className={fieldLabelClass}>
+                Weight (kg)
+              </Label>
               <Input id="weight" name="weight" type="number" step="0.0001" min="0" defaultValue={product.weight ?? ''} />
             </div>
           </div>
@@ -98,7 +110,9 @@ export function EditProductForm({
         <SectionCard title="Status & Visibility">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status" className={fieldLabelClass}>
+                Status
+              </Label>
               <Select name="status" defaultValue={product.status}>
                 <SelectTrigger id="status" className="w-full">
                   <SelectValue />
@@ -113,7 +127,9 @@ export function EditProductForm({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="visibility">Visibility</Label>
+              <Label htmlFor="visibility" className={fieldLabelClass}>
+                Visibility
+              </Label>
               <Select name="visibility" defaultValue={product.visibility}>
                 <SelectTrigger id="visibility" className="w-full">
                   <SelectValue />
@@ -133,7 +149,9 @@ export function EditProductForm({
         <SectionCard title="Tax">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="taxClassId">Tax Class</Label>
+              <Label htmlFor="taxClassId" className={fieldLabelClass}>
+                Tax Class
+              </Label>
               <Select name="taxClassId" defaultValue={product.taxClassId ?? ''}>
                 <SelectTrigger id="taxClassId" className="w-full">
                   <SelectValue placeholder="None (0% GST)">
@@ -150,7 +168,9 @@ export function EditProductForm({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hsnCode">HSN/SAC Code</Label>
+              <Label htmlFor="hsnCode" className={fieldLabelClass}>
+                HSN/SAC Code
+              </Label>
               <Input id="hsnCode" name="hsnCode" maxLength={8} defaultValue={product.hsnCode ?? ''} placeholder="e.g. 61091000" />
             </div>
           </div>

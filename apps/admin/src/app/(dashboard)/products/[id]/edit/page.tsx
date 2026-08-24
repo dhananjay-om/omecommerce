@@ -4,7 +4,7 @@ import { apiGet, ApiError } from '@/lib/api-client';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass, Variant, VariantPrice, VariantStock } from '@/lib/types';
 import { SITE_URL } from '@/lib/config';
 import { Button } from '@/components/ui/button';
-import { BackLink } from '@/components/back-link';
+import { ProductDetailHeader } from '../../product-detail-header';
 import { EditProductForm } from './edit-product-form';
 
 export interface VariantPricingEntry {
@@ -55,18 +55,19 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <div>
-      <BackLink href={`/products/${id}`} label={`Back to ${product.name ?? product.sku}`} />
-      <div className="mt-2 flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          render={<a href={`${SITE_URL}/${product.slug}.html`} target="_blank" rel="noreferrer" />}
-        >
-          View Product
-          <ExternalLink className="size-3.5" />
-        </Button>
-      </div>
+      <ProductDetailHeader
+        product={product}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            render={<a href={`${SITE_URL}/${product.slug}.html`} target="_blank" rel="noreferrer" />}
+          >
+            View Product
+            <ExternalLink className="size-3.5" />
+          </Button>
+        }
+      />
       <div className="mt-6">
         <EditProductForm
           product={product}
