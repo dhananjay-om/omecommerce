@@ -460,12 +460,12 @@ truth, and any drift between the two is surfaced, not hidden.
 | 19.2 | Close the event gaps in §3 (add the missing `outbox.write()` calls) | 19.1 | **Done** (ProductUpdated/ProductPriceChanged/StockChanged/CustomerRegistered — via multi-agent Workflow, independently verified) |
 | 19.3 | `analytics-projector.worker.ts` (incremental) + `analytics-refresh.worker.ts` (nightly batch/reconciliation, §12) | 19.1, 19.2 | **Done** — live-verified end-to-end (real checkout → cancel/refund → summary tables correct; one real bug found and fixed: stale `summary_order_status_daily` rows on a status transition) |
 | 19.4 | `src/modules/analytics/` REST module (§9) | 19.3 | **Done** — 10 read endpoints + AlertRule CRUD/history, gated on the 4 new permission codes |
-| 19.5 | Executive + Sales + Order dashboards (admin UI) | 19.4 | Not started |
-| 19.6 | Product + Customer + Inventory dashboards, RFM (§5) | 19.4 | Not started |
+| 19.5 | Executive + Sales + Order dashboards (admin UI) | 19.4 | **Done** — built via a 6-way parallel multi-agent Workflow on top of personally-built shared scaffolding (date-range filter, StatCard, chart wrappers styled per the dataviz skill) |
+| 19.6 | Product + Customer + Inventory dashboards, RFM (§5) | 19.4 | **Done** — same Workflow batch as 19.5; RFM segment distribution shown on the Customer dashboard |
 | 19.7 | Reports/export (§7) | 19.4 | Not started |
-| 19.8 | Alert engine (§10) | 19.4 | **Partly done** — the evaluation engine (`EvaluateAlertRules`, runs nightly) and AlertRule CRUD API are live and verified; the admin config UI and real notification delivery (email — an explicit open question, §16) are not started |
-| 19.9 | Live verification (curl + Puppeteer, this session's standing discipline) + integration tests | 19.5–19.8 | Done for 19.1–19.4 (curl-verified end-to-end); still needed for 19.5–19.8 once built |
-| 19.10 | Deploy script (`deploy/deploy-analytics-*.sh`, following this repo's per-feature deploy-script convention) | 19.9 | **Done** — `deploy/deploy-analytics-reporting.sh` covers 19.1–19.4; a later script will cover the dashboard UI once built |
+| 19.8 | Alert engine (§10) | 19.4 | **Mostly done** — evaluation engine, CRUD API, and the admin config UI (`/reports/alerts`, list + create/edit/delete dialogs) are all live and verified, including a full create→list→delete pass through the real UI. Real notification delivery (email) is still an explicit open question (§16) — `AlertHistory` rows record every fired condition, `notifiedAt` stays unset |
+| 19.9 | Live verification (curl + Puppeteer, this session's standing discipline) + integration tests | 19.5–19.8 | Done for 19.1–19.6/19.8 (curl + Puppeteer, including seeding fresh live demo data through real checkouts to get meaningful screenshots) — no new automated integration test file added yet for the analytics module itself |
+| 19.10 | Deploy script (`deploy/deploy-analytics-*.sh`, following this repo's per-feature deploy-script convention) | 19.9 | **Done** — `deploy/deploy-analytics-reporting.sh` (19.1–19.4) + `deploy/deploy-analytics-dashboards.sh` (19.5/19.6/19.8 UI) |
 
 Phase 2 (blocked on §16 decisions, not scheduled until they resolve):
 UTM/session-tracking capture → Marketing dashboard + conversion funnel;
