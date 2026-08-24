@@ -15,8 +15,21 @@ import {
 
 const initialState: ActionState = { error: null, success: false };
 
-export function DeleteCouponDialog({ code }: { code: string }) {
-  const [open, setOpen] = useState(false);
+export function DeleteCouponDialog({
+  code,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  code: string;
+  /** When provided, this dialog is externally controlled (e.g. opened from
+   *  the coupons table's row "..." menu) and renders no trigger of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const [state, formAction, pending] = useActionState(deleteCoupon, initialState);
   const [handledState, setHandledState] = useState(state);
 
@@ -27,7 +40,9 @@ export function DeleteCouponDialog({ code }: { code: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="text-destructive hover:text-destructive">Delete</Button>} />
+      {!isControlled ? (
+        <DialogTrigger render={<Button variant="outline" size="sm" className="text-destructive hover:text-destructive">Delete</Button>} />
+      ) : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Coupon — {code}</DialogTitle>

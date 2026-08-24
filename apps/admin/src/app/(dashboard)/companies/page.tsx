@@ -1,12 +1,13 @@
 import Link from 'next/link';
+import Form from 'next/form';
+import { Search } from 'lucide-react';
 import { apiGet, buildQuery } from '@/lib/api-client';
 import type { CompanyList, CompanyStatus, Website } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { statusBadgeVariant } from '@/lib/status-badge';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { PageBreadcrumb } from '@/components/page-breadcrumb';
+import { CompaniesTable } from './companies-table';
 
 const PAGE_SIZE = 20;
 const COMPANY_STATUSES: CompanyStatus[] = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
@@ -29,21 +30,34 @@ export default async function CompaniesPage({
     apiGet<Website[]>('/admin/v1/websites'),
   ]);
   const totalPages = Math.max(1, Math.ceil(list.total / list.pageSize));
-  const hasFilters = !!(params.websiteCode || params.status || params.q);
+  const hasFilters = Boolean(params.websiteCode || params.status || params.q);
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Companies</h1>
-        <Link href="/companies/new" className={cn(buttonVariants())}>
+      <PageBreadcrumb items={[{ label: 'B2B', href: '/companies' }, { label: 'Companies' }]} />
+
+      <div className="mt-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Companies</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {list.total} compan{list.total === 1 ? 'y' : 'ies'}
+          </p>
+        </div>
+        <Link href="/companies/new" className={cn(buttonVariants({ size: 'sm' }))}>
           New Company
         </Link>
       </div>
 
-      <form className="mt-6 flex flex-wrap items-center gap-2" action="/companies">
-        <Input name="q" placeholder="Search by code or name…" defaultValue={params.q} className="max-w-sm" />
+      {/* next/form: a plain <form action="/companies"> doesn't respect
+          this app's /admin basePath, the same pre-existing bug already
+          fixed on Orders/Products/Customers/Gift Cards/Referrals. */}
+      <Form id="companies-filters" className="mt-6 flex flex-wrap items-center gap-2" action="/companies">
+        <div className="relative max-w-[320px] flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" placeholder="Search by code or name…" defaultValue={params.q} className="pl-8" />
+        </div>
         <select name="websiteCode" defaultValue={params.websiteCode ?? ''} className={nativeSelectClass}>
-          <option value="">All Websites</option>
+          <option value="">All websites</option>
           {websites.map((w) => (
             <option key={w.code} value={w.code}>
               {w.name}
@@ -51,69 +65,30 @@ export default async function CompaniesPage({
           ))}
         </select>
         <select name="status" defaultValue={params.status ?? ''} className={nativeSelectClass}>
-          <option value="">All Statuses</option>
+          <option value="">All statuses</option>
           {COMPANY_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </select>
-        <Button type="submit" variant="outline">
-          Search
+        <Button type="submit" size="sm">
+          Apply
         </Button>
         {hasFilters ? (
-          <Link href="/companies" className={cn(buttonVariants({ variant: 'ghost' }))}>
+          <Link href="/companies" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Clear
           </Link>
         ) : null}
-      </form>
+      </Form>
 
-      <div className="mt-6 rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.companies.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  No companies found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              list.companies.map((c) => (
-                <TableRow key={c.publicId}>
-                  <TableCell className="font-medium">
-                    <Link href={`/companies/${c.publicId}`} className="hover:underline">
-                      {c.code}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{c.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusBadgeVariant(c.status)}>{c.status}</Badge>
-                  </TableCell>
-                  <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Link href={`/companies/${c.publicId}`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-                      View
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="mt-6">
+        <CompaniesTable companies={list.companies} />
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          {list.total} compan{list.total === 1 ? 'y' : 'ies'} · page {list.page} of {totalPages}
+          Showing {list.companies.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{(page - 1) * PAGE_SIZE + list.companies.length} of {list.total}
         </span>
         <div className="flex gap-2">
           {page <= 1 ? (
@@ -128,6 +103,9 @@ export default async function CompaniesPage({
               Previous
             </Link>
           )}
+          <span className="px-1">
+            {page} / {totalPages}
+          </span>
           {page >= totalPages ? (
             <Button variant="outline" size="sm" disabled>
               Next

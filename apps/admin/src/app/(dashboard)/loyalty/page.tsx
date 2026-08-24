@@ -1,6 +1,8 @@
 import { apiGet } from '@/lib/api-client';
 import type { Website, LoyaltyProgram, LoyaltyTier } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageBreadcrumb } from '@/components/page-breadcrumb';
+import { NavTabs } from '@/components/nav-tabs';
 import { LoyaltyProgramForm } from './loyalty-program-form';
 import { TiersTable } from './tiers-table';
 
@@ -19,15 +21,20 @@ export default async function LoyaltyPage() {
 
   return (
     <div>
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Loyalty Program</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Points are earned and clawed back fully automatically — earned when an order is paid, reversed
-          proportionally on refund. There is nothing to trigger manually here; this page only configures the
-          rates, tiers, and redemption rules each program applies.
-        </p>
+      <PageBreadcrumb items={[{ label: 'Commerce', href: '/loyalty' }, { label: 'Loyalty & Referrals' }]} />
+      <div className="mt-2">
+        <h1 className="text-[1.32rem] font-extrabold tracking-tight">Loyalty & Referrals</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Reward repeat purchases and word-of-mouth growth</p>
       </div>
 
+      <div className="mt-6">
+        <NavTabs items={[{ href: '/loyalty', label: 'Loyalty Program' }, { href: '/referrals', label: 'Referrals' }]} />
+      </div>
+
+      {/* Points are earned and clawed back fully automatically — earned
+          when an order is paid, reversed proportionally on refund. There
+          is nothing to trigger manually here; this page only configures
+          the rates, tiers, and redemption rules each program applies. */}
       <div className="mt-6 space-y-6">
         {websites.map((w) => {
           const program = byWebsiteCode.get(w.code) ?? null;

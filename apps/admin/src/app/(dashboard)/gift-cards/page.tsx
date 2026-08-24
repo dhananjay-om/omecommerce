@@ -1,15 +1,18 @@
 import Link from 'next/link';
+import Form from 'next/form';
+import { Plus, Search } from 'lucide-react';
 import { apiGet, buildQuery } from '@/lib/api-client';
 import type { GiftCardList, GiftCardStatus } from '@/lib/types';
-import { formatPrice } from '@/lib/format-price';
-import { Badge } from '@/components/ui/badge';
-import { statusBadgeVariant } from '@/lib/status-badge';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { PageBreadcrumb } from '@/components/page-breadcrumb';
+import { GiftCardsTable } from './gift-cards-table';
 
 const PAGE_SIZE = 20;
+const STATUSES: GiftCardStatus[] = ['ACTIVE', 'REDEEMED', 'EXPIRED', 'DISABLED', 'PENDING'];
+const nativeSelectClass =
+  'h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 
 export default async function GiftCardsPage({
   searchParams,
@@ -23,80 +26,59 @@ export default async function GiftCardsPage({
     `/admin/v1/gift-cards${buildQuery({ page, pageSize: PAGE_SIZE, last4: params.last4, recipientEmail: params.recipientEmail, status: params.status })}`,
   );
   const totalPages = Math.max(1, Math.ceil(list.total / list.pageSize));
-  const hasFilters = !!(params.last4 || params.recipientEmail || params.status);
+  const hasFilters = Boolean(params.last4 || params.recipientEmail || params.status);
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Gift Cards</h1>
-        <Link href="/gift-cards/new" className={cn(buttonVariants())}>
+      <PageBreadcrumb items={[{ label: 'Commerce', href: '/gift-cards' }, { label: 'Gift Cards' }]} />
+
+      <div className="mt-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Gift Cards</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {list.total} gift card{list.total === 1 ? '' : 's'} issued
+          </p>
+        </div>
+        <Link href="/gift-cards/new" className={cn(buttonVariants({ size: 'sm' }))}>
+          <Plus className="size-3.5" />
           Issue Gift Card
         </Link>
       </div>
 
-      <form className="mt-6 flex flex-wrap gap-2" action="/gift-cards">
-        <Input name="last4" placeholder="Last 4 digits…" defaultValue={params.last4} className="max-w-40" />
-        <Input name="recipientEmail" placeholder="Recipient email…" defaultValue={params.recipientEmail} className="max-w-sm" />
-        <Button type="submit" variant="outline">
-          Search
+      {/* next/form: a plain <form action="/gift-cards"> doesn't respect
+          this app's /admin basePath, the same pre-existing bug already
+          fixed on Orders/Products/Customers. */}
+      <Form id="gift-cards-filters" className="mt-6 flex flex-wrap items-center gap-2" action="/gift-cards">
+        <div className="relative max-w-40 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input name="last4" placeholder="Last 4 digits…" defaultValue={params.last4} className="pl-8" />
+        </div>
+        <Input name="recipientEmail" placeholder="Recipient email…" defaultValue={params.recipientEmail} className="max-w-sm flex-1" />
+        <select name="status" defaultValue={params.status ?? ''} className={nativeSelectClass}>
+          <option value="">All statuses</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <Button type="submit" size="sm">
+          Apply
         </Button>
         {hasFilters ? (
-          <Link href="/gift-cards" className={cn(buttonVariants({ variant: 'ghost' }))}>
+          <Link href="/gift-cards" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Clear
           </Link>
         ) : null}
-      </form>
+      </Form>
 
-      <div className="mt-6 rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Last 4</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Kind</TableHead>
-              <TableHead>Initial</TableHead>
-              <TableHead>Balance</TableHead>
-              <TableHead>Recipient</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.giftCards.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">
-                  No gift cards found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              list.giftCards.map((c) => (
-                <TableRow key={c.publicId}>
-                  <TableCell className="font-mono">•••• {c.codeLast4}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusBadgeVariant(c.status)}>{c.status}</Badge>
-                  </TableCell>
-                  <TableCell>{c.kind}</TableCell>
-                  <TableCell>{formatPrice(c.initialAmount, c.currency)}</TableCell>
-                  <TableCell>{formatPrice(c.balance, c.currency)}</TableCell>
-                  <TableCell>{c.recipientEmail ?? '—'}</TableCell>
-                  <TableCell>{c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : '—'}</TableCell>
-                  <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Link href={`/gift-cards/${c.publicId}`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-                      View
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="mt-6">
+        <GiftCardsTable giftCards={list.giftCards} />
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          {list.total} gift card{list.total === 1 ? '' : 's'} · page {list.page} of {totalPages}
+          Showing {list.giftCards.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{(page - 1) * PAGE_SIZE + list.giftCards.length} of {list.total}
         </span>
         <div className="flex gap-2">
           {page <= 1 ? (
@@ -111,6 +93,9 @@ export default async function GiftCardsPage({
               Previous
             </Link>
           )}
+          <span className="px-1">
+            {page} / {totalPages}
+          </span>
           {page >= totalPages ? (
             <Button variant="outline" size="sm" disabled>
               Next
