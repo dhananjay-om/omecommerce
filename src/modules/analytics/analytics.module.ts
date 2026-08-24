@@ -18,6 +18,9 @@ import {
   GetLowStockNow,
   GetRfmSegments,
   GetReconciliationLog,
+  GetCustomerActivityTrend,
+  GetTopCustomers,
+  GetInventoryTrend,
 } from './application/query-analytics.usecases.js';
 import { CreateAlertRule, UpdateAlertRule, ListAlertRules, GetAlertRuleByPublicId, DeleteAlertRule, ListAlertHistory } from './application/alert-rule.usecases.js';
 import {
@@ -70,6 +73,9 @@ export function createAnalyticsModule(db: Db, authorize: (permission: string) =>
   const getLowStockNow = new GetLowStockNow(analyticsQuery);
   const getRfmSegments = new GetRfmSegments(analyticsQuery);
   const getReconciliationLog = new GetReconciliationLog(analyticsQuery);
+  const getCustomerActivityTrend = new GetCustomerActivityTrend(analyticsQuery);
+  const getTopCustomers = new GetTopCustomers(analyticsQuery);
+  const getInventoryTrend = new GetInventoryTrend(analyticsQuery);
 
   const createAlertRule = new CreateAlertRule(alertRules);
   const updateAlertRule = new UpdateAlertRule(alertRules);
@@ -153,6 +159,28 @@ export function createAnalyticsModule(db: Db, authorize: (permission: string) =>
     view,
     asyncHandler(async (req, res) => {
       res.json({ data: await getReconciliationLog.execute(parse(analyticsDateRangeQuerySchema, req.query)) });
+    }),
+  );
+  admin.get(
+    '/analytics/customers/activity',
+    view,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCustomerActivityTrend.execute(parse(analyticsDateRangeQuerySchema, req.query)) });
+    }),
+  );
+  admin.get(
+    '/analytics/customers/top',
+    view,
+    asyncHandler(async (req, res) => {
+      const query = parse(analyticsTopNQuerySchema, req.query);
+      res.json({ data: await getTopCustomers.execute(query, query.limit ?? 10) });
+    }),
+  );
+  admin.get(
+    '/analytics/inventory/trend',
+    view,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getInventoryTrend.execute(parse(analyticsDateRangeQuerySchema, req.query)) });
     }),
   );
 

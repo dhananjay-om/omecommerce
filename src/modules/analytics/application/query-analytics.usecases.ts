@@ -84,3 +84,24 @@ export class GetReconciliationLog {
     return this.analytics.getReconciliationLog(toRange(q));
   }
 }
+
+export class GetCustomerActivityTrend {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery) {
+    return this.analytics.getCustomerActivityTrend(toRange(q));
+  }
+}
+
+export class GetTopCustomers {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery, limit: number) {
+    return this.analytics.getTopCustomers(toRange(q), limit);
+  }
+}
+
+export class GetInventoryTrend {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery) {
+    return this.analytics.getInventoryTrend(toRange(q));
+  }
+}

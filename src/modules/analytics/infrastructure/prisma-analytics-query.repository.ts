@@ -13,6 +13,9 @@ import type {
   InventorySnapshotRow,
   RfmSegmentCount,
   ReconciliationRow,
+  CustomerActivityRow,
+  TopCustomerRow,
+  InventoryTrendRow,
 } from '../domain/queries.js';
 
 /**
@@ -246,6 +249,74 @@ export class PrismaAnalyticsQueryRepository implements AnalyticsQueryRepository 
         ${websiteFilter}
     `);
     return Number(rows[0]?.n ?? 0n);
+  }
+
+  async getCustomerActivityTrend(range: DateRange): Promise<CustomerActivityRow[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{ date_key: number; new_customers: bigint; returning_customers: bigint; total_orders: bigint; total_revenue: string }>
+    >(Prisma.sql`
+      SELECT date_key,
+        COUNT(*) FILTER (WHERE is_first_order_day) AS new_customers,
+        COUNT(*) FILTER (WHERE NOT is_first_order_day) AS returning_customers,
+        COALESCE(SUM(orders_placed), 0) AS total_orders,
+        COALESCE(SUM(revenue), 0) AS total_revenue
+      FROM fact_customer_daily
+      WHERE date_key >= ${range.fromDateKey} AND date_key <= ${range.toDateKey}
+      GROUP BY date_key
+      ORDER BY date_key ASC
+    `);
+    return rows.map((r) => ({
+      dateKey: r.date_key,
+      newCustomers: Number(r.new_customers),
+      returningCustomers: Number(r.returning_customers),
+      totalOrders: Number(r.total_orders),
+      totalRevenue: r.total_revenue,
+    }));
+  }
+
+  async getTopCustomers(range: DateRange, limit: number): Promise<TopCustomerRow[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{ customer_id: bigint; email: string | null; first_name: string | null; last_name: string | null; orders_placed: bigint; revenue: string }>
+    >(Prisma.sql`
+      SELECT fcd.customer_id, c.email, c.first_name, c.last_name,
+        SUM(fcd.orders_placed) AS orders_placed, SUM(fcd.revenue) AS revenue
+      FROM fact_customer_daily fcd
+      LEFT JOIN customer c ON c.id = fcd.customer_id
+      WHERE fcd.date_key >= ${range.fromDateKey} AND fcd.date_key <= ${range.toDateKey}
+      GROUP BY fcd.customer_id, c.email, c.first_name, c.last_name
+      ORDER BY revenue DESC
+      LIMIT ${limit}
+    `);
+    return rows.map((r) => ({
+      customerId: r.customer_id,
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(' ') || null,
+      ordersPlaced: Number(r.orders_placed),
+      revenue: r.revenue,
+    }));
+  }
+
+  async getInventoryTrend(range: DateRange): Promise<InventoryTrendRow[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{ date_key: number; total_on_hand: bigint; total_reserved: bigint; total_available: bigint; low_stock_count: bigint }>
+    >(Prisma.sql`
+      SELECT date_key,
+        COALESCE(SUM(on_hand), 0) AS total_on_hand,
+        COALESCE(SUM(reserved), 0) AS total_reserved,
+        COALESCE(SUM(available), 0) AS total_available,
+        COUNT(*) FILTER (WHERE reorder_point IS NOT NULL AND available <= reorder_point) AS low_stock_count
+      FROM summary_inventory_daily
+      WHERE date_key >= ${range.fromDateKey} AND date_key <= ${range.toDateKey}
+      GROUP BY date_key
+      ORDER BY date_key ASC
+    `);
+    return rows.map((r) => ({
+      dateKey: r.date_key,
+      totalOnHand: Number(r.total_on_hand),
+      totalReserved: Number(r.total_reserved),
+      totalAvailable: Number(r.total_available),
+      lowStockCount: Number(r.low_stock_count),
+    }));
   }
 
   async getReconciliationLog(range: DateRange): Promise<ReconciliationRow[]> {
