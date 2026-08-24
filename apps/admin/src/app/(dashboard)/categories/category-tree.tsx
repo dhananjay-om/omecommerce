@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { ChevronDown, MoreHorizontal } from 'lucide-react';
 import type { Category } from '@/lib/types';
 import { deleteCategory } from './actions';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { DotBadge } from '@/components/dot-badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface TreeNode {
   category: Category;
@@ -29,39 +30,85 @@ function buildTree(categories: Category[]): TreeNode[] {
   return build('');
 }
 
-function TreeRow({ node, depth, onDelete, deleting }: { node: TreeNode; depth: number; onDelete: (publicId: string) => void; deleting: string | null }) {
+/** Deterministic hash → one of the 8 categorical chart colors (same
+ *  --chart-1..8 tokens used everywhere else in this revamp), so every
+ *  category gets a distinct, stable swatch color instead of one flat
+ *  color for all of them — matches the mock's own `hashColor()`, which
+ *  picks from this exact 8-slot categorical palette. Purely decorative
+ *  (not a real per-category "color" field), so it needs no backend data. */
+function hashChartColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return `var(--chart-${(h % 8) + 1})`;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
+function TreeRow({
+  node,
+  onDelete,
+  deleting,
+}: {
+  node: TreeNode;
+  onDelete: (publicId: string) => void;
+  deleting: string | null;
+}) {
+  const router = useRouter();
+  const name = node.category.nameDefault ?? '(untitled)';
+  const href = `/categories/${node.category.publicId}/edit`;
+
   return (
-    <>
-      <div className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-muted/50" style={{ paddingLeft: `${depth * 24 + 12}px` }}>
-        <div className="flex items-center gap-2">
-          {node.category.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
-            <img src={node.category.imageUrl} alt="" className="h-6 w-6 rounded object-cover" />
-          ) : null}
-          <span className="text-sm">{node.category.nameDefault ?? '(untitled)'}</span>
-          {!node.category.includeInMenu ? (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Hidden from menu</span>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1">
-          <Link href={`/categories/${node.category.publicId}/edit`} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
-            Edit
-          </Link>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={deleting === node.category.publicId}
-            onClick={() => onDelete(node.category.publicId)}
+    <li className="py-0.5">
+      <div
+        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+        onClick={() => router.push(href)}
+      >
+        {node.children.length > 0 ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <span className="inline-block size-3.5 shrink-0" />}
+        {node.category.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
+          <img src={node.category.imageUrl} alt="" className="size-6 shrink-0 rounded-md object-cover" />
+        ) : (
+          <div
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-[9px] font-bold text-white"
+            style={{ background: hashChartColor(node.category.publicId) }}
           >
-            Delete
-          </Button>
-        </div>
+            {initials(name)}
+          </div>
+        )}
+        <span className="flex-1 truncate font-medium text-foreground">{name}</span>
+        <DotBadge variant={node.category.includeInMenu ? 'success' : 'secondary'}>{node.category.includeInMenu ? 'Visible' : 'Hidden'}</DotBadge>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-7" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <MoreHorizontal className="size-4" />
+                <span className="sr-only">Actions for {name}</span>
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={() => router.push(href)}>Edit</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" disabled={deleting === node.category.publicId} onClick={() => onDelete(node.category.publicId)}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      {node.children.map((child) => (
-        <TreeRow key={child.category.publicId} node={child} depth={depth + 1} onDelete={onDelete} deleting={deleting} />
-      ))}
-    </>
+      {node.children.length > 0 ? (
+        <ul className="ml-4 border-l pl-1.5">
+          {node.children.map((child) => (
+            <TreeRow key={child.category.publicId} node={child} onDelete={onDelete} deleting={deleting} />
+          ))}
+        </ul>
+      ) : null}
+    </li>
   );
 }
 
@@ -87,16 +134,20 @@ export function CategoryTree({ categories }: { categories: Category[] }) {
   }
 
   if (categories.length === 0) {
-    return <p className="text-muted-foreground">No categories yet.</p>;
+    return (
+      <div className="rounded-xl bg-card py-10 text-center text-sm text-muted-foreground ring-1 ring-foreground/10">No categories yet.</div>
+    );
   }
 
   return (
     <div>
       {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
-      <div className="rounded-md border py-1">
-        {tree.map((node) => (
-          <TreeRow key={node.category.publicId} node={node} depth={0} onDelete={handleDelete} deleting={isPending ? deletingId : null} />
-        ))}
+      <div className="rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+        <ul className="list-none">
+          {tree.map((node) => (
+            <TreeRow key={node.category.publicId} node={node} onDelete={handleDelete} deleting={isPending ? deletingId : null} />
+          ))}
+        </ul>
       </div>
     </div>
   );

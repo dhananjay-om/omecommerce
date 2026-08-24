@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { createCategory, type ActionState } from './actions';
 import type { Category } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,14 @@ export function NewCategoryDialog({ categories }: { categories: Category[] }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button>New Category</Button>} />
+      <DialogTrigger
+        render={
+          <Button size="sm">
+            <Plus className="size-3.5" />
+            Add Category
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New Category</DialogTitle>

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { apiGet } from '@/lib/api-client';
 import type { Category } from '@/lib/types';
-import { BackLink } from '@/components/back-link';
+import { PageBreadcrumb } from '@/components/page-breadcrumb';
 import { CategoryEditForm } from '../../category-edit-form';
 
 export default async function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,11 +12,12 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
   const categories = await apiGet<Category[]>('/admin/v1/categories');
   const category = categories.find((c) => c.publicId === id);
   if (!category) notFound();
+  const name = category.nameDefault ?? '(untitled)';
 
   return (
     <div>
-      <BackLink href="/categories" label="Back to Categories" />
-      <h1 className="mt-2 text-3xl font-bold tracking-tight">Edit Category — {category.nameDefault ?? '(untitled)'}</h1>
+      <PageBreadcrumb items={[{ label: 'Commerce', href: '/categories' }, { label: 'Categories', href: '/categories' }, { label: name }]} />
+      <h1 className="mt-2 text-[1.32rem] font-extrabold tracking-tight">{name}</h1>
       <div className="mt-6">
         <CategoryEditForm category={category} categories={categories} />
       </div>
