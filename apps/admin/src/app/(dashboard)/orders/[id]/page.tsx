@@ -122,12 +122,20 @@ export default async function OrderInformationPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
+                  {/* pl-6/pr-6 on the first/last column restore the card's own
+                      24px edge padding, which the wrapper's `-mx-6` bleed
+                      (needed so the table can scroll horizontally edge-to-edge
+                      on narrow screens) otherwise cancels down to the table
+                      cell's own 8px — without this, "Product" reads as jammed
+                      against the card's left edge and "Total" against its
+                      right edge, and neither lines up with the totals footer
+                      below, which keeps its own px-6. */}
+                  <TableHead className="pl-6">Product</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Discount</TableHead>
                   <TableHead className="text-right">Tax</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="pr-6 text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -145,7 +153,7 @@ export default async function OrderInformationPage({
                   ].filter(Boolean);
                   return (
                     <TableRow key={line.sku}>
-                      <TableCell>
+                      <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[10px] font-bold text-primary">
                             {initials(line.name)}
@@ -171,7 +179,7 @@ export default async function OrderInformationPage({
                       </TableCell>
                       <TableCell className="text-right">{line.discountAmount !== '0.0000' ? `-${formatPrice(line.discountAmount, order.currency)}` : '—'}</TableCell>
                       <TableCell className="text-right">{formatPrice(line.taxAmount, order.currency)}</TableCell>
-                      <TableCell className="text-right font-semibold">{formatPrice(line.rowTotal, order.currency)}</TableCell>
+                      <TableCell className="pr-6 text-right font-semibold">{formatPrice(line.rowTotal, order.currency)}</TableCell>
                     </TableRow>
                   );
                 })}
