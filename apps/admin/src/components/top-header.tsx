@@ -2,9 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
-import { logout } from '@/app/actions/auth';
+import { sectionLabelForPath } from '@/lib/nav-data';
 import { Button } from '@/components/ui/button';
-import { sectionLabelForPath } from '@/components/dashboard-nav';
+import { CommandPalette } from '@/components/topbar/command-palette';
+import { AskAiButton } from '@/components/topbar/ask-ai-button';
+import { NotificationsPopover } from '@/components/topbar/notifications-popover';
+import { ThemeToggle } from '@/components/topbar/theme-toggle';
+import { AvatarMenu } from '@/components/topbar/avatar-menu';
 
 /** siteUrl is passed down from layout.tsx (a Server Component — see its own
  *  comment) rather than read here directly: it comes from a plain, non-
@@ -15,25 +19,25 @@ export function TopHeader({ siteUrl }: { siteUrl: string }) {
   const label = sectionLabelForPath(pathname);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-background px-8">
-      <span className="text-sm text-muted-foreground">
-        Admin <span className="text-foreground">/ {label}</span>
-      </span>
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" render={<a href={siteUrl} target="_blank" rel="noreferrer" />}>
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-background px-6">
+      <CommandPalette />
+
+      <div className="ml-auto flex items-center gap-1.5">
+        <AskAiButton />
+        <NotificationsPopover />
+        <ThemeToggle />
+        <Button variant="ghost" size="sm" render={<a href={siteUrl} target="_blank" rel="noreferrer" />}>
           View Store
           <ExternalLink className="size-3.5" />
         </Button>
-        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-          A
-        </div>
-        <span className="hidden text-sm text-muted-foreground sm:inline">Admin</span>
-        <form action={logout}>
-          <Button type="submit" variant="outline" size="sm">
-            Sign out
-          </Button>
-        </form>
+        <AvatarMenu />
       </div>
+
+      {/* Breadcrumb text is kept for screen readers / the browser tab title
+          context, visually secondary now that search anchors the topbar
+          (same "Admin / {section}" source as before — sectionLabelForPath
+          now reads off nav-data.ts instead of dashboard-nav.tsx). */}
+      <span className="sr-only">Admin / {label}</span>
     </header>
   );
 }

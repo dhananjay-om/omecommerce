@@ -16,6 +16,9 @@ const ITEMS: NavItem[] = [
   { href: '/reports/products', label: 'Products' },
   { href: '/reports/customers', label: 'Customers' },
   { href: '/reports/inventory', label: 'Inventory' },
+  { href: '/reports/marketing', label: 'Marketing' },
+  { href: '/reports/financial', label: 'Financial' },
+  { href: '/reports/builder', label: 'Report Builder' },
   { href: '/reports/alerts', label: 'Alert Rules' },
 ];
 

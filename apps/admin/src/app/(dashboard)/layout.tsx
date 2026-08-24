@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { ShoppingBag } from 'lucide-react';
 import { getSession } from '@/lib/session';
-import { DashboardNav } from '@/components/dashboard-nav';
+import { AppSidebar } from '@/components/app-sidebar';
 import { TopHeader } from '@/components/top-header';
 import { Toaster } from '@/components/ui/sonner';
 import { SITE_URL } from '@/lib/config';
@@ -25,21 +23,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
-      <aside className="relative z-30 flex w-20 flex-col items-center bg-sidebar text-sidebar-foreground">
-        <Link href="/dashboard" className="flex h-16 w-full items-center justify-center" title="OMEcommerce">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <ShoppingBag className="size-4.5 text-primary-foreground" strokeWidth={2.25} />
-          </div>
-        </Link>
-        <div className="flex-1 overflow-y-auto py-2">
-          <DashboardNav />
-        </div>
-      </aside>
+    <div className="flex h-screen bg-bg-page">
+      <AppSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopHeader siteUrl={SITE_URL} />
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1600px] p-8">{children}</div>
+          <div className="mx-auto max-w-[1560px] p-8">{children}</div>
         </main>
       </div>
       <Toaster />
