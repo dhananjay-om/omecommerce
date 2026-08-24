@@ -84,7 +84,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          {/* Same `.page-title` size (1.32rem/800) as the order detail page —
+              the mock uses one consistent title size across list AND detail
+              pages, not a bigger heading for lists. */}
+          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Orders</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {list.total} order{list.total === 1 ? '' : 's'}
           </p>

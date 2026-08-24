@@ -39,7 +39,11 @@ export default async function OrderDetailLayout({ children, params }: { children
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">Order #{order.orderNumber}</h1>
+            {/* The mock's `.page-title` is 1.32rem/800 everywhere (list AND
+                detail pages) — much smaller than a typical `text-3xl` (30px)
+                h1; matched exactly here instead of guessing at a Tailwind
+                step size. */}
+            <h1 className="text-[1.32rem] font-extrabold tracking-tight">Order #{order.orderNumber}</h1>
             <Badge variant={statusBadgeVariant(order.status)}>{order.status}</Badge>
           </div>
           {/* Financial/fulfillment status folded into plain text here instead
