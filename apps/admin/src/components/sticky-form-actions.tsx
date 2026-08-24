@@ -17,9 +17,12 @@ import { Button } from '@/components/ui/button';
  * the visible viewport edge — it "sticks" only within `<main>`'s own
  * (effectively unbounded) box, which in practice means it never visibly
  * sticks at all. `fixed` sidesteps that mismatch entirely by positioning
- * against the viewport directly. `left-20` matches the dashboard rail's
- * own fixed width (apps/admin/.../(dashboard)/layout.tsx's `<aside
- * className="w-20">`) so the bar never covers it.
+ * against the viewport directly. `left-62` matches the sidebar's own
+ * fixed width (components/app-sidebar.tsx's `<aside className="w-62">`)
+ * so the bar starts after it instead of rendering underneath it — this
+ * was still `left-20`, sized for the icon-rail sidebar the admin UI
+ * revamp replaced, until a screenshot caught the bar rendering mostly
+ * hidden behind the new 248px sidebar.
  *
  * Renders its own spacer of matching height as the last element, so a
  * form's real final section (e.g. "Images") never ends up hidden behind
@@ -49,7 +52,7 @@ export function StickyFormActions({
 }) {
   return (
     <>
-      <div className="fixed inset-x-0 bottom-0 left-20 z-30 border-t bg-background/95 py-4 backdrop-blur supports-backdrop-filter:bg-background/80">
+      <div className="fixed inset-x-0 bottom-0 left-62 z-30 border-t bg-background/95 py-4 shadow-[0_-4px_16px_rgba(16,19,26,0.06)] backdrop-blur supports-backdrop-filter:bg-background/80">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-8">
           <Button type="submit" form={formId} disabled={pending}>
             {pending ? pendingLabel : label}
