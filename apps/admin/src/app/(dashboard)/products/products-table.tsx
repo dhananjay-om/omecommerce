@@ -181,8 +181,8 @@ export function ProductsTable({
                           }
                         />
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/products/${p.publicId}`)}>View</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/products/${p.publicId}/edit`)}>Edit</DropdownMenuItem>
+                          {/* One destination now — the Overview tab already has directly-editable fields, so "View" and "Edit" aren't 2 different pages anymore. */}
+                          <DropdownMenuItem onClick={() => router.push(`/products/${p.publicId}`)}>Open</DropdownMenuItem>
                           <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(p)}>
                             Delete
                           </DropdownMenuItem>

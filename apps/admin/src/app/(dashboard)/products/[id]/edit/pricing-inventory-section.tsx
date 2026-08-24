@@ -190,119 +190,112 @@ function AdjustStockRowDialog({
 }
 
 /**
- * Price and stock are variant-scoped in this system (per price-list, per warehouse), not
- * plain product fields — this section surfaces and edits the existing Pricing/Inventory
- * systems for the product's single implicit variant, rather than faking denormalized
- * product-level columns.
+ * Price is variant-scoped in this system (per price-list), not a plain
+ * product field — this surfaces and edits the existing Pricing system for
+ * the product's single implicit variant, rather than faking a denormalized
+ * product-level column. Split from the combined Pricing+Inventory section
+ * into its own component so the Pricing/Inventory admin-UI-revamp tabs can
+ * render each independently, matching the mock's separate Pricing/
+ * Inventory tabs — same dialogs, same data, just two places to look at it.
  */
-export function PricingInventorySection({
+export function PricingSection({
   productPublicId,
   variantId,
   prices,
-  stock,
 }: {
   productPublicId: string;
   variantId: string;
   prices: VariantPrice[];
+}) {
+  if (prices.length === 0) {
+    return <p className="text-sm text-muted-foreground">No price lists exist yet. Create one on the Pricing page first.</p>;
+  }
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Price List</TableHead>
+          <TableHead>Currency</TableHead>
+          <TableHead>Price</TableHead>
+          <TableHead className="text-right">Action</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {prices.map((row) => (
+          <TableRow key={row.priceListCode}>
+            <TableCell>{row.priceListName}</TableCell>
+            <TableCell>{row.currency}</TableCell>
+            <TableCell>
+              {row.price ? (
+                <span className="flex items-center gap-2">
+                  {formatPrice(row.price, row.currency)}
+                  {row.mrp && Number(row.mrp) > Number(row.price) ? (
+                    <span className="text-xs text-muted-foreground line-through">{formatPrice(row.mrp, row.currency)}</span>
+                  ) : null}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Not set</span>
+              )}
+            </TableCell>
+            <TableCell className="text-right">
+              <SetPriceRowDialog productPublicId={productPublicId} variantId={variantId} row={row} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+/** Stock is variant-scoped (per warehouse) — same split-out rationale as
+ *  `PricingSection` above. */
+export function InventorySection({
+  productPublicId,
+  variantId,
+  stock,
+}: {
+  productPublicId: string;
+  variantId: string;
   stock: VariantStock[];
 }) {
   const totalAvailable = stock.reduce((sum, row) => sum + row.available, 0);
 
+  if (stock.length === 0) {
+    return <p className="text-sm text-muted-foreground">No warehouses exist yet. Create one on the Inventory page first.</p>;
+  }
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h4 className="text-sm font-medium text-muted-foreground">Pricing</h4>
-        </div>
-        {prices.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No price lists exist yet. Create one on the Pricing page first.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Price List</TableHead>
-                <TableHead>Currency</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {prices.map((row) => (
-                <TableRow key={row.priceListCode}>
-                  <TableCell>{row.priceListName}</TableCell>
-                  <TableCell>{row.currency}</TableCell>
-                  <TableCell>
-                    {row.price ? (
-                      <span className="flex items-center gap-2">
-                        {formatPrice(row.price, row.currency)}
-                        {row.mrp && Number(row.mrp) > Number(row.price) ? (
-                          <span className="text-xs text-muted-foreground line-through">
-                            {formatPrice(row.mrp, row.currency)}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Not set</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <SetPriceRowDialog productPublicId={productPublicId} variantId={variantId} row={row} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+    <div>
+      <div className="mb-2 flex items-center justify-end">
+        <Badge variant={totalAvailable > 0 ? 'success' : 'destructive'}>{totalAvailable > 0 ? 'In Stock' : 'Out of Stock'}</Badge>
       </div>
-
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h4 className="text-sm font-medium text-muted-foreground">Inventory</h4>
-          {stock.length > 0 ? (
-            <Badge variant={totalAvailable > 0 ? 'success' : 'destructive'}>
-              {totalAvailable > 0 ? 'In Stock' : 'Out of Stock'}
-            </Badge>
-          ) : null}
-        </div>
-        {stock.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No warehouses exist yet. Create one on the Inventory page first.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Warehouse</TableHead>
-                <TableHead>On Hand</TableHead>
-                <TableHead>Reserved</TableHead>
-                <TableHead>Available</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stock.map((row) => (
-                <TableRow key={row.warehouseCode}>
-                  <TableCell>{row.warehouseName}</TableCell>
-                  <TableCell>{row.onHand}</TableCell>
-                  <TableCell>{row.reserved}</TableCell>
-                  <TableCell>{row.available}</TableCell>
-                  <TableCell>
-                    <Badge variant={row.available > 0 ? 'success' : 'secondary'}>
-                      {row.available > 0 ? 'In Stock' : 'Out of Stock'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <AdjustStockRowDialog productPublicId={productPublicId} variantId={variantId} row={row} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Warehouse</TableHead>
+            <TableHead>On Hand</TableHead>
+            <TableHead>Reserved</TableHead>
+            <TableHead>Available</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {stock.map((row) => (
+            <TableRow key={row.warehouseCode}>
+              <TableCell>{row.warehouseName}</TableCell>
+              <TableCell>{row.onHand}</TableCell>
+              <TableCell>{row.reserved}</TableCell>
+              <TableCell>{row.available}</TableCell>
+              <TableCell>
+                <Badge variant={row.available > 0 ? 'success' : 'secondary'}>{row.available > 0 ? 'In Stock' : 'Out of Stock'}</Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <AdjustStockRowDialog productPublicId={productPublicId} variantId={variantId} row={row} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

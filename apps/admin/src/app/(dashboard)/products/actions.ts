@@ -132,6 +132,35 @@ export async function updateProduct(
   redirect(`/products/${productPublicId}`);
 }
 
+/**
+ * Attributes-only save for the SEO tab (admin UI revamp) — deliberately
+ * does NOT touch `updateProduct`'s core-field PATCH or `saveCategoryIds`.
+ * `saveCategoryIds` treats an empty submission as "clear all categories"
+ * (see its own comment above), so a SEO-only form calling `updateProduct`
+ * directly would silently wipe the product's categories on every SEO
+ * save. `saveAttributeValues` has no such landmine — it only ever writes
+ * the attribute codes actually present in the submitted FormData, so this
+ * is safe to call from a form that carries nothing but the SEO group's
+ * `attr__*` fields.
+ */
+export async function updateProductAttributes(
+  productPublicId: string,
+  _prevState: UpdateProductFormState,
+  formData: FormData,
+): Promise<UpdateProductFormState> {
+  try {
+    await saveAttributeValues(productPublicId, formData);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { error: err.message };
+    }
+    throw err;
+  }
+
+  revalidatePath(`/products/${productPublicId}/seo`);
+  redirect(`/products/${productPublicId}/seo`);
+}
+
 export interface BulkUpdateStatusResult {
   error: string | null;
 }

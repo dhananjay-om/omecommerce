@@ -1,184 +1,26 @@
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { ExternalLink } from 'lucide-react';
-import { apiGet, ApiError } from '@/lib/api-client';
-import type { ProductDetail } from '@/lib/types';
-import { SITE_URL } from '@/lib/config';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { statusBadgeVariant } from '@/lib/status-badge';
-import { cn } from '@/lib/utils';
-import { ProductDetailHeader } from '../product-detail-header';
+import { apiGet } from '@/lib/api-client';
+import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass } from '@/lib/types';
+import { ProductOverviewForm } from './product-overview-form';
 
-export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+/** Overview tab — matches the mock's product-detail Overview exactly in
+ *  shape (Product Information + AI Assistant panel), with the rest of
+ *  this system's real editable fields (Status/Visibility/Tax/Attributes/
+ *  Categories) carried below, same as the pre-tab-revamp edit page had. */
+export default async function ProductOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // Same "404 cleanly, re-throw anything else" pattern every other detail
-  // page in this app already uses (customers/[id], coupons/[code]/edit,
-  // content/*/[id]/edit, categories/[id]/edit) — this page was the one
-  // outlier still doing a bare unguarded apiGet(), which meant a
-  // deleted/bad-id product crashed the whole page instead of showing a
-  // clean 404. Anything other than a 404 still re-throws — now caught by
-  // (dashboard)/error.tsx instead of crashing the connection outright.
-  let product: ProductDetail;
-  try {
-    product = await apiGet<ProductDetail>(`/admin/v1/products/${id}`);
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) notFound();
-    throw err;
-  }
-  const attributeEntries = Object.entries(product.attributes);
+  // Deduped by Next.js against the identical fetch the parent layout also
+  // makes (same URL+options, same request pass) — costs no extra round trip.
+  const product = await apiGet<ProductDetail>(`/admin/v1/products/${id}`);
 
-  return (
-    <div className="space-y-6">
-      <ProductDetailHeader
-        product={product}
-        actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              render={<a href={`${SITE_URL}/${product.slug}.html`} target="_blank" rel="noreferrer" />}
-            >
-              View Product
-              <ExternalLink className="size-3.5" />
-            </Button>
-            <Link href={`/products/${product.publicId}/edit`} className={cn(buttonVariants({ size: 'sm' }))}>
-              Edit
-            </Link>
-          </>
-        }
-      />
+  const [attributeSets, categories, taxClasses] = await Promise.all([
+    apiGet<AttributeSet[]>('/admin/v1/attribute-sets'),
+    apiGet<Category[]>('/admin/v1/categories'),
+    apiGet<TaxClass[]>('/admin/v1/tax-classes'),
+  ]);
+  const details = await Promise.all(attributeSets.map((s) => apiGet<AttributeSetDetail>(`/admin/v1/attribute-sets/${s.id}`)));
+  const attributeSetDetails: Record<string, AttributeSetDetail> = {};
+  for (const d of details) attributeSetDetails[d.id] = d;
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
-          <div>
-            <div className="text-muted-foreground">SKU</div>
-            <div className="font-medium">{product.sku}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Type</div>
-            <div className="font-medium">{product.type}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Visibility</div>
-            <div className="font-medium">{product.visibility}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Attribute Set ID</div>
-            <div className="font-medium">{product.attributeSetId}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Weight</div>
-            <div className="font-medium">{product.weight ? `${product.weight} kg` : '—'}</div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Images</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {product.media.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No images yet.{' '}
-              <Link href={`/products/${product.publicId}/edit`} className="underline hover:text-foreground">
-                Add some
-              </Link>
-              .
-            </p>
-          ) : (
-            <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
-              {product.media.map((m) => (
-                // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
-                <img key={m.productMediaId} src={m.url} alt={m.altText ?? ''} className="aspect-square w-full rounded-md border object-cover" />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Variants</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {product.variants.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No variants.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Axis Values</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Public ID</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {product.variants.map((v) => (
-                  <TableRow key={v.publicId}>
-                    <TableCell>{v.sku}</TableCell>
-                    <TableCell>
-                      {v.axisValues.length === 0 ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {v.axisValues.map((a) => (
-                            <Badge key={a.attributeCode} variant="outline">
-                              {a.attributeLabel}: {a.optionLabel}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusBadgeVariant(v.status)}>{v.status}</Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{v.publicId}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Attributes (GLOBAL scope)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {attributeEntries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No GLOBAL-scope attribute values assigned.</p>
-          ) : (
-            <dl className="space-y-2 text-sm">
-              {attributeEntries.map(([code, value], i) => (
-                <div key={code}>
-                  {i > 0 ? <Separator className="mb-2" /> : null}
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">{code}</dt>
-                    <dd className="font-medium">{String(value)}</dd>
-                  </div>
-                </div>
-              ))}
-            </dl>
-          )}
-          <p className="mt-4 text-xs text-muted-foreground">
-            <Link href={`/products/${product.publicId}/edit`} className="underline hover:text-foreground">
-              Edit these values
-            </Link>{' '}
-            — per-website/store/store-view overrides aren&apos;t supported here yet, GLOBAL scope only.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <ProductOverviewForm product={product} attributeSets={attributeSets} attributeSetDetails={attributeSetDetails} categories={categories} taxClasses={taxClasses} />;
 }
