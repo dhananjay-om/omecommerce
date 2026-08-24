@@ -19,8 +19,21 @@ const EMAIL_TYPES = [
   { value: 'CUSTOM', label: 'Custom Message' },
 ];
 
-export function SendEmailDialog({ orderPublicId }: { orderPublicId: string }) {
-  const [open, setOpen] = useState(false);
+export function SendEmailDialog({
+  orderPublicId,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  orderPublicId: string;
+  /** When provided, this dialog is externally controlled (e.g. opened from
+   *  `OrderActionsMenu`'s "..." menu) and renders no trigger of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const [type, setType] = useState('CONFIRMATION');
   const action = sendOrderEmail.bind(null, orderPublicId);
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -33,7 +46,7 @@ export function SendEmailDialog({ orderPublicId }: { orderPublicId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline">Send Email</Button>} />
+      {!isControlled ? <DialogTrigger render={<Button variant="outline">Send Email</Button>} /> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>

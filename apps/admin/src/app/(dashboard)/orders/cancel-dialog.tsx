@@ -9,8 +9,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 
 const initialState: ActionState = { error: null, success: false };
 
-export function CancelDialog({ orderPublicId }: { orderPublicId: string }) {
-  const [open, setOpen] = useState(false);
+export function CancelDialog({
+  orderPublicId,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  orderPublicId: string;
+  /** When provided, this dialog is externally controlled (e.g. opened from
+   *  `OrderActionsMenu`'s "..." menu) and renders no trigger of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const action = cancelOrder.bind(null, orderPublicId);
   const [state, formAction, pending] = useActionState(action, initialState);
   const [handledState, setHandledState] = useState(state);
@@ -22,7 +35,7 @@ export function CancelDialog({ orderPublicId }: { orderPublicId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="destructive">Cancel Order</Button>} />
+      {!isControlled ? <DialogTrigger render={<Button variant="destructive">Cancel Order</Button>} /> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Cancel Order</DialogTitle>

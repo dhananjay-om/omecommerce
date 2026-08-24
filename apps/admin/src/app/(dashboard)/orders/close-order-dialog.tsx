@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 
 const initialState: ActionState = { error: null, success: false };
 
-/** plan/15 Phase 9 — mirrors CloseOrder's own guard (see close-order.usecase.ts's header comment for why "fully shipped" stands in for "fully delivered"). */
-function closeEligibility(order: OrderDetail): { eligible: boolean; reason: string | null } {
+/** plan/15 Phase 9 — mirrors CloseOrder's own guard (see close-order.usecase.ts's header comment for why "fully shipped" stands in for "fully delivered"). Exported so `OrderActionsMenu` can decide whether to show the "Close Order" item at all. */
+export function closeEligibility(order: OrderDetail): { eligible: boolean; reason: string | null } {
   if (order.status === 'CLOSED') return { eligible: false, reason: null };
   if (order.status === 'CANCELLED') return { eligible: false, reason: null };
   if (order.fulfillmentStatus !== 'FULFILLED') {
@@ -21,8 +21,23 @@ function closeEligibility(order: OrderDetail): { eligible: boolean; reason: stri
   return { eligible: true, reason: null };
 }
 
-export function CloseOrderDialog({ order }: { order: OrderDetail }) {
-  const [open, setOpen] = useState(false);
+export function CloseOrderDialog({
+  order,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  order: OrderDetail;
+  /** When provided, this dialog is externally controlled (e.g. opened from
+   *  `OrderActionsMenu`'s "..." menu) and renders no trigger of its own —
+   *  the ineligibility reason is no longer shown inline either, since the
+   *  menu only offers this item when `closeEligibility` says it's eligible. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const action = closeOrder.bind(null, order.publicId);
   const [state, formAction, pending] = useActionState(action, initialState);
   const [handledState, setHandledState] = useState(state);
@@ -35,12 +50,12 @@ export function CloseOrderDialog({ order }: { order: OrderDetail }) {
   const { eligible, reason } = closeEligibility(order);
   if (order.status === 'CLOSED' || order.status === 'CANCELLED') return null;
   if (!eligible) {
-    return <p className="self-center text-sm text-muted-foreground">{reason}</p>;
+    return isControlled ? null : <p className="self-center text-sm text-muted-foreground">{reason}</p>;
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline">Close Order</Button>} />
+      {!isControlled ? <DialogTrigger render={<Button variant="outline">Close Order</Button>} /> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Close Order</DialogTitle>

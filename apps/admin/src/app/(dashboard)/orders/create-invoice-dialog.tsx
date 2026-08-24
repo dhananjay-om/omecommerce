@@ -14,8 +14,32 @@ function alreadyInvoiced(invoices: OrderInvoice[], sku: string): number {
   return invoices.flatMap((inv) => inv.lines).filter((l) => l.sku === sku).reduce((sum, l) => sum + l.qty, 0);
 }
 
-export function CreateInvoiceDialog({ orderPublicId, lines, invoices }: { orderPublicId: string; lines: OrderLine[]; invoices: OrderInvoice[] }) {
-  const [open, setOpen] = useState(false);
+/** Whether any line still has a remaining, un-invoiced quantity — exported
+ *  so `OrderActionsMenu` can decide whether to show the "Create Invoice"
+ *  item at all, using the exact same rule this dialog uses to hide itself. */
+export function hasInvoiceableLines(lines: OrderLine[], invoices: OrderInvoice[]): boolean {
+  return lines.some((line) => line.qty - alreadyInvoiced(invoices, line.sku) > 0);
+}
+
+export function CreateInvoiceDialog({
+  orderPublicId,
+  lines,
+  invoices,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  orderPublicId: string;
+  lines: OrderLine[];
+  invoices: OrderInvoice[];
+  /** When provided, this dialog is externally controlled (e.g. opened from
+   *  `OrderActionsMenu`'s "..." menu) and renders no trigger of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const action = createInvoice.bind(null, orderPublicId);
   const [state, formAction, pending] = useActionState(action, initialState);
   const [handledState, setHandledState] = useState(state);
@@ -32,7 +56,7 @@ export function CreateInvoiceDialog({ orderPublicId, lines, invoices }: { orderP
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline">Create Invoice</Button>} />
+      {!isControlled ? <DialogTrigger render={<Button variant="outline">Create Invoice</Button>} /> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Invoice</DialogTitle>
