@@ -123,49 +123,58 @@ export default async function OrderInformationPage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead>HSN/SAC</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Ordered</TableHead>
-                  <TableHead className="text-right">Invoiced</TableHead>
-                  <TableHead className="text-right">Shipped</TableHead>
-                  <TableHead className="text-right">Refunded</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Discount</TableHead>
                   <TableHead className="text-right">Tax</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {order.lines.map((line) => (
-                  <TableRow key={line.sku}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[10px] font-bold text-primary">
-                          {initials(line.name)}
+                {order.lines.map((line) => {
+                  const invoiced = invoicedQty(order, line.sku);
+                  // Compact sub-line instead of 3 dedicated columns (Invoiced/
+                  // Shipped/Refunded) the mock doesn't have at all — only shown
+                  // once fulfillment activity actually exists, so a freshly
+                  // placed order's table matches the mock's clean 6-column
+                  // look exactly instead of always carrying 3 all-zero columns.
+                  const fulfillmentBits = [
+                    invoiced > 0 ? `${invoiced} invoiced` : null,
+                    line.fulfilledQty > 0 ? `${line.fulfilledQty} shipped` : null,
+                    line.refundedQty > 0 ? `${line.refundedQty} refunded` : null,
+                  ].filter(Boolean);
+                  return (
+                    <TableRow key={line.sku}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[10px] font-bold text-primary">
+                            {initials(line.name)}
+                          </div>
+                          <div>
+                            <div className="font-medium">{line.name}</div>
+                            <div className="font-mono text-xs text-muted-foreground">
+                              {line.sku}
+                              {line.hsnCode ? ` · HSN ${line.hsnCode}` : ''}
+                            </div>
+                            {fulfillmentBits.length > 0 ? <div className="mt-0.5 text-xs text-muted-foreground">{fulfillmentBits.join(' · ')}</div> : null}
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium">{line.name}</div>
-                          <div className="font-mono text-xs text-muted-foreground">{line.sku}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{line.hsnCode ?? '—'}</TableCell>
-                    <TableCell className="text-right">
-                      <span className="flex items-center justify-end gap-2">
-                        {line.mrp && Number(line.mrp) > Number(line.unitPrice) ? (
-                          <span className="text-xs text-muted-foreground line-through">{formatPrice(line.mrp, order.currency)}</span>
-                        ) : null}
-                        {formatPrice(line.unitPrice, order.currency)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">{line.qty}</TableCell>
-                    <TableCell className="text-right">{invoicedQty(order, line.sku)}</TableCell>
-                    <TableCell className="text-right">{line.fulfilledQty}</TableCell>
-                    <TableCell className="text-right">{line.refundedQty}</TableCell>
-                    <TableCell className="text-right">{line.discountAmount !== '0.0000' ? `-${formatPrice(line.discountAmount, order.currency)}` : '—'}</TableCell>
-                    <TableCell className="text-right">{formatPrice(line.taxAmount, order.currency)}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatPrice(line.rowTotal, order.currency)}</TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="text-right">{line.qty}</TableCell>
+                      <TableCell className="text-right">
+                        <span className="flex items-center justify-end gap-2">
+                          {line.mrp && Number(line.mrp) > Number(line.unitPrice) ? (
+                            <span className="text-xs text-muted-foreground line-through">{formatPrice(line.mrp, order.currency)}</span>
+                          ) : null}
+                          {formatPrice(line.unitPrice, order.currency)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">{line.discountAmount !== '0.0000' ? `-${formatPrice(line.discountAmount, order.currency)}` : '—'}</TableCell>
+                      <TableCell className="text-right">{formatPrice(line.taxAmount, order.currency)}</TableCell>
+                      <TableCell className="text-right font-semibold">{formatPrice(line.rowTotal, order.currency)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

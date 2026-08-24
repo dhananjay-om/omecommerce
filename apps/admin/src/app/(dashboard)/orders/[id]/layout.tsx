@@ -4,6 +4,8 @@ import type { OrderDetail } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { statusBadgeVariant } from '@/lib/status-badge';
 import { NavTabs } from '@/components/nav-tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { OrderStepper } from '../order-stepper';
 import { FulfillDialog } from '../fulfill-dialog';
 import { RefundDialog } from '../refund-dialog';
 import { CancelDialog } from '../cancel-dialog';
@@ -57,6 +59,14 @@ export default async function OrderDetailLayout({ children, params }: { children
           {cancellable ? <CancelDialog orderPublicId={order.publicId} /> : null}
         </div>
       </div>
+
+      {order.status !== 'CANCELLED' ? (
+        <Card className="mt-4">
+          <CardContent className="py-4">
+            <OrderStepper order={order} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="mt-6">
         <NavTabs
