@@ -102,6 +102,30 @@ export interface ReconciliationRow {
   diffAmount: string | null;
 }
 
+export interface CustomerActivityRow {
+  dateKey: number;
+  newCustomers: number;
+  returningCustomers: number;
+  totalOrders: number;
+  totalRevenue: string;
+}
+
+export interface TopCustomerRow {
+  customerId: bigint;
+  email: string | null;
+  name: string | null;
+  ordersPlaced: number;
+  revenue: string;
+}
+
+export interface InventoryTrendRow {
+  dateKey: number;
+  totalOnHand: number;
+  totalReserved: number;
+  totalAvailable: number;
+  lowStockCount: number;
+}
+
 export interface AnalyticsQueryRepository {
   getSalesTrend(range: DateRange): Promise<SalesDailyRow[]>;
   getOrderStatusBreakdown(range: DateRange): Promise<OrderStatusRow[]>;
@@ -123,6 +147,20 @@ export interface AnalyticsQueryRepository {
   countOutOfStock(): Promise<number>;
   getRfmSegments(): Promise<RfmSegmentCount[]>;
   getReconciliationLog(range: DateRange): Promise<ReconciliationRow[]>;
+  /** New-vs-returning daily trend — the Customer dashboard's own read,
+   *  from fact_customer_daily (not customer_rfm, which is a current-state
+   *  snapshot, not a time series). `isFirstOrderDay` was computed once at
+   *  write time (see refreshOrderSummaries), never reinterpreted here. */
+  getCustomerActivityTrend(range: DateRange): Promise<CustomerActivityRow[]>;
+  /** Top customers by revenue over the range, aggregated from
+   *  fact_customer_daily — not website-scoped (that table isn't; see its
+   *  own doc comment). */
+  getTopCustomers(range: DateRange, limit: number): Promise<TopCustomerRow[]>;
+  /** Daily physical-stock trend from the nightly summary_inventory_daily
+   *  snapshot — distinct from getLowStockNow (live, right-now) and
+   *  countLowStock/countOutOfStock (live counts for the alert engine).
+   *  This is the Inventory dashboard's historical trend line. */
+  getInventoryTrend(range: DateRange): Promise<InventoryTrendRow[]>;
 
   /** Live query, not summary-table-derived (the ORDER_STUCK alert's
    *  documented exception — see analytics.prisma's header comment): orders

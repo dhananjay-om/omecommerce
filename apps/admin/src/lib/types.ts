@@ -974,3 +974,148 @@ export interface EmailSettings {
   fromEmail: string | null;
   updatedAt: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Analytics & Reporting (plan/19) — GET /admin/v1/analytics/*. Every row shape
+// here mirrors src/modules/analytics/domain/queries.ts exactly. BigInt ids
+// (productId/categoryId/variantId/warehouseId/customerId/websiteId) arrive as
+// strings — the backend installs a global BigInt.prototype.toJSON (see
+// src/shared/interface/http/serialization.ts), confirmed via live curl, not
+// assumed. Every date-range endpoint requires BOTH dateFrom and dateTo
+// ("YYYY-MM-DD"), never optional — see interface/http/schemas.ts.
+// ---------------------------------------------------------------------------
+
+export interface SalesDailyRow {
+  dateKey: number;
+  websiteId: string;
+  currency: string;
+  grossRevenue: string;
+  discountTotal: string;
+  taxTotal: string;
+  shippingTotal: string;
+  refundTotal: string;
+  netRevenue: string;
+  orderCount: number;
+  unitsSold: number;
+  newCustomerCount: number;
+}
+
+export interface OrderStatusRow {
+  dateKey: number;
+  status: string;
+  orderCount: number;
+}
+
+export interface ProductPerformanceRow {
+  productId: string;
+  productName: string | null;
+  sku: string | null;
+  unitsSold: number;
+  revenue: string;
+  orderCount: number;
+}
+
+export interface CategoryPerformanceRow {
+  categoryId: string;
+  categoryName: string | null;
+  unitsSold: number;
+  revenue: string;
+}
+
+export interface PaymentMethodRow {
+  method: string;
+  gateway: string;
+  successCount: number;
+  failedCount: number;
+  successAmount: string;
+  refundedAmount: string;
+}
+
+export interface ReturnDailyRow {
+  dateKey: number;
+  returnCount: number;
+  returnQty: number;
+  returnAmount: string;
+}
+
+export interface FulfillmentDailyRow {
+  dateKey: number;
+  ordersProcessed: number;
+  avgProcessingHours: string | null;
+  avgShippingHours: string | null;
+  avgDeliveryHours: string | null;
+}
+
+export interface InventorySnapshotRow {
+  variantId: string;
+  sku: string | null;
+  productName: string | null;
+  warehouseId: string;
+  warehouseName: string | null;
+  onHand: number;
+  reserved: number;
+  available: number;
+  reorderPoint: number | null;
+}
+
+export interface RfmSegmentCount {
+  segment: string;
+  customerCount: number;
+}
+
+export interface ReconciliationRow {
+  dateKey: number;
+  tableName: string;
+  expectedCount: number;
+  actualCount: number;
+  diffCount: number;
+  diffAmount: string | null;
+}
+
+export interface CustomerActivityRow {
+  dateKey: number;
+  newCustomers: number;
+  returningCustomers: number;
+  totalOrders: number;
+  totalRevenue: string;
+}
+
+export interface TopCustomerRow {
+  customerId: string;
+  email: string | null;
+  name: string | null;
+  ordersPlaced: number;
+  revenue: string;
+}
+
+export interface InventoryTrendRow {
+  dateKey: number;
+  totalOnHand: number;
+  totalReserved: number;
+  totalAvailable: number;
+  lowStockCount: number;
+}
+
+/** Fixed vocabulary — mirrors src/modules/analytics/application/alert-rule.usecases.ts's
+ *  ALERT_METRIC_CODES/ALERT_COMPARATORS exactly. */
+export type AlertMetricCode = 'REVENUE_DROP' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'PAYMENT_FAILURE_RATE' | 'RETURN_RATE' | 'ORDER_STUCK';
+export type AlertComparator = 'gt' | 'lt' | 'gte' | 'lte';
+
+export interface AlertRuleView {
+  publicId: string;
+  metricCode: AlertMetricCode;
+  comparator: AlertComparator;
+  thresholdValue: string;
+  windowDays: number;
+  recipientEmails: string[];
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface AlertHistoryView {
+  firedAt: string;
+  metricValue: string;
+  thresholdValue: string;
+  message: string;
+  notifiedAt: string | null;
+}

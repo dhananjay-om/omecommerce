@@ -35,6 +35,11 @@ import {
   Truck,
   Banknote,
   X,
+  BarChart3,
+  LineChart,
+  ClipboardList,
+  PackageSearch,
+  BellRing,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -89,6 +94,20 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/gift-cards', label: 'Gift Cards', icon: CreditCard },
       { href: '/loyalty', label: 'Loyalty Program', icon: Award },
       { href: '/referrals', label: 'Referrals', icon: Share2 },
+    ],
+  },
+  {
+    key: 'reports',
+    label: 'Reports',
+    icon: BarChart3,
+    items: [
+      { href: '/reports', label: 'Executive', icon: LayoutDashboard },
+      { href: '/reports/sales', label: 'Sales', icon: LineChart },
+      { href: '/reports/orders', label: 'Orders', icon: ClipboardList },
+      { href: '/reports/products', label: 'Products', icon: BarChart3 },
+      { href: '/reports/customers', label: 'Customers', icon: Users },
+      { href: '/reports/inventory', label: 'Inventory', icon: PackageSearch },
+      { href: '/reports/alerts', label: 'Alert Rules', icon: BellRing },
     ],
   },
   {
