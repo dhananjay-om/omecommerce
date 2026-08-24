@@ -3,14 +3,17 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ImageIcon } from 'lucide-react';
+import { ChevronRight, ImageIcon, MoreHorizontal } from 'lucide-react';
 import type { ProductListItem } from '@/lib/types';
 import { bulkUpdateProductStatus } from './actions';
 import { DeleteProductDialog } from './delete-product-dialog';
 import { Badge } from '@/components/ui/badge';
+import { DotBadge } from '@/components/dot-badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { statusBadgeVariant } from '@/lib/status-badge';
+import { relativeDate } from '@/lib/relative-date';
 
 export type SortKey = 'sku' | 'nameDefault' | 'createdAt' | 'status';
 
@@ -52,6 +55,7 @@ export function ProductsTable({
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProductListItem | null>(null);
 
   const allSelected = products.length > 0 && products.every((p) => selected.has(p.publicId));
 
@@ -83,9 +87,14 @@ export function ProductsTable({
 
   return (
     <div>
+      {/* Matches the mock's `.bulkbar` (accent-wash background, accent text)
+          instead of a plain neutral bar — same real Activate/Deactivate
+          actions this table already had, just restyled. The mock's own
+          bulk bar also offers Bulk Edit/Publish/Price/Inventory, none of
+          which have a real backend endpoint yet, so they're not added here. */}
       {selected.size > 0 ? (
-        <div className="mb-3 flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          <span className="font-medium">
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+          <span>
             {selected.size} product{selected.size === 1 ? '' : 's'} selected
           </span>
           <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => applyBulkStatus('ACTIVE')}>
@@ -94,88 +103,62 @@ export function ProductsTable({
           <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => applyBulkStatus('ARCHIVED')}>
             Deactivate
           </Button>
-          {error ? <span className="text-destructive">{error}</span> : null}
+          {error ? <span className="font-normal text-destructive">{error}</span> : null}
         </div>
       ) : null}
 
-      <div className="rounded-md border">
+      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-10 pl-6">
                 <input type="checkbox" className="size-4" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
               </TableHead>
-              <TableHead className="w-14" />
+              <SortableHeader label="Product" sortKey="nameDefault" sortLinks={sortLinks} activeSortBy={activeSortBy} activeSortDir={activeSortDir} />
               <SortableHeader label="SKU" sortKey="sku" sortLinks={sortLinks} activeSortBy={activeSortBy} activeSortDir={activeSortDir} />
-              <SortableHeader
-                label="Name"
-                sortKey="nameDefault"
-                sortLinks={sortLinks}
-                activeSortBy={activeSortBy}
-                activeSortDir={activeSortDir}
-              />
               <TableHead>Type</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Salable Qty</TableHead>
+              <TableHead className="text-right">Inventory</TableHead>
               <TableHead>Tax</TableHead>
-              <SortableHeader
-                label="Status"
-                sortKey="status"
-                sortLinks={sortLinks}
-                activeSortBy={activeSortBy}
-                activeSortDir={activeSortDir}
-              />
-              <SortableHeader
-                label="Created"
-                sortKey="createdAt"
-                sortLinks={sortLinks}
-                activeSortBy={activeSortBy}
-                activeSortDir={activeSortDir}
-              />
-              <TableHead className="text-right">Actions</TableHead>
+              <SortableHeader label="Status" sortKey="status" sortLinks={sortLinks} activeSortBy={activeSortBy} activeSortDir={activeSortDir} />
+              <SortableHeader label="Created" sortKey="createdAt" sortLinks={sortLinks} activeSortBy={activeSortBy} activeSortDir={activeSortDir} />
+              <TableHead className="w-14 pr-6" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   No products found.
                 </TableCell>
               </TableRow>
             ) : (
               products.map((p) => (
-                <TableRow key={p.publicId}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      className="size-4"
-                      checked={selected.has(p.publicId)}
-                      onChange={() => toggleOne(p.publicId)}
-                      aria-label={`Select ${p.sku}`}
-                    />
+                <TableRow key={p.publicId} className="cursor-pointer" onClick={() => router.push(`/products/${p.publicId}`)}>
+                  <TableCell className="pl-6" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" className="size-4" checked={selected.has(p.publicId)} onChange={() => toggleOne(p.publicId)} aria-label={`Select ${p.sku}`} />
                   </TableCell>
                   <TableCell>
-                    {p.thumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
-                      <img src={p.thumbnailUrl} alt="" className="size-9 rounded-md border object-cover" />
-                    ) : (
-                      <div className="flex size-9 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
-                        <ImageIcon className="size-4" />
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {p.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
+                        <img src={p.thumbnailUrl} alt="" className="size-8 shrink-0 rounded-md border object-cover" />
+                      ) : (
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                          <ImageIcon className="size-4" />
+                        </div>
+                      )}
+                      <span className="font-medium text-foreground">{p.name ?? '—'}</span>
+                    </div>
                   </TableCell>
-                  <TableCell className="font-medium">
-                    <Link href={`/products/${p.publicId}`} className="hover:underline">
-                      {p.sku}
-                    </Link>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{p.sku}</TableCell>
+                  <TableCell className="text-muted-foreground">{p.type}</TableCell>
+                  <TableCell className="text-right">
+                    {p.salableQuantity} units
+                    {p.salableQuantity !== p.quantity ? <div className="text-xs text-muted-foreground">{p.quantity} total</div> : null}
                   </TableCell>
-                  <TableCell>{p.name ?? '—'}</TableCell>
-                  <TableCell>{p.type}</TableCell>
-                  <TableCell>{p.quantity}</TableCell>
-                  <TableCell>{p.salableQuantity}</TableCell>
                   <TableCell>
                     {p.hasTaxClass ? (
-                      <Badge variant="success">GST</Badge>
+                      <DotBadge variant="success">GST</DotBadge>
                     ) : (
                       <Badge variant="secondary" title="No tax class assigned — charged 0 GST at checkout">
                         None
@@ -183,11 +166,30 @@ export function ProductsTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusBadgeVariant(p.status)}>{p.status}</Badge>
+                    <DotBadge variant={statusBadgeVariant(p.status)}>{p.status}</DotBadge>
                   </TableCell>
-                  <TableCell>{new Date(p.createdAt).toLocaleDateString('en-US')}</TableCell>
-                  <TableCell className="text-right">
-                    <DeleteProductDialog publicId={p.publicId} sku={p.sku} />
+                  <TableCell className="text-muted-foreground">{relativeDate(p.createdAt)}</TableCell>
+                  <TableCell className="pr-6" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button variant="ghost" size="icon" className="size-8">
+                              <MoreHorizontal className="size-4" />
+                              <span className="sr-only">Actions for {p.sku}</span>
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => router.push(`/products/${p.publicId}`)}>View</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/products/${p.publicId}/edit`)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(p)}>
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -195,6 +197,18 @@ export function ProductsTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* One shared, externally-controlled dialog instance for every row's
+          "Delete" menu item — same base-ui "open a dialog from a menu"
+          pattern as the order detail header's "..." menu. */}
+      <DeleteProductDialog
+        publicId={deleteTarget?.publicId ?? ''}
+        sku={deleteTarget?.sku ?? ''}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

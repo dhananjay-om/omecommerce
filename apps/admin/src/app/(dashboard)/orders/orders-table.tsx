@@ -5,48 +5,14 @@ import { useRouter } from 'next/navigation';
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
 import type { OrderListItem } from '@/lib/types';
 import { formatPrice } from '@/lib/format-price';
-import { Badge, badgeVariants } from '@/components/ui/badge';
-import type { VariantProps } from 'class-variance-authority';
+import { relativeDate } from '@/lib/relative-date';
+import { DotBadge } from '@/components/dot-badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { statusBadgeVariant } from '@/lib/status-badge';
-import { cn } from '@/lib/utils';
 
 export type SortKey = 'createdAt' | 'grandTotal' | 'customerName';
-
-/** "Today" / "3 days ago" / "1w ago" — matches the mock's relative Date
- *  column exactly, instead of a fixed-format absolute date. */
-function relativeDate(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / 86_400_000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks}w ago`;
-  return new Date(iso).toLocaleDateString('en-US');
-}
-
-/** A status pill with a leading colored dot — matches the mock's `.badge`
- *  exactly (existing `Badge` variants already give the tinted bg + colored
- *  text; the dot is the one piece this table adds locally). */
-function DotBadge({ variant, children }: { variant: VariantProps<typeof badgeVariants>['variant']; children: React.ReactNode }) {
-  const dotColor: Record<string, string> = {
-    success: 'bg-status-good',
-    warning: 'bg-status-warning',
-    destructive: 'bg-status-critical',
-    secondary: 'bg-muted-foreground',
-    outline: 'bg-muted-foreground',
-    default: 'bg-primary',
-  };
-  return (
-    <Badge variant={variant}>
-      <span className={cn('size-1.5 rounded-full', dotColor[variant ?? 'default'])} />
-      {children}
-    </Badge>
-  );
-}
 
 function SortableHeader({
   label,

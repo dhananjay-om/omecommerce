@@ -1,13 +1,15 @@
 import Link from 'next/link';
+import Form from 'next/form';
+import { Search } from 'lucide-react';
 import { apiGet, buildQuery } from '@/lib/api-client';
 import type { AttributeSet, ProductList } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { ProductsTable, type SortKey } from './products-table';
+import { MoreFiltersPopover } from './more-filters-popover';
 
 const DEFAULT_PAGE_SIZE = 20;
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const PRODUCT_TYPES = ['SIMPLE', 'CONFIGURABLE', 'BUNDLE', 'DIGITAL', 'VIRTUAL'];
 const STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
 
@@ -73,31 +75,42 @@ export default async function ProductsPage({
   };
 
   const hasFilters = Boolean(params.search || params.status || params.type || params.attributeSetId);
+  const moreFiltersActiveCount = [params.attributeSetId].filter(Boolean).length;
 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Products</h1>
+        <div>
+          {/* Same `.page-title` size (1.32rem/800) as the Orders pages —
+              the mock uses one consistent title size everywhere. */}
+          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Products</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {list.total} product{list.total === 1 ? '' : 's'}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
-          <Link href="/products/import" className={cn(buttonVariants({ variant: 'outline' }))}>
+          <Link href="/products/import" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             Import
           </Link>
-          <Link href="/products/new" className={cn(buttonVariants())}>
-            New Product
+          <Link href="/products/new" className={cn(buttonVariants({ size: 'sm' }))}>
+            Add Product
           </Link>
         </div>
       </div>
 
-      <form className="mt-6 flex flex-wrap items-center gap-2" action="/products">
-        <Input
-          key={params.search ?? ''}
-          name="search"
-          placeholder="Search by SKU or name…"
-          defaultValue={params.search}
-          className="max-w-sm"
-        />
+      {/* One search box + 2 dropdowns + "More filters" — matches the mock's
+          clean filter-bar shape, same convention as the Orders list.
+          next/form (not a plain <form>): this app is reverse-proxied at
+          the /admin basePath — a plain `<form action="/products">` would
+          silently drop that prefix on submit, the same pre-existing bug
+          fixed on the Orders filter form. */}
+      <Form id="products-filters" className="mt-6 flex flex-wrap items-center gap-2" action="/products">
+        <div className="relative max-w-[320px] flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input key={params.search ?? ''} name="search" placeholder="Search product, SKU, brand…" defaultValue={params.search} className="pl-8" />
+        </div>
         <select name="status" defaultValue={params.status ?? ''} className={nativeSelectClass}>
-          <option value="">All Statuses</option>
+          <option value="">All statuses</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -105,37 +118,23 @@ export default async function ProductsPage({
           ))}
         </select>
         <select name="type" defaultValue={params.type ?? ''} className={nativeSelectClass}>
-          <option value="">All Types</option>
+          <option value="">All types</option>
           {PRODUCT_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
             </option>
           ))}
         </select>
-        <select name="attributeSetId" defaultValue={params.attributeSetId ?? ''} className={nativeSelectClass}>
-          <option value="">All Attribute Sets</option>
-          {attributeSets.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select name="pageSize" defaultValue={String(pageSize)} className={nativeSelectClass}>
-          {PAGE_SIZE_OPTIONS.map((n) => (
-            <option key={n} value={n}>
-              {n} / page
-            </option>
-          ))}
-        </select>
-        <Button type="submit" variant="outline">
+        <MoreFiltersPopover formId="products-filters" attributeSets={attributeSets} attributeSetId={params.attributeSetId} pageSize={pageSize} activeCount={moreFiltersActiveCount} />
+        <Button type="submit" size="sm">
           Apply
         </Button>
         {hasFilters ? (
-          <Link href="/products" className={cn(buttonVariants({ variant: 'ghost' }))}>
+          <Link href="/products" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Clear
           </Link>
         ) : null}
-      </form>
+      </Form>
 
       <div className="mt-6">
         <ProductsTable products={list.products} sortLinks={sortLinks} activeSortBy={sortBy} activeSortDir={sortDir} />
@@ -143,7 +142,7 @@ export default async function ProductsPage({
 
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          {list.total} product{list.total === 1 ? '' : 's'} · page {list.page} of {totalPages}
+          Showing {list.products.length ? (page - 1) * pageSize + 1 : 0}–{(page - 1) * pageSize + list.products.length} of {list.total}
         </span>
         <div className="flex gap-2">
           {page <= 1 ? (
@@ -158,6 +157,9 @@ export default async function ProductsPage({
               Previous
             </Link>
           )}
+          <span className="px-1">
+            {page} / {totalPages}
+          </span>
           {page >= totalPages ? (
             <Button variant="outline" size="sm" disabled>
               Next
