@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, CircleHelp } from 'lucide-react';
 import { NAV, bestMatchingNavItem } from '@/lib/nav-data';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,11 @@ import { cn } from '@/lib/utils';
  * daily-use-affecting change — see the plan). Reads `NAV` from
  * `lib/nav-data.ts` — the single source of truth also used by the
  * breadcrumb, the command palette, and every `ComingSoon` page.
+ *
+ * Active-item look (wash background + a left accent bar + solid white
+ * text) and the footer (Help & Documentation + a store info card) match
+ * the "Meridian Commerce OS" mock's `.sb-item.active`/`#sidebar-foot`
+ * exactly, per explicit user color/content-parity feedback.
  */
 export function AppSidebar() {
   const pathname = usePathname();
@@ -56,10 +61,10 @@ export function AppSidebar() {
                     key={item.key}
                     href={item.href}
                     className={cn(
-                      'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+                      'flex items-center gap-2.5 rounded-r-lg border-l-2 py-1.5 pr-2.5 pl-2 text-sm transition-colors',
                       active
-                        ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground',
+                        ? 'border-l-sidebar-primary bg-sidebar-accent font-semibold text-sidebar-accent-foreground'
+                        : 'border-l-transparent text-sidebar-foreground/75 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground',
                     )}
                   >
                     <Icon className="size-4 shrink-0" strokeWidth={2} />
@@ -76,6 +81,25 @@ export function AppSidebar() {
           </div>
         ))}
       </nav>
+
+      <div className="shrink-0 border-t border-sidebar-border p-2.5">
+        <Link
+          href="/system/notifications"
+          className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
+        >
+          <CircleHelp className="size-4" strokeWidth={2} />
+          Help &amp; Documentation
+        </Link>
+        <div className="mt-1 flex items-center gap-2.5 rounded-lg px-2 py-2">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-sidebar-border bg-[#1c2029] text-[10px] font-bold text-white">
+            OM
+          </div>
+          <div className="leading-tight">
+            <div className="text-[13px] font-semibold text-white">OMEcommerce</div>
+            <div className="text-[11px] text-sidebar-foreground/50">Store Admin</div>
+          </div>
+        </div>
+      </div>
     </aside>
   );
 }

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import { apiGet } from '@/lib/api-client';
+import type { Website } from '@/lib/types';
 import { AppSidebar } from '@/components/app-sidebar';
 import { TopHeader } from '@/components/top-header';
 import { Toaster } from '@/components/ui/sonner';
@@ -22,11 +24,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect('/login');
   }
 
+  // Best-effort — the topbar's store-switcher chip is informational chrome
+  // (see StoreSwitcherChip's own comment), not load-bearing for the page,
+  // so a transient failure here shouldn't take down the whole shell.
+  const websiteNames = await apiGet<Website[]>('/admin/v1/websites')
+    .then((sites) => sites.map((s) => s.name))
+    .catch(() => []);
+
   return (
     <div className="flex h-screen bg-bg-page">
       <AppSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader siteUrl={SITE_URL} />
+        <TopHeader siteUrl={SITE_URL} websiteNames={websiteNames} />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1560px] p-8">{children}</div>
         </main>

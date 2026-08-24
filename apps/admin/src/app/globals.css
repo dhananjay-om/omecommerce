@@ -71,21 +71,25 @@
 }
 
 :root {
-  /* Brand: OrangeMantra red-orange (#ee3514), sampled from the company logo. */
+  /* Brand accent: matches the "Meridian Commerce OS" mock exactly (#2a78d6),
+     per explicit user correction — an earlier pass kept the pre-existing
+     OrangeMantra red-orange (#ee3514) as a deliberate, flagged "your call"
+     recommendation; the user asked for full color-match instead, so this
+     supersedes that. */
   --background: oklch(1 0 0);
   --foreground: oklch(0.18 0.01 40);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.18 0.01 40);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.01 40);
-  --primary: oklch(0.618 0.224 32.05);
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: #2a78d6;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0.006 40);
   --secondary-foreground: oklch(0.24 0.01 40);
   --muted: oklch(0.97 0.006 40);
   --muted-foreground: oklch(0.52 0.015 40);
-  --accent: oklch(0.955 0.02 35);
-  --accent-foreground: oklch(0.35 0.15 32);
+  --accent: rgba(42, 120, 214, 0.1);
+  --accent-foreground: #1c5cab;
   --destructive: oklch(0.577 0.245 27.325);
   --success: oklch(0.627 0.17 149.21);
   --success-foreground: oklch(0.99 0 0);
@@ -93,16 +97,24 @@
   --warning-foreground: oklch(0.99 0 0);
   --border: oklch(0.922 0.006 40);
   --input: oklch(0.922 0.006 40);
-  --ring: oklch(0.618 0.224 32.05 / 55%);
-  --chart-1: oklch(0.618 0.224 32.05);
-  --chart-2: oklch(0.627 0.17 149.21);
-  --chart-3: oklch(0.666 0.157 58.32);
-  --chart-4: oklch(0.556 0.02 40);
-  --chart-5: oklch(0.371 0.02 40);
-  /* chart-6..8: the dataviz-skill categorical palette's remaining 3 slots
-     (magenta/violet/red) — extends the existing 5-slot set to the full
-     8-slot set the admin-revamp mock uses, same validated palette. */
-  --chart-6: #e87ba4;
+  --ring: rgba(42, 120, 214, 0.55);
+  /* chart-1..8: the actual dataviz-skill validated categorical palette
+     (== the mock's --cat-1..8), in its fixed CVD-safe order. CORRECTION:
+     an earlier pass claimed chart-1..5 already equalled this palette
+     because they shared the SAME OKLCH FORMULA SHAPE as primary/success/
+     warning/two grays — but that's a different claim than being the same
+     COLOR. Converting oklch(0.618 0.224 32.05) (the old chart-1) to hex
+     gives #ee3513 — OrangeMantra orange, not the palette's blue #2a78d6 —
+     so the old chart-1..5 were never actually this palette at all, just
+     values that happened to reuse the theme's own primary/success/warning
+     tokens. Fixed here, verified by direct oklch->rgb conversion this time,
+     not by re-reading a claim. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
   --chart-7: #4a3aa7;
   --chart-8: #e34948;
   --radius: 0.625rem;
@@ -128,15 +140,20 @@
   --status-critical-bg: #fbe3e3;
   --status-critical-text: #a52323;
   /* The admin sidebar is always dark (a fixed dark-chrome + light-content
-     hybrid, like most SaaS admin panels) — these don't flip with .dark. */
-  --sidebar: oklch(0.21 0.032 264.665);
-  --sidebar-foreground: oklch(0.968 0.007 247.896);
-  --sidebar-primary: oklch(0.618 0.224 32.05);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.98 0.016 73.684);
-  --sidebar-accent-foreground: oklch(0.618 0.224 32.05);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.618 0.224 32.05 / 55%);
+     hybrid, like most SaaS admin panels) — these don't flip with .dark,
+     matching the mock's own --sb-* tokens exactly (also theme-invariant). */
+  --sidebar: #0d1017;
+  --sidebar-foreground: #aeb4c2;
+  --sidebar-primary: #2a78d6;
+  --sidebar-primary-foreground: #ffffff;
+  /* Active-nav-item look, matching the mock's .sb-item.active exactly: a
+     subtle blue wash + solid white text (NOT a tinted-text-on-tinted-bg
+     combo) + a left accent bar (see AppSidebar's own border-l-* class,
+     colored via sidebar-primary above). */
+  --sidebar-accent: rgba(58, 135, 229, 0.16);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: rgba(42, 120, 214, 0.55);
 }
 
 .dark {
@@ -146,14 +163,14 @@
   --card-foreground: oklch(0.97 0.004 40);
   --popover: oklch(0.21 0.01 40);
   --popover-foreground: oklch(0.97 0.004 40);
-  --primary: oklch(0.68 0.2 33);
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: #3987e5;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.27 0.012 40);
   --secondary-foreground: oklch(0.97 0.004 40);
   --muted: oklch(0.27 0.012 40);
   --muted-foreground: oklch(0.71 0.015 40);
-  --accent: oklch(0.3 0.04 33);
-  --accent-foreground: oklch(0.93 0.03 33);
+  --accent: rgba(57, 135, 229, 0.16);
+  --accent-foreground: #86b6ef;
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.72 0.19 149.58);
   --success-foreground: oklch(0.16 0.02 149);
@@ -161,13 +178,15 @@
   --warning-foreground: oklch(0.2 0.02 70);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.68 0.2 33 / 55%);
-  --chart-1: oklch(0.68 0.2 33);
-  --chart-2: oklch(0.72 0.19 149.58);
-  --chart-3: oklch(0.77 0.165 70.08);
-  --chart-4: oklch(0.708 0.02 40);
-  --chart-5: oklch(0.556 0.02 40);
-  --chart-6: #d55181;
+  --ring: rgba(57, 135, 229, 0.4);
+  /* Dark-mode dataviz-skill categorical palette (== the mock's dark-mode
+     --cat-1..8) — same correction as the light block above. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
   --chart-7: #9085e9;
   --chart-8: #e66767;
   --bg-page: #0a0b0e;
@@ -185,14 +204,14 @@
   --status-critical: #d03b3b;
   --status-critical-bg: rgba(208, 59, 59, 0.18);
   --status-critical-text: #e66767;
-  --sidebar: oklch(0.17 0.01 40);
-  --sidebar-foreground: oklch(0.92 0.006 40);
-  --sidebar-primary: oklch(0.68 0.2 33);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.9 0.05 40);
-  --sidebar-accent-foreground: oklch(0.5 0.2 30);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.68 0.2 33 / 55%);
+  --sidebar: #0d1017;
+  --sidebar-foreground: #aeb4c2;
+  --sidebar-primary: #3987e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(58, 135, 229, 0.16);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: rgba(57, 135, 229, 0.4);
 }
 
 @layer base {
