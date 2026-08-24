@@ -8,25 +8,29 @@ import { Button } from '@/components/ui/button';
  * a page with several SectionCards, or, on the product edit page, several
  * MORE sections after the form itself).
  *
- * `position: fixed`, not `sticky`: the dashboard layout's `<main>` carries
- * an `overflow-y-auto` class, but its height isn't actually bounded by its
- * flex parent in practice — the real scrolling happens on the document
- * itself, not inside `<main>`'s own box. `position: sticky` computes
- * against the nearest ancestor that establishes a scroll container
- * (`<main>`, because of that class), so a sticky bar there never reaches
- * the visible viewport edge — it "sticks" only within `<main>`'s own
- * (effectively unbounded) box, which in practice means it never visibly
- * sticks at all. `fixed` sidesteps that mismatch entirely by positioning
- * against the viewport directly. `left-62` matches the sidebar's own
- * fixed width (components/app-sidebar.tsx's `<aside className="w-62">`)
- * so the bar starts after it instead of rendering underneath it — this
- * was still `left-20`, sized for the icon-rail sidebar the admin UI
- * revamp replaced, until a screenshot caught the bar rendering mostly
- * hidden behind the new 248px sidebar.
+ * `position: sticky`, not `fixed`: this used to be `fixed` — pinned
+ * against the viewport directly, with `left-62` hand-matching the
+ * sidebar's width so the bar wouldn't render underneath it, plus a manual
+ * spacer div so the form's real last section never ended up hidden behind
+ * it. That worked for tall forms, but `fixed` positioning is glued to the
+ * viewport's bottom edge unconditionally — on a shorter form (or a
+ * shorter category/attribute list after a trim), the page's real content
+ * ends well above the viewport's bottom, leaving a large dead gap between
+ * the last card and the floating bar (caught live via a screenshot: a
+ * short products's Categories card ended, then several hundred px of
+ * blank page, then the bar).
  *
- * Renders its own spacer of matching height as the last element, so a
- * form's real final section (e.g. "Images") never ends up hidden behind
- * this now-out-of-flow bar — callers don't need to remember one themselves.
+ * `sticky` fixes this by construction instead of patching around it: it
+ * stays in normal document flow (no more hand-matched `left-*` offset, no
+ * more manual spacer — both were only needed to work around `fixed`
+ * taking the element out of flow), so on a short form it just settles
+ * right after the last card with no gap, and on a form taller than the
+ * viewport it still pins to the bottom exactly like before, because its
+ * un-stuck position is already below the fold from the first paint. The
+ * `<main>` in `(dashboard)/layout.tsx` (`overflow-y-auto`) is a genuine
+ * bounded scroll container — confirmed live (`main.scrollHeight >
+ * main.clientHeight` on a real long form) — so sticky's nearest-scrolling-
+ * ancestor computation resolves against it correctly.
  *
  * `formId` is optional — pass it (and give the actual <form> a matching
  * `id`) when this bar needs to render OUTSIDE that <form> in the DOM (e.g.
@@ -52,7 +56,7 @@ export function StickyFormActions({
 }) {
   return (
     <>
-      <div className="fixed inset-x-0 bottom-0 left-62 z-30 border-t bg-background/95 py-4 shadow-[0_-4px_16px_rgba(16,19,26,0.06)] backdrop-blur supports-backdrop-filter:bg-background/80">
+      <div className="sticky inset-x-0 bottom-0 z-30 border-t bg-background/95 py-4 shadow-[0_-4px_16px_rgba(16,19,26,0.06)] backdrop-blur supports-backdrop-filter:bg-background/80">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-8">
           <Button type="submit" form={formId} disabled={pending}>
             {pending ? pendingLabel : label}
@@ -61,8 +65,6 @@ export function StickyFormActions({
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>
-      {/* A bit taller than the bar's own rendered height (py-4 + button/text line-height, ~65px) — the extra margin is deliberate breathing room, not just exact clearance, so the last real section never feels crowded against the floating bar above it. */}
-      <div className="h-24" aria-hidden="true" />
     </>
   );
 }
