@@ -9,43 +9,57 @@ import { Label } from '@/components/ui/label';
 
 const initialState: LoginFormState = { error: null };
 
+/** Small brand mark — same icon/wordmark/type scale as the sidebar's own
+ *  (components/app-sidebar.tsx), reused here instead of this page having
+ *  its own separate "orangemantra" wordmark and a third "OrangeMantra
+ *  Technologies" string in the footer — 3 different brand identities on
+ *  one small page was part of what read as messy. */
+function BrandMark({ tone = 'default' }: { tone?: 'default' | 'onDark' }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className={tone === 'onDark' ? 'flex size-8 items-center justify-center rounded-lg bg-white/15' : 'flex size-8 items-center justify-center rounded-lg bg-primary'}>
+        <ShoppingBag className={tone === 'onDark' ? 'size-4.5' : 'size-4.5 text-primary-foreground'} strokeWidth={2.25} />
+      </div>
+      <span className="text-sm font-bold tracking-tight">OMEcommerce</span>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
-    <div className="flex min-h-screen">
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-white/15">
-            <ShoppingBag className="size-5" strokeWidth={2.25} />
+    // Centered, bounded card instead of a full-bleed 50/50 split — a split
+    // screen that stretches edge-to-edge scales badly on a wide monitor:
+    // both halves' content stays a fixed width, so the gap between them
+    // grows into a large dead gutter, and everything reads as stranded at
+    // the left/right edges instead of one composed page (caught live via
+    // a screenshot at 1600px). Capping the whole thing at max-w-4xl and
+    // centering it on a neutral page background keeps it looking the same
+    // — proportioned, intentional — at any viewport width.
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl bg-card shadow-xl ring-1 ring-foreground/10 lg:grid-cols-2">
+        <div className="relative hidden flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex">
+          <BrandMark tone="onDark" />
+          <div>
+            <h1 className="text-2xl leading-tight font-bold tracking-tight">
+              Your commerce,
+              <br />
+              your way.
+            </h1>
+            <p className="mt-2 max-w-xs text-sm text-primary-foreground/75">One admin for catalog, inventory, pricing, orders, and customers.</p>
           </div>
-          <span className="text-lg font-bold tracking-tight">OMEcommerce</span>
+          <p className="text-xs text-primary-foreground/50">© {new Date().getFullYear()} OMEcommerce</p>
         </div>
-        <div>
-          <h1 className="text-4xl leading-tight font-bold tracking-tight">
-            Your commerce,
-            <br />
-            your way.
-          </h1>
-          <p className="mt-3 max-w-sm text-primary-foreground/80">
-            One admin for catalog, inventory, pricing, orders, and customers.
-          </p>
-        </div>
-        <p className="text-sm text-primary-foreground/60">© {new Date().getFullYear()} OrangeMantra Technologies</p>
-      </div>
 
-      <div className="flex w-full flex-col items-center justify-center px-6 lg:w-1/2">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
-            <span className="text-2xl leading-none font-bold tracking-tight">
-              <span className="text-primary">orange</span>
-              <span className="text-foreground">mantra</span>
-            </span>
+        <div className="flex flex-col justify-center p-8 sm:p-10">
+          <div className="mb-6 lg:hidden">
+            <BrandMark />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight">Sign in</h2>
+          <h2 className="text-[1.32rem] font-extrabold tracking-tight">Sign in</h2>
           <p className="mt-1 text-sm text-muted-foreground">Welcome back. Enter your credentials to continue.</p>
 
-          <form action={formAction} className="mt-8 space-y-4">
+          <form action={formAction} className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" name="email" type="email" autoComplete="username" required />
