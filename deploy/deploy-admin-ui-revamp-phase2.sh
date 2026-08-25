@@ -41,8 +41,18 @@
 #     render partly behind the sidebar and leave a large dead gap on
 #     shorter forms — switched to `position: sticky`, the correct tool for
 #     that pattern
+#   - Date-range filter (Dashboard + every /reports/* page): was a full row
+#     of 5 preset buttons + 2 date inputs + an Apply button; now one
+#     compact dropdown trigger showing the active range, matching the
+#     "More filters" popover already used on Orders/Products
 #
 # Admin app only — no backend/migration changes in any of this.
+#
+# For realistic-looking demo data on the Dashboard/Reports charts (orders
+# spread across different dates and products instead of a single spike),
+# run scripts/seed-demo-orders.mjs — see its own header comment for usage
+# and env vars. Separate from this deploy: creates real orders through the
+# storefront checkout API, so run it after this deploy, not as part of it.
 #
 # Run from the repo root, after `git pull`: ./deploy/deploy-admin-ui-revamp-phase2.sh
 set -uo pipefail
@@ -55,7 +65,7 @@ COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 echo "==> Rebuilding admin (Dashboard/Orders/Products/Categories/Customers/"
 echo "    Discounts/Gift Cards/Loyalty/Referrals/Warehouses/Companies"
 echo "    restyled, every popup redesigned, login page + sticky Save bar +"
-echo "    basePath form fixes)"
+echo "    basePath form fixes, date-range filter now a dropdown)"
 $COMPOSE up -d --build admin
 if [ $? -ne 0 ]; then
   echo "!! admin build/restart failed — see the output above" >&2
