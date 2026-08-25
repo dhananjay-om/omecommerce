@@ -51,6 +51,20 @@ async function fetchTotal(query: Record<string, string | number | undefined>): P
   }
 }
 
+/** Every analytics fetch on this page goes through this instead of a bare
+ *  `apiGet` — one endpoint being down/misconfigured (e.g. the analytics
+ *  migration or permission sync from deploy-analytics-reporting.sh never
+ *  having been run in a given environment) used to fail the whole
+ *  `Promise.all` and crash the entire page behind Next's generic error
+ *  boundary. Each section now degrades to its own empty state instead. */
+async function safeFetch<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch {
+    return fallback;
+  }
+}
+
 function sumSales(rows: SalesDailyRow[]) {
   const grossRevenue = rows.reduce((sum, r) => sum + Number(r.grossRevenue), 0);
   const netRevenue = rows.reduce((sum, r) => sum + Number(r.netRevenue), 0);
@@ -109,13 +123,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     delivered,
     returnsPending,
   ] = await Promise.all([
-    apiGet<SalesDailyRow[]>(`/admin/v1/analytics/sales${query}`),
-    apiGet<SalesDailyRow[]>(`/admin/v1/analytics/sales${buildQuery({ ...prevRange })}`),
-    apiGet<ProductPerformanceRow[]>(`/admin/v1/analytics/top-products${buildQuery({ ...range, limit: 5 })}`),
-    apiGet<CategoryPerformanceRow[]>(`/admin/v1/analytics/top-categories${buildQuery({ ...range, limit: 5 })}`),
-    apiGet<RfmSegmentCount[]>('/admin/v1/analytics/customers/rfm').catch(() => []),
-    apiGet<InventorySnapshotRow[]>(`/admin/v1/analytics/inventory/low-stock${buildQuery({ limit: 25 })}`),
-    apiGet<OrderList>('/admin/v1/orders?pageSize=8&sortBy=createdAt&sortDir=desc'),
+    safeFetch(apiGet<SalesDailyRow[]>(`/admin/v1/analytics/sales${query}`), []),
+    safeFetch(apiGet<SalesDailyRow[]>(`/admin/v1/analytics/sales${buildQuery({ ...prevRange })}`), []),
+    safeFetch(apiGet<ProductPerformanceRow[]>(`/admin/v1/analytics/top-products${buildQuery({ ...range, limit: 5 })}`), []),
+    safeFetch(apiGet<CategoryPerformanceRow[]>(`/admin/v1/analytics/top-categories${buildQuery({ ...range, limit: 5 })}`), []),
+    safeFetch(apiGet<RfmSegmentCount[]>('/admin/v1/analytics/customers/rfm'), []),
+    safeFetch(apiGet<InventorySnapshotRow[]>(`/admin/v1/analytics/inventory/low-stock${buildQuery({ limit: 25 })}`), []),
+    safeFetch(apiGet<OrderList>('/admin/v1/orders?pageSize=8&sortBy=createdAt&sortDir=desc'), { total: 0, page: 1, pageSize: 8, orders: [] }),
     fetchTotal({ dateFrom: today, dateTo: today }),
     fetchTotal({ financialStatus: 'PENDING' }),
     fetchTotal({ financialStatus: 'PAID', fulfillmentStatus: 'UNFULFILLED' }),
