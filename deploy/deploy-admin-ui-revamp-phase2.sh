@@ -16,11 +16,17 @@
 #     the left/right edges on a wide monitor — now a single bounded card
 #     centered on the page, with one consistent OMEcommerce brand mark
 #     instead of 3 different logos/names on one screen
-#   - Dashboard: was 3 plain counter cards + a basic table — now real KPIs,
-#     an orders-by-status breakdown, a revenue trend chart, top products/
-#     categories by revenue, and restyled Recent Orders + Inventory Risk
-#     tables, all reusing the same real analytics endpoints /reports
-#     already uses (no new backend work, no fabricated numbers)
+#   - Dashboard: was 3 plain counter cards + a basic table — now the full
+#     "Command Center" reference layout: real KPIs with real "vs previous
+#     period" deltas, rule-based Insights computed from real data, a
+#     9-tile real-time operations funnel (real targeted order counts), a
+#     dual-period Sales Analytics chart with a metric toggle, 4 real
+#     "revenue by X" breakdowns (category/products/customer segment/
+#     website), and restyled Recent Orders + Inventory Risk tables. A
+#     handful of KPIs with no real data model yet (conversion rate, gross
+#     profit/margin, CAC, CLV) show clearly-illustrative placeholder
+#     values rather than a blank tile, per explicit instruction to build
+#     the reference design now and wire up real data later.
 #   - 2 real bugs fixed along the way: several pages' filter/search forms
 #     were missing the /admin basePath on submit (plain <form> doesn't
 #     respect it, next/form does); the sticky "Save Changes" bar used
