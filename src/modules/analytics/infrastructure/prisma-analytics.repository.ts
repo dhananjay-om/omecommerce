@@ -73,6 +73,21 @@ export class PrismaAnalyticsRepository implements AnalyticsRepository {
     `;
     const newCustomersByCurrency = new Map(newCustomerRows.map((r) => [r.currency, r.new_customer_count]));
 
+    // Zero every existing row for this bucket first — same reasoning as
+    // summary_order_status_daily below, generalized: a bucket can now
+    // regress from having orders to having none (e.g. a hard-deleted
+    // order — DeleteOrder), not just grow. Upserting only the currencies
+    // still present today would leave a stale nonzero row for any
+    // currency that dropped to zero. Confirmed by actually hitting this:
+    // deleting a day's only order left its summary_sales_daily row
+    // showing the deleted order's revenue forever, since the empty
+    // `salesRows` result below just skips the loop entirely.
+    await this.db.$executeRaw`
+      UPDATE summary_sales_daily
+      SET gross_revenue = 0, discount_total = 0, tax_total = 0, shipping_total = 0, refund_total = 0,
+          net_revenue = 0, order_count = 0, units_sold = 0, new_customer_count = 0, updated_at = now()
+      WHERE date_key = ${dateKey} AND website_id = ${websiteId} AND order_count != 0
+    `;
     for (const row of salesRows) {
       const refundTotal = refundByCurrency.get(row.currency) ?? '0';
       await this.db.$executeRaw`
@@ -113,7 +128,12 @@ export class PrismaAnalyticsRepository implements AnalyticsRepository {
       `;
     }
 
-    // Product-level — same financial_status != FAILED exclusion as sales.
+    // Product-level — same financial_status != FAILED exclusion as sales,
+    // and the same "zero this bucket first" reasoning as sales above.
+    await this.db.$executeRaw`
+      UPDATE summary_product_daily SET units_sold = 0, revenue = 0, order_count = 0, updated_at = now()
+      WHERE date_key = ${dateKey} AND website_id = ${websiteId} AND order_count != 0
+    `;
     const productRows = await this.db.$queryRaw<
       Array<{ currency: string; product_id: bigint; units_sold: bigint; revenue: string; order_count: bigint }>
     >`
@@ -134,7 +154,12 @@ export class PrismaAnalyticsRepository implements AnalyticsRepository {
     }
 
     // Category-level — a line's product can sit in multiple categories;
-    // every one gets credited (matches this table's own doc comment).
+    // every one gets credited (matches this table's own doc comment). Same
+    // "zero this bucket first" reasoning as sales/product above.
+    await this.db.$executeRaw`
+      UPDATE summary_category_daily SET units_sold = 0, revenue = 0, updated_at = now()
+      WHERE date_key = ${dateKey} AND website_id = ${websiteId} AND units_sold != 0
+    `;
     const categoryRows = await this.db.$queryRaw<Array<{ currency: string; category_id: bigint; units_sold: bigint; revenue: string }>>`
       SELECT o.currency, pc.category_id, SUM(ol.qty) AS units_sold, SUM(ol.row_total) AS revenue
       FROM order_line ol
