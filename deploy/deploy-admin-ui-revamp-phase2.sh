@@ -16,6 +16,11 @@
 #     the left/right edges on a wide monitor — now a single bounded card
 #     centered on the page, with one consistent OMEcommerce brand mark
 #     instead of 3 different logos/names on one screen
+#   - Dashboard: was 3 plain counter cards + a basic table — now real KPIs,
+#     an orders-by-status breakdown, a revenue trend chart, top products/
+#     categories by revenue, and restyled Recent Orders + Inventory Risk
+#     tables, all reusing the same real analytics endpoints /reports
+#     already uses (no new backend work, no fabricated numbers)
 #   - 2 real bugs fixed along the way: several pages' filter/search forms
 #     were missing the /admin basePath on submit (plain <form> doesn't
 #     respect it, next/form does); the sticky "Save Changes" bar used
@@ -34,9 +39,10 @@ cd "$REPO_ROOT"
 
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
-echo "==> Rebuilding admin (Orders/Products/Categories/Customers/Discounts/"
-echo "    Gift Cards/Loyalty/Referrals/Warehouses/Companies restyled, every"
-echo "    popup redesigned, sticky Save bar + basePath form fixes)"
+echo "==> Rebuilding admin (Dashboard/Orders/Products/Categories/Customers/"
+echo "    Discounts/Gift Cards/Loyalty/Referrals/Warehouses/Companies"
+echo "    restyled, every popup redesigned, login page + sticky Save bar +"
+echo "    basePath form fixes)"
 $COMPOSE up -d --build admin
 if [ $? -ne 0 ]; then
   echo "!! admin build/restart failed — see the output above" >&2
