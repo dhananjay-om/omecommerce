@@ -12,6 +12,7 @@ import { GetAiSettings } from './application/get-ai-settings.usecase.js';
 import { UpdateAiSettings } from './application/update-ai-settings.usecase.js';
 import { TestAiConnection } from './application/test-ai-connection.usecase.js';
 import { listInsightsQuerySchema, updateAiSettingsSchema } from './interface/http/schemas.js';
+import { todayDateKey } from '../analytics/domain/date-key.js';
 
 export interface AiRouters {
   admin: Router;
@@ -45,6 +46,12 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
   const updateAiSettings = new UpdateAiSettings(aiSettings);
   const testAiConnection = new TestAiConnection(db);
 
+  // Reuses the exact worker-side composition (createAiRefreshDeps, right
+  // above) for the on-demand "Refresh now" button — same RunNightlyAiRefresh
+  // the nightly job calls, just triggered from a request instead of a cron
+  // tick, so there's only ever one code path that actually runs the rules.
+  const { runNightlyAiRefresh } = createAiRefreshDeps(db);
+
   const admin = Router();
   const view = authorize('ai:view');
   const manage = authorize('ai:manage');
@@ -54,6 +61,17 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     view,
     asyncHandler(async (req, res) => {
       res.json({ data: await listInsights.execute(parse(listInsightsQuerySchema, req.query)) });
+    }),
+  );
+  admin.post(
+    '/ai/insights/refresh',
+    view,
+    asyncHandler(async (_req, res) => {
+      // Today's dateKey, not "yesterday" like the nightly job — someone
+      // clicking "Refresh now" wants to see where things stand today,
+      // including a partial day, not wait for a fully-closed one.
+      await runNightlyAiRefresh.execute(todayDateKey(new Date()));
+      res.status(204).send();
     }),
   );
 

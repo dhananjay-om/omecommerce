@@ -6,6 +6,7 @@ import type { AiInsightList } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { RefreshInsightsButton } from './refresh-button';
 
 const DEFAULT_PAGE_SIZE = 20;
 const CATEGORIES = ['Sales', 'Inventory', 'Orders', 'Customers', 'Fulfillment'];
@@ -64,6 +65,7 @@ export default async function AiInsightsPage({ searchParams }: { searchParams: P
             {list.total} insight{list.total === 1 ? '' : 's'} — refreshed nightly from your last 7 days of activity
           </p>
         </div>
+        <RefreshInsightsButton />
       </div>
 
       <Form id="ai-insights-filters" className="mt-6 flex flex-wrap items-center gap-2" action="/ai/insights">
@@ -97,7 +99,7 @@ export default async function AiInsightsPage({ searchParams }: { searchParams: P
         {list.insights.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              {hasFilters ? 'No insights match these filters.' : "No insights yet — check back after tonight's refresh."}
+              {hasFilters ? 'No insights match these filters.' : 'No insights yet — click "Refresh now" above, or check back after tonight\'s automatic refresh.'}
             </CardContent>
           </Card>
         ) : (
