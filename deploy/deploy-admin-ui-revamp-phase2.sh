@@ -12,6 +12,10 @@
 #     Companies: list grids restyled to the same look
 #   - Every popup app-wide (shared Dialog component): darker backdrop,
 #     wider body, real shadow, bordered header
+#   - Login page: was a full-bleed 50/50 split that stranded its content at
+#     the left/right edges on a wide monitor — now a single bounded card
+#     centered on the page, with one consistent OMEcommerce brand mark
+#     instead of 3 different logos/names on one screen
 #   - 2 real bugs fixed along the way: several pages' filter/search forms
 #     were missing the /admin basePath on submit (plain <form> doesn't
 #     respect it, next/form does); the sticky "Save Changes" bar used
