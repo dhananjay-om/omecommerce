@@ -11,7 +11,8 @@ import { ListInsights } from './application/list-insights.usecase.js';
 import { GetAiSettings } from './application/get-ai-settings.usecase.js';
 import { UpdateAiSettings } from './application/update-ai-settings.usecase.js';
 import { TestAiConnection } from './application/test-ai-connection.usecase.js';
-import { listInsightsQuerySchema, updateAiSettingsSchema } from './interface/http/schemas.js';
+import { ChatWithAssistant } from './application/chat-with-assistant.usecase.js';
+import { listInsightsQuerySchema, updateAiSettingsSchema, assistantChatSchema } from './interface/http/schemas.js';
 import { todayDateKey } from '../analytics/domain/date-key.js';
 
 export interface AiRouters {
@@ -51,6 +52,9 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
   // the nightly job calls, just triggered from a request instead of a cron
   // tick, so there's only ever one code path that actually runs the rules.
   const { runNightlyAiRefresh } = createAiRefreshDeps(db);
+
+  const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
+  const chatWithAssistant = new ChatWithAssistant(db, analyticsQuery);
 
   const admin = Router();
   const view = authorize('ai:view');
@@ -95,6 +99,15 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     manage,
     asyncHandler(async (_req, res) => {
       res.json({ data: await testAiConnection.execute() });
+    }),
+  );
+
+  admin.post(
+    '/ai/assistant/chat',
+    view,
+    asyncHandler(async (req, res) => {
+      const body = parse(assistantChatSchema, req.body);
+      res.json({ data: await chatWithAssistant.execute(body) });
     }),
   );
 

@@ -29,3 +29,15 @@ export const updateAiSettingsSchema = z.object({
   model: z.string().min(1).max(100),
   isActive: z.boolean(),
 });
+
+export const assistantChatSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().min(1).max(4000),
+      }),
+    )
+    .min(1)
+    .max(50),
+});

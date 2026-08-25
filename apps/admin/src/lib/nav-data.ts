@@ -120,9 +120,8 @@ export const NAV: NavGroup[] = [
         description: 'Explainable, data-grounded insights generated nightly from your real business data.',
       },
       {
-        key: 'ai-assistant', label: 'AI Assistant', href: '/ai/assistant', icon: Bot, status: 'comingSoon',
+        key: 'ai-assistant', label: 'AI Assistant', href: '/ai/assistant', icon: Bot, status: 'live',
         description: 'Ask questions about your store in plain language and get data-backed answers.',
-        planned: ['A chat interface answering questions like "what\'s my best-selling category this week?"', 'Suggested questions grounded in your actual current data', 'Direct links from an answer into the relevant report or record'],
       },
       {
         key: 'forecasting', label: 'Forecasting', href: '/ai/forecasting', icon: Radar, status: 'comingSoon',

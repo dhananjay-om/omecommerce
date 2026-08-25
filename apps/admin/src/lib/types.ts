@@ -1145,3 +1145,19 @@ export interface AiSettings {
   isActive: boolean;
   updatedAt: string | null;
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatToolLink {
+  tool: string;
+  label: string;
+  href: string;
+}
+
+export interface ChatResult {
+  message: string;
+  toolsUsed: ChatToolLink[];
+}
