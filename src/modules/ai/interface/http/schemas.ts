@@ -41,3 +41,10 @@ export const assistantChatSchema = z.object({
     .min(1)
     .max(50),
 });
+
+export const listForecastsQuerySchema = z.object({
+  riskTier: z.enum(['high', 'medium', 'low']).optional(),
+  websiteId: z.string().regex(/^\d+$/).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+});

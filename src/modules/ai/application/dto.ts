@@ -25,3 +25,10 @@ export interface UpdateAiSettingsCommand {
   model: string;
   isActive: boolean;
 }
+
+export interface ListForecastsQuery {
+  riskTier?: string;
+  websiteId?: string;
+  page?: number;
+  pageSize?: number;
+}

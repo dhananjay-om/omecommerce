@@ -49,3 +49,11 @@ export interface AiSettingsRepository {
   get(): Promise<AiSettingsRecord | null>;
   upsert(input: UpsertAiSettingsInput): Promise<AiSettingsRecord>;
 }
+
+/** Forecast write/refresh port — same idempotent "full re-derivation of a
+ *  bucket" contract as AiInsightRepository above (see ai.prisma's
+ *  ProductForecast model doc comment for the metric definitions this
+ *  computes). */
+export interface ProductForecastRepository {
+  refreshForecasts(dateKey: number, websiteId: bigint): Promise<void>;
+}

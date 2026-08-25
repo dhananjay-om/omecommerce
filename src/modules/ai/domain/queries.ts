@@ -37,3 +37,38 @@ export interface AiInsightListResult {
 export interface AiInsightQueryRepository {
   list(filter: AiInsightFilter): Promise<AiInsightListResult>;
 }
+
+/** Forecast read port — same read/write split as AiInsightQueryRepository
+ *  above. Rows are joined against `product` for display (name/sku) — the
+ *  write side only stores `productId`, same convention as
+ *  AnalyticsQueryRepository.getTopProducts. */
+export interface ProductForecastFilter {
+  riskTier?: string;
+  websiteId?: bigint;
+  page: number;
+  pageSize: number;
+}
+
+export interface ProductForecastRow {
+  publicId: string;
+  dateKey: number;
+  productId: string;
+  productName: string | null;
+  sku: string | null;
+  avgDailySellRate: string;
+  trendPct: string | null;
+  currentStock: number;
+  daysOfCover: string | null;
+  riskTier: string;
+}
+
+export interface ProductForecastListResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  forecasts: ProductForecastRow[];
+}
+
+export interface ProductForecastQueryRepository {
+  list(filter: ProductForecastFilter): Promise<ProductForecastListResult>;
+}

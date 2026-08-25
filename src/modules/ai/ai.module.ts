@@ -4,15 +4,20 @@ import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaAiInsightRepository } from './infrastructure/prisma-ai-insight.repository.js';
 import { PrismaAiInsightQueryRepository } from './infrastructure/prisma-ai-insight-query.repository.js';
 import { PrismaAiSettingsRepository } from './infrastructure/prisma-ai-settings.repository.js';
+import { PrismaProductForecastRepository } from './infrastructure/prisma-product-forecast.repository.js';
+import { PrismaProductForecastQueryRepository } from './infrastructure/prisma-product-forecast-query.repository.js';
 import { PrismaAnalyticsQueryRepository } from '../analytics/infrastructure/prisma-analytics-query.repository.js';
 import { RefreshWebsiteInsights } from './application/refresh-website-insights.usecase.js';
 import { RunNightlyAiRefresh } from './application/run-nightly-ai-refresh.usecase.js';
+import { RefreshWebsiteForecasts } from './application/refresh-website-forecasts.usecase.js';
+import { RunNightlyForecastRefresh } from './application/run-nightly-forecast-refresh.usecase.js';
 import { ListInsights } from './application/list-insights.usecase.js';
+import { ListForecasts } from './application/list-forecasts.usecase.js';
 import { GetAiSettings } from './application/get-ai-settings.usecase.js';
 import { UpdateAiSettings } from './application/update-ai-settings.usecase.js';
 import { TestAiConnection } from './application/test-ai-connection.usecase.js';
 import { ChatWithAssistant } from './application/chat-with-assistant.usecase.js';
-import { listInsightsQuerySchema, updateAiSettingsSchema, assistantChatSchema } from './interface/http/schemas.js';
+import { listInsightsQuerySchema, updateAiSettingsSchema, assistantChatSchema, listForecastsQuerySchema } from './interface/http/schemas.js';
 import { todayDateKey } from '../analytics/domain/date-key.js';
 
 export interface AiRouters {
@@ -27,11 +32,19 @@ export interface AiRouters {
  *  that module's exported functions build analytics-specific deps
  *  (RefreshWebsiteDay etc.), not a bare query repository, so instantiating
  *  it here directly is simpler than adding an export just for this. */
-export function createAiRefreshDeps(db: Db): { runNightlyAiRefresh: RunNightlyAiRefresh } {
+export function createAiRefreshDeps(db: Db): { runNightlyAiRefresh: RunNightlyAiRefresh; runNightlyForecastRefresh: RunNightlyForecastRefresh } {
   const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
   const aiInsights = new PrismaAiInsightRepository(db, analyticsQuery);
   const refreshWebsiteInsights = new RefreshWebsiteInsights(aiInsights);
-  return { runNightlyAiRefresh: new RunNightlyAiRefresh(aiInsights, refreshWebsiteInsights) };
+  const productForecasts = new PrismaProductForecastRepository(db);
+  const refreshWebsiteForecasts = new RefreshWebsiteForecasts(productForecasts);
+  return {
+    runNightlyAiRefresh: new RunNightlyAiRefresh(aiInsights, refreshWebsiteInsights),
+    // Reuses aiInsights.listWebsiteIds() for the website loop (see
+    // RunNightlyForecastRefresh's own doc comment) rather than duplicating
+    // that method on ProductForecastRepository too.
+    runNightlyForecastRefresh: new RunNightlyForecastRefresh(aiInsights, refreshWebsiteForecasts),
+  };
 }
 
 /** Composition root for the admin-only AI Insights REST API — mirrors
@@ -48,10 +61,14 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
   const testAiConnection = new TestAiConnection(db);
 
   // Reuses the exact worker-side composition (createAiRefreshDeps, right
-  // above) for the on-demand "Refresh now" button — same RunNightlyAiRefresh
-  // the nightly job calls, just triggered from a request instead of a cron
-  // tick, so there's only ever one code path that actually runs the rules.
-  const { runNightlyAiRefresh } = createAiRefreshDeps(db);
+  // above) for the on-demand "Refresh now" buttons — same
+  // RunNightlyAiRefresh/RunNightlyForecastRefresh the nightly job calls,
+  // just triggered from a request instead of a cron tick, so there's only
+  // ever one code path that actually runs the rules/metrics.
+  const { runNightlyAiRefresh, runNightlyForecastRefresh } = createAiRefreshDeps(db);
+
+  const forecastsQuery = new PrismaProductForecastQueryRepository(db);
+  const listForecasts = new ListForecasts(forecastsQuery);
 
   const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
   const chatWithAssistant = new ChatWithAssistant(db, analyticsQuery);
@@ -108,6 +125,22 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     asyncHandler(async (req, res) => {
       const body = parse(assistantChatSchema, req.body);
       res.json({ data: await chatWithAssistant.execute(body) });
+    }),
+  );
+
+  admin.get(
+    '/ai/forecasts',
+    view,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listForecasts.execute(parse(listForecastsQuerySchema, req.query)) });
+    }),
+  );
+  admin.post(
+    '/ai/forecasts/refresh',
+    view,
+    asyncHandler(async (_req, res) => {
+      await runNightlyForecastRefresh.execute(todayDateKey(new Date()));
+      res.status(204).send();
     }),
   );
 

@@ -124,9 +124,8 @@ export const NAV: NavGroup[] = [
         description: 'Ask questions about your store in plain language and get data-backed answers.',
       },
       {
-        key: 'forecasting', label: 'Forecasting', href: '/ai/forecasting', icon: Radar, status: 'comingSoon',
-        description: 'AI-projected demand per SKU, and which ones are at risk of stocking out.',
-        planned: ['Actual-vs-projected demand charting per SKU', 'A stockout-risk ranking with predicted days-of-cover', 'One-click purchase order creation from a forecasted shortfall'],
+        key: 'forecasting', label: 'Forecasting', href: '/ai/forecasting', icon: Radar, status: 'live',
+        description: 'Projected demand per product, and which ones are at risk of stocking out.',
       },
       {
         key: 'recommendations', label: 'Recommendations', href: '/ai/recommendations', icon: Target, status: 'comingSoon',

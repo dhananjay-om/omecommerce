@@ -1161,3 +1161,23 @@ export interface ChatResult {
   message: string;
   toolsUsed: ChatToolLink[];
 }
+
+export interface ProductForecast {
+  publicId: string;
+  dateKey: number;
+  productId: string;
+  productName: string | null;
+  sku: string | null;
+  avgDailySellRate: string;
+  trendPct: string | null;
+  currentStock: number;
+  daysOfCover: string | null;
+  riskTier: 'high' | 'medium' | 'low';
+}
+
+export interface ProductForecastList {
+  total: number;
+  page: number;
+  pageSize: number;
+  forecasts: ProductForecast[];
+}

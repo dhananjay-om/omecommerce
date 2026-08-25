@@ -91,3 +91,49 @@ model AiSettings {
 
   @@map("ai_settings")
 }
+
+/// One row per (day, website, product) with a real forecastable sales
+/// signal — same "derived, refreshed not live-queried" posture as
+/// AiInsight, same nightly cadence (see src/workers/ai-refresh.worker.ts).
+/// Product-grain, not variant-grain — same simplification
+/// SummaryProductDaily itself already made for the same reason (see that
+/// model's own doc comment in analytics.prisma): most catalog items here
+/// are SIMPLE products with one implicit variant. `currentStock` sums
+/// stock_item.available across every variant/warehouse of the product.
+/// Deliberately NOT LLM-based — a plain trailing-window moving average,
+/// same "explainable, not a model guess" philosophy as AiInsight.
+///
+/// A product with zero recent sales gets no row at all (not a forecastable
+/// signal) — refreshForecasts deletes any existing row for a product that
+/// drops out, same "clear what's no longer true" reasoning as
+/// PrismaAiInsightRepository.refreshInsights.
+model ProductForecast {
+  id               BigInt   @id @default(autoincrement())
+  publicId         String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  dateKey          Int      @map("date_key")
+  websiteId        BigInt   @map("website_id")
+  productId        BigInt   @map("product_id")
+  /// Trailing-14-day units sold ÷ 14 — units are currency-agnostic, so
+  /// this sums across every currency SummaryProductDaily tracked for the
+  /// product, unlike money-keyed reads elsewhere in this schema.
+  avgDailySellRate Decimal  @map("avg_daily_sell_rate") @db.Decimal(10, 4)
+  /// Percent change, most-recent-7-days average vs. the 7 days before —
+  /// null when the earlier window had zero sales (an undefined
+  /// percentage, not zero).
+  trendPct         Decimal? @map("trend_pct") @db.Decimal(10, 2)
+  currentStock     Int      @map("current_stock")
+  /// currentStock ÷ avgDailySellRate — null when avgDailySellRate is 0
+  /// (an "infinite" cover isn't a meaningful number to show; this row
+  /// wouldn't exist in that case anyway, see the model doc comment above).
+  daysOfCover      Decimal? @map("days_of_cover") @db.Decimal(10, 2)
+  /// Fixed vocabulary in application code ('high'/'medium'/'low', by
+  /// daysOfCover thresholds) — String, not an enum, same reasoning as
+  /// AiInsight.impact.
+  riskTier         String   @map("risk_tier")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, productId], map: "ux_product_forecast_date_website_product")
+  @@index([websiteId, dateKey])
+  @@index([riskTier])
+  @@map("product_forecast")
+}

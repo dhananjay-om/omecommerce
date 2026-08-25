@@ -23,12 +23,18 @@ export async function scheduleAiRefresh(): Promise<void> {
 
 /** Per-job-name handler for the shared `maintenance` Worker (workers/
  *  index.ts's startMaintenanceWorker()). Regenerates every website's AI
- *  Insights for the day that just closed. No event-driven projector
- *  alongside this (unlike analytics-projector.worker.ts) — a trailing-7-day
- *  trend insight doesn't need real-time updates the way "today's order
- *  count" does; nightly is the right cadence for this kind of report. */
+ *  Insights, then Product Forecasts, for the day that just closed — same
+ *  one-job-does-several-related-things shape as analytics'
+ *  RunNightlyRefresh (order summaries + fulfillment + inventory snapshot +
+ *  RFM, all in one nightly pass), not a second cron registration per
+ *  table. No event-driven projector alongside this (unlike
+ *  analytics-projector.worker.ts) — a trailing-window trend/forecast
+ *  doesn't need real-time updates the way "today's order count" does;
+ *  nightly is the right cadence for both. Insights failing doesn't block
+ *  Forecasts from still running (each wrapped independently) — they're
+ *  unrelated derived outputs, no reason one's failure should skip the other. */
 export function createAiRefreshHandler(): (job: Job) => Promise<void> {
-  const { runNightlyAiRefresh } = createAiRefreshDeps(prisma);
+  const { runNightlyAiRefresh, runNightlyForecastRefresh } = createAiRefreshDeps(prisma);
 
   return async (job: Job) => {
     if (job.name !== AI_REFRESH_JOB_NAME) return;
@@ -38,6 +44,12 @@ export function createAiRefreshHandler(): (job: Job) => Promise<void> {
       logger.info({ dateKey }, 'AI insights nightly refresh completed');
     } catch (err) {
       logger.error({ err, dateKey }, 'AI insights nightly refresh failed');
+    }
+    try {
+      await runNightlyForecastRefresh.execute(dateKey);
+      logger.info({ dateKey }, 'product forecast nightly refresh completed');
+    } catch (err) {
+      logger.error({ err, dateKey }, 'product forecast nightly refresh failed');
     }
   };
 }
