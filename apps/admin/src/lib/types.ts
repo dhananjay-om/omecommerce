@@ -1137,3 +1137,11 @@ export interface AiInsightList {
   pageSize: number;
   insights: AiInsight[];
 }
+
+export interface AiSettings {
+  provider: string;
+  model: string;
+  hasApiKey: boolean;
+  isActive: boolean;
+  updatedAt: string | null;
+}

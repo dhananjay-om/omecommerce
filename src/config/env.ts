@@ -55,6 +55,12 @@ const EnvSchema = z.object({
   // Order Details" / storefront link inside a transactional email. Optional
   // — a missing value just means that link is omitted, not a boot failure.
   SITE_URL: z.string().url().optional(),
+  // Fallback OpenAI credential for LLM-based AI features — optional, same
+  // "absent = fall back further" posture as SMTP_*: the admin-configurable
+  // AiSettings DB row (Stores > AI Settings) is the real gate and takes
+  // precedence when present (see getOpenAiClient), this just covers running
+  // before that row has ever been saved.
+  OPENAI_API_KEY: z.string().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

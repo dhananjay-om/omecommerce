@@ -48,3 +48,46 @@ model AiInsight {
   @@index([websiteId, dateKey])
   @@map("ai_insight")
 }
+
+/// Admin-configurable LLM provider credentials (currently just OpenAI),
+/// backing whatever future LLM-based feature reads it (AI Assistant first —
+/// this table intentionally has no reader yet, it's the key-management
+/// piece that ships ahead of the feature that will consume it). Same
+/// singleton/plaintext-with-documented-tradeoff shape as EmailSettings
+/// (system.prisma) — deliberately mirrored, not reinvented:
+///
+/// A true singleton — at most one row ever exists, enforced at the
+/// application layer (`findFirst()` then update-or-create), not a DB
+/// constraint — same as EmailSettings itself; that model's own repository
+/// comment incorrectly claims a DB-level unique index enforces this, but no
+/// such index exists in its schema either, so don't copy that claim here.
+///
+/// `apiKey` is stored in plaintext, not hashed — same reasoning as
+/// EmailSettings.password: the app must present the ORIGINAL key to OpenAI
+/// on every call, so only reversible storage is possible without a
+/// symmetric-encryption key this project doesn't have anywhere yet. Same
+/// real exposure delta as that column (rides along in backups/replicas,
+/// unlike JWT_SECRET/GIFT_CARD_HMAC_SECRET which are env-var-only) —
+/// mitigated the same way: GetAiSettings never returns this column's
+/// value, only whether one is set.
+model AiSettings {
+  id        BigInt   @id @default(autoincrement())
+  publicId  String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  /// Fixed vocabulary in application code ('openai' today) — String, not an
+  /// enum, so adding a second provider later needs no migration. Only
+  /// 'openai' is actually wired to anything; the admin UI doesn't offer a
+  /// picker for providers that don't work yet.
+  provider  String   @default("openai")
+  apiKey    String   @map("api_key")
+  model     String   @default("gpt-4o-mini")
+  /// Lets a saved key be temporarily disabled without deleting it (e.g. to
+  /// pause spend) — checked by getOpenAiClient before the DB row is even
+  /// considered "configured".
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+
+  @@map("ai_settings")
+}

@@ -134,6 +134,10 @@ export const NAV: NavGroup[] = [
         description: 'Ranked, confidence-scored suggestions for pricing, restocking, and merchandising.',
         planned: ['A ranked list of suggested actions with an estimated impact and confidence score', 'One-click apply for the safe/reversible suggestions'],
       },
+      {
+        key: 'ai-settings', label: 'AI Settings', href: '/ai/settings', icon: Settings, status: 'live',
+        description: 'Configure the LLM provider key (OpenAI) used by AI features.',
+      },
     ],
   },
   {
