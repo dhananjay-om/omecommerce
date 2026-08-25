@@ -128,9 +128,8 @@ export const NAV: NavGroup[] = [
         description: 'Projected demand per product, and which ones are at risk of stocking out.',
       },
       {
-        key: 'recommendations', label: 'Recommendations', href: '/ai/recommendations', icon: Target, status: 'comingSoon',
-        description: 'Ranked, confidence-scored suggestions for pricing, restocking, and merchandising.',
-        planned: ['A ranked list of suggested actions with an estimated impact and confidence score', 'One-click apply for the safe/reversible suggestions'],
+        key: 'recommendations', label: 'Recommendations', href: '/ai/recommendations', icon: Target, status: 'live',
+        description: 'Ranked, confidence-scored suggestions for restocking, promoting slow movers, and featuring trending categories.',
       },
       {
         key: 'ai-settings', label: 'AI Settings', href: '/ai/settings', icon: Settings, status: 'live',

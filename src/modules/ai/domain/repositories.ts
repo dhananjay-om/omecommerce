@@ -57,3 +57,10 @@ export interface AiSettingsRepository {
 export interface ProductForecastRepository {
   refreshForecasts(dateKey: number, websiteId: bigint): Promise<void>;
 }
+
+/** Suggestion write/refresh port — same idempotent contract as the others
+ *  above (see ai.prisma's MerchandisingSuggestion model doc comment for
+ *  the 3 suggestion kinds this computes). */
+export interface MerchandisingSuggestionRepository {
+  refreshSuggestions(dateKey: number, websiteId: bigint): Promise<void>;
+}

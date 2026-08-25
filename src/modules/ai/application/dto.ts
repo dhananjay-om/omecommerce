@@ -32,3 +32,11 @@ export interface ListForecastsQuery {
   page?: number;
   pageSize?: number;
 }
+
+export interface ListSuggestionsQuery {
+  kind?: string;
+  confidence?: string;
+  websiteId?: string;
+  page?: number;
+  pageSize?: number;
+}

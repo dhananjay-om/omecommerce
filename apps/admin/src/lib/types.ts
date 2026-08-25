@@ -1166,6 +1166,7 @@ export interface ProductForecast {
   publicId: string;
   dateKey: number;
   productId: string;
+  productPublicId: string | null;
   productName: string | null;
   sku: string | null;
   avgDailySellRate: string;
@@ -1180,4 +1181,25 @@ export interface ProductForecastList {
   page: number;
   pageSize: number;
   forecasts: ProductForecast[];
+}
+
+export interface MerchandisingSuggestion {
+  publicId: string;
+  dateKey: number;
+  kind: 'RESTOCK' | 'PROMOTE_SLOW_MOVER' | 'FEATURE_TRENDING_CATEGORY';
+  targetType: 'PRODUCT' | 'CATEGORY';
+  targetName: string | null;
+  headline: string;
+  rationale: string;
+  impactScore: string;
+  confidence: 'high' | 'medium' | 'low';
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface MerchandisingSuggestionList {
+  total: number;
+  page: number;
+  pageSize: number;
+  suggestions: MerchandisingSuggestion[];
 }

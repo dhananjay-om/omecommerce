@@ -23,18 +23,19 @@ export async function scheduleAiRefresh(): Promise<void> {
 
 /** Per-job-name handler for the shared `maintenance` Worker (workers/
  *  index.ts's startMaintenanceWorker()). Regenerates every website's AI
- *  Insights, then Product Forecasts, for the day that just closed — same
- *  one-job-does-several-related-things shape as analytics'
- *  RunNightlyRefresh (order summaries + fulfillment + inventory snapshot +
- *  RFM, all in one nightly pass), not a second cron registration per
- *  table. No event-driven projector alongside this (unlike
+ *  Insights, then Product Forecasts, then Merchandising Suggestions, for the
+ *  day that just closed — same one-job-does-several-related-things shape as
+ *  analytics' RunNightlyRefresh (order summaries + fulfillment + inventory
+ *  snapshot + RFM, all in one nightly pass), not a second cron registration
+ *  per table. No event-driven projector alongside this (unlike
  *  analytics-projector.worker.ts) — a trailing-window trend/forecast
  *  doesn't need real-time updates the way "today's order count" does;
- *  nightly is the right cadence for both. Insights failing doesn't block
- *  Forecasts from still running (each wrapped independently) — they're
- *  unrelated derived outputs, no reason one's failure should skip the other. */
+ *  nightly is the right cadence for all three. Each step is wrapped
+ *  independently so one failing doesn't block the others — EXCEPT
+ *  Suggestions must still run last: 2 of its 3 kinds read Forecasts' own
+ *  freshly-written output, so ordering (not just independence) matters here. */
 export function createAiRefreshHandler(): (job: Job) => Promise<void> {
-  const { runNightlyAiRefresh, runNightlyForecastRefresh } = createAiRefreshDeps(prisma);
+  const { runNightlyAiRefresh, runNightlyForecastRefresh, runNightlySuggestionRefresh } = createAiRefreshDeps(prisma);
 
   return async (job: Job) => {
     if (job.name !== AI_REFRESH_JOB_NAME) return;
@@ -50,6 +51,12 @@ export function createAiRefreshHandler(): (job: Job) => Promise<void> {
       logger.info({ dateKey }, 'product forecast nightly refresh completed');
     } catch (err) {
       logger.error({ err, dateKey }, 'product forecast nightly refresh failed');
+    }
+    try {
+      await runNightlySuggestionRefresh.execute(dateKey);
+      logger.info({ dateKey }, 'merchandising suggestion nightly refresh completed');
+    } catch (err) {
+      logger.error({ err, dateKey }, 'merchandising suggestion nightly refresh failed');
     }
   };
 }

@@ -6,6 +6,7 @@ interface ForecastRow {
   public_id: string;
   date_key: number;
   product_id: bigint;
+  product_public_id: string | null;
   product_name: string | null;
   sku: string | null;
   avg_daily_sell_rate: Prisma.Decimal;
@@ -31,7 +32,7 @@ export class PrismaProductForecastQueryRepository implements ProductForecastQuer
     const [totalRows, rows] = await Promise.all([
       this.db.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS n FROM product_forecast pf ${where}`),
       this.db.$queryRaw<ForecastRow[]>(Prisma.sql`
-        SELECT pf.public_id, pf.date_key, pf.product_id, p.name_default AS product_name, p.sku,
+        SELECT pf.public_id, pf.date_key, pf.product_id, p.public_id AS product_public_id, p.name_default AS product_name, p.sku,
           pf.avg_daily_sell_rate, pf.trend_pct, pf.current_stock, pf.days_of_cover, pf.risk_tier
         FROM product_forecast pf
         LEFT JOIN product p ON p.id = pf.product_id
@@ -53,6 +54,7 @@ export class PrismaProductForecastQueryRepository implements ProductForecastQuer
         publicId: r.public_id,
         dateKey: r.date_key,
         productId: r.product_id.toString(),
+        productPublicId: r.product_public_id,
         productName: r.product_name,
         sku: r.sku,
         avgDailySellRate: r.avg_daily_sell_rate.toString(),

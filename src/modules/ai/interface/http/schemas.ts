@@ -48,3 +48,11 @@ export const listForecastsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(100).optional(),
 });
+
+export const listSuggestionsQuerySchema = z.object({
+  kind: z.enum(['RESTOCK', 'PROMOTE_SLOW_MOVER', 'FEATURE_TRENDING_CATEGORY']).optional(),
+  confidence: z.enum(['high', 'medium', 'low']).optional(),
+  websiteId: z.string().regex(/^\d+$/).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
+});

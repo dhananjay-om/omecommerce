@@ -137,3 +137,52 @@ model ProductForecast {
   @@index([riskTier])
   @@map("product_forecast")
 }
+
+/// One row per generated suggestion — the fourth and last AI features
+/// concern in this module. Same "derived, refreshed not live-queried"
+/// posture as AiInsight/ProductForecast, same nightly cadence (folded into
+/// the same ai-refresh.worker.ts job, run third — after ProductForecast,
+/// since the RESTOCK/PROMOTE_SLOW_MOVER kinds read that table's own
+/// output directly rather than re-deriving it). Deliberately NOT
+/// LLM-based, same "explainable" philosophy as the rest of this module.
+///
+/// `kind` is a fixed vocabulary in application code
+/// (RESTOCK/PROMOTE_SLOW_MOVER/FEATURE_TRENDING_CATEGORY) — String, not an
+/// enum, same reasoning as AiInsight.ruleCode. `targetType`/`targetId`
+/// generalize AiInsight's whole-website-only scope to a specific
+/// product/category, since every suggestion here is inherently about one
+/// entity, unlike most Insight rules.
+///
+/// `impactScore` is a real computed number, but genuinely different units
+/// per `kind` (documented in the rule engine) — good enough for a
+/// reasonable default sort, not claimed to be a precisely comparable
+/// cross-kind metric. `confidence` is a tier based on how much real data
+/// backs the signal, not a fabricated ML score — same "explainable, not
+/// fake precision" posture as every tier elsewhere in this module.
+///
+/// No "apply" action — every suggestion's actionHref links to the real
+/// admin page where a merchant would act on it themselves (same
+/// convention as AiInsight.actionHref); there's no generic "apply this
+/// suggestion" primitive in this codebase, and building bespoke
+/// automation per kind (e.g. auto-creating a coupon) is a separate, much
+/// larger feature, deliberately not built here.
+model MerchandisingSuggestion {
+  id          BigInt   @id @default(autoincrement())
+  publicId    String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  dateKey     Int      @map("date_key")
+  websiteId   BigInt   @map("website_id")
+  kind        String
+  targetType  String   @map("target_type") // 'PRODUCT' | 'CATEGORY'
+  targetId    BigInt   @map("target_id")
+  headline    String
+  rationale   String
+  impactScore Decimal  @map("impact_score") @db.Decimal(12, 2)
+  confidence  String
+  actionLabel String   @map("action_label")
+  actionHref  String   @map("action_href")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, kind, targetType, targetId], map: "ux_merch_suggestion_date_website_kind_target")
+  @@index([websiteId, dateKey])
+  @@map("merchandising_suggestion")
+}

@@ -53,6 +53,13 @@ export interface ProductForecastRow {
   publicId: string;
   dateKey: number;
   productId: string;
+  /** The product's own publicId (UUID) — what /products/:id routes
+   *  actually key by (confirmed against every product list page's own
+   *  `router.push('/products/${p.publicId}')` convention). `productId`
+   *  above is the internal bigint id, never valid in a URL — a real bug
+   *  found and fixed while building Recommendations: the frontend was
+   *  linking with `productId`, which 404s. */
+  productPublicId: string | null;
   productName: string | null;
   sku: string | null;
   avgDailySellRate: string;
@@ -71,4 +78,43 @@ export interface ProductForecastListResult {
 
 export interface ProductForecastQueryRepository {
   list(filter: ProductForecastFilter): Promise<ProductForecastListResult>;
+}
+
+/** Suggestion read port — same read/write split as the others above.
+ *  `actionHref` (built from the target's own publicId at write time, same
+ *  "get the publicId right, not the internal id" fix applied to
+ *  ProductForecast above) points straight at the suggested ACTION's own
+ *  page (e.g. .../inventory or .../pricing), not just the entity's
+ *  overview — same convention as AiInsight.actionHref. */
+export interface MerchandisingSuggestionFilter {
+  kind?: string;
+  confidence?: string;
+  websiteId?: bigint;
+  page: number;
+  pageSize: number;
+}
+
+export interface MerchandisingSuggestionRow {
+  publicId: string;
+  dateKey: number;
+  kind: string;
+  targetType: string;
+  targetName: string | null;
+  headline: string;
+  rationale: string;
+  impactScore: string;
+  confidence: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface MerchandisingSuggestionListResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  suggestions: MerchandisingSuggestionRow[];
+}
+
+export interface MerchandisingSuggestionQueryRepository {
+  list(filter: MerchandisingSuggestionFilter): Promise<MerchandisingSuggestionListResult>;
 }

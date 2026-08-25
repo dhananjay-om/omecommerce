@@ -103,9 +103,19 @@ export default async function ForecastingPage({ searchParams }: { searchParams: 
               list.forecasts.map((f) => (
                 <TableRow key={f.publicId}>
                   <TableCell>
-                    <Link href={`/products/${f.productId}`} className="font-medium text-foreground hover:underline">
-                      {f.productName ?? '—'}
-                    </Link>
+                    {/* publicId (UUID), not the internal productId — every
+                        real /products/:id route is keyed by publicId (see
+                        every list page's own router.push convention); a
+                        real bug, linking with the internal id 404s. Falls
+                        back to plain text if the product's since been
+                        deleted (LEFT JOIN returns null). */}
+                    {f.productPublicId ? (
+                      <Link href={`/products/${f.productPublicId}`} className="font-medium text-foreground hover:underline">
+                        {f.productName ?? '—'}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-foreground">{f.productName ?? '—'}</span>
+                    )}
                     <div className="text-xs text-muted-foreground">{f.sku}</div>
                   </TableCell>
                   <TableCell className="text-right">{Number(f.avgDailySellRate).toFixed(2)} units/day</TableCell>
