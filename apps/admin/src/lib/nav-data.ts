@@ -116,9 +116,8 @@ export const NAV: NavGroup[] = [
     accent: 'ai',
     items: [
       {
-        key: 'ai-insights', label: 'AI Insights', href: '/ai/insights', icon: Sparkles, status: 'comingSoon',
-        description: 'Explainable, data-grounded insights generated continuously from your live business data.',
-        planned: ['Automatic anomaly and opportunity detection across sales, inventory, and fulfillment', 'A plain-language "why am I seeing this?" explanation on every insight', 'One-click actions (create a PO, view the affected report) from each card'],
+        key: 'ai-insights', label: 'AI Insights', href: '/ai/insights', icon: Sparkles, status: 'live',
+        description: 'Explainable, data-grounded insights generated nightly from your real business data.',
       },
       {
         key: 'ai-assistant', label: 'AI Assistant', href: '/ai/assistant', icon: Bot, status: 'comingSoon',

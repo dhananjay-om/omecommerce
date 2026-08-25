@@ -26,6 +26,7 @@ import { createLoyaltyModule } from './modules/loyalty/loyalty.module.js';
 import { createReferralModule } from './modules/referral/referral.module.js';
 import { createCompanyModule } from './modules/company/company.module.js';
 import { createAnalyticsModule } from './modules/analytics/analytics.module.js';
+import { createAiModule } from './modules/ai/ai.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -122,6 +123,9 @@ export function createApp(): Express {
 
   const analytics = createAnalyticsModule(prisma, auth.authorize);
   app.use('/admin/v1', analytics.admin);
+
+  const ai = createAiModule(prisma, auth.authorize);
+  app.use('/admin/v1', ai.admin);
 
   app.use(notFound);
   app.use(errorHandler);

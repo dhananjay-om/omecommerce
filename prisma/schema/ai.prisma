@@ -1,0 +1,50 @@
+// =============================================================================
+// OMEcommerce — AI Insights (Track 1 of the AI features plan)
+// -----------------------------------------------------------------------------
+// A derived read model, same posture as analytics.prisma's summary_* tables
+// (see that file's own header comment for the full convention this follows):
+// nothing outside the AI refresh worker/use case ever writes here. Every rule
+// reads the EXISTING analytics summary tables (src/modules/analytics) via
+// AnalyticsQueryRepository — this table stores the rules' OUTPUT, not new raw
+// aggregation. Explicitly not LLM-generated: every row here is the result of
+// a plain threshold rule over real numbers, same "explainable, not a model
+// guess" philosophy the Dashboard's own ai-insights.tsx already established
+// (see that component's header comment) — this table is that same pattern's
+// persisted, exhaustive version, not a different kind of "AI".
+// =============================================================================
+
+/// One row per generated insight. `dateKey` is the day the underlying
+/// trailing-window comparison closed on (matches analytics' YYYYMMDD
+/// convention, src/modules/analytics/domain/date-key.ts's dateKeyOf — reused
+/// directly, not reimplemented). `ruleCode` is a fixed vocabulary in
+/// application code (REVENUE_DROP/REVENUE_UP/OUT_OF_STOCK/LOW_STOCK/
+/// PAYMENT_FAILURE_SPIKE/RETURN_RATE_UP/ORDER_STUCK/FULFILLMENT_SLOWDOWN/
+/// NEW_CUSTOMERS/...) — String, not an enum, same "a summary table must
+/// never fail to write because a new rule was added" reasoning as
+/// SummaryOrderStatusDaily.status.
+///
+/// No per-entity column (e.g. a future per-SKU rule's variant/product id) in
+/// this first pass — every Phase 1 rule is a whole-website metric, and a
+/// nullable column in a unique constraint needs `NULLS NOT DISTINCT` (raw
+/// SQL, not expressible in Prisma's schema DSL — see prisma/README.md) to
+/// actually dedupe on refresh; not worth that machinery for a column nothing
+/// writes yet. Add it back in its own migration once a real per-entity rule
+/// needs it.
+model AiInsight {
+  id          BigInt   @id @default(autoincrement())
+  publicId    String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  dateKey     Int      @map("date_key")
+  websiteId   BigInt   @map("website_id")
+  ruleCode    String   @map("rule_code")
+  category    String
+  impact      String
+  headline    String
+  actionLabel String   @map("action_label")
+  actionHref  String   @map("action_href")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([dateKey, websiteId, ruleCode], map: "ux_ai_insight_date_website_rule")
+  @@index([websiteId, dateKey])
+  @@map("ai_insight")
+}

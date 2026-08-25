@@ -46,4 +46,5 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { code: 'reports:export', description: 'Export analytics reports to CSV/Excel' },
   { code: 'reports:schedule', description: 'Schedule recurring report deliveries' },
   { code: 'alerts:manage', description: 'Configure analytics alert rules' },
+  { code: 'ai:view', description: 'View AI-generated insights' },
 ];

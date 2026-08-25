@@ -12,6 +12,7 @@ import { createLoyaltyEarnHandler } from './loyalty-earn.worker.js';
 import { createReferralQualifyHandler } from './referral-qualify.worker.js';
 import { createAnalyticsProjectorHandler } from './analytics-projector.worker.js';
 import { createAnalyticsRefreshHandler, scheduleAnalyticsRefresh } from './analytics-refresh.worker.js';
+import { createAiRefreshHandler, scheduleAiRefresh } from './ai-refresh.worker.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 export interface WorkerHandles {
@@ -67,6 +68,7 @@ function startMaintenanceWorker(): Worker {
     createReservationSweepHandler(),
     createStoredValueHoldSweepHandler(),
     createAnalyticsRefreshHandler(),
+    createAiRefreshHandler(),
   ];
 
   const worker = new Worker(
@@ -102,9 +104,10 @@ export async function startWorkers(): Promise<WorkerHandles> {
   await scheduleReservationSweep();
   await scheduleStoredValueHoldSweep();
   await scheduleAnalyticsRefresh();
+  await scheduleAiRefresh();
 
   logger.info(
-    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify, analytics projector], maintenance [reservation sweep, stored-value hold sweep, analytics nightly refresh], bulk import)',
+    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify, analytics projector], maintenance [reservation sweep, stored-value hold sweep, analytics nightly refresh, AI insights nightly refresh], bulk import)',
   );
 
   return {

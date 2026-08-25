@@ -1119,3 +1119,21 @@ export interface AlertHistoryView {
   message: string;
   notifiedAt: string | null;
 }
+
+export interface AiInsight {
+  publicId: string;
+  dateKey: number;
+  category: string;
+  impact: 'high' | 'medium' | 'low';
+  headline: string;
+  actionLabel: string;
+  actionHref: string;
+  createdAt: string;
+}
+
+export interface AiInsightList {
+  total: number;
+  page: number;
+  pageSize: number;
+  insights: AiInsight[];
+}
