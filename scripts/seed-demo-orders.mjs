@@ -129,6 +129,56 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// --- Realistic-looking (synthetic, not real people) customer identities —
+// a mix of Indian and Western names, matching a GST-registered store that
+// also has a "US Retail" website: real analytics/order-list screens read
+// oddly with "Demo Customer 7" / demo-order-7@example.com rows in them. ---
+const FIRST_NAMES = [
+  'Aarav', 'Vivaan', 'Aditya', 'Ishaan', 'Kabir', 'Arjun', 'Rohan', 'Ananya', 'Diya', 'Priya',
+  'Saanvi', 'Meera', 'Neha', 'Riya', 'Kavya', 'James', 'Michael', 'Daniel', 'Olivia', 'Emma',
+  'Sophia', 'Liam', 'Noah', 'Ava', 'Mia', 'Ethan', 'Grace', 'Lucas', 'Chloe', 'Ryan',
+];
+const LAST_NAMES = [
+  'Sharma', 'Verma', 'Gupta', 'Patel', 'Reddy', 'Iyer', 'Nair', 'Menon', 'Kapoor', 'Chopra',
+  'Malhotra', 'Bose', 'Rao', 'Mehta', 'Joshi', 'Smith', 'Johnson', 'Brown', 'Williams', 'Miller',
+  'Davis', 'Wilson', 'Anderson', 'Taylor', 'Thomas', 'Moore', 'Clark', 'Lewis', 'Walker', 'Hall',
+];
+const EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'];
+const CITIES_IN = [
+  { city: 'Mumbai', postalCode: '400001', country: 'IN' },
+  { city: 'Delhi', postalCode: '110001', country: 'IN' },
+  { city: 'Bengaluru', postalCode: '560001', country: 'IN' },
+  { city: 'Hyderabad', postalCode: '500001', country: 'IN' },
+  { city: 'Pune', postalCode: '411001', country: 'IN' },
+  { city: 'Chennai', postalCode: '600001', country: 'IN' },
+  { city: 'Kolkata', postalCode: '700001', country: 'IN' },
+  { city: 'Ahmedabad', postalCode: '380001', country: 'IN' },
+];
+const CITIES_US = [
+  { city: 'New York', postalCode: '10001', country: 'US' },
+  { city: 'Los Angeles', postalCode: '90001', country: 'US' },
+  { city: 'Chicago', postalCode: '60601', country: 'US' },
+  { city: 'Houston', postalCode: '77001', country: 'US' },
+  { city: 'Seattle', postalCode: '98101', country: 'US' },
+  { city: 'Austin', postalCode: '73301', country: 'US' },
+];
+
+/** One name backs both the address and the checkout email — a real
+ *  customer's order confirmation name and email line up, and mismatched
+ *  ones (a seeded "James Miller" checking out as demo-order-7@example.com)
+ *  are exactly the kind of thing that reads as obviously fake data on the
+ *  order list. Trailing digits in the local-part are a normal, common
+ *  pattern for a real email (avoids collisions without looking synthetic).
+ *  City/country follows the resolved storefront currency (INR vs.
+ *  everything else) so a USD store doesn't get Indian addresses. */
+function randomCustomer(currency) {
+  const firstName = pick(FIRST_NAMES);
+  const lastName = pick(LAST_NAMES);
+  const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${randInt(1, 999)}@${pick(EMAIL_DOMAINS)}`;
+  const location = pick(currency === 'INR' ? CITIES_IN : CITIES_US);
+  return { name: `${firstName} ${lastName}`, email, ...location };
+}
+
 // --- Date-key helpers — mirrors src/modules/analytics/domain/date-key.ts exactly,
 // the shared bucketing convention every analytics query keys by (UTC calendar day). ---
 function dateKeyOf(date) {
@@ -195,6 +245,18 @@ async function refreshDay(dateKey, websiteId) {
   `;
   const newCustomersByCurrency = new Map(newCustomerRows.map((r) => [r.currency, r.new_customer_count]));
 
+  // Zero this bucket first — matches prisma-analytics.repository.ts's own
+  // fix (found by actually testing this script's sibling delete-order
+  // feature): without it, a currency/product/category that had orders
+  // before but has none anymore (e.g. this script re-run after some
+  // orders were deleted) keeps showing its old, now-wrong numbers forever,
+  // since an empty query result below just skips the upsert loop.
+  await prisma.$executeRaw`
+    UPDATE summary_sales_daily
+    SET gross_revenue = 0, discount_total = 0, tax_total = 0, shipping_total = 0, refund_total = 0,
+        net_revenue = 0, order_count = 0, units_sold = 0, new_customer_count = 0, updated_at = now()
+    WHERE date_key = ${dateKey} AND website_id = ${websiteId} AND order_count != 0
+  `;
   for (const row of salesRows) {
     const refundTotal = refundByCurrency.get(row.currency) ?? '0';
     await prisma.$executeRaw`
@@ -225,6 +287,10 @@ async function refreshDay(dateKey, websiteId) {
     `;
   }
 
+  await prisma.$executeRaw`
+    UPDATE summary_product_daily SET units_sold = 0, revenue = 0, order_count = 0, updated_at = now()
+    WHERE date_key = ${dateKey} AND website_id = ${websiteId} AND order_count != 0
+  `;
   const productRows = await prisma.$queryRaw`
     SELECT o.currency, pv.product_id, SUM(ol.qty) AS units_sold, SUM(ol.row_total) AS revenue, COUNT(DISTINCT o.id) AS order_count
     FROM order_line ol
@@ -242,6 +308,10 @@ async function refreshDay(dateKey, websiteId) {
     `;
   }
 
+  await prisma.$executeRaw`
+    UPDATE summary_category_daily SET units_sold = 0, revenue = 0, updated_at = now()
+    WHERE date_key = ${dateKey} AND website_id = ${websiteId} AND units_sold != 0
+  `;
   const categoryRows = await prisma.$queryRaw`
     SELECT o.currency, pc.category_id, SUM(ol.qty) AS units_sold, SUM(ol.row_total) AS revenue
     FROM order_line ol
@@ -292,10 +362,10 @@ for (let i = 0; i < ORDER_COUNT; i++) {
       continue;
     }
 
-    const n = i + 1;
-    const address = { name: `Demo Customer ${n}`, line1: `${randInt(1, 999)} Market St`, city: 'Springfield', postalCode: '12345', country: 'US' };
+    const customer = randomCustomer(currency);
+    const address = { name: customer.name, line1: `${randInt(1, 999)} Main St`, city: customer.city, postalCode: customer.postalCode, country: customer.country };
     const order = await S('POST', `/store/v1/carts/${cartId}/checkout`, {
-      email: `demo-order-${n}@example.com`,
+      email: customer.email,
       billingAddress: address,
       shippingAddress: address,
       shippingMethodCode,
