@@ -27,6 +27,13 @@
 #     profit/margin, CAC, CLV) show clearly-illustrative placeholder
 #     values rather than a blank tile, per explicit instruction to build
 #     the reference design now and wire up real data later.
+#   - Dashboard: also made resilient to any single analytics endpoint
+#     failing — one bad/unavailable endpoint used to crash the whole page
+#     with Next's generic error screen; now that one section just shows
+#     its empty state instead. IMPORTANT: if /admin/dashboard or
+#     /admin/reports errors even after this, run
+#     deploy-analytics-reporting.sh too (separate migration + a manual
+#     "Sync Permissions + log out/back in" step) — see that script.
 #   - 2 real bugs fixed along the way: several pages' filter/search forms
 #     were missing the /admin basePath on submit (plain <form> doesn't
 #     respect it, next/form does); the sticky "Save Changes" bar used
