@@ -244,6 +244,29 @@ export class PrismaOrderRepository implements OrderRepository {
     await this.db.order.update({ where: { id: orderId }, data: { closedAt, status: 'CLOSED' } });
   }
 
+  async hardDelete(orderId: bigint): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      // coupon_redemption.order_id and 3 *_line tables' order_line_id are
+      // all ON DELETE RESTRICT (see order.prisma) — everything else
+      // cascades from `order` automatically. Naively relying on that
+      // cascade alone (just `order.delete()`) fails in practice: Postgres
+      // doesn't guarantee resolving a "diamond" dependency where a
+      // RESTRICT FK sits between two different CASCADE paths converging on
+      // the same row (order -> fulfillment -> fulfillment_line vs.
+      // order -> order_line, with fulfillment_line.order_line_id
+      // RESTRICT) — confirmed by actually hitting
+      // `fulfillment_line_order_line_id_fkey` this way first, even though
+      // every one of those rows would have been gone by the end of the
+      // same statement. So every RESTRICT-side row is deleted explicitly,
+      // in dependency order, before the order itself.
+      await tx.$executeRaw`DELETE FROM coupon_redemption WHERE order_id = ${orderId}`;
+      await tx.$executeRaw`DELETE FROM fulfillment_line WHERE order_line_id IN (SELECT id FROM order_line WHERE order_id = ${orderId})`;
+      await tx.$executeRaw`DELETE FROM order_return_line WHERE order_line_id IN (SELECT id FROM order_line WHERE order_id = ${orderId})`;
+      await tx.$executeRaw`DELETE FROM order_invoice_line WHERE order_line_id IN (SELECT id FROM order_line WHERE order_id = ${orderId})`;
+      await tx.order.delete({ where: { id: orderId } });
+    });
+  }
+
   async recordPayment(input: {
     orderId: bigint;
     method: string;

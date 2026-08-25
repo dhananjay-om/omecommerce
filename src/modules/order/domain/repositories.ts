@@ -729,4 +729,13 @@ export interface OrderRepository {
   /** plan/15 Phase 3 — appends one email-log row (SENT or FAILED — the send attempt itself already happened by the time this is called). */
   recordEmailLog(input: RecordEmailLogInput): Promise<OrderEmailLogView>;
   listEmailLog(orderId: bigint): Promise<OrderEmailLogView[]>;
+  /** Permanent delete — every child row (lines, addresses, payments,
+   *  fulfillments, returns, history, notes, invoices, email log) cascades
+   *  at the DB level (see order.prisma's model comments) except
+   *  coupon_redemption, whose FK is deliberately ON DELETE RESTRICT
+   *  elsewhere (a derived-financial row should never silently vanish) —
+   *  removed explicitly here, in the same transaction, since deleting the
+   *  order itself makes that redemption record moot. Caller is responsible
+   *  for any business-rule guard (see DeleteOrder) — this just executes. */
+  hardDelete(orderId: bigint): Promise<void>;
 }

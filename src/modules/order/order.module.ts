@@ -82,6 +82,7 @@ import { SmtpEmailSender } from './infrastructure/smtp-email-sender.js';
 import type { EmailSender } from './domain/ports.js';
 import { env } from '../../config/env.js';
 import { CloseOrder } from './application/close-order.usecase.js';
+import { DeleteOrder } from './application/delete-order.usecase.js';
 import { ExportOrders } from './application/export-orders.usecase.js';
 import { GetCustomerOrder } from './application/get-customer-order.usecase.js';
 import { GetCustomerOrderInvoicePdfUrl } from './application/get-customer-order-invoice-pdf-url.usecase.js';
@@ -394,6 +395,7 @@ export function createOrderModule(
   const updateEmailSettings = new UpdateEmailSettings(emailSettings, adminUsers);
   const sendTestEmail = new SendTestEmail(emailSender);
   const closeOrder = new CloseOrder(orders, outbox);
+  const deleteOrder = new DeleteOrder(orders, outbox);
   const exportOrders = new ExportOrders(orders);
   const getCustomerOrder = new GetCustomerOrder(orders, customers, companies);
   const getCustomerOrderInvoicePdfUrl = new GetCustomerOrderInvoicePdfUrl(
@@ -687,6 +689,14 @@ export function createOrderModule(
     authorize('orders:close'),
     asyncHandler(async (req, res) => {
       res.json({ data: await closeOrder.execute(req.params.publicId!) });
+    }),
+  );
+  admin.delete(
+    '/orders/:publicId',
+    authorize('orders:delete'),
+    asyncHandler(async (req, res) => {
+      await deleteOrder.execute(req.params.publicId!);
+      res.status(204).send();
     }),
   );
 

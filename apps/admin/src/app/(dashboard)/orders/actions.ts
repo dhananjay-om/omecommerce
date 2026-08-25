@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, ApiError } from '@/lib/api-client';
+import { apiPost, apiDelete, ApiError } from '@/lib/api-client';
 import type { OrderDetail, OrderNote, OrderEmailLogEntry } from '@/lib/types';
 
 export interface ActionState {
@@ -98,6 +98,49 @@ export async function closeOrder(orderPublicId: string, _prevState: ActionState)
 
   revalidatePath(`/orders/${orderPublicId}`);
   return { error: null, success: true };
+}
+
+/** Permanent delete — backend only allows this once the order is already
+ *  CANCELLED or CLOSED (see delete-order.usecase.ts). Revalidates the list
+ *  page too, not just the (now-gone) detail page, since this is reachable
+ *  from both the orders list row menu and the detail page's "..." menu. */
+export async function deleteOrder(orderPublicId: string, _prevState: ActionState): Promise<ActionState> {
+  try {
+    await apiDelete(`/admin/v1/orders/${orderPublicId}`);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath('/orders');
+  return { error: null, success: true };
+}
+
+export interface BulkDeleteResult {
+  deletedCount: number;
+  errors: string[];
+}
+
+/** Deletes what's eligible and reports the rest, rather than aborting the
+ *  whole batch on the first ineligible order (Promise.allSettled, not
+ *  Promise.all) — a bulk selection realistically mixes deletable and
+ *  not-yet-cancelled/closed orders, and losing 0 out of 10 because 1 wasn't
+ *  eligible would be worse UX than the reverse. */
+export async function bulkDeleteOrders(publicIds: string[]): Promise<BulkDeleteResult> {
+  const results = await Promise.allSettled(publicIds.map((id) => apiDelete(`/admin/v1/orders/${id}`)));
+  const errors: string[] = [];
+  let deletedCount = 0;
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      deletedCount++;
+    } else {
+      const message = r.reason instanceof ApiError ? r.reason.message : 'Unknown error';
+      errors.push(`Order ${publicIds[i]}: ${message}`);
+    }
+  });
+
+  revalidatePath('/orders');
+  return { deletedCount, errors };
 }
 
 export async function markOrderPaid(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {

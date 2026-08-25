@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MoreHorizontal } from 'lucide-react';
 import type { OrderDetail } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -9,8 +10,9 @@ import { CreateInvoiceDialog, hasInvoiceableLines } from './create-invoice-dialo
 import { SendEmailDialog } from './send-email-dialog';
 import { CloseOrderDialog, closeEligibility } from './close-order-dialog';
 import { CancelDialog } from './cancel-dialog';
+import { DeleteOrderDialog, deleteEligible } from './delete-order-dialog';
 
-type ActionKey = 'invoice' | 'email' | 'close' | 'cancel';
+type ActionKey = 'invoice' | 'email' | 'close' | 'cancel' | 'delete';
 
 /**
  * The order detail header's lower-frequency actions (Create Invoice, Send
@@ -27,11 +29,13 @@ type ActionKey = 'invoice' | 'email' | 'close' | 'cancel';
  * `onClick`, with the `Dialog.Root` rendered outside the menu's popup).
  */
 export function OrderActionsMenu({ order }: { order: OrderDetail }) {
+  const router = useRouter();
   const [openDialog, setOpenDialog] = useState<ActionKey | null>(null);
 
   const cancellable = !['CANCELLED', 'COMPLETED', 'CLOSED'].includes(order.status);
   const invoiceable = hasInvoiceableLines(order.lines, order.invoices);
   const { eligible: closeEligible } = closeEligibility(order);
+  const deletable = deleteEligible(order.status);
 
   return (
     <>
@@ -48,13 +52,16 @@ export function OrderActionsMenu({ order }: { order: OrderDetail }) {
           {invoiceable ? <DropdownMenuItem onClick={() => setOpenDialog('invoice')}>Create Invoice</DropdownMenuItem> : null}
           <DropdownMenuItem onClick={() => setOpenDialog('email')}>Send Email</DropdownMenuItem>
           {closeEligible ? <DropdownMenuItem onClick={() => setOpenDialog('close')}>Close Order</DropdownMenuItem> : null}
+          {cancellable || deletable ? <DropdownMenuSeparator /> : null}
           {cancellable ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={() => setOpenDialog('cancel')}>
-                Cancel Order
-              </DropdownMenuItem>
-            </>
+            <DropdownMenuItem variant="destructive" onClick={() => setOpenDialog('cancel')}>
+              Cancel Order
+            </DropdownMenuItem>
+          ) : null}
+          {deletable ? (
+            <DropdownMenuItem variant="destructive" onClick={() => setOpenDialog('delete')}>
+              Delete Order
+            </DropdownMenuItem>
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -69,6 +76,13 @@ export function OrderActionsMenu({ order }: { order: OrderDetail }) {
       <SendEmailDialog orderPublicId={order.publicId} open={openDialog === 'email'} onOpenChange={(v) => setOpenDialog(v ? 'email' : null)} />
       <CloseOrderDialog order={order} open={openDialog === 'close'} onOpenChange={(v) => setOpenDialog(v ? 'close' : null)} />
       <CancelDialog orderPublicId={order.publicId} open={openDialog === 'cancel'} onOpenChange={(v) => setOpenDialog(v ? 'cancel' : null)} />
+      <DeleteOrderDialog
+        orderPublicId={order.publicId}
+        orderNumber={order.orderNumber}
+        open={openDialog === 'delete'}
+        onOpenChange={(v) => setOpenDialog(v ? 'delete' : null)}
+        onDeleted={() => router.push('/orders')}
+      />
     </>
   );
 }

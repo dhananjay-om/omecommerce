@@ -30,6 +30,7 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { code: 'orders:invoice', description: 'Create, view, and email order invoices' },
   { code: 'orders:email', description: 'Send order-related emails to customers' },
   { code: 'orders:close', description: 'Close completed orders' },
+  { code: 'orders:delete', description: 'Permanently delete cancelled/closed orders' },
   { code: 'orders:export', description: 'Export the order grid to CSV/Excel' },
   { code: 'inventory:adjust', description: 'Adjust warehouse stock levels' },
   { code: 'catalog:manage', description: 'Manage attribute sets, attributes, and bulk product import' },
