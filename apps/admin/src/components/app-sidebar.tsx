@@ -1,10 +1,16 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, CircleHelp } from 'lucide-react';
+import { ShoppingBag, CircleHelp, ChevronDown } from 'lucide-react';
 import { NAV, bestMatchingNavItem } from '@/lib/nav-data';
 import { cn } from '@/lib/utils';
+
+// Per-browser preference only (which groups are collapsed) — not worth a
+// server round-trip or a user-settings row, same "localStorage is fine for
+// a lightweight per-viewer convenience" posture used elsewhere in the admin.
+const COLLAPSED_GROUPS_STORAGE_KEY = 'ome-admin-sidebar-collapsed-groups';
 
 /**
  * Always-visible 248px grouped-list sidebar (admin UI revamp — replaces
@@ -18,10 +24,41 @@ import { cn } from '@/lib/utils';
  * text) and the footer (Help & Documentation + a store info card) match
  * the "Meridian Commerce OS" mock's `.sb-item.active`/`#sidebar-foot`
  * exactly, per explicit user color/content-parity feedback.
+ *
+ * Each group header is clickable and toggles that group's item list
+ * collapsed/expanded (same behavior for every group, not just one) — the
+ * collapsed set is remembered per browser via localStorage so it survives
+ * a reload/next navigation.
  */
 export function AppSidebar() {
   const pathname = usePathname();
   const activeItem = bestMatchingNavItem(pathname);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // Read the saved preference after mount, not during render — avoids an
+  // SSR/client markup mismatch (the server always renders "all expanded";
+  // localStorage only exists in the browser).
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- same hydration-mismatch-avoidance recipe as theme-toggle.tsx: the server can't know a browser-only localStorage value, so this MUST run once after mount, not during render
+      if (raw) setCollapsedGroups(JSON.parse(raw));
+    } catch {
+      // Private-browsing/storage-blocked — fall back to "everything expanded".
+    }
+  }, []);
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        window.localStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore — the toggle still works for this session, just won't persist
+      }
+      return next;
+    });
+  }
 
   return (
     <aside className="flex h-screen w-62 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
@@ -36,50 +73,59 @@ export function AppSidebar() {
       </Link>
 
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
-        {NAV.map((group) => (
-          <div key={group.key} className="mb-4">
-            <div
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 pt-3 pb-1.5 text-[11px] font-semibold tracking-wider uppercase',
-                group.accent === 'ai' ? 'text-primary' : 'text-sidebar-foreground/45',
+        {NAV.map((group) => {
+          const isCollapsed = Boolean(collapsedGroups[group.key]);
+          return (
+            <div key={group.key} className="mb-4">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.key)}
+                aria-expanded={!isCollapsed}
+                className={cn(
+                  'flex w-full items-center gap-1.5 rounded-md px-2.5 pt-3 pb-1.5 text-[11px] font-semibold tracking-wider uppercase transition-colors',
+                  group.accent === 'ai' ? 'text-primary' : 'text-sidebar-foreground/45 hover:text-sidebar-foreground/70',
+                )}
+              >
+                {group.accent === 'ai' ? <group.icon className="size-3" /> : null}
+                {group.label}
+                {group.accent === 'ai' ? (
+                  <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-normal text-primary normal-case">
+                    Powered by AI
+                  </span>
+                ) : null}
+                <ChevronDown className={cn('ml-auto size-3.5 shrink-0 transition-transform', isCollapsed && '-rotate-90')} />
+              </button>
+              {isCollapsed ? null : (
+                <div className="flex flex-col gap-0.5">
+                  {group.items.map((item) => {
+                    const active = item.key === activeItem?.key;
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-2.5 rounded-r-lg border-l-2 py-1.5 pr-2.5 pl-2 text-sm transition-colors',
+                          active
+                            ? 'border-l-sidebar-primary bg-sidebar-accent font-semibold text-sidebar-accent-foreground'
+                            : 'border-l-transparent text-sidebar-foreground/75 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground',
+                        )}
+                      >
+                        <Icon className="size-4 shrink-0" strokeWidth={2} />
+                        <span className="truncate">{item.label}</span>
+                        {item.status === 'comingSoon' ? (
+                          <span className="ml-auto rounded-full bg-sidebar-foreground/10 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-sidebar-foreground/50 uppercase">
+                            Soon
+                          </span>
+                        ) : null}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            >
-              {group.accent === 'ai' ? <group.icon className="size-3" /> : null}
-              {group.label}
-              {group.accent === 'ai' ? (
-                <span className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-normal text-primary normal-case">
-                  Powered by AI
-                </span>
-              ) : null}
             </div>
-            <div className="flex flex-col gap-0.5">
-              {group.items.map((item) => {
-                const active = item.key === activeItem?.key;
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-r-lg border-l-2 py-1.5 pr-2.5 pl-2 text-sm transition-colors',
-                      active
-                        ? 'border-l-sidebar-primary bg-sidebar-accent font-semibold text-sidebar-accent-foreground'
-                        : 'border-l-transparent text-sidebar-foreground/75 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground',
-                    )}
-                  >
-                    <Icon className="size-4 shrink-0" strokeWidth={2} />
-                    <span className="truncate">{item.label}</span>
-                    {item.status === 'comingSoon' ? (
-                      <span className="ml-auto rounded-full bg-sidebar-foreground/10 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-sidebar-foreground/50 uppercase">
-                        Soon
-                      </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border p-2.5">
