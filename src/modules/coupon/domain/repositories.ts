@@ -113,6 +113,14 @@ export interface CouponRepository {
   list(): Promise<CouponInfo[]>;
   update(code: string, input: UpdateCouponInput): Promise<CouponInfo>;
   softDelete(code: string): Promise<void>;
+  /** The storefront PDP's "Offers" section — every active, date-in-range
+   *  coupon that would actually apply to this one product: every CART-
+   *  target coupon (store-wide, no conditions to check) plus every ITEM-
+   *  target coupon whose conditions this product matches (reuses the same
+   *  productMatchesConditions() resolution the cart-evaluation path
+   *  already runs, just against one bare product instead of cart lines —
+   *  see PrismaCouponRepository's own resolveProductContext()). */
+  listApplicableForProduct(productId: bigint, asOf: Date): Promise<CouponInfo[]>;
 }
 
 export interface DiscountLineInput {

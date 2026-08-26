@@ -7,17 +7,20 @@ import { CreateCoupon } from './application/create-coupon.usecase.js';
 import { UpdateCoupon } from './application/update-coupon.usecase.js';
 import { ListCoupons } from './application/list-coupons.usecase.js';
 import { DeleteCoupon } from './application/delete-coupon.usecase.js';
+import { ListApplicableOffers } from './application/list-applicable-offers.usecase.js';
 import { createCouponSchema, updateCouponSchema } from './interface/http/schemas.js';
 
 export interface CouponRouters {
   admin: Router;
+  store: Router;
 }
 
-/** Composition root for the Coupon module — admin CRUD only. The store-facing
- *  apply/remove-coupon routes live in order.module.ts instead: they mutate Cart,
- *  Order's own aggregate, the same reasoning AddCartLine/RemoveCartLine already
- *  follow. order.module.ts imports PrismaCouponRepository directly (as a
- *  DiscountCalculator) to power those routes and the checkout saga. */
+/** Composition root for the Coupon module — admin CRUD, plus ONE real
+ *  storefront read (the PDP's "Offers" section). Applying/removing a
+ *  coupon at checkout still lives in order.module.ts (it mutates Cart,
+ *  Order's own aggregate — order.module.ts imports PrismaCouponRepository
+ *  directly as a DiscountCalculator for that); this module's own `store`
+ *  router is read-only, never touches Cart/Order. */
 export function createCouponModule(db: Db, authorize: (permission: string) => RequestHandler): CouponRouters {
   const coupons = new PrismaCouponRepository(db);
   const products = new PrismaProductLookup(db);
@@ -28,6 +31,7 @@ export function createCouponModule(db: Db, authorize: (permission: string) => Re
   const updateCoupon = new UpdateCoupon(coupons, products, categories, attributes);
   const listCoupons = new ListCoupons(coupons, products, categories, attributes);
   const deleteCoupon = new DeleteCoupon(coupons);
+  const listApplicableOffers = new ListApplicableOffers(coupons, products);
 
   const admin = Router();
 
@@ -68,5 +72,13 @@ export function createCouponModule(db: Db, authorize: (permission: string) => Re
     }),
   );
 
-  return { admin };
+  const store = Router();
+  store.get(
+    '/products/:id/offers',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listApplicableOffers.execute(req.params.id!) });
+    }),
+  );
+
+  return { admin, store };
 }

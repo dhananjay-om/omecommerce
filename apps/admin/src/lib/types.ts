@@ -52,6 +52,7 @@ export interface ProductReview {
   rating: number;
   title: string | null;
   body: string;
+  isApproved: boolean;
   createdAt: string;
 }
 
@@ -346,6 +347,30 @@ export interface ShippingMethod {
   flatRate: string;
   currency: string;
   isActive: boolean;
+}
+
+export interface Pincode {
+  publicId: string;
+  code: string;
+  city: string;
+  state: string;
+  estimatedDays: number;
+  codAvailable: boolean;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface PincodeList {
+  total: number;
+  page: number;
+  pageSize: number;
+  pincodes: Pincode[];
+}
+
+export interface BulkUpsertPincodesResult {
+  total: number;
+  created: number;
+  updated: number;
 }
 
 export type PaymentMethodType = 'COD' | 'ONLINE';

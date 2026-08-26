@@ -1,11 +1,16 @@
 import Link from 'next/link';
 import { StarIcon } from '@heroicons/react/24/solid';
+import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 import type { ProductDetail, SearchHit } from '@/types/product';
 import type { Category } from '@/types/category';
 import { SITE_URL } from '@/lib/config';
+import { cn } from '@/lib/utils';
+import { getProductReviews } from '@/services/reviews.service';
 import { ProductGallery } from '@/components/pdp/product-gallery';
 import { ProductPurchasePanel } from '@/components/pdp/product-purchase-panel';
 import { ProductTabs } from '@/components/pdp/product-tabs';
+import { PincodeChecker } from '@/components/pdp/pincode-checker';
+import { ProductOffers } from '@/components/pdp/product-offers';
 import { RecentlyViewed } from '@/components/pdp/recently-viewed';
 import { ProductCarousel } from '@/components/product/product-carousel';
 
@@ -27,7 +32,7 @@ export function stringAttr(attributes: Record<string, unknown>, code: string): s
  * markup — same reasoning generateMetadata's own logic stays inline in each
  * route file instead (metadata is cheap enough not to need sharing).
  */
-export function ProductDetailView({
+export async function ProductDetailView({
   product,
   relatedHits,
   breadcrumbCategory,
@@ -39,6 +44,7 @@ export function ProductDetailView({
   const priceNumber = product.price ? Number(product.price) : null;
   const shortDescription = stringAttr(product.attributes, 'short_description');
   const description = stringAttr(product.attributes, 'description');
+  const reviews = await getProductReviews(product.publicId);
 
   const productJsonLd = {
     '@context': 'https://schema.org',
@@ -90,12 +96,20 @@ export function ProductDetailView({
           <p className="mt-1 text-sm text-muted-foreground">SKU: {product.sku}</p>
 
           <div className="mt-3 flex items-center gap-2">
-            <div className="flex text-cta opacity-40" aria-hidden>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <StarIcon key={i} className="size-4" />
-              ))}
+            <div className="flex" aria-hidden>
+              {Array.from({ length: 5 }).map((_, i) =>
+                reviews.averageRating && i < Math.round(reviews.averageRating) ? (
+                  <StarIcon key={i} className="size-4 text-cta" />
+                ) : (
+                  <StarOutlineIcon key={i} className={cn('size-4', reviews.averageRating ? 'text-muted-foreground/40' : 'text-cta opacity-40')} />
+                ),
+              )}
             </div>
-            <span className="text-xs text-muted-foreground">No ratings yet</span>
+            <span className="text-xs text-muted-foreground">
+              {reviews.total > 0 && reviews.averageRating
+                ? `${reviews.averageRating.toFixed(1)} (${reviews.total} review${reviews.total === 1 ? '' : 's'})`
+                : 'No ratings yet'}
+            </span>
           </div>
 
           <div className="mt-4">
@@ -107,12 +121,17 @@ export function ProductDetailView({
             />
           </div>
 
+          <div className="mt-4 space-y-3">
+            <PincodeChecker />
+            <ProductOffers productId={product.publicId} />
+          </div>
+
           {shortDescription ? <p className="mt-6 text-sm text-muted-foreground">{shortDescription}</p> : null}
         </div>
       </div>
 
       <div className="mt-10">
-        <ProductTabs sku={product.sku} description={description} attributes={product.attributes} />
+        <ProductTabs productId={product.publicId} sku={product.sku} description={description} attributes={product.attributes} reviews={reviews} />
       </div>
 
       <ProductCarousel title="Related Products" hits={relatedHits} />

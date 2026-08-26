@@ -494,13 +494,42 @@ export interface ProductReviewInfo {
   rating: number;
   title: string | null;
   body: string;
+  isApproved: boolean;
   createdAt: Date;
 }
 
-/** Read-only — see ProductReview's own schema doc comment for why there's
- *  no create/moderate path (no submission flow exists to write through). */
+export interface CreateProductReviewInput {
+  productId: bigint;
+  customerId: bigint;
+  customerName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+}
+
+/** Count of approved reviews per star (1-5), for the PDP's rating-
+ *  breakdown bar chart — always all 5 keys present, 0 where there are
+ *  none, never a sparse/missing key. */
+export type RatingBreakdown = Record<1 | 2 | 3 | 4 | 5, number>;
+
+export interface PaginatedProductReviews {
+  total: number;
+  page: number;
+  pageSize: number;
+  reviews: ProductReviewInfo[];
+}
+
 export interface ProductReviewRepository {
+  /** Admin moderation queue — unpaginated (small volume), sees every
+   *  status (pending/approved/rejected). */
   listForProduct(productId: bigint): Promise<ProductReviewInfo[]>;
+  /** The public storefront read — approved-only, paginated (the one place
+   *  in this feature that genuinely needs it, unlike the admin queue). */
+  listApprovedForProduct(productId: bigint, page: number, pageSize: number): Promise<PaginatedProductReviews>;
+  create(input: CreateProductReviewInput): Promise<ProductReviewInfo>;
+  /** Throws NotFoundError if the review doesn't belong to this product (defensive — an admin route scoped by :id in the URL shouldn't be able to moderate a review under the wrong product by guessing a reviewId). */
+  setApproval(productId: bigint, reviewPublicId: string, isApproved: boolean): Promise<void>;
+  countByRating(productId: bigint, approvedOnly: boolean): Promise<RatingBreakdown>;
 }
 
 /** Port over the MinIO/S3-backed object store (plan/13 Phase J) — lets use-cases stay unit-testable without a real bucket. */

@@ -27,6 +27,7 @@ import { createReferralModule } from './modules/referral/referral.module.js';
 import { createCompanyModule } from './modules/company/company.module.js';
 import { createAnalyticsModule } from './modules/analytics/analytics.module.js';
 import { createAiModule } from './modules/ai/ai.module.js';
+import { createPincodeModule } from './modules/pincode/pincode.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -53,7 +54,14 @@ export function createApp(): Express {
   app.use('/admin/v1', auth.admin);
 
   // Modules
-  const catalog = createCatalogModule(prisma, redis, auth.authorize);
+  // Customer built before Catalog (unlike most other cross-module
+  // authenticateCustomer consumers below, which build it later) — Catalog
+  // now needs it too, for the storefront review-submission route.
+  const customer = createCustomerModule(prisma);
+  app.use('/admin/v1', customer.admin);
+  app.use('/store/v1', customer.store);
+
+  const catalog = createCatalogModule(prisma, redis, auth.authorize, customer.authenticateCustomer);
   app.use('/admin/v1', catalog.admin);
   app.use('/store/v1', catalog.store);
 
@@ -69,10 +77,11 @@ export function createApp(): Express {
 
   const coupon = createCouponModule(prisma, auth.authorize);
   app.use('/admin/v1', coupon.admin);
+  app.use('/store/v1', coupon.store);
 
-  const customer = createCustomerModule(prisma);
-  app.use('/admin/v1', customer.admin);
-  app.use('/store/v1', customer.store);
+  const pincode = createPincodeModule(prisma, auth.authorize);
+  app.use('/admin/v1', pincode.admin);
+  app.use('/store/v1', pincode.store);
 
   // plan/15 Phase 11 — Order needs customer.authenticateCustomer to gate its
   // new /me/orders/:id, /invoice, /tracking, /reorder routes (same

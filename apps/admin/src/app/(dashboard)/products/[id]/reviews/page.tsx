@@ -4,6 +4,7 @@ import type { ProductDetail, ProductReview } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReviewSummary } from './review-summary';
+import { ReviewModerationActions } from './review-moderation-actions';
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -20,9 +21,10 @@ function formatDate(iso: string): string {
 }
 
 /**
- * Real (minimal) review reads — see ProductReview's own schema doc comment
- * for why this is deliberately small: no submission flow, no moderation,
- * just enough real customer text for the AI Summary above to read from.
+ * Real customer review submission + moderation — see ProductReview's own
+ * schema doc comment for the upgrade from the original AI-summarization-only
+ * pass. This admin route (unlike the storefront's) returns every review
+ * regardless of approval status, so pending ones can be moderated here.
  */
 export default async function ProductReviewsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -59,7 +61,10 @@ export default async function ProductReviewsPage({ params }: { params: Promise<{
                   </div>
                   {r.title ? <p className="text-sm font-semibold text-foreground">{r.title}</p> : null}
                   <p className="text-sm text-muted-foreground">{r.body}</p>
-                  <p className="text-xs font-medium text-foreground">— {r.customerName}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-foreground">— {r.customerName}</p>
+                    <ReviewModerationActions productId={id} reviewId={r.publicId} isApproved={r.isApproved} />
+                  </div>
                 </CardContent>
               </Card>
             ))}

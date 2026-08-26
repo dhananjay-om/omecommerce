@@ -140,6 +140,32 @@ export class PrismaCouponRepository implements CouponRepository, DiscountCalcula
     return rows.map(toInfo);
   }
 
+  async listApplicableForProduct(productId: bigint, asOf: Date): Promise<CouponInfo[]> {
+    const candidates = await this.db.coupon.findMany({
+      where: {
+        isActive: true,
+        AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: asOf } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: asOf } }] }],
+      },
+      include: { conditions: true },
+    });
+    if (candidates.length === 0) return [];
+
+    // Resolved once, reused across every ITEM-target candidate — same
+    // "one context per distinct product" economy resolveContributingLines
+    // already applies per-cart, just for a single product here.
+    let productContext: ProductMatchContext | null = null;
+    const applicable: CouponRow[] = [];
+    for (const coupon of candidates) {
+      if (coupon.targetType === 'CART') {
+        applicable.push(coupon);
+        continue;
+      }
+      productContext ??= await this.resolveProductContext(productId);
+      if (productMatchesConditions(coupon.conditions, productContext)) applicable.push(coupon);
+    }
+    return applicable.map(toInfo);
+  }
+
   async update(code: string, input: UpdateCouponInput): Promise<CouponInfo> {
     const row = await this.db.$transaction(async (tx) => {
       // Simplest-correct approach for a small, admin-authored config list:

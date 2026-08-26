@@ -497,28 +497,39 @@ model ProductMedia {
   @@map("product_media")
 }
 
-/// Deliberately minimal — this system has no storefront review-submission
-/// flow, moderation queue, or reply/vote features (unlike a real review
-/// platform). It exists to give the AI Product Assistant's "Analyze
-/// Product Performance"-style summarization a real body of customer text
-/// to read, same "read real data, don't invent it" posture as every other
-/// AI feature in this system — not a full review system. No `isApproved`/
-/// moderation field: since there's no submission flow to moderate against,
-/// adding one would silently imply a workflow that doesn't exist.
+/// Real storefront review submission + moderation (upgraded from an
+/// original deliberately-minimal, admin-only, no-submission-flow pass —
+/// see git history — once a real submission flow existed, adding
+/// `isApproved` stopped silently implying a workflow that didn't exist).
+/// A logged-in customer submits (`customerId` set, `customerName`
+/// snapshotted from their account name at submission time so a later
+/// name change doesn't retroactively edit old reviews — same "snapshot,
+/// don't live-join" convention as OrderLine's own sku/name/price
+/// snapshotting). Starts `isApproved: false`; only flips to `true` via
+/// admin moderation (src/modules/catalog's ModerateProductReview use
+/// case) — the storefront's own public read only ever returns approved
+/// rows.
 model ProductReview {
   id           BigInt   @id @default(autoincrement())
   publicId     String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
   productId    BigInt   @map("product_id")
+  /// Nullable — a handful of pre-existing rows from this model's original
+  /// admin-only, no-submission-flow pass have no real customer behind
+  /// them (seeded purely as AI-summarization fixture text).
+  customerId   BigInt?  @map("customer_id")
   customerName String   @map("customer_name")
   /// 1-5, enforced by a CHECK constraint (raw SQL, same convention as this
   /// schema's other narrow numeric ranges — see e.g. discount.prisma).
   rating       Int
   title        String?
   body         String
+  isApproved   Boolean  @default(false) @map("is_approved")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([productId, createdAt])
+  @@index([productId, isApproved])
   @@map("product_review")
 }

@@ -19,6 +19,7 @@ import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './inf
 import { PrismaBrandRepository } from './infrastructure/prisma-brand.repository.js';
 import { PrismaMediaAssetRepository, PrismaProductMediaRepository } from './infrastructure/prisma-media.repository.js';
 import { PrismaProductReviewRepository } from './infrastructure/prisma-product-review.repository.js';
+import { CustomerNameLookup } from './infrastructure/customer-name-lookup.js';
 import { S3MediaStorage } from './infrastructure/s3-media-storage.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
 import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-resolver.js';
@@ -45,6 +46,9 @@ import { DeleteProductVariant } from './application/delete-product-variant.useca
 import { ListProducts } from './application/list-products.usecase.js';
 import { GetProductDetail } from './application/get-product-detail.usecase.js';
 import { ListProductReviews } from './application/list-product-reviews.usecase.js';
+import { ListApprovedProductReviews } from './application/list-approved-product-reviews.usecase.js';
+import { SubmitProductReview } from './application/submit-product-review.usecase.js';
+import { ModerateProductReview } from './application/moderate-product-review.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
 import { ListAttributes, ListAttributeOptions } from './application/list-attributes.usecase.js';
 import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
@@ -95,6 +99,9 @@ import {
   createMediaAssetSchema,
   attachProductMediaSchema,
   updateProductMediaAltTextSchema,
+  submitProductReviewSchema,
+  listApprovedProductReviewsQuerySchema,
+  moderateProductReviewSchema,
 } from './interface/http/schemas.js';
 
 export interface CatalogRouters {
@@ -102,8 +109,13 @@ export interface CatalogRouters {
   store: Router;
 }
 
-/** Composition root for the Catalog module — wires ports to Prisma adapters. */
-export function createCatalogModule(db: Db, redis: Redis, authorize: (permission: string) => RequestHandler): CatalogRouters {
+/** Composition root for the Catalog module — wires ports to Prisma adapters.
+ *  `requireCustomer` is the SAME `authenticateCustomer` middleware instance
+ *  the Customer module exports (same cross-module reuse convention as
+ *  wishlist/order/wallet/giftcard/loyalty/referral/company — see app.ts) —
+ *  gates the one write this module's `store` router now has (submitting a
+ *  review). */
+export function createCatalogModule(db: Db, redis: Redis, authorize: (permission: string) => RequestHandler, requireCustomer: RequestHandler): CatalogRouters {
   const products = new PrismaProductRepository(db);
   const attributes = new PrismaAttributeRepository(db);
   const attributeSets = new PrismaAttributeSetRepository(db);
@@ -155,6 +167,10 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const listProducts = new ListProducts(products, productMedia, mediaStorage);
   const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories, productMedia, mediaStorage);
   const listProductReviews = new ListProductReviews(products, productReviews);
+  const listApprovedProductReviews = new ListApprovedProductReviews(products, productReviews);
+  const customerNames = new CustomerNameLookup(db);
+  const submitProductReview = new SubmitProductReview(products, productReviews, customerNames);
+  const moderateProductReview = new ModerateProductReview(products, productReviews);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
   const listAttributes = new ListAttributes(attributes);
@@ -206,6 +222,15 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/products/:publicId/reviews',
     asyncHandler(async (req, res) => {
       res.json({ data: await listProductReviews.execute(req.params.publicId!) });
+    }),
+  );
+  admin.patch(
+    '/products/:publicId/reviews/:reviewId/moderate',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(moderateProductReviewSchema, req.body);
+      await moderateProductReview.execute({ productPublicId: req.params.publicId!, reviewPublicId: req.params.reviewId!, ...body });
+      res.status(204).send();
     }),
   );
   admin.patch(
@@ -593,6 +618,28 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       const query = parse(storeViewQuerySchema, req.query);
       const view = await getStoreProductDetailBySlug.execute(req.params.slug!, query.storeViewId);
       res.json({ data: view });
+    }),
+  );
+  store.get(
+    '/products/:publicId/reviews',
+    asyncHandler(async (req, res) => {
+      const query = parse(listApprovedProductReviewsQuerySchema, req.query);
+      res.json({ data: await listApprovedProductReviews.execute(req.params.publicId!, query.page, query.pageSize) });
+    }),
+  );
+  store.post(
+    '/products/:publicId/reviews',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      const body = parse(submitProductReviewSchema, req.body);
+      const view = await submitProductReview.execute({
+        productPublicId: req.params.publicId!,
+        customerPublicId: req.customer!.customerPublicId,
+        rating: body.rating,
+        title: body.title ?? null,
+        body: body.body,
+      });
+      res.status(201).json({ data: view });
     }),
   );
   store.get(

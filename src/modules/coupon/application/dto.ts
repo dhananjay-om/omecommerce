@@ -86,3 +86,18 @@ export interface CouponView {
   endsAt: string | null;
   isActive: boolean;
 }
+
+/** The storefront PDP's "Offers" section — deliberately smaller than
+ *  CouponView: no usage counts/limits, no raw condition rows, nothing a
+ *  shopper shouldn't see about how the coupon is internally configured.
+ *  `code` is omitted entirely for an auto-apply offer — there's no code
+ *  to type, so showing one would be misleading. */
+export interface OfferView {
+  code: string | null;
+  description: string | null;
+  discountType: CouponDiscountType;
+  value: string;
+  currency: string | null;
+  minSubtotal: string | null;
+  isAutoApply: boolean;
+}

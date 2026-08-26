@@ -275,3 +275,18 @@ export const attachProductMediaSchema = z.object({
 export const updateProductMediaAltTextSchema = z.object({
   altText: z.string().max(250).nullable(),
 });
+
+export const submitProductReviewSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  title: z.string().max(150).nullish(),
+  body: z.string().min(1).max(5000),
+});
+
+export const listApprovedProductReviewsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(50).optional(),
+});
+
+export const moderateProductReviewSchema = z.object({
+  isApproved: z.boolean(),
+});

@@ -1,6 +1,8 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProductReviews } from './product-reviews';
+import type { ProductReviewList } from '@/types/review';
 
 function formatLabel(code: string): string {
   return code.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -11,13 +13,17 @@ function formatLabel(code: string): string {
 const NON_SPEC_CODES = new Set(['description', 'short_description', 'url_key', 'meta_title', 'meta_keywords', 'meta_description']);
 
 export function ProductTabs({
+  productId,
   sku,
   description,
   attributes,
+  reviews,
 }: {
+  productId: string;
   sku: string;
   description: string | null;
   attributes: Record<string, unknown>;
+  reviews: ProductReviewList;
 }) {
   const specEntries = Object.entries(attributes).filter(
     ([code, value]) => !NON_SPEC_CODES.has(code) && value !== null && value !== undefined && value !== '',
@@ -47,9 +53,8 @@ export function ProductTabs({
           </dl>
         )}
       </TabsContent>
-      {/* Reviews UI-only for now — no review backend exists (plan/14 context). */}
-      <TabsContent value="reviews" className="pt-4 text-muted-foreground">
-        <p>No reviews yet. Be the first to review this product.</p>
+      <TabsContent value="reviews" className="pt-4">
+        <ProductReviews productId={productId} initialReviews={reviews} />
       </TabsContent>
     </Tabs>
   );

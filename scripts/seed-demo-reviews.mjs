@@ -50,7 +50,11 @@ for (const [sku, reviews] of Object.entries(REVIEWS_BY_SKU)) {
     continue;
   }
   await prisma.productReview.createMany({
-    data: reviews.map((r) => ({ productId: product.id, customerName: r.customerName, rating: r.rating, title: r.title, body: r.body })),
+    // isApproved: true — these are demo fixture reviews (no real customer,
+    // no submission flow behind them), meant to show up immediately, not
+    // sit in the real moderation queue real customer submissions now go
+    // through (see ProductReview's own schema doc comment).
+    data: reviews.map((r) => ({ productId: product.id, customerName: r.customerName, rating: r.rating, title: r.title, body: r.body, isApproved: true })),
   });
   console.log(`seeded ${reviews.length} reviews for ${sku}`);
   seeded++;

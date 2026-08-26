@@ -519,7 +519,39 @@ export interface ProductReviewView {
   rating: number;
   title: string | null;
   body: string;
+  isApproved: boolean;
   createdAt: string;
+}
+
+export interface SubmitProductReviewCommand {
+  productPublicId: string;
+  customerPublicId: string;
+  rating: number;
+  title: string | null;
+  body: string;
+}
+
+export interface ModerateProductReviewCommand {
+  productPublicId: string;
+  reviewPublicId: string;
+  isApproved: boolean;
+}
+
+export interface RatingBreakdownView {
+  1: number;
+  2: number;
+  3: number;
+  4: number;
+  5: number;
+}
+
+export interface ProductReviewListView {
+  total: number;
+  page: number;
+  pageSize: number;
+  averageRating: number | null;
+  ratingBreakdown: RatingBreakdownView;
+  reviews: ProductReviewView[];
 }
 
 export interface DetachProductMediaCommand {
