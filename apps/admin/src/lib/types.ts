@@ -63,6 +63,30 @@ export interface ProductDetail {
   attributes: Record<string, unknown>;
   categoryIds: string[];
   media: ProductMedia[];
+  tags: string[];
+}
+
+/** AI Product Assistant (product edit page) response shapes — mirrors
+ *  src/modules/ai/infrastructure/product-assistant-openai.ts's own return
+ *  types exactly. */
+export interface ProductImageAnalysis {
+  title: string;
+  description: string;
+  tags: string[];
+  metaTitle: string;
+  metaDescription: string;
+  dominantColor: string;
+  productTypeGuess: string;
+}
+
+export interface ProductPriceSuggestion {
+  suggestedPrice: number;
+  rationale: string;
+}
+
+export interface ProductCategorySuggestion {
+  category: string;
+  rationale: string;
 }
 
 export type CategoryType = 'MANUAL' | 'DYNAMIC';

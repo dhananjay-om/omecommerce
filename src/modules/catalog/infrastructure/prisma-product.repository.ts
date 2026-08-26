@@ -41,6 +41,7 @@ function toDomainProps(row: PrismaProductRow) {
     isVirtual: row.isVirtual,
     taxClassId: row.taxClassId,
     hsnCode: row.hsnCode,
+    tags: row.tags,
   };
 }
 
@@ -148,6 +149,7 @@ export class PrismaProductRepository implements ProductRepository {
         brandId: input.brandId,
         taxClassId: input.taxClassId,
         hsnCode: input.hsnCode,
+        tags: input.tags,
       },
     });
     return Product.fromPersistence(toDomainProps(row));

@@ -160,6 +160,12 @@ model Product {
   hasVariants    Boolean           @default(false) @map("has_variants")
   /// Denormalized default name cache for admin lists; authoritative name is a scoped attribute value.
   nameDefault    String?           @map("name_default")
+  /// Free-text merchandising tags (search/filter keywords, not a taxonomy) —
+  /// a plain string array, not a Tag/ProductTag join table: no cross-product
+  /// reuse/autocomplete UI is in scope, so the join table's extra complexity
+  /// has no payoff yet (same "grain simplification" posture as this schema's
+  /// other MVP calls — see e.g. SummaryProductDaily's own doc comment).
+  tags           String[]          @default([])
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy      BigInt?           @map("created_by")

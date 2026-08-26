@@ -66,6 +66,11 @@ export interface UpdateProductInput {
   /** `undefined` leaves it untouched; `null` clears it (same pairing convention as brandId). */
   taxClassId?: bigint | null;
   hsnCode?: string | null;
+  /** `undefined` leaves tags untouched; `[]` clears them — the Overview
+   *  form always submits its current full tag set, so an empty array here
+   *  genuinely means "remove all tags," not "field omitted" (no
+   *  saveCategoryIds-style separate-form landmine applies to this field). */
+  tags?: string[];
 }
 
 /** Persistence port for the Product aggregate (implemented in infrastructure). */

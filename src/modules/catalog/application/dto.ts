@@ -37,6 +37,8 @@ export interface UpdateProductCommand {
   /** Tax class's internal id, as a string; `null` clears it (same undefined-vs-null pairing as brandId). */
   taxClassId?: string | null;
   hsnCode?: string | null;
+  /** `undefined` leaves tags untouched; `[]` clears them (see UpdateProductInput.tags's own comment). */
+  tags?: string[];
 }
 
 export interface ProductView {
@@ -51,6 +53,7 @@ export interface ProductView {
   weight: string | null;
   taxClassId: string | null;
   hsnCode: string | null;
+  tags: string[];
 }
 
 export interface AssignAttributeValueCommand {

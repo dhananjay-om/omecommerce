@@ -48,6 +48,7 @@ export class UpdateProduct {
       brandId,
       taxClassId: cmd.taxClassId !== undefined ? (cmd.taxClassId === null ? null : parseNumericId(cmd.taxClassId, 'taxClassId')) : undefined,
       hsnCode: cmd.hsnCode,
+      tags: cmd.tags,
     });
 
     await this.outbox.write({

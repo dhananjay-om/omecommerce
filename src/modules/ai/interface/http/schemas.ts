@@ -56,3 +56,38 @@ export const listSuggestionsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(100).optional(),
 });
+
+// Per-product AI Assistant (product edit page). `context` is whatever the
+// admin's own form currently holds — the frontend already has this data
+// loaded (product/attributes/categories), so it's passed rather than
+// re-fetched, keeping every generation route a pure "context in, draft out"
+// call with no extra reads beyond what a given action genuinely needs
+// (analyze-performance/suggest-price still fetch real numbers server-side,
+// since the Overview page doesn't load those).
+const productContextSchema = z.object({
+  title: z.string().max(512),
+  description: z.string().max(20000).optional(),
+  sku: z.string().max(128).optional(),
+  productType: z.string().max(64).optional(),
+  categoryNames: z.array(z.string().max(256)).max(50).optional(),
+  tags: z.array(z.string().max(40)).max(20).optional(),
+});
+
+export const generateFromContextSchema = z.object({
+  context: productContextSchema,
+});
+
+export const suggestCategorySchema = z.object({
+  context: productContextSchema,
+  categoryNames: z.array(z.string().max(256)).min(1).max(500),
+});
+
+// storageKey/mimeType only, never the image bytes themselves — the backend
+// reads the already-uploaded object's own bytes server-side (see
+// ProductAssistant.analyzeImage), which avoids bloating this request body
+// ~33% for no benefit the way a base64 data URL over JSON would.
+export const analyzeProductImageSchema = z.object({
+  storageKey: z.string().min(1).max(512),
+  mimeType: z.string().regex(/^image\//, 'expected an image mime type'),
+  context: productContextSchema,
+});

@@ -57,6 +57,7 @@ export const updateProductSchema = z.object({
   brandId: z.string().uuid().nullish(),
   taxClassId: z.string().regex(/^\d+$/, 'expected numeric id').nullish(),
   hsnCode: z.string().max(8).nullish(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
 });
 
 export const assignAttributeValueSchema = z.object({

@@ -72,6 +72,10 @@ export class GetProductForStoreView {
       // shown to a customer) — GST tax class/HSN aren't storefront-relevant.
       taxClassId: null,
       hsnCode: null,
+      // Unlike taxClassId/hsnCode above, tags ARE real product data a
+      // storefront could reasonably use (search/filter keywords) — passed
+      // through rather than hardcoded empty.
+      tags: p.tags,
       storeViewId: query.storeViewId,
       currency: ctx.currency,
       pricesIncludeTax: ctx.pricesIncludeTax,

@@ -22,14 +22,19 @@ import { GetAiSettings } from './application/get-ai-settings.usecase.js';
 import { UpdateAiSettings } from './application/update-ai-settings.usecase.js';
 import { TestAiConnection } from './application/test-ai-connection.usecase.js';
 import { ChatWithAssistant } from './application/chat-with-assistant.usecase.js';
+import { ProductAssistant } from './application/product-assistant.usecase.js';
 import {
   listInsightsQuerySchema,
   updateAiSettingsSchema,
   assistantChatSchema,
   listForecastsQuerySchema,
   listSuggestionsQuerySchema,
+  generateFromContextSchema,
+  suggestCategorySchema,
+  analyzeProductImageSchema,
 } from './interface/http/schemas.js';
 import { todayDateKey } from '../analytics/domain/date-key.js';
+import { NotFoundError } from '../../shared/domain/errors.js';
 
 export interface AiRouters {
   admin: Router;
@@ -95,9 +100,20 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
   const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
   const chatWithAssistant = new ChatWithAssistant(db, analyticsQuery);
 
+  const productAssistant = new ProductAssistant(db);
+
   const admin = Router();
   const view = authorize('ai:view');
   const manage = authorize('ai:manage');
+
+  /** publicId (route param) -> internal id, for the 2 product-assistant
+   *  actions that need real DB-backed grounding data (analyze-performance,
+   *  suggest-price) rather than just the context the frontend already sent. */
+  async function resolveProductId(publicId: string): Promise<bigint> {
+    const row = await db.product.findFirst({ where: { publicId, deletedAt: null }, select: { id: true } });
+    if (!row) throw new NotFoundError('product', publicId);
+    return row.id;
+  }
 
   admin.get(
     '/ai/insights',
@@ -179,6 +195,79 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     asyncHandler(async (_req, res) => {
       await runNightlySuggestionRefresh.execute(todayDateKey(new Date()));
       res.status(204).send();
+    }),
+  );
+
+  // Per-product AI Assistant (product edit page's "AI Product Assistant"
+  // card) — every route here is read-only from the DB's point of view
+  // (see product-assistant.usecase.ts's own header comment): a draft or
+  // suggestion comes back, nothing is written. `:id` is the product's
+  // publicId, matched to every other product-scoped admin route's own
+  // convention (see catalog.module.ts).
+  admin.post(
+    '/ai/products/:id/generate-title',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      res.json({ data: { title: await productAssistant.generateTitle(context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/generate-tags',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      res.json({ data: { tags: await productAssistant.generateTags(context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/generate-seo-title',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      res.json({ data: { metaTitle: await productAssistant.generateSeoTitle(context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/generate-meta-description',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      res.json({ data: { metaDescription: await productAssistant.generateMetaDescription(context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/analyze-image',
+    view,
+    asyncHandler(async (req, res) => {
+      const { storageKey, mimeType, context } = parse(analyzeProductImageSchema, req.body);
+      res.json({ data: await productAssistant.analyzeImage(context, storageKey, mimeType) });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/analyze-performance',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      const productId = await resolveProductId(req.params.id!);
+      res.json({ data: { narrative: await productAssistant.analyzePerformance(productId, context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/suggest-price',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      const productId = await resolveProductId(req.params.id!);
+      res.json({ data: await productAssistant.suggestPrice(productId, context) });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/suggest-category',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context, categoryNames } = parse(suggestCategorySchema, req.body);
+      res.json({ data: await productAssistant.suggestCategory(context, categoryNames) });
     }),
   );
 

@@ -1,12 +1,15 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { Sparkles, Upload } from 'lucide-react';
+import { useActionState, useRef, useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { updateProduct, type UpdateProductFormState } from '../actions';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass } from '@/lib/types';
-import { AttributeFieldsSection } from '../attribute-fields-section';
+import { AttributeFieldsSection, attributeInputName } from '../attribute-fields-section';
 import { DESCRIPTION_GROUP } from '../default-attribute-groups';
 import { CategoryPicker } from '../category-picker';
+import { TagsField } from './tags-field';
+import { AiProductAssistant } from './ai-product-assistant';
+import { generateTitle, generateTags, type ProductAiContext } from './ai-product-assistant-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Input } from '@/components/ui/input';
@@ -16,7 +19,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
 const VISIBILITIES = ['BOTH', 'CATALOG', 'SEARCH', 'NOT_VISIBLE'];
-const AI_QUICK_ACTIONS = ['Generate SEO Title', 'Generate Meta Description', 'Analyze Product Performance', 'Suggest Price', 'Suggest Category', 'Detect Missing Product Data'];
 
 const initialState: UpdateProductFormState = { error: null };
 
@@ -56,20 +58,72 @@ export function ProductOverviewForm({
   const selectedSetDetail = attributeSetDetails[attributeSetId];
   const categoryNames = categories.filter((c) => product.categoryIds.includes(c.publicId)).map((c) => c.nameDefault ?? c.slug);
 
+  const [tags, setTags] = useState<string[]>(product.tags);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [titleGenPending, setTitleGenPending] = useState(false);
+  const [titleGenError, setTitleGenError] = useState<string | null>(null);
+  const [tagsGenPending, setTagsGenPending] = useState(false);
+  const [tagsGenError, setTagsGenError] = useState<string | null>(null);
+
+  /** Reads the FORM's current (possibly unsaved) values, not the original
+   *  server-rendered `product` prop — so e.g. generating tags after already
+   *  editing the title grounds on the new title, not the stale one. Title/
+   *  Description are plain uncontrolled inputs (see the imports above), so
+   *  this reads them straight off the DOM. */
+  function getContext(): ProductAiContext {
+    const descriptionEl = document.getElementById(attributeInputName('description')) as HTMLTextAreaElement | null;
+    return {
+      title: titleInputRef.current?.value ?? product.name ?? '',
+      description: descriptionEl?.value,
+      sku: product.sku,
+      productType: product.type,
+      categoryNames,
+      tags,
+    };
+  }
+
+  async function handleGenerateTitle() {
+    setTitleGenPending(true);
+    setTitleGenError(null);
+    try {
+      const result = await generateTitle(product.publicId, getContext());
+      if (result.error || !result.data) {
+        setTitleGenError(result.error ?? 'Generation failed.');
+        return;
+      }
+      if (titleInputRef.current) titleInputRef.current.value = result.data.title;
+    } finally {
+      setTitleGenPending(false);
+    }
+  }
+
+  async function handleGenerateTags() {
+    setTagsGenPending(true);
+    setTagsGenError(null);
+    try {
+      const result = await generateTags(product.publicId, getContext());
+      if (result.error || !result.data) {
+        setTagsGenError(result.error ?? 'Generation failed.');
+        return;
+      }
+      setTags(result.data.tags);
+    } finally {
+      setTagsGenPending(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <form id="product-overview-form" action={formAction} className="space-y-6">
         {/* Matches the mock's Overview tab: a "Product Information" card
-            (title/brand/type/category/tags) beside an "AI Product
-            Assistant" panel. Real fields (Title, Type, Category-preview)
-            are wired to real data; Brand/Vendor and Tags have no backend
-            concept yet in this system, so they're disabled placeholders
-            rather than fake inputs that would silently do nothing on
-            save — same for the entire AI panel, which has no real AI
-            backend (see nav-data.ts's AI group, all "Coming soon").
-            Description is edited in the Attributes card below, not
-            duplicated here, to avoid two editable copies of the same
-            field on one page. */}
+            (title/brand/type/category/tags) beside a real, wired "AI
+            Product Assistant" panel (ai-product-assistant.tsx). Brand/
+            Vendor still has no backend concept in this system, so it stays
+            a disabled placeholder. Description is edited in the Attributes
+            card below, not duplicated here, to avoid two editable copies
+            of the same field on one page — the AI card's "Generate from
+            Image" reaches it directly by DOM id instead (see
+            attributeInputName + getContext above). */}
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <SectionCard title="Product Information">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -78,12 +132,13 @@ export function ProductOverviewForm({
                   <Label htmlFor="nameDefault" className={fieldLabelClass}>
                     Title
                   </Label>
-                  <Button type="button" variant="ghost" size="sm" disabled title="Coming soon">
+                  <Button type="button" variant="ghost" size="sm" disabled={titleGenPending} onClick={handleGenerateTitle}>
                     <Sparkles className="size-3" />
-                    Generate
+                    {titleGenPending ? 'Generating…' : 'Generate'}
                   </Button>
                 </div>
-                <Input id="nameDefault" name="nameDefault" defaultValue={product.name ?? ''} />
+                <Input id="nameDefault" name="nameDefault" ref={titleInputRef} defaultValue={product.name ?? ''} />
+                {titleGenError ? <p className="text-xs text-destructive">{titleGenError}</p> : null}
               </div>
               <div className="space-y-2">
                 <Label className={fieldLabelClass}>Brand / Vendor</Label>
@@ -103,47 +158,31 @@ export function ProductOverviewForm({
             <div>
               <div className="flex items-center justify-between">
                 <Label className={fieldLabelClass}>Tags</Label>
-                <Button type="button" variant="ghost" size="sm" disabled title="Coming soon">
+                <Button type="button" variant="ghost" size="sm" disabled={tagsGenPending} onClick={handleGenerateTags}>
                   <Sparkles className="size-3" />
-                  Generate Tags
+                  {tagsGenPending ? 'Generating…' : 'Generate Tags'}
                 </Button>
               </div>
-              <div className="mt-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">No tags yet — coming soon.</div>
+              <TagsField tags={tags} onTagsChange={setTags} />
+              {tagsGenError ? <p className="mt-1 text-xs text-destructive">{tagsGenError}</p> : null}
             </div>
           </SectionCard>
 
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader className="border-b pb-4">
-              <CardTitle className="flex items-center gap-1.5 text-[0.88rem] font-bold">
-                <Sparkles className="size-3.5 text-primary" />
-                AI Product Assistant
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">Generate content, or upload a photo and let AI draft the listing.</p>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-2">
-              <div className="rounded-lg border bg-card p-3">
-                <p className="text-xs font-semibold">Generate from Image</p>
-                <p className="mt-1 text-xs text-muted-foreground">Upload a product photo — AI detects the dominant color and product type, then drafts title, description, tags and SEO copy.</p>
-                <div className="mt-2 flex gap-2">
-                  <Button type="button" variant="outline" size="sm" className="flex-1" disabled title="Coming soon">
-                    <Upload className="size-3" />
-                    Upload Photo
-                  </Button>
-                  <Button type="button" size="sm" className="flex-1" disabled title="Coming soon">
-                    <Sparkles className="size-3" />
-                    Analyze &amp; Generate
-                  </Button>
-                </div>
-              </div>
-              <div className="text-[0.72rem] font-bold tracking-wide text-muted-foreground uppercase">Quick Actions</div>
-              {AI_QUICK_ACTIONS.map((a) => (
-                <Button key={a} type="button" variant="outline" size="sm" className="w-full justify-start" disabled title="Coming soon">
-                  <Sparkles className="size-3" />
-                  {a}
-                </Button>
-              ))}
-            </CardContent>
-          </Card>
+          <AiProductAssistant
+            productPublicId={product.publicId}
+            categoryNames={categoryNames}
+            metaTitle={(product.attributes.meta_title as string | undefined) ?? null}
+            metaDescription={(product.attributes.meta_description as string | undefined) ?? null}
+            getContext={getContext}
+            applyTitle={(title) => {
+              if (titleInputRef.current) titleInputRef.current.value = title;
+            }}
+            applyDescription={(description) => {
+              const el = document.getElementById(attributeInputName('description')) as HTMLTextAreaElement | null;
+              if (el) el.value = description;
+            }}
+            applyTags={setTags}
+          />
         </div>
 
         <SectionCard title="Status & Visibility">

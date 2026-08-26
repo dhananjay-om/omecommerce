@@ -26,6 +26,9 @@ export interface ProductProps {
   /** HSN (goods) / SAC (services) code — independent of taxClassId, a legal
    *  India GST invoice requirement. Snapshotted onto OrderLine at checkout. */
   hsnCode: string | null;
+  /** Free-text merchandising tags — see Product.tags's own schema doc
+   *  comment for why this is a plain string array, not a Tag entity. */
+  tags: string[];
 }
 
 export interface CreateProductInput {
@@ -75,6 +78,7 @@ export class Product {
       isVirtual: input.type === ProductType.VIRTUAL,
       taxClassId: input.taxClassId ?? null,
       hsnCode: input.hsnCode ?? null,
+      tags: [],
     });
   }
 

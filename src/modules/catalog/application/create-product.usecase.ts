@@ -90,5 +90,6 @@ export function toView(product: Product): ProductView {
     weight: p.weight,
     taxClassId: p.taxClassId?.toString() ?? null,
     hsnCode: p.hsnCode,
+    tags: p.tags,
   };
 }

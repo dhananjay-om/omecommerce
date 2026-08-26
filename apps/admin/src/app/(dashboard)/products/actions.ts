@@ -104,6 +104,10 @@ export async function updateProduct(
   const weight = String(formData.get('weight') ?? '').trim();
   const taxClassId = String(formData.get('taxClassId') ?? '').trim();
   const hsnCode = String(formData.get('hsnCode') ?? '').trim();
+  // Always sent as the form's current full set (see UpdateProductInput.tags's
+  // own comment) — not the saveCategoryIds-style "only if this form section
+  // renders" landmine, since Tags lives directly on this same form, always.
+  const tags = formData.getAll('tags').map(String).filter(Boolean);
 
   if (!attributeSetId) {
     return { error: 'Attribute set is required.' };
@@ -118,6 +122,7 @@ export async function updateProduct(
       weight: weight || null,
       taxClassId: taxClassId || null,
       hsnCode: hsnCode || null,
+      tags,
     });
     await saveAttributeValues(productPublicId, formData);
     await saveCategoryIds(productPublicId, formData);
