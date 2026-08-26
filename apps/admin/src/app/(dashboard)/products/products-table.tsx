@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, ImageIcon, MoreHorizontal } from 'lucide-react';
-import type { ProductListItem } from '@/lib/types';
-import { bulkUpdateProductStatus } from './actions';
+import { ChevronRight, ImageIcon, MoreHorizontal, Sparkles } from 'lucide-react';
+import type { ProductListItem, BulkJobStatus } from '@/lib/types';
+import { bulkUpdateProductStatus, submitBulkGenerateDescriptions, getBulkGenerateDescriptionsJobStatus, type BulkGenerateDescriptionsResult } from './actions';
 import { DeleteProductDialog } from './delete-product-dialog';
 import { Badge } from '@/components/ui/badge';
 import { DotBadge } from '@/components/dot-badge';
@@ -57,6 +57,42 @@ export function ProductsTable({
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProductListItem | null>(null);
 
+  const [genJobStatus, setGenJobStatus] = useState<BulkJobStatus<BulkGenerateDescriptionsResult> | null>(null);
+  const [genSubmitting, setGenSubmitting] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const genPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (genPollTimer.current) clearTimeout(genPollTimer.current);
+    };
+  }, []);
+
+  function pollGenJob(id: string) {
+    genPollTimer.current = setTimeout(async () => {
+      const status = await getBulkGenerateDescriptionsJobStatus(id);
+      setGenJobStatus(status);
+      if (status.status === 'completed' || status.status === 'failed') {
+        setGenSubmitting(false);
+        return;
+      }
+      pollGenJob(id);
+    }, 1000);
+  }
+
+  async function handleGenerateDescriptions() {
+    setGenError(null);
+    setGenJobStatus(null);
+    setGenSubmitting(true);
+    const result = await submitBulkGenerateDescriptions(Array.from(selected));
+    if (result.error || !result.jobId) {
+      setGenError(result.error ?? 'Something went wrong.');
+      setGenSubmitting(false);
+      return;
+    }
+    pollGenJob(result.jobId);
+  }
+
   const allSelected = products.length > 0 && products.every((p) => selected.has(p.publicId));
 
   function toggleAll() {
@@ -93,17 +129,31 @@ export function ProductsTable({
           bulk bar also offers Bulk Edit/Publish/Price/Inventory, none of
           which have a real backend endpoint yet, so they're not added here. */}
       {selected.size > 0 ? (
-        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-          <span>
-            {selected.size} product{selected.size === 1 ? '' : 's'} selected
-          </span>
-          <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => applyBulkStatus('ACTIVE')}>
-            Activate
-          </Button>
-          <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => applyBulkStatus('ARCHIVED')}>
-            Deactivate
-          </Button>
-          {error ? <span className="font-normal text-destructive">{error}</span> : null}
+        <div className="mb-3 space-y-1.5">
+          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+            <span>
+              {selected.size} product{selected.size === 1 ? '' : 's'} selected
+            </span>
+            <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => applyBulkStatus('ACTIVE')}>
+              Activate
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => applyBulkStatus('ARCHIVED')}>
+              Deactivate
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={genSubmitting} onClick={handleGenerateDescriptions}>
+              <Sparkles className="size-3" />
+              {genSubmitting ? `Generating… ${typeof genJobStatus?.progress === 'number' ? genJobStatus.progress : 0}%` : 'Generate Missing Descriptions'}
+            </Button>
+            {error ? <span className="font-normal text-destructive">{error}</span> : null}
+          </div>
+          {genError ? <p className="text-xs text-destructive">{genError}</p> : null}
+          {genJobStatus?.status === 'completed' && genJobStatus.result ? (
+            <p className="text-xs text-muted-foreground">
+              Generated {genJobStatus.result.generated}, skipped {genJobStatus.result.skipped} (already had a description)
+              {genJobStatus.result.failed > 0 ? `, ${genJobStatus.result.failed} failed` : ''}.
+            </p>
+          ) : null}
+          {genJobStatus?.status === 'failed' ? <p className="text-xs text-destructive">{genJobStatus.error ?? 'The job failed.'}</p> : null}
         </div>
       ) : null}
 

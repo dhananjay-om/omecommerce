@@ -46,6 +46,15 @@ export interface ProductMedia {
   altText: string | null;
 }
 
+export interface ProductReview {
+  publicId: string;
+  customerName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  createdAt: string;
+}
+
 export interface ProductDetail {
   publicId: string;
   sku: string;
@@ -87,6 +96,12 @@ export interface ProductPriceSuggestion {
 export interface ProductCategorySuggestion {
   category: string;
   rationale: string;
+}
+
+export interface ProductAttributeSuggestion {
+  code: string;
+  label: string;
+  suggestedValue: string;
 }
 
 export type CategoryType = 'MANUAL' | 'DYNAMIC';

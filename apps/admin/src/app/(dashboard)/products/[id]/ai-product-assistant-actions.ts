@@ -1,7 +1,7 @@
 'use server';
 
 import { apiPost, apiPut, ApiError } from '@/lib/api-client';
-import type { ProductImageAnalysis, ProductPriceSuggestion, ProductCategorySuggestion } from '@/lib/types';
+import type { ProductImageAnalysis, ProductPriceSuggestion, ProductCategorySuggestion, ProductAttributeSuggestion } from '@/lib/types';
 
 export interface ProductAiContext {
   title: string;
@@ -10,6 +10,14 @@ export interface ProductAiContext {
   productType?: string;
   categoryNames?: string[];
   tags?: string[];
+}
+
+export interface AttributeForSuggestion {
+  code: string;
+  label: string;
+  dataType: string;
+  options?: string[];
+  currentValue?: string;
 }
 
 export interface ProductAiResult<T> {
@@ -51,6 +59,18 @@ export async function generateMetaDescription(productPublicId: string, context: 
   return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/generate-meta-description`, { context });
 }
 
+export async function suggestAttributeValues(
+  productPublicId: string,
+  context: ProductAiContext,
+  attributes: AttributeForSuggestion[],
+): Promise<ProductAiResult<{ suggestions: ProductAttributeSuggestion[] }>> {
+  return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/suggest-attribute-values`, { context, attributes });
+}
+
+export async function generateAltText(productPublicId: string, productMediaId: string, context: ProductAiContext): Promise<ProductAiResult<{ altText: string }>> {
+  return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/generate-alt-text`, { productMediaId, context });
+}
+
 export async function analyzeProductImage(
   productPublicId: string,
   storageKey: string,
@@ -62,6 +82,10 @@ export async function analyzeProductImage(
 
 export async function analyzePerformance(productPublicId: string, context: ProductAiContext): Promise<ProductAiResult<{ narrative: string }>> {
   return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/analyze-performance`, { context });
+}
+
+export async function summarizeReviews(productPublicId: string, context: ProductAiContext): Promise<ProductAiResult<{ summary: string }>> {
+  return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/summarize-reviews`, { context });
 }
 
 export async function suggestPrice(productPublicId: string, context: ProductAiContext): Promise<ProductAiResult<ProductPriceSuggestion>> {

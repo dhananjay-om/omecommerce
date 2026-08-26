@@ -42,6 +42,7 @@ export class CreateProduct {
       weight: cmd.weight ?? null,
       taxClassId: cmd.taxClassId ? parseId(cmd.taxClassId, 'taxClassId') : null,
       hsnCode: cmd.hsnCode ?? null,
+      tags: cmd.tags,
     });
     const saved = await this.products.create(product);
 

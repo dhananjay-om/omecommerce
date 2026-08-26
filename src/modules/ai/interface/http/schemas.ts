@@ -82,6 +82,19 @@ export const suggestCategorySchema = z.object({
   categoryNames: z.array(z.string().max(256)).min(1).max(500),
 });
 
+const attributeForSuggestionSchema = z.object({
+  code: z.string().min(1).max(64),
+  label: z.string().min(1).max(128),
+  dataType: z.string().min(1).max(32),
+  options: z.array(z.string().max(128)).max(100).optional(),
+  currentValue: z.string().max(500).optional(),
+});
+
+export const suggestAttributeValuesSchema = z.object({
+  context: productContextSchema,
+  attributes: z.array(attributeForSuggestionSchema).max(50),
+});
+
 // storageKey/mimeType only, never the image bytes themselves — the backend
 // reads the already-uploaded object's own bytes server-side (see
 // ProductAssistant.analyzeImage), which avoids bloating this request body
@@ -89,5 +102,14 @@ export const suggestCategorySchema = z.object({
 export const analyzeProductImageSchema = z.object({
   storageKey: z.string().min(1).max(512),
   mimeType: z.string().regex(/^image\//, 'expected an image mime type'),
+  context: productContextSchema,
+});
+
+// For an image ALREADY attached to the product's gallery — resolved
+// server-side to its real storageKey/mimeType (see ai.module.ts's route),
+// not accepted from the client, so there's no way to point this at an
+// arbitrary object.
+export const generateAltTextSchema = z.object({
+  productMediaId: z.string().regex(/^\d+$/, 'expected numeric id'),
   context: productContextSchema,
 });

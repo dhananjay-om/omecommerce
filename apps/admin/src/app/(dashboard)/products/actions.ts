@@ -59,6 +59,7 @@ export async function createProduct(_prevState: CreateProductFormState, formData
   const weight = String(formData.get('weight') ?? '').trim();
   const taxClassId = String(formData.get('taxClassId') ?? '').trim();
   const hsnCode = String(formData.get('hsnCode') ?? '').trim();
+  const tags = formData.getAll('tags').map(String).filter(Boolean);
 
   if (!type || !sku || !attributeSetId) {
     return { error: 'Type, SKU, and attribute set are required.' };
@@ -75,6 +76,7 @@ export async function createProduct(_prevState: CreateProductFormState, formData
       weight: weight || undefined,
       taxClassId: taxClassId || undefined,
       hsnCode: hsnCode || undefined,
+      tags: tags.length > 0 ? tags : undefined,
     });
     await saveAttributeValues(created.publicId, formData);
     await saveCategoryIds(created.publicId, formData);
@@ -261,6 +263,46 @@ export async function submitBulkUpsertProducts(
 /** Polled repeatedly by the client while a bulk-upsert-products job is in flight. */
 export async function getBulkProductJobStatus(jobId: string): Promise<BulkJobStatus<BulkProductImportResult>> {
   const status = await apiGet<BulkJobStatus<BulkProductImportResult>>(`/admin/v1/jobs/${jobId}`);
+  if (status.status === 'completed') {
+    revalidatePath('/products');
+  }
+  return status;
+}
+
+export interface BulkGenerateDescriptionsResult {
+  total: number;
+  generated: number;
+  skipped: number;
+  failed: number;
+  errors: Array<{ row: number; productPublicId: string; message: string }>;
+}
+
+export interface BulkGenerateDescriptionsSubmitState {
+  error: string | null;
+  jobId: string | null;
+}
+
+/** Called imperatively from the products list's bulk bar (same "return the
+ *  jobId immediately, then the caller polls" shape as
+ *  submitBulkUpsertProducts) — each selected product missing a description
+ *  gets a real, grounded OpenAI call; anything that already has one is
+ *  skipped, not overwritten. */
+export async function submitBulkGenerateDescriptions(publicIds: string[]): Promise<BulkGenerateDescriptionsSubmitState> {
+  if (publicIds.length === 0) {
+    return { error: 'Select at least one product first.', jobId: null };
+  }
+  try {
+    const { jobId } = await apiPost<{ jobId: string }>('/admin/v1/products/bulk-generate-descriptions', { productPublicIds: publicIds });
+    return { error: null, jobId };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, jobId: null };
+    throw err;
+  }
+}
+
+/** Polled repeatedly while a bulk-generate-descriptions job is in flight. */
+export async function getBulkGenerateDescriptionsJobStatus(jobId: string): Promise<BulkJobStatus<BulkGenerateDescriptionsResult>> {
+  const status = await apiGet<BulkJobStatus<BulkGenerateDescriptionsResult>>(`/admin/v1/jobs/${jobId}`);
   if (status.status === 'completed') {
     revalidatePath('/products');
   }

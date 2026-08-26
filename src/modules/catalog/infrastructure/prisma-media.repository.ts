@@ -120,4 +120,8 @@ export class PrismaProductMediaRepository implements ProductMediaRepository {
       this.db.productMedia.update({ where: { id: productMediaId }, data: { role: 'THUMBNAIL' } }),
     ]);
   }
+
+  async updateAltOverride(id: bigint, altOverride: string | null): Promise<void> {
+    await this.db.productMedia.update({ where: { id }, data: { altOverride } });
+  }
 }

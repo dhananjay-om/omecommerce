@@ -12,7 +12,7 @@ const INPUT_NAME_PREFIX = 'attr__';
  * future phase — see plan/13's out-of-scope list), JSON has no defined shape to
  * render generically, and REF_* are foreign keys into other entities (products,
  * categories, brands, CMS, collections, customers) that would need a picker UI. */
-const NOT_EDITABLE_TYPES = new Set<AttributeDataType>([
+export const NOT_EDITABLE_TYPES = new Set<AttributeDataType>([
   'IMAGE',
   'FILE',
   'JSON',

@@ -36,6 +36,9 @@ import { PrismaPriceListRepository } from '../modules/pricing/infrastructure/pri
 // literally named PrismaVariantLookup and this worker needs both.
 import { PrismaVariantLookup as PrismaPricingVariantLookup } from '../modules/pricing/infrastructure/prisma-customer-group.repository.js';
 import { SetProductPrice } from '../modules/pricing/application/set-product-price.usecase.js';
+import { fromRow } from '../modules/catalog/domain/attribute-value.js';
+import { getOpenAiClient } from '../modules/ai/infrastructure/dynamic-openai-client.js';
+import { generateDescription } from '../modules/ai/infrastructure/product-assistant-openai.js';
 import { logger } from '../shared/infrastructure/logger.js';
 
 /**
@@ -85,12 +88,15 @@ export function startBulkImportWorker(): Worker {
 
   const worker = new Worker(
     BULK_JOBS_QUEUE,
-    async (job): Promise<BulkImportResult | BulkStockResult | BulkProductImportResult> => {
+    async (job): Promise<BulkImportResult | BulkStockResult | BulkProductImportResult | BulkGenerateDescriptionsResult> => {
       if (job.name === 'bulk-set-stock') {
         return runBulkSetStock(job, setStockQuantity);
       }
       if (job.name === 'bulk-upsert-products') {
         return runBulkUpsertProducts(job, upsertDeps);
+      }
+      if (job.name === 'bulk-generate-descriptions') {
+        return runBulkGenerateDescriptions(job, { products, attrStore, assignAttributeValue });
       }
       // Default/legacy job name for the pre-existing create-only product-import flow.
       return runBulkImportProducts(job, createProduct, assignAttributeValue);
@@ -387,4 +393,84 @@ async function runBulkUpsertProducts(
   }
 
   return { total: rows.length, created, updated, failed: errors.length, errors };
+}
+
+interface BulkGenerateDescriptionsRowError {
+  row: number;
+  productPublicId: string;
+  message: string;
+}
+
+interface BulkGenerateDescriptionsResult {
+  total: number;
+  generated: number;
+  skipped: number;
+  failed: number;
+  errors: BulkGenerateDescriptionsRowError[];
+}
+
+interface BulkGenerateDescriptionsDeps {
+  products: PrismaProductRepository;
+  attrStore: PrismaProductAttributeStore;
+  assignAttributeValue: AssignAttributeValue;
+}
+
+/**
+ * "Generate missing descriptions" from the product list's bulk bar —
+ * skips (doesn't overwrite) any product that already has a real
+ * description, same "don't silently clobber existing content" posture as
+ * every other AI Product Assistant action. Writes through the exact same
+ * AssignAttributeValue use case the admin's own Overview form calls (via
+ * saveAttributeValues) — there's no separate bulk-only write path here
+ * either, same precedent as runBulkUpsertProducts above.
+ *
+ * Structurally this is a per-row try/catch/progress/error-collection loop
+ * like every other job in this file — the one real difference is each row
+ * is a real OpenAI call (~1-3s, can genuinely fail), not a plain DB write,
+ * which is exactly why this needed to be a queued job rather than
+ * bulkUpdateProductStatus's synchronous Promise.all-per-item shape (see
+ * that action's own doc comment in products/actions.ts on the admin side).
+ */
+async function runBulkGenerateDescriptions(
+  job: { data: unknown; updateProgress: (n: number) => Promise<void> },
+  deps: BulkGenerateDescriptionsDeps,
+): Promise<BulkGenerateDescriptionsResult> {
+  const { productPublicIds } = job.data as { productPublicIds: string[] };
+  const errors: BulkGenerateDescriptionsRowError[] = [];
+  let generated = 0;
+  let skipped = 0;
+
+  const handle = await getOpenAiClient(prisma);
+  if (!handle) {
+    throw new Error('The AI Product Assistant needs an OpenAI key — configure one in AI Settings.');
+  }
+
+  for (let i = 0; i < productPublicIds.length; i++) {
+    const publicId = productPublicIds[i]!;
+    try {
+      const product = await deps.products.findByPublicId(publicId);
+      if (!product || product.props.id === null) throw new Error('product not found');
+
+      const attributeRows = await deps.attrStore.resolveGlobalValues(product.props.id);
+      const descriptionRow = attributeRows.find((r) => r.code === 'description');
+      const currentDescription = descriptionRow ? fromRow(descriptionRow.dataType, descriptionRow.columns) : null;
+      if (currentDescription != null && String(currentDescription).trim() !== '') {
+        skipped++;
+      } else {
+        const description = await generateDescription(handle, {
+          title: product.props.nameDefault ?? '',
+          sku: product.props.sku,
+          productType: product.props.type,
+          tags: product.props.tags,
+        });
+        await deps.assignAttributeValue.execute({ productPublicId: publicId, attributeCode: 'description', scope: 'GLOBAL', value: description });
+        generated++;
+      }
+    } catch (err) {
+      errors.push({ row: i, productPublicId: publicId, message: err instanceof Error ? err.message : String(err) });
+    }
+    await job.updateProgress(Math.round(((i + 1) / productPublicIds.length) * 100));
+  }
+
+  return { total: productPublicIds.length, generated, skipped, failed: errors.length, errors };
 }

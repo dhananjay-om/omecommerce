@@ -4,12 +4,19 @@ import { useActionState, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { updateProduct, type UpdateProductFormState } from '../actions';
 import type { AttributeSet, AttributeSetDetail, Category, ProductDetail, TaxClass } from '@/lib/types';
-import { AttributeFieldsSection, attributeInputName } from '../attribute-fields-section';
+import { AttributeFieldsSection, attributeInputName, NOT_EDITABLE_TYPES } from '../attribute-fields-section';
 import { DESCRIPTION_GROUP } from '../default-attribute-groups';
 import { CategoryPicker } from '../category-picker';
 import { TagsField } from './tags-field';
 import { AiProductAssistant } from './ai-product-assistant';
-import { generateTitle, generateTags, generateDescription, generateShortDescription, type ProductAiContext } from './ai-product-assistant-actions';
+import {
+  generateTitle,
+  generateTags,
+  generateDescription,
+  generateShortDescription,
+  type ProductAiContext,
+  type AttributeForSuggestion,
+} from './ai-product-assistant-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Input } from '@/components/ui/input';
@@ -57,6 +64,19 @@ export function ProductOverviewForm({
   const [attributeSetId, setAttributeSetId] = useState(product.attributeSetId);
   const selectedSetDetail = attributeSetDetails[attributeSetId];
   const categoryNames = categories.filter((c) => product.categoryIds.includes(c.publicId)).map((c) => c.nameDefault ?? c.slug);
+  // The attribute set's own real attributes only (Description/SEO are
+  // fixed groups, not set-scoped, and already have their own dedicated
+  // Generate buttons) — feeds Suggest Attribute Values' real option lists.
+  const attributesForSuggestion: AttributeForSuggestion[] = (selectedSetDetail?.groups ?? [])
+    .flatMap((g) => g.attributes)
+    .filter((a) => !NOT_EDITABLE_TYPES.has(a.dataType))
+    .map((a) => ({
+      code: a.code,
+      label: a.label,
+      dataType: a.dataType,
+      options: a.options.length > 0 ? a.options.map((o) => o.label) : undefined,
+      currentValue: product.attributes[a.code] != null ? String(product.attributes[a.code]) : undefined,
+    }));
 
   const [tags, setTags] = useState<string[]>(product.tags);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -240,6 +260,7 @@ export function ProductOverviewForm({
             categoryNames={categoryNames}
             metaTitle={(product.attributes.meta_title as string | undefined) ?? null}
             metaDescription={(product.attributes.meta_description as string | undefined) ?? null}
+            attributesForSuggestion={attributesForSuggestion}
             getContext={getContext}
             applyTitle={(title) => {
               if (titleInputRef.current) titleInputRef.current.value = title;

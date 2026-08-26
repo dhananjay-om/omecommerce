@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiDelete, ApiError } from '@/lib/api-client';
+import { apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
 
 export interface RequestUploadUrlResult {
   error: string | null;
@@ -62,6 +62,25 @@ export async function detachMedia(productPublicId: string, productMediaId: strin
   revalidatePath(`/products/${productPublicId}/edit`);
   revalidatePath(`/products/${productPublicId}`);
   revalidatePath('/products');
+  return { error: null };
+}
+
+export interface UpdateAltTextResult {
+  error: string | null;
+}
+
+/** Manual edits and the AI Product Assistant's "Generate" button next to
+ *  an image both save through this one action. */
+export async function updateMediaAltText(productPublicId: string, productMediaId: string, altText: string): Promise<UpdateAltTextResult> {
+  try {
+    await apiPatch(`/admin/v1/products/${productPublicId}/media/${productMediaId}`, { altText: altText.trim() || null });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidatePath(`/products/${productPublicId}/edit`);
+  revalidatePath(`/products/${productPublicId}`);
   return { error: null };
 }
 

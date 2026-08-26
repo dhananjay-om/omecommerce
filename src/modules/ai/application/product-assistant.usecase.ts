@@ -4,14 +4,30 @@ import { DomainError } from '../../../shared/domain/errors.js';
 import { getObjectBytes } from '../../../shared/infrastructure/storage/s3-client.js';
 import { getOpenAiClient } from '../infrastructure/dynamic-openai-client.js';
 import * as assistant from '../infrastructure/product-assistant-openai.js';
-import type { ProductContext, ImageAnalysisDraft, PriceSuggestion, CategorySuggestion } from '../infrastructure/product-assistant-openai.js';
+import type {
+  ProductContext,
+  ImageAnalysisDraft,
+  PriceSuggestion,
+  CategorySuggestion,
+  AttributeForSuggestion,
+  AttributeValueSuggestion,
+} from '../infrastructure/product-assistant-openai.js';
 import { todayDateKey } from '../../analytics/domain/date-key.js';
+import type { ProductReviewRepository } from '../../catalog/domain/repositories.js';
 
 function shiftDays(dateKey: number, days: number): Date {
   const s = String(dateKey);
   const d = new Date(Date.UTC(Number(s.slice(0, 4)), Number(s.slice(4, 6)) - 1, Number(s.slice(6, 8))));
   d.setUTCDate(d.getUTCDate() + days);
   return d;
+}
+
+/** Base64-embeds an object's bytes as a data URL, for vision calls — see
+ *  analyzeImage's own doc comment for why this is preferred over handing
+ *  OpenAI a presigned URL. */
+async function readImageAsDataUrl(storageKey: string, mimeType: string): Promise<string> {
+  const bytes = await getObjectBytes(storageKey);
+  return `data:${mimeType};base64,${bytes.toString('base64')}`;
 }
 
 function dateKeyOf(d: Date): number {
@@ -30,7 +46,13 @@ function dateKeyOf(d: Date): number {
  * an already-uploaded temp image, it doesn't write one).
  */
 export class ProductAssistant {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    // Cross-module port reuse (same convention as ChatWithAssistant taking
+    // AnalyticsQueryRepository directly) — reviews are a catalog concern,
+    // this module just reads them, never writes.
+    private readonly productReviews: ProductReviewRepository,
+  ) {}
 
   private async requireHandle() {
     const handle = await getOpenAiClient(this.db);
@@ -77,15 +99,42 @@ export class ProductAssistant {
    *  Media tab afterward if they like the result). */
   async analyzeImage(ctx: ProductContext, storageKey: string, mimeType: string): Promise<ImageAnalysisDraft> {
     const handle = await this.requireHandle();
-    const bytes = await getObjectBytes(storageKey);
-    const dataUrl = `data:${mimeType};base64,${bytes.toString('base64')}`;
+    const dataUrl = await readImageAsDataUrl(storageKey, mimeType);
     return assistant.analyzeProductImage(handle, ctx, dataUrl);
+  }
+
+  /** Same read pattern as analyzeImage above, but for an image already
+   *  attached to the product's gallery (the Media tab's "Generate" button
+   *  next to an existing photo) rather than a fresh temp upload — the
+   *  caller resolves `storageKey`/`mimeType` from the real ProductMedia/
+   *  MediaAsset row (see ai.module.ts's route) before calling this. */
+  async generateAltTextForImage(ctx: ProductContext, storageKey: string, mimeType: string): Promise<string> {
+    const handle = await this.requireHandle();
+    const dataUrl = await readImageAsDataUrl(storageKey, mimeType);
+    return assistant.generateAltText(handle, ctx, dataUrl);
   }
 
   async analyzePerformance(productId: bigint, ctx: ProductContext): Promise<string> {
     const handle = await this.requireHandle();
     const summary = await this.buildPerformanceSummary(productId);
     return assistant.analyzePerformance(handle, ctx, summary);
+  }
+
+  /** Skips the OpenAI call entirely (and requireHandle's key check) when
+   *  there are no reviews yet — a "0 reviews" product is an extremely
+   *  common, expected state, not an error, and there's nothing real to
+   *  summarize; calling the model anyway would just invite it to pad the
+   *  answer with generic filler. */
+  async summarizeReviews(productId: bigint, ctx: ProductContext): Promise<string> {
+    const reviews = await this.productReviews.listForProduct(productId);
+    if (reviews.length === 0) {
+      return 'No reviews yet for this product.';
+    }
+    const handle = await this.requireHandle();
+    const reviewsText = reviews
+      .map((r) => `- ${r.rating}/5${r.title ? ` "${r.title}"` : ''} (${r.customerName}): ${r.body}`)
+      .join('\n');
+    return assistant.summarizeReviews(handle, ctx, reviewsText);
   }
 
   async suggestPrice(productId: bigint, ctx: ProductContext): Promise<PriceSuggestion> {
@@ -96,6 +145,10 @@ export class ProductAssistant {
 
   async suggestCategory(ctx: ProductContext, availableCategoryNames: string[]): Promise<CategorySuggestion> {
     return assistant.suggestCategory(await this.requireHandle(), ctx, availableCategoryNames);
+  }
+
+  async suggestAttributeValues(ctx: ProductContext, attributes: AttributeForSuggestion[]): Promise<AttributeValueSuggestion[]> {
+    return assistant.suggestAttributeValues(await this.requireHandle(), ctx, attributes);
   }
 
   /** Trailing-30-day vs. prior-30-day units/revenue/orders from

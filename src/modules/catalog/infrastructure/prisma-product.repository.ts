@@ -84,6 +84,7 @@ export class PrismaProductRepository implements ProductRepository {
             isVirtual: p.isVirtual,
             taxClassId: p.taxClassId,
             hsnCode: p.hsnCode,
+            tags: p.tags,
           },
         });
         if (IMPLICIT_VARIANT_TYPES.has(created.type)) {

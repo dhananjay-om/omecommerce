@@ -42,6 +42,7 @@ export interface CreateProductInput {
   weight?: string | null;
   taxClassId?: bigint | null;
   hsnCode?: string | null;
+  tags?: string[];
 }
 
 /**
@@ -78,7 +79,7 @@ export class Product {
       isVirtual: input.type === ProductType.VIRTUAL,
       taxClassId: input.taxClassId ?? null,
       hsnCode: input.hsnCode ?? null,
-      tags: [],
+      tags: input.tags ?? [],
     });
   }
 

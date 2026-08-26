@@ -23,6 +23,7 @@ export interface CreateProductCommand {
    *  convention as attributeSetId above). */
   taxClassId?: string | null;
   hsnCode?: string | null;
+  tags?: string[];
 }
 
 export interface UpdateProductCommand {
@@ -512,9 +513,25 @@ export interface ProductMediaView {
   altText: string | null;
 }
 
+export interface ProductReviewView {
+  publicId: string;
+  customerName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  createdAt: string;
+}
+
 export interface DetachProductMediaCommand {
   productPublicId: string;
   productMediaId: string;
+}
+
+export interface UpdateProductMediaAltTextCommand {
+  productPublicId: string;
+  productMediaId: string;
+  /** `null` clears the override, reverting to the asset's own default alt text. */
+  altText: string | null;
 }
 
 export interface SetProductThumbnailCommand {

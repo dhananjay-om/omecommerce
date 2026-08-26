@@ -32,6 +32,7 @@ export const createProductSchema = z.object({
   weight: decimalString.nullish(),
   taxClassId: z.string().regex(/^\d+$/, 'expected numeric id').nullish(),
   hsnCode: z.string().max(8).nullish(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
 });
 
 const variantAxisSchema = z.object({
@@ -197,6 +198,13 @@ export const bulkUpsertProductsSchema = z.object({
   rows: z.array(bulkUpsertRowSchema).min(1).max(10_000),
 });
 
+// Selected from the product list's bulk bar — far smaller cap than the CSV
+// imports above (a real page selection, not a spreadsheet), and each row is
+// an LLM call (slow, ~1-3s), unlike those imports' plain DB writes.
+export const bulkGenerateDescriptionsSchema = z.object({
+  productPublicIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
 export const createCategorySchema = z.object({
   parentId: z.string().uuid().nullish(),
   nameDefault: z.string().max(512).nullish(),
@@ -262,4 +270,8 @@ export const createMediaAssetSchema = z.object({
 export const attachProductMediaSchema = z.object({
   mediaPublicId: z.string().uuid(),
   role: z.nativeEnum(ProductMediaRole).optional(),
+});
+
+export const updateProductMediaAltTextSchema = z.object({
+  altText: z.string().max(250).nullable(),
 });

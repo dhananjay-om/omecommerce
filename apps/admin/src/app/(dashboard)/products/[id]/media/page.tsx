@@ -10,7 +10,11 @@ export default async function ProductMediaPage({ params }: { params: Promise<{ i
   return (
     <Card>
       <CardContent className="pt-6">
-        <ImageUploadField productPublicId={product.publicId} media={product.media} />
+        <ImageUploadField
+          productPublicId={product.publicId}
+          media={product.media}
+          aiContext={{ title: product.name ?? '', sku: product.sku, productType: product.type, tags: product.tags }}
+        />
       </CardContent>
     </Card>
   );

@@ -9,6 +9,7 @@ import { PrismaProductForecastQueryRepository } from './infrastructure/prisma-pr
 import { PrismaMerchandisingSuggestionRepository } from './infrastructure/prisma-merchandising-suggestion.repository.js';
 import { PrismaMerchandisingSuggestionQueryRepository } from './infrastructure/prisma-merchandising-suggestion-query.repository.js';
 import { PrismaAnalyticsQueryRepository } from '../analytics/infrastructure/prisma-analytics-query.repository.js';
+import { PrismaProductReviewRepository } from '../catalog/infrastructure/prisma-product-review.repository.js';
 import { RefreshWebsiteInsights } from './application/refresh-website-insights.usecase.js';
 import { RunNightlyAiRefresh } from './application/run-nightly-ai-refresh.usecase.js';
 import { RefreshWebsiteForecasts } from './application/refresh-website-forecasts.usecase.js';
@@ -32,6 +33,8 @@ import {
   generateFromContextSchema,
   suggestCategorySchema,
   analyzeProductImageSchema,
+  generateAltTextSchema,
+  suggestAttributeValuesSchema,
 } from './interface/http/schemas.js';
 import { todayDateKey } from '../analytics/domain/date-key.js';
 import { NotFoundError } from '../../shared/domain/errors.js';
@@ -100,7 +103,7 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
   const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
   const chatWithAssistant = new ChatWithAssistant(db, analyticsQuery);
 
-  const productAssistant = new ProductAssistant(db);
+  const productAssistant = new ProductAssistant(db, new PrismaProductReviewRepository(db));
 
   const admin = Router();
   const view = authorize('ai:view');
@@ -113,6 +116,20 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     const row = await db.product.findFirst({ where: { publicId, deletedAt: null }, select: { id: true } });
     if (!row) throw new NotFoundError('product', publicId);
     return row.id;
+  }
+
+  /** productMediaId -> real storageKey/mimeType, verified to actually
+   *  belong to the given product (never trusts a client-supplied storage
+   *  location the way analyze-image's temp-upload flow reasonably can —
+   *  this is for an ALREADY-attached gallery image, so it's looked up, not
+   *  taken on faith). */
+  async function resolveProductMediaImage(productId: bigint, productMediaId: string): Promise<{ storageKey: string; mimeType: string }> {
+    const row = await db.productMedia.findFirst({
+      where: { id: BigInt(productMediaId), productId },
+      select: { asset: { select: { storageKey: true, mimeType: true } } },
+    });
+    if (!row) throw new NotFoundError('product media', productMediaId);
+    return { storageKey: row.asset.storageKey, mimeType: row.asset.mimeType };
   }
 
   admin.get(
@@ -261,12 +278,31 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     }),
   );
   admin.post(
+    '/ai/products/:id/generate-alt-text',
+    view,
+    asyncHandler(async (req, res) => {
+      const { productMediaId, context } = parse(generateAltTextSchema, req.body);
+      const productId = await resolveProductId(req.params.id!);
+      const { storageKey, mimeType } = await resolveProductMediaImage(productId, productMediaId);
+      res.json({ data: { altText: await productAssistant.generateAltTextForImage(context, storageKey, mimeType) } });
+    }),
+  );
+  admin.post(
     '/ai/products/:id/analyze-performance',
     view,
     asyncHandler(async (req, res) => {
       const { context } = parse(generateFromContextSchema, req.body);
       const productId = await resolveProductId(req.params.id!);
       res.json({ data: { narrative: await productAssistant.analyzePerformance(productId, context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/summarize-reviews',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      const productId = await resolveProductId(req.params.id!);
+      res.json({ data: { summary: await productAssistant.summarizeReviews(productId, context) } });
     }),
   );
   admin.post(
@@ -284,6 +320,14 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     asyncHandler(async (req, res) => {
       const { context, categoryNames } = parse(suggestCategorySchema, req.body);
       res.json({ data: await productAssistant.suggestCategory(context, categoryNames) });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/suggest-attribute-values',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context, attributes } = parse(suggestAttributeValuesSchema, req.body);
+      res.json({ data: { suggestions: await productAssistant.suggestAttributeValues(context, attributes) } });
     }),
   );
 

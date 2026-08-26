@@ -484,6 +484,23 @@ export interface ProductMediaRepository {
   listThumbnailStorageKeysForProducts(productIds: bigint[]): Promise<Map<string, string>>;
   /** Marks one media row as the product's single THUMBNAIL ("main image"), demoting any other row on the same product currently holding that role back to GALLERY — exactly one thumbnail at a time. */
   setThumbnail(productId: bigint, productMediaId: bigint): Promise<void>;
+  /** Per-product override of the underlying MediaAsset's altDefault — `null` clears the override, reverting display to the asset's own default (same resolution as get-product-detail.usecase.ts: `altOverride ?? assetAltDefault`). */
+  updateAltOverride(id: bigint, altOverride: string | null): Promise<void>;
+}
+
+export interface ProductReviewInfo {
+  publicId: string;
+  customerName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  createdAt: Date;
+}
+
+/** Read-only — see ProductReview's own schema doc comment for why there's
+ *  no create/moderate path (no submission flow exists to write through). */
+export interface ProductReviewRepository {
+  listForProduct(productId: bigint): Promise<ProductReviewInfo[]>;
 }
 
 /** Port over the MinIO/S3-backed object store (plan/13 Phase J) — lets use-cases stay unit-testable without a real bucket. */

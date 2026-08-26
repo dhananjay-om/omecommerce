@@ -18,6 +18,7 @@ import {
 import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './infrastructure/prisma-category.repository.js';
 import { PrismaBrandRepository } from './infrastructure/prisma-brand.repository.js';
 import { PrismaMediaAssetRepository, PrismaProductMediaRepository } from './infrastructure/prisma-media.repository.js';
+import { PrismaProductReviewRepository } from './infrastructure/prisma-product-review.repository.js';
 import { S3MediaStorage } from './infrastructure/s3-media-storage.js';
 import { PrismaProductAttributeStore } from './infrastructure/product-attribute.store.js';
 import { PrismaPriceResolver } from '../pricing/infrastructure/prisma-price-resolver.js';
@@ -43,6 +44,7 @@ import { UpdateProductVariant } from './application/update-product-variant.useca
 import { DeleteProductVariant } from './application/delete-product-variant.usecase.js';
 import { ListProducts } from './application/list-products.usecase.js';
 import { GetProductDetail } from './application/get-product-detail.usecase.js';
+import { ListProductReviews } from './application/list-product-reviews.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
 import { ListAttributes, ListAttributeOptions } from './application/list-attributes.usecase.js';
 import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
@@ -63,6 +65,7 @@ import { RequestMediaUpload } from './application/request-media-upload.usecase.j
 import { CreateMediaAsset } from './application/create-media-asset.usecase.js';
 import { AttachProductMedia } from './application/attach-product-media.usecase.js';
 import { DetachProductMedia } from './application/detach-product-media.usecase.js';
+import { UpdateProductMediaAltText } from './application/update-product-media-alt-text.usecase.js';
 import { SetProductThumbnail } from './application/set-product-thumbnail.usecase.js';
 import {
   createProductSchema,
@@ -80,6 +83,7 @@ import {
   assignAttributeToGroupSchema,
   bulkImportProductsSchema,
   bulkUpsertProductsSchema,
+  bulkGenerateDescriptionsSchema,
   createCategorySchema,
   updateCategorySchema,
   reparentCategorySchema,
@@ -90,6 +94,7 @@ import {
   requestMediaUploadSchema,
   createMediaAssetSchema,
   attachProductMediaSchema,
+  updateProductMediaAltTextSchema,
 } from './interface/http/schemas.js';
 
 export interface CatalogRouters {
@@ -109,6 +114,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const brands = new PrismaBrandRepository(db);
   const mediaAssets = new PrismaMediaAssetRepository(db);
   const productMedia = new PrismaProductMediaRepository(db);
+  const productReviews = new PrismaProductReviewRepository(db);
   const mediaStorage = new S3MediaStorage();
   const storeContext = new PrismaStoreContextResolver(db);
   const cache = new CacheAside(redis);
@@ -148,6 +154,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const deleteProductVariant = new DeleteProductVariant(variants);
   const listProducts = new ListProducts(products, productMedia, mediaStorage);
   const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories, productMedia, mediaStorage);
+  const listProductReviews = new ListProductReviews(products, productReviews);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
   const listAttributes = new ListAttributes(attributes);
@@ -169,6 +176,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const createMediaAsset = new CreateMediaAsset(mediaAssets);
   const attachProductMedia = new AttachProductMedia(products, mediaAssets, productMedia, mediaStorage);
   const detachProductMedia = new DetachProductMedia(products, productMedia);
+  const updateProductMediaAltText = new UpdateProductMediaAltText(products, productMedia);
   const setProductThumbnail = new SetProductThumbnail(products, productMedia, mediaStorage);
 
   // --- Admin API ---
@@ -192,6 +200,12 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/products/:publicId',
     asyncHandler(async (req, res) => {
       res.json({ data: await getProductDetail.execute(req.params.publicId!) });
+    }),
+  );
+  admin.get(
+    '/products/:publicId/reviews',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await listProductReviews.execute(req.params.publicId!) });
     }),
   );
   admin.patch(
@@ -478,6 +492,15 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
       res.json({ data: view });
     }),
   );
+  admin.patch(
+    '/products/:publicId/media/:productMediaId',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateProductMediaAltTextSchema, req.body);
+      await updateProductMediaAltText.execute({ productPublicId: req.params.publicId!, productMediaId: req.params.productMediaId!, ...body });
+      res.status(204).send();
+    }),
+  );
   admin.post(
     '/products/bulk-import',
     authorize('catalog:manage'),
@@ -507,6 +530,20 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
         warehouseCode: body.warehouseCode,
         rows: body.rows,
       });
+      res.status(202).json({ data: { jobId: job.id } });
+    }),
+  );
+  admin.post(
+    '/products/bulk-generate-descriptions',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      // Same shared bulk-jobs queue, one more job.name branch dispatched
+      // from the SAME worker (src/workers/bulk-import.worker.ts) — polled
+      // via the same generic GET /admin/v1/jobs/:jobId below. Unlike the
+      // CSV imports above, each row here is a real OpenAI call (products
+      // already having a description are skipped, not regenerated).
+      const body = parse(bulkGenerateDescriptionsSchema, req.body);
+      const job = await getBulkJobsQueue().add('bulk-generate-descriptions', { productPublicIds: body.productPublicIds });
       res.status(202).json({ data: { jobId: job.id } });
     }),
   );

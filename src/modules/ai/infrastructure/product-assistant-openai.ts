@@ -42,6 +42,22 @@ export interface CategorySuggestion {
   rationale: string;
 }
 
+export interface AttributeForSuggestion {
+  code: string;
+  label: string;
+  dataType: string;
+  /** Real option labels (SELECT/MULTISELECT only) — the model must pick
+   *  from these verbatim, never invent a new option. */
+  options?: string[];
+  currentValue?: string;
+}
+
+export interface AttributeValueSuggestion {
+  code: string;
+  label: string;
+  suggestedValue: string;
+}
+
 function contextBlock(ctx: ProductContext): string {
   return [
     `Title: ${ctx.title || '(none yet)'}`,
@@ -174,6 +190,28 @@ export async function analyzeProductImage(handle: OpenAiClientHandle, ctx: Produ
   );
 }
 
+export async function generateAltText(handle: OpenAiClientHandle, ctx: ProductContext, imageDataUrl: string): Promise<string> {
+  const text = await callOpenAi(
+    handle,
+    `${GROUNDING_RULE} Look at the attached product photo. Write ONE accessibility alt-text description of what's literally ` +
+      `visible in the image — concise (under 125 characters), no "image of"/"picture of" prefix, no marketing language. Reply ` +
+      `with the alt text only, no quotes.`,
+    contextBlock(ctx),
+    { type: 'image_url', image_url: { url: imageDataUrl } },
+  );
+  return text.replace(/^["']|["']$/g, '');
+}
+
+export async function summarizeReviews(handle: OpenAiClientHandle, ctx: ProductContext, reviewsText: string): Promise<string> {
+  return callOpenAi(
+    handle,
+    `${GROUNDING_RULE} You will be given real customer reviews for this product (with their star ratings). Write a short (3-5 ` +
+      `sentence) plain-English summary of what customers say — common praise, common complaints, and the overall sentiment. ` +
+      `Base this ONLY on the reviews given — never invent a complaint or compliment not actually present in the text.`,
+    `${contextBlock(ctx)}\n\nReal customer reviews:\n${reviewsText}`,
+  );
+}
+
 export async function analyzePerformance(handle: OpenAiClientHandle, ctx: ProductContext, performanceSummary: string): Promise<string> {
   return callOpenAi(
     handle,
@@ -201,4 +239,35 @@ export async function suggestCategory(handle: OpenAiClientHandle, ctx: ProductCo
       `name not in the list. Reply as a JSON object: {"category": "<one of the listed names, verbatim>", "rationale": "..."}.`,
     `${contextBlock(ctx)}\n\nAvailable categories:\n${availableCategoryNames.join(', ')}`,
   );
+}
+
+/** Informational only, never auto-applied — SELECT/MULTISELECT fields are
+ *  custom controlled components (not plain inputs), so unlike Title/Tags/
+ *  Description there's no safe DOM write to inject a suggestion into; the
+ *  admin sets these themselves in the Attributes section below, using this
+ *  as a starting point. */
+export async function suggestAttributeValues(handle: OpenAiClientHandle, ctx: ProductContext, attributes: AttributeForSuggestion[]): Promise<AttributeValueSuggestion[]> {
+  if (attributes.length === 0) return [];
+  const attrList = attributes
+    .map((a) => {
+      const optionsNote = a.options?.length ? `, MUST be exactly one of these options: [${a.options.join(', ')}]` : '';
+      const currentNote = a.currentValue ? ` (currently: ${a.currentValue})` : '';
+      return `- ${a.label} (code: ${a.code}, type: ${a.dataType}${optionsNote})${currentNote}`;
+    })
+    .join('\n');
+
+  const draft = await callOpenAiJson<{ suggestions: Array<{ code: string; value: string }> }>(
+    handle,
+    `${GROUNDING_RULE} For each attribute listed, suggest a value grounded in the product context — one entry per attribute, same ` +
+      `order given. For any attribute with a fixed option list, you MUST reply with exactly one (or for a clearly multi-value ` +
+      `field, several, comma-separated) of the listed options verbatim — never invent an option not in the list. Skip an ` +
+      `attribute entirely (omit it from the array) if nothing in the context supports a confident guess. Reply as a JSON object: ` +
+      `{"suggestions": [{"code": "...", "value": "..."}, ...]}.`,
+    `${contextBlock(ctx)}\n\nAttributes to suggest values for:\n${attrList}`,
+  );
+
+  const byCode = new Map(attributes.map((a) => [a.code, a.label]));
+  return (draft.suggestions ?? [])
+    .filter((s) => byCode.has(s.code) && s.value?.trim())
+    .map((s) => ({ code: s.code, label: byCode.get(s.code)!, suggestedValue: s.value.trim() }));
 }

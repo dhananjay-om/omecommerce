@@ -10,16 +10,18 @@ import {
   analyzePerformance,
   suggestPrice,
   suggestCategory,
+  suggestAttributeValues,
   applySeoCopy,
   type ProductAiContext,
+  type AttributeForSuggestion,
 } from './ai-product-assistant-actions';
-import type { ProductImageAnalysis } from '@/lib/types';
+import type { ProductImageAnalysis, ProductAttributeSuggestion } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUploadButton } from '@/components/ui/file-upload-button';
 import { cn } from '@/lib/utils';
 
-type QuickActionKey = 'seoTitle' | 'metaDescription' | 'performance' | 'price' | 'category' | 'missingData';
+type QuickActionKey = 'seoTitle' | 'metaDescription' | 'performance' | 'price' | 'category' | 'attributes' | 'missingData';
 
 const QUICK_ACTIONS: Array<{ key: QuickActionKey; label: string }> = [
   { key: 'seoTitle', label: 'Generate SEO Title' },
@@ -27,6 +29,7 @@ const QUICK_ACTIONS: Array<{ key: QuickActionKey; label: string }> = [
   { key: 'performance', label: 'Analyze Product Performance' },
   { key: 'price', label: 'Suggest Price' },
   { key: 'category', label: 'Suggest Category' },
+  { key: 'attributes', label: 'Suggest Attribute Values' },
   { key: 'missingData', label: 'Detect Missing Product Data' },
 ];
 
@@ -34,6 +37,7 @@ type QuickActionResult =
   | { kind: 'text'; label: string; value: string; applyLabel?: string; onApply?: () => void; applied?: boolean; applyPending?: boolean }
   | { kind: 'price'; suggestedPrice: number; rationale: string }
   | { kind: 'category'; category: string; rationale: string }
+  | { kind: 'attributes'; suggestions: ProductAttributeSuggestion[] }
   | { kind: 'missingData'; missing: string[] };
 
 /**
@@ -59,6 +63,7 @@ export function AiProductAssistant({
   categoryNames,
   metaTitle,
   metaDescription,
+  attributesForSuggestion,
   getContext,
   applyTitle,
   applyDescription,
@@ -68,6 +73,10 @@ export function AiProductAssistant({
   categoryNames: string[];
   metaTitle: string | null;
   metaDescription: string | null;
+  /** The current attribute set's own real attributes (Description/SEO
+   *  excluded — those have their own dedicated generate buttons) with
+   *  their real option lists, for Suggest Attribute Values' grounding. */
+  attributesForSuggestion: AttributeForSuggestion[];
   getContext: () => ProductAiContext;
   applyTitle: (title: string) => void;
   applyDescription: (description: string) => void;
@@ -191,6 +200,14 @@ export function AiProductAssistant({
         const result = await suggestCategory(productPublicId, ctx, categoryNames);
         if (result.error || !result.data) return setActionError(result.error ?? 'Suggestion failed.');
         setActionResult({ kind: 'category', category: result.data.category, rationale: result.data.rationale });
+      } else if (key === 'attributes') {
+        if (attributesForSuggestion.length === 0) {
+          setActionResult({ kind: 'attributes', suggestions: [] });
+          return;
+        }
+        const result = await suggestAttributeValues(productPublicId, ctx, attributesForSuggestion);
+        if (result.error || !result.data) return setActionError(result.error ?? 'Suggestion failed.');
+        setActionResult({ kind: 'attributes', suggestions: result.data.suggestions });
       }
     } finally {
       setActionPending(false);
@@ -334,6 +351,28 @@ function QuickActionResultPanel({ result }: { result: QuickActionResult }) {
         <p className="font-medium text-foreground">Suggested category: {result.category}</p>
         <p className="mt-1 text-muted-foreground">{result.rationale}</p>
         <p className="mt-1.5 text-[0.68rem] text-muted-foreground">Informational only — assign it yourself in Categories below.</p>
+      </div>
+    );
+  }
+
+  if (result.kind === 'attributes') {
+    return (
+      <div className="rounded-md border bg-card p-2.5 text-xs">
+        {result.suggestions.length === 0 ? (
+          <p className="text-muted-foreground">No suggestable attributes on this product&apos;s attribute set (beyond Description/SEO, which have their own Generate buttons).</p>
+        ) : (
+          <>
+            <p className="font-medium text-foreground">Suggested values:</p>
+            <ul className="mt-1 space-y-1">
+              {result.suggestions.map((s) => (
+                <li key={s.code}>
+                  <span className="font-medium text-foreground">{s.label}:</span> <span className="text-muted-foreground">{s.suggestedValue}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-[0.68rem] text-muted-foreground">Informational only — set these yourself in the Attributes section below.</p>
+          </>
+        )}
       </div>
     );
   }

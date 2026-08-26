@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Star } from 'lucide-react';
+import { Star, Sparkles } from 'lucide-react';
 import type { ProductMedia } from '@/lib/types';
-import { requestUploadUrl, confirmMediaUpload, detachMedia, setThumbnail } from './media-actions';
+import { requestUploadUrl, confirmMediaUpload, detachMedia, setThumbnail, updateMediaAltText } from './media-actions';
+import { generateAltText, type ProductAiContext } from '../ai-product-assistant-actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { FileUploadButton } from '@/components/ui/file-upload-button';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +37,17 @@ function readImageDimensions(file: File): Promise<{ width: number; height: numbe
  * to, plus the admin grid's own thumbnail column. Images need an existing
  * product to attach to, so this only appears on the edit page, not create.
  */
-export function ImageUploadField({ productPublicId, media }: { productPublicId: string; media: ProductMedia[] }) {
+export function ImageUploadField({
+  productPublicId,
+  media,
+  aiContext,
+}: {
+  productPublicId: string;
+  media: ProductMedia[];
+  /** Minimal real product context for alt-text generation grounding —
+   *  see products/[id]/media/page.tsx's own call site. */
+  aiContext: ProductAiContext;
+}) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -131,40 +143,43 @@ export function ImageUploadField({ productPublicId, media }: { productPublicId: 
             const isThumbnail = m.role === 'THUMBNAIL';
             const busy = isPending && pendingId === m.productMediaId;
             return (
-              <div key={m.productMediaId} className={cn('group relative overflow-hidden rounded-md border-2', isThumbnail ? 'border-primary' : 'border-transparent')}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic; next/image's remote-pattern allowlist doesn't fit this */}
-                <img src={m.url} alt={m.altText ?? ''} className="aspect-square w-full object-cover" />
-                {isThumbnail ? (
-                  <Badge className="absolute top-1 left-1 gap-1">
-                    <Star className="size-3 fill-current" /> Main
-                  </Badge>
-                ) : null}
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-black/60 p-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  {!isThumbnail ? (
+              <div key={m.productMediaId} className="space-y-1">
+                <div className={cn('group relative overflow-hidden rounded-md border-2', isThumbnail ? 'border-primary' : 'border-transparent')}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic; next/image's remote-pattern allowlist doesn't fit this */}
+                  <img src={m.url} alt={m.altText ?? ''} className="aspect-square w-full object-cover" />
+                  {isThumbnail ? (
+                    <Badge className="absolute top-1 left-1 gap-1">
+                      <Star className="size-3 fill-current" /> Main
+                    </Badge>
+                  ) : null}
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-black/60 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {!isThumbnail ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-6 px-1.5 text-xs"
+                        disabled={busy}
+                        onClick={() => handleSetThumbnail(m.productMediaId)}
+                      >
+                        {busy && pendingAction === 'thumbnail' ? '…' : 'Set as Main'}
+                      </Button>
+                    ) : (
+                      <span />
+                    )}
                     <Button
                       type="button"
-                      variant="secondary"
+                      variant="destructive"
                       size="sm"
                       className="h-6 px-1.5 text-xs"
                       disabled={busy}
-                      onClick={() => handleSetThumbnail(m.productMediaId)}
+                      onClick={() => handleDelete(m.productMediaId)}
                     >
-                      {busy && pendingAction === 'thumbnail' ? '…' : 'Set as Main'}
+                      {busy && pendingAction === 'delete' ? '…' : 'Delete'}
                     </Button>
-                  ) : (
-                    <span />
-                  )}
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="h-6 px-1.5 text-xs"
-                    disabled={busy}
-                    onClick={() => handleDelete(m.productMediaId)}
-                  >
-                    {busy && pendingAction === 'delete' ? '…' : 'Delete'}
-                  </Button>
+                  </div>
                 </div>
+                <AltTextRow productPublicId={productPublicId} media={m} aiContext={aiContext} />
               </div>
             );
           })}
@@ -177,6 +192,70 @@ export function ImageUploadField({ productPublicId, media }: { productPublicId: 
         disabled={uploading}
         label={uploading ? 'Uploading…' : 'Add Images'}
       />
+    </div>
+  );
+}
+
+/** Per-image alt-text editor — the manual input and the AI "Generate"
+ *  button both save through the same updateMediaAltText action (see its
+ *  own doc comment). Auto-saves on blur, same low-friction posture as
+ *  every other inline-editable field in this admin, rather than a
+ *  separate visible Save button. */
+function AltTextRow({ productPublicId, media, aiContext }: { productPublicId: string; media: ProductMedia; aiContext: ProductAiContext }) {
+  const [value, setValue] = useState(media.altText ?? '');
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const savedRef = useRef(media.altText ?? '');
+
+  async function save(next: string) {
+    if (next === savedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await updateMediaAltText(productPublicId, media.productMediaId, next);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      savedRef.current = next;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    setError(null);
+    try {
+      const result = await generateAltText(productPublicId, media.productMediaId, aiContext);
+      if (result.error || !result.data) {
+        setError(result.error ?? 'Generation failed.');
+        return;
+      }
+      setValue(result.data.altText);
+      await save(result.data.altText);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center gap-1">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => save(value)}
+          placeholder="Alt text…"
+          className="h-7 text-xs"
+          disabled={saving}
+        />
+        <Button type="button" variant="ghost" size="icon-sm" title="Generate alt text with AI" disabled={generating} onClick={handleGenerate}>
+          <Sparkles className={cn('size-3', generating && 'animate-pulse')} />
+        </Button>
+      </div>
+      {error ? <p className="text-[0.65rem] text-destructive">{error}</p> : null}
     </div>
   );
 }
