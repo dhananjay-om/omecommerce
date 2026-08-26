@@ -42,7 +42,17 @@ export function ProductGallery({ media, productName }: { media: ProductMedia[]; 
           watchSlidesProgress
           slidesPerView={5}
           spaceBetween={8}
-          className="thumbs-swiper"
+          // Swiper needs an explicit height AND width on the container
+          // itself — unlike the main gallery above (sized via `aspect-
+          // square w-full` on the Swiper element directly), each
+          // thumbnail's own `aspect-square` div can't give the *outer*
+          // `.swiper`/`.swiper-wrapper` a size on its own. Without `w-full`
+          // here, Swiper's slidesPerView={5} math resolves against
+          // whatever tiny intrinsic width the container falls back to
+          // (confirmed live: ~34px instead of the real gallery width),
+          // so the whole row rendered as a near-invisible sliver even
+          // after fixing the height alone.
+          className="thumbs-swiper h-16 w-full sm:h-20"
         >
           {media.map((item) => (
             <SwiperSlide key={item.productMediaId} className="cursor-pointer">
