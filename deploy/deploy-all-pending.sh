@@ -9,7 +9,10 @@
 # migration and skips any already applied; rebuilding api/admin always
 # picks up whatever's currently checked out.
 #
-# Covers, most recent first: 5 AI Product Assistant extras (create-page AI,
+# Covers, most recent first: a storefront fix (the PDP's thumbnail image
+# gallery was rendering near-invisible — a missing height/width on its
+# Swiper container, not a data problem; multi-image upload in admin was
+# already working), 5 AI Product Assistant extras (create-page AI,
 # per-image alt text, attribute-value suggestions, product reviews + AI
 # summary, bulk "Generate Missing Descriptions"), the AI Product Assistant
 # itself (Generate from Image + Quick Actions on the product edit page,
@@ -25,8 +28,8 @@ cd "$REPO_ROOT"
 
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
-echo "==> Rebuilding api, admin"
-$COMPOSE up -d --build api admin
+echo "==> Rebuilding api, admin, storefront"
+$COMPOSE up -d --build api admin storefront
 if [ $? -ne 0 ]; then
   echo "!! build/restart failed — see the output above" >&2
   exit 1
