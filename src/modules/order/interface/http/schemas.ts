@@ -132,7 +132,13 @@ export const createShippingMethodSchema = z.object({
   code: z.string().min(1).max(64),
   name: z.string().min(1).max(256),
   flatRate: z.string().regex(/^\d+(\.\d{1,4})?$/, 'expected a decimal amount'),
-  currency: z.string().length(3),
+  // Normalized here, not left to the caller — the admin's own currency input
+  // only *displays* uppercase via a CSS class (text-transform doesn't touch
+  // the real value), so a lowercase "usd" was submitted, byte-for-byte,
+  // looking identical to "USD" on screen, and failed the currency FK
+  // silently-until-it-didn't (see prisma-setup.repository.ts's new P2003
+  // handling for the other half of this fix).
+  currency: z.string().length(3).transform((v) => v.toUpperCase()),
 });
 
 export const updateShippingMethodSchema = z.object({

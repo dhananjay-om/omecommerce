@@ -8,6 +8,29 @@ import type {
   PaymentMethodAdminInfo,
 } from '../domain/repositories.js';
 import { toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
+import { ConflictError, ValidationError } from '../../../shared/domain/errors.js';
+import { Prisma } from '@prisma/client';
+
+/** None of the 3 `create()`s below had ever caught a Prisma error — a
+ *  duplicate `code` slipping past the use case's own check-then-create
+ *  race, or (ShippingMethod only) a `currency` not actually registered
+ *  under Stores > Currency Setup, both bubbled up as a raw, unhandled 500
+ *  ("Internal Server Error") instead of a clean, actionable message. Same
+ *  P2002-backstop precedent as prisma-product.repository.ts's own
+ *  comment on this exact class of bug; P2003 (FK violation) handling
+ *  mirrors PrismaCurrencyRepository.delete's existing one, just for the
+ *  opposite direction (referenced row doesn't exist, not "still referenced"). */
+function translateSetupCreateError(err: unknown, code: string): never {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') throw new ConflictError(`code already exists: ${code}`);
+    if (err.code === 'P2003') {
+      throw new ValidationError('currency is not configured for this store', [
+        { path: 'currency', message: 'add it under Stores > Currency Setup first' },
+      ]);
+    }
+  }
+  throw err;
+}
 
 // Prisma's Decimal.toString() strips trailing zeros ("0.1800" -> "0.18"); this
 // round-trip through the fixed-point minor-units helpers restores the padded
@@ -31,8 +54,12 @@ export class PrismaTaxClassRepository implements TaxClassRepository {
   constructor(private readonly db: Db) {}
 
   async create(input: { code: string; name: string; rate: string }): Promise<TaxClassAdminInfo> {
-    const row = await this.db.taxClass.create({ data: input });
-    return toAdminInfo(row);
+    try {
+      const row = await this.db.taxClass.create({ data: input });
+      return toAdminInfo(row);
+    } catch (err) {
+      translateSetupCreateError(err, input.code);
+    }
   }
 
   async findByCode(code: string): Promise<TaxClassAdminInfo | null> {
@@ -84,8 +111,12 @@ export class PrismaShippingMethodRepository implements ShippingMethodRepository 
     flatRate: string;
     currency: string;
   }): Promise<{ publicId: string; code: string }> {
-    const row = await this.db.shippingMethod.create({ data: input });
-    return { publicId: row.publicId, code: row.code };
+    try {
+      const row = await this.db.shippingMethod.create({ data: input });
+      return { publicId: row.publicId, code: row.code };
+    } catch (err) {
+      translateSetupCreateError(err, input.code);
+    }
   }
 
   async findByCode(code: string): Promise<{ id: bigint; code: string } | null> {
@@ -134,8 +165,12 @@ export class PrismaPaymentMethodRepository implements PaymentMethodRepository {
   constructor(private readonly db: Db) {}
 
   async create(input: { code: string; name: string; type: PaymentMethodAdminInfo['type'] }): Promise<{ publicId: string; code: string }> {
-    const row = await this.db.paymentMethod.create({ data: input });
-    return { publicId: row.publicId, code: row.code };
+    try {
+      const row = await this.db.paymentMethod.create({ data: input });
+      return { publicId: row.publicId, code: row.code };
+    } catch (err) {
+      translateSetupCreateError(err, input.code);
+    }
   }
 
   async findByCode(code: string): Promise<PaymentMethodAdminInfo | null> {
