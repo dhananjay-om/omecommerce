@@ -55,9 +55,18 @@ function FieldLabel({ htmlFor, attr }: { htmlFor?: string; attr: { label: string
 export function AttributeFieldsSection({
   groups,
   values,
+  renderFieldAction,
 }: {
   groups: AttributeSetGroupDetail[];
   values: Record<string, unknown>;
+  /** Optional per-field action slot (e.g. an AI "Generate" button) shown
+   *  next to a TEXTAREA/RICHTEXT field's label, keyed by attribute code —
+   *  return null/undefined for codes that don't need one. Keeps this
+   *  component generic (it renders ANY attribute set's fields, most of
+   *  which have no such action) while letting a specific caller (the
+   *  Overview form, for Description/Short Description) opt in without
+   *  this component needing to know anything about AI. */
+  renderFieldAction?: (code: string) => React.ReactNode;
 }) {
   const attrTypes = buildAttrTypesMap(groups);
   const groupsWithAttributes = groups.filter((g) => g.attributes.length > 0);
@@ -98,9 +107,13 @@ export function AttributeFieldsSection({
               }
 
               if (attr.dataType === 'TEXTAREA' || attr.dataType === 'RICHTEXT') {
+                const fieldAction = renderFieldAction?.(attr.code);
                 return (
                   <div key={attr.code} className="space-y-2 sm:col-span-2">
-                    <FieldLabel htmlFor={name} attr={attr} />
+                    <div className="flex items-center justify-between">
+                      <FieldLabel htmlFor={name} attr={attr} />
+                      {fieldAction}
+                    </div>
                     <Textarea id={name} name={name} defaultValue={current != null ? String(current) : ''} />
                   </div>
                 );

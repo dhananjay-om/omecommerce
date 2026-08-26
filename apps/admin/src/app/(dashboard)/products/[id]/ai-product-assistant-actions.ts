@@ -35,6 +35,14 @@ export async function generateTags(productPublicId: string, context: ProductAiCo
   return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/generate-tags`, { context });
 }
 
+export async function generateDescription(productPublicId: string, context: ProductAiContext): Promise<ProductAiResult<{ description: string }>> {
+  return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/generate-description`, { context });
+}
+
+export async function generateShortDescription(productPublicId: string, context: ProductAiContext): Promise<ProductAiResult<{ shortDescription: string }>> {
+  return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/generate-short-description`, { context });
+}
+
 export async function generateSeoTitle(productPublicId: string, context: ProductAiContext): Promise<ProductAiResult<{ metaTitle: string }>> {
   return callProductAssistant(`/admin/v1/ai/products/${productPublicId}/generate-seo-title`, { context });
 }

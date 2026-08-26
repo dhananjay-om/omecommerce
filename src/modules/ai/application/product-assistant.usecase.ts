@@ -48,6 +48,14 @@ export class ProductAssistant {
     return assistant.generateTags(await this.requireHandle(), ctx);
   }
 
+  async generateDescription(ctx: ProductContext): Promise<string> {
+    return assistant.generateDescription(await this.requireHandle(), ctx);
+  }
+
+  async generateShortDescription(ctx: ProductContext): Promise<string> {
+    return assistant.generateShortDescription(await this.requireHandle(), ctx);
+  }
+
   async generateSeoTitle(ctx: ProductContext): Promise<string> {
     return assistant.generateSeoTitle(await this.requireHandle(), ctx);
   }

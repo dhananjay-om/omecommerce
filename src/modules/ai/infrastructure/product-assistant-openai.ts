@@ -126,6 +126,23 @@ export async function generateTags(handle: OpenAiClientHandle, ctx: ProductConte
   return (draft.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 8);
 }
 
+export async function generateDescription(handle: OpenAiClientHandle, ctx: ProductContext): Promise<string> {
+  return callOpenAi(
+    handle,
+    `${GROUNDING_RULE} Write a full product description, 2-4 short paragraphs, plain text (no markdown headings/bullets). Reply with the description text only.`,
+    contextBlock(ctx),
+  );
+}
+
+export async function generateShortDescription(handle: OpenAiClientHandle, ctx: ProductContext): Promise<string> {
+  const text = await callOpenAi(
+    handle,
+    `${GROUNDING_RULE} Write ONE short-description blurb, ideally 1-2 sentences (under 200 characters), the kind shown in a product listing card. Reply with the text only, no quotes.`,
+    contextBlock(ctx),
+  );
+  return text.replace(/^["']|["']$/g, '');
+}
+
 export async function generateSeoTitle(handle: OpenAiClientHandle, ctx: ProductContext): Promise<string> {
   const text = await callOpenAi(
     handle,

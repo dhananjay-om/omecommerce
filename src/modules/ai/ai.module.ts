@@ -221,6 +221,22 @@ export function createAiModule(db: Db, authorize: (permission: string) => Reques
     }),
   );
   admin.post(
+    '/ai/products/:id/generate-description',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      res.json({ data: { description: await productAssistant.generateDescription(context) } });
+    }),
+  );
+  admin.post(
+    '/ai/products/:id/generate-short-description',
+    view,
+    asyncHandler(async (req, res) => {
+      const { context } = parse(generateFromContextSchema, req.body);
+      res.json({ data: { shortDescription: await productAssistant.generateShortDescription(context) } });
+    }),
+  );
+  admin.post(
     '/ai/products/:id/generate-seo-title',
     view,
     asyncHandler(async (req, res) => {

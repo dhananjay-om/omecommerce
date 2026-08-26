@@ -9,7 +9,7 @@ import { DESCRIPTION_GROUP } from '../default-attribute-groups';
 import { CategoryPicker } from '../category-picker';
 import { TagsField } from './tags-field';
 import { AiProductAssistant } from './ai-product-assistant';
-import { generateTitle, generateTags, type ProductAiContext } from './ai-product-assistant-actions';
+import { generateTitle, generateTags, generateDescription, generateShortDescription, type ProductAiContext } from './ai-product-assistant-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Input } from '@/components/ui/input';
@@ -64,6 +64,10 @@ export function ProductOverviewForm({
   const [titleGenError, setTitleGenError] = useState<string | null>(null);
   const [tagsGenPending, setTagsGenPending] = useState(false);
   const [tagsGenError, setTagsGenError] = useState<string | null>(null);
+  const [descGenPending, setDescGenPending] = useState(false);
+  const [descGenError, setDescGenError] = useState<string | null>(null);
+  const [shortDescGenPending, setShortDescGenPending] = useState(false);
+  const [shortDescGenError, setShortDescGenError] = useState<string | null>(null);
 
   /** Reads the FORM's current (possibly unsaved) values, not the original
    *  server-rendered `product` prop — so e.g. generating tags after already
@@ -110,6 +114,69 @@ export function ProductOverviewForm({
     } finally {
       setTagsGenPending(false);
     }
+  }
+
+  function descriptionEl(): HTMLTextAreaElement | null {
+    return document.getElementById(attributeInputName('description')) as HTMLTextAreaElement | null;
+  }
+
+  function shortDescriptionEl(): HTMLTextAreaElement | null {
+    return document.getElementById(attributeInputName('short_description')) as HTMLTextAreaElement | null;
+  }
+
+  async function handleGenerateDescription() {
+    setDescGenPending(true);
+    setDescGenError(null);
+    try {
+      const result = await generateDescription(product.publicId, getContext());
+      if (result.error || !result.data) {
+        setDescGenError(result.error ?? 'Generation failed.');
+        return;
+      }
+      const el = descriptionEl();
+      if (el) el.value = result.data.description;
+    } finally {
+      setDescGenPending(false);
+    }
+  }
+
+  async function handleGenerateShortDescription() {
+    setShortDescGenPending(true);
+    setShortDescGenError(null);
+    try {
+      const result = await generateShortDescription(product.publicId, getContext());
+      if (result.error || !result.data) {
+        setShortDescGenError(result.error ?? 'Generation failed.');
+        return;
+      }
+      const el = shortDescriptionEl();
+      if (el) el.value = result.data.shortDescription;
+    } finally {
+      setShortDescGenPending(false);
+    }
+  }
+
+  /** Passed to AttributeFieldsSection's optional per-field action slot —
+   *  only Description/Short Description get a "Generate" button, every
+   *  other attribute (set-specific or otherwise) gets none. */
+  function renderDescriptionFieldAction(code: string) {
+    if (code === 'description') {
+      return (
+        <Button type="button" variant="ghost" size="sm" disabled={descGenPending} onClick={handleGenerateDescription}>
+          <Sparkles className="size-3" />
+          {descGenPending ? 'Generating…' : 'Generate'}
+        </Button>
+      );
+    }
+    if (code === 'short_description') {
+      return (
+        <Button type="button" variant="ghost" size="sm" disabled={shortDescGenPending} onClick={handleGenerateShortDescription}>
+          <Sparkles className="size-3" />
+          {shortDescGenPending ? 'Generating…' : 'Generate'}
+        </Button>
+      );
+    }
+    return null;
   }
 
   return (
@@ -288,7 +355,13 @@ export function ProductOverviewForm({
             </Label>
             <Input id="weight" name="weight" type="number" step="0.0001" min="0" defaultValue={product.weight ?? ''} />
           </div>
-          <AttributeFieldsSection groups={[DESCRIPTION_GROUP, ...(selectedSetDetail?.groups ?? [])]} values={product.attributes} />
+          <AttributeFieldsSection
+            groups={[DESCRIPTION_GROUP, ...(selectedSetDetail?.groups ?? [])]}
+            values={product.attributes}
+            renderFieldAction={renderDescriptionFieldAction}
+          />
+          {descGenError ? <p className="text-xs text-destructive">Description: {descGenError}</p> : null}
+          {shortDescGenError ? <p className="text-xs text-destructive">Short Description: {shortDescGenError}</p> : null}
         </SectionCard>
 
         <SectionCard title="Categories">
