@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useRef, type FormEvent } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { StarIcon } from '@heroicons/react/24/solid';
-import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
+import { StarIcon as StarOutlineIcon, XMarkIcon, CameraIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,128 @@ import { useAuthStore } from '@/store/auth-store';
 import { api } from '@/lib/axios';
 import { cn } from '@/lib/utils';
 import type { ProductReviewList } from '@/types/review';
+
+const MAX_PHOTOS = 5;
+
+interface PendingPhoto {
+  id: string;
+  previewUrl: string;
+  storageKey: string | null;
+  uploading: boolean;
+  error: string | null;
+}
+
+/**
+ * Uploads straight to storage the same way the admin's product-image
+ * uploader does (presign a PUT, then PUT the bytes directly) — this server
+ * never sees the raw file. Returns the storage key on success; the caller
+ * updates its own state.
+ */
+async function uploadReviewPhoto(file: File): Promise<{ storageKey: string } | { error: string }> {
+  try {
+    const { data: presign } = await api.post<{ uploadUrl: string; storageKey: string }>('/reviews/uploads', {
+      filename: file.name,
+      mimeType: file.type,
+    });
+    const putRes = await fetch(presign.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+    if (!putRes.ok) return { error: 'Upload failed.' };
+    return { storageKey: presign.storageKey };
+  } catch (err) {
+    const message = axios.isAxiosError(err) ? (err.response?.data as { error?: string } | undefined)?.error : null;
+    return { error: message ?? 'Upload failed.' };
+  }
+}
+
+function PhotoPicker({ photos, setPhotos }: { photos: PendingPhoto[]; setPhotos: React.Dispatch<React.SetStateAction<PendingPhoto[]>> }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const room = MAX_PHOTOS - photos.length;
+    const selected = Array.from(files).slice(0, room);
+
+    const drafts: PendingPhoto[] = selected.map((file) => ({
+      id: `${file.name}-${file.size}-${crypto.randomUUID()}`,
+      previewUrl: URL.createObjectURL(file),
+      storageKey: null,
+      uploading: true,
+      error: null,
+    }));
+    setPhotos((prev) => [...prev, ...drafts]);
+
+    await Promise.all(
+      selected.map(async (file, i) => {
+        const draft = drafts[i];
+        const result = await uploadReviewPhoto(file);
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === draft.id
+              ? 'error' in result
+                ? { ...p, uploading: false, error: result.error }
+                : { ...p, uploading: false, storageKey: result.storageKey }
+              : p,
+          ),
+        );
+      }),
+    );
+  }
+
+  function removePhoto(id: string) {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Add photos (optional)</p>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((p) => (
+          <div key={p.id} className="relative size-16">
+            {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview URL, not a remote asset next/image can optimize */}
+            <img src={p.previewUrl} alt="" className={cn('size-16 rounded-md border object-cover', p.uploading && 'opacity-50')} />
+            {p.uploading ? (
+              <span className="absolute inset-0 flex items-center justify-center text-[0.6rem] text-white">…</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => removePhoto(p.id)}
+                aria-label="Remove photo"
+                className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-foreground text-background"
+              >
+                <XMarkIcon className="size-3" />
+              </button>
+            )}
+            {p.error ? <span className="absolute inset-x-0 -bottom-4 text-center text-[0.6rem] text-destructive">Failed</span> : null}
+          </div>
+        ))}
+        {photos.length < MAX_PHOTOS ? (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex size-16 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed text-muted-foreground hover:border-foreground hover:text-foreground"
+          >
+            <CameraIcon className="size-5" />
+            <span className="text-[0.6rem]">Add</span>
+          </button>
+        ) : null}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void handleFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}
 
 function StarRow({ rating, size = 'size-4' }: { rating: number; size?: string }) {
   return (
@@ -62,6 +184,7 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -89,15 +212,22 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
       setSubmitError('Please write a review before submitting.');
       return;
     }
+    if (photos.some((p) => p.uploading)) {
+      setSubmitError('Please wait for your photos to finish uploading.');
+      return;
+    }
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await api.post(`/products/${productId}/reviews`, { rating, title: title.trim() || null, body: body.trim() });
+      const imageKeys = photos.map((p) => p.storageKey).filter((k): k is string => k !== null);
+      await api.post(`/products/${productId}/reviews`, { rating, title: title.trim() || null, body: body.trim(), imageKeys });
       setSubmitted(true);
       setShowForm(false);
       setRating(0);
       setTitle('');
       setBody('');
+      photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+      setPhotos([]);
       toast.success("Thanks! Your review will show once it's approved.");
     } catch (err) {
       const message = axios.isAxiosError(err) ? (err.response?.data as { error?: string } | undefined)?.error : null;
@@ -157,9 +287,10 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
               rows={4}
               maxLength={5000}
             />
+            <PhotoPicker photos={photos} setPhotos={setPhotos} />
             {submitError ? <p className="text-xs text-destructive">{submitError}</p> : null}
             <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={submitting}>
+              <Button type="submit" size="sm" disabled={submitting || photos.some((p) => p.uploading)}>
                 {submitting ? 'Submitting…' : 'Submit Review'}
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
@@ -191,6 +322,16 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
               </div>
               {r.title ? <p className="mt-1 text-sm font-semibold">{r.title}</p> : null}
               <p className="mt-1 text-sm text-muted-foreground">{r.body}</p>
+              {r.images.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {r.images.map((url, i) => (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic; next/image's remote-pattern allowlist doesn't fit this */}
+                      <img src={url} alt={`Photo ${i + 1} from ${r.customerName}'s review`} className="size-16 rounded-md border object-cover" />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
               <p className="mt-1 text-xs font-medium">— {r.customerName}</p>
             </div>
           ))}

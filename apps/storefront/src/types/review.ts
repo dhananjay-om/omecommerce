@@ -12,6 +12,8 @@ export interface ProductReview {
   rating: number;
   title: string | null;
   body: string;
+  /** Resolved presigned GET URLs — a customer's own uploaded photos. */
+  images: string[];
   createdAt: string;
 }
 

@@ -1,14 +1,15 @@
-import type { ProductRepository, ProductReviewRepository } from '../domain/repositories.js';
+import type { ProductRepository, ProductReviewRepository, ProductReviewInfo, MediaStorage } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import type { ProductReviewView } from './dto.js';
 
-function toView(r: { publicId: string; customerName: string; rating: number; title: string | null; body: string; isApproved: boolean; createdAt: Date }): ProductReviewView {
+async function toView(r: ProductReviewInfo, storage: MediaStorage): Promise<ProductReviewView> {
   return {
     publicId: r.publicId,
     customerName: r.customerName,
     rating: r.rating,
     title: r.title,
     body: r.body,
+    images: await Promise.all(r.imageKeys.map((k) => storage.presignGetUrl(k))),
     isApproved: r.isApproved,
     createdAt: r.createdAt.toISOString(),
   };
@@ -21,6 +22,7 @@ export class ListProductReviews {
   constructor(
     private readonly products: ProductRepository,
     private readonly reviews: ProductReviewRepository,
+    private readonly storage: MediaStorage,
   ) {}
 
   async execute(productPublicId: string): Promise<ProductReviewView[]> {
@@ -28,6 +30,6 @@ export class ListProductReviews {
     if (!product || product.props.id === null) throw new NotFoundError('product', productPublicId);
 
     const rows = await this.reviews.listForProduct(product.props.id);
-    return rows.map(toView);
+    return Promise.all(rows.map((r) => toView(r, this.storage)));
   }
 }

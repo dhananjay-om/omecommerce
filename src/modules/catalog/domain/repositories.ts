@@ -494,6 +494,9 @@ export interface ProductReviewInfo {
   rating: number;
   title: string | null;
   body: string;
+  /** Raw storage keys, not URLs — same "own the key, resolve a presigned
+   *  GET URL at read time" split as ProductMediaInfo.assetStorageKey. */
+  imageKeys: string[];
   isApproved: boolean;
   createdAt: Date;
 }
@@ -505,6 +508,7 @@ export interface CreateProductReviewInput {
   rating: number;
   title: string | null;
   body: string;
+  imageKeys: string[];
 }
 
 /** Count of approved reviews per star (1-5), for the PDP's rating-
@@ -519,6 +523,30 @@ export interface PaginatedProductReviews {
   reviews: ProductReviewInfo[];
 }
 
+/** One review plus the product it belongs to — only the cross-product
+ *  admin queue (`listAll`) needs this; every per-product read already has
+ *  the product in scope from the URL. */
+export interface AdminReviewListItem extends ProductReviewInfo {
+  productPublicId: string;
+  /** `nameDefault ?? sku` — always a real, non-empty label since sku is required. */
+  productName: string;
+}
+
+export interface ListAllReviewsFilter {
+  /** Omitted = every status, matching listForProduct's own "sees
+   *  everything" posture for the admin side. */
+  isApproved?: boolean;
+  page: number;
+  pageSize: number;
+}
+
+export interface PaginatedAdminReviews {
+  total: number;
+  page: number;
+  pageSize: number;
+  reviews: AdminReviewListItem[];
+}
+
 export interface ProductReviewRepository {
   /** Admin moderation queue — unpaginated (small volume), sees every
    *  status (pending/approved/rejected). */
@@ -526,6 +554,10 @@ export interface ProductReviewRepository {
   /** The public storefront read — approved-only, paginated (the one place
    *  in this feature that genuinely needs it, unlike the admin queue). */
   listApprovedForProduct(productId: bigint, page: number, pageSize: number): Promise<PaginatedProductReviews>;
+  /** Cross-product admin queue (Commerce > Reviews) — every product's
+   *  reviews in one paginated, filterable-by-status list, unlike
+   *  `listForProduct` which needs a product already in hand. */
+  listAll(filter: ListAllReviewsFilter): Promise<PaginatedAdminReviews>;
   create(input: CreateProductReviewInput): Promise<ProductReviewInfo>;
   /** Throws NotFoundError if the review doesn't belong to this product (defensive — an admin route scoped by :id in the URL shouldn't be able to moderate a review under the wrong product by guessing a reviewId). */
   setApproval(productId: bigint, reviewPublicId: string, isApproved: boolean): Promise<void>;

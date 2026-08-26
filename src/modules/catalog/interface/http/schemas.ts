@@ -280,6 +280,9 @@ export const submitProductReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   title: z.string().max(150).nullish(),
   body: z.string().min(1).max(5000),
+  // Storage keys from a prior POST /reviews/uploads round-trip, not raw
+  // files — that upload always goes direct-to-storage.
+  imageKeys: z.array(z.string().min(1)).max(5).optional(),
 });
 
 export const listApprovedProductReviewsQuerySchema = z.object({
@@ -289,4 +292,21 @@ export const listApprovedProductReviewsQuerySchema = z.object({
 
 export const moderateProductReviewSchema = z.object({
   isApproved: z.boolean(),
+});
+
+export const requestReviewImageUploadSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().regex(/^image\/(jpeg|png|webp|gif)$/, 'must be an image (jpeg, png, webp, or gif)'),
+});
+
+export const listAllReviewsQuerySchema = z.object({
+  // NOT z.coerce.boolean() — that coerces via the global Boolean(), so the
+  // string "false" (a non-empty string) coerces to `true`. Left as the raw
+  // 'true'/'false' enum here (not `.transform()`, which fights parse<T>()'s
+  // single-type-param signature the same way `.default()` does elsewhere
+  // in this codebase) — converted to a real boolean explicitly at the
+  // route call site instead.
+  isApproved: z.enum(['true', 'false']).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(100).optional(),
 });

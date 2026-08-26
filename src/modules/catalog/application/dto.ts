@@ -519,8 +519,25 @@ export interface ProductReviewView {
   rating: number;
   title: string | null;
   body: string;
+  /** Resolved presigned GET URLs (900s), same as ProductMediaView.url — never
+   *  the raw storage keys. Re-resolved fresh on every read. */
+  images: string[];
   isApproved: boolean;
   createdAt: string;
+}
+
+/** Cross-product admin queue row — the same view, plus which product it
+ *  belongs to (every per-product read already has that from the URL). */
+export interface AdminReviewListItemView extends ProductReviewView {
+  productPublicId: string;
+  productName: string;
+}
+
+export interface PaginatedAdminReviewsView {
+  total: number;
+  page: number;
+  pageSize: number;
+  reviews: AdminReviewListItemView[];
 }
 
 export interface SubmitProductReviewCommand {
@@ -529,6 +546,9 @@ export interface SubmitProductReviewCommand {
   rating: number;
   title: string | null;
   body: string;
+  /** Storage keys from a prior POST /reviews/uploads round-trip — never a
+   *  raw file, that upload always goes direct-to-storage. */
+  imageKeys: string[];
 }
 
 export interface ModerateProductReviewCommand {

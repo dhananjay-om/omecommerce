@@ -1,4 +1,4 @@
-import type { ProductRepository, ProductReviewRepository } from '../domain/repositories.js';
+import type { ProductRepository, ProductReviewRepository, MediaStorage } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 import type { ProductReviewListView } from './dto.js';
 
@@ -12,6 +12,7 @@ export class ListApprovedProductReviews {
   constructor(
     private readonly products: ProductRepository,
     private readonly reviews: ProductReviewRepository,
+    private readonly storage: MediaStorage,
   ) {}
 
   async execute(productPublicId: string, page?: number, pageSize?: number): Promise<ProductReviewListView> {
@@ -33,15 +34,18 @@ export class ListApprovedProductReviews {
       pageSize: resolvedPageSize,
       averageRating,
       ratingBreakdown: breakdown,
-      reviews: reviews.map((r) => ({
-        publicId: r.publicId,
-        customerName: r.customerName,
-        rating: r.rating,
-        title: r.title,
-        body: r.body,
-        isApproved: r.isApproved,
-        createdAt: r.createdAt.toISOString(),
-      })),
+      reviews: await Promise.all(
+        reviews.map(async (r) => ({
+          publicId: r.publicId,
+          customerName: r.customerName,
+          rating: r.rating,
+          title: r.title,
+          body: r.body,
+          images: await Promise.all(r.imageKeys.map((k) => this.storage.presignGetUrl(k))),
+          isApproved: r.isApproved,
+          createdAt: r.createdAt.toISOString(),
+        })),
+      ),
     };
   }
 }

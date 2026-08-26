@@ -31,9 +31,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'A star rating and review text are required.' }, { status: 400 });
   }
   const title = typeof body?.title === 'string' && body.title.trim() ? body.title.trim() : null;
+  const imageKeys = Array.isArray(body?.imageKeys) ? body.imageKeys.filter((k: unknown) => typeof k === 'string' && k.length > 0) : [];
 
   try {
-    const review = await apiPost(`/store/v1/products/${id}/reviews`, { rating, title, body: reviewBody }, { auth: true });
+    const review = await apiPost(`/store/v1/products/${id}/reviews`, { rating, title, body: reviewBody, imageKeys }, { auth: true });
     return NextResponse.json(review, { status: 201 });
   } catch (err) {
     if (err instanceof ApiError) return NextResponse.json({ error: err.message }, { status: err.status });

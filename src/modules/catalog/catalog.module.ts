@@ -49,6 +49,8 @@ import { ListProductReviews } from './application/list-product-reviews.usecase.j
 import { ListApprovedProductReviews } from './application/list-approved-product-reviews.usecase.js';
 import { SubmitProductReview } from './application/submit-product-review.usecase.js';
 import { ModerateProductReview } from './application/moderate-product-review.usecase.js';
+import { ListAllProductReviews } from './application/list-all-product-reviews.usecase.js';
+import { RequestReviewImageUpload } from './application/request-review-image-upload.usecase.js';
 import { ListAttributeSets } from './application/list-attribute-sets.usecase.js';
 import { ListAttributes, ListAttributeOptions } from './application/list-attributes.usecase.js';
 import { GetAttributeSetDetail } from './application/get-attribute-set-detail.usecase.js';
@@ -102,6 +104,8 @@ import {
   submitProductReviewSchema,
   listApprovedProductReviewsQuerySchema,
   moderateProductReviewSchema,
+  requestReviewImageUploadSchema,
+  listAllReviewsQuerySchema,
 } from './interface/http/schemas.js';
 
 export interface CatalogRouters {
@@ -166,11 +170,13 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const deleteProductVariant = new DeleteProductVariant(variants);
   const listProducts = new ListProducts(products, productMedia, mediaStorage);
   const getProductDetail = new GetProductDetail(products, variants, attrStore, productCategories, productMedia, mediaStorage);
-  const listProductReviews = new ListProductReviews(products, productReviews);
-  const listApprovedProductReviews = new ListApprovedProductReviews(products, productReviews);
+  const listProductReviews = new ListProductReviews(products, productReviews, mediaStorage);
+  const listApprovedProductReviews = new ListApprovedProductReviews(products, productReviews, mediaStorage);
+  const listAllProductReviews = new ListAllProductReviews(productReviews, mediaStorage);
   const customerNames = new CustomerNameLookup(db);
-  const submitProductReview = new SubmitProductReview(products, productReviews, customerNames);
+  const submitProductReview = new SubmitProductReview(products, productReviews, customerNames, mediaStorage);
   const moderateProductReview = new ModerateProductReview(products, productReviews);
+  const requestReviewImageUpload = new RequestReviewImageUpload(mediaStorage);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);
   const listAttributes = new ListAttributes(attributes);
@@ -222,6 +228,15 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     '/products/:publicId/reviews',
     asyncHandler(async (req, res) => {
       res.json({ data: await listProductReviews.execute(req.params.publicId!) });
+    }),
+  );
+  admin.get(
+    '/reviews',
+    authorize('catalog:manage'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listAllReviewsQuerySchema, req.query);
+      const isApproved = query.isApproved === undefined ? undefined : query.isApproved === 'true';
+      res.json({ data: await listAllProductReviews.execute(isApproved, query.page, query.pageSize) });
     }),
   );
   admin.patch(
@@ -628,6 +643,14 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     }),
   );
   store.post(
+    '/reviews/uploads',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      const body = parse(requestReviewImageUploadSchema, req.body);
+      res.status(201).json({ data: await requestReviewImageUpload.execute(body) });
+    }),
+  );
+  store.post(
     '/products/:publicId/reviews',
     requireCustomer,
     asyncHandler(async (req, res) => {
@@ -638,6 +661,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
         rating: body.rating,
         title: body.title ?? null,
         body: body.body,
+        imageKeys: body.imageKeys ?? [],
       });
       res.status(201).json({ data: view });
     }),

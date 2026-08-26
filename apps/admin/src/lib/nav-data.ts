@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Package,
   FolderTree,
+  Star,
   Layers,
   Users,
   Tag,
@@ -146,6 +147,7 @@ export const NAV: NavGroup[] = [
       { key: 'orders', label: 'Orders', href: '/orders', icon: ShoppingCart, status: 'live', description: 'Every order across all channels and warehouses.' },
       { key: 'products', label: 'Products', href: '/products', icon: Package, status: 'live', description: 'Your product catalog — variants, pricing, media, and channel visibility.' },
       { key: 'categories', label: 'Categories', href: '/categories', icon: FolderTree, status: 'live', description: 'The category tree products are organized under.' },
+      { key: 'reviews', label: 'Reviews', href: '/reviews', icon: Star, status: 'live', description: 'Every customer review across all products — approve or reject before it shows on the storefront.' },
       {
         key: 'collections', label: 'Collections', href: '/categories/collections', icon: Layers, status: 'comingSoon',
         description: 'Curated, named product groupings distinct from the category tree.',

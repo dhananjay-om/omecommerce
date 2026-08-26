@@ -4,7 +4,8 @@ import type { ProductDetail, ProductReview } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReviewSummary } from './review-summary';
-import { ReviewModerationActions } from './review-moderation-actions';
+import { ReviewModerationActions } from '@/components/reviews/review-moderation-actions';
+import { ReviewImages } from '@/components/reviews/review-images';
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -61,6 +62,7 @@ export default async function ProductReviewsPage({ params }: { params: Promise<{
                   </div>
                   {r.title ? <p className="text-sm font-semibold text-foreground">{r.title}</p> : null}
                   <p className="text-sm text-muted-foreground">{r.body}</p>
+                  <ReviewImages images={r.images} />
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-foreground">— {r.customerName}</p>
                     <ReviewModerationActions productId={id} reviewId={r.publicId} isApproved={r.isApproved} />

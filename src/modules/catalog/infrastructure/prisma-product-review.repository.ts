@@ -6,15 +6,29 @@ import type {
   CreateProductReviewInput,
   RatingBreakdown,
   PaginatedProductReviews,
+  ListAllReviewsFilter,
+  PaginatedAdminReviews,
 } from '../domain/repositories.js';
 
-function toInfo(r: { publicId: string; customerName: string; rating: number; title: string | null; body: string; isApproved: boolean; createdAt: Date }): ProductReviewInfo {
+interface ReviewRow {
+  publicId: string;
+  customerName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  imageKeys: string[];
+  isApproved: boolean;
+  createdAt: Date;
+}
+
+function toInfo(r: ReviewRow): ProductReviewInfo {
   return {
     publicId: r.publicId,
     customerName: r.customerName,
     rating: r.rating,
     title: r.title,
     body: r.body,
+    imageKeys: r.imageKeys,
     isApproved: r.isApproved,
     createdAt: r.createdAt,
   };
@@ -44,6 +58,30 @@ export class PrismaProductReviewRepository implements ProductReviewRepository {
     return { total, page, pageSize, reviews: rows.map(toInfo) };
   }
 
+  async listAll(filter: ListAllReviewsFilter): Promise<PaginatedAdminReviews> {
+    const where = filter.isApproved === undefined ? {} : { isApproved: filter.isApproved };
+    const [total, rows] = await this.db.$transaction([
+      this.db.productReview.count({ where }),
+      this.db.productReview.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+        // nameDefault, not the EAV-resolved per-storeView `name` GetProductDetail
+        // computes — a plain denormalized column (see catalog.prisma's own
+        // comment on it), good enough for an admin queue label and avoids
+        // pulling the whole attribute-resolution path in for a list read.
+        include: { product: { select: { publicId: true, nameDefault: true, sku: true } } },
+      }),
+    ]);
+    return {
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+      reviews: rows.map((r) => ({ ...toInfo(r), productPublicId: r.product.publicId, productName: r.product.nameDefault ?? r.product.sku })),
+    };
+  }
+
   async create(input: CreateProductReviewInput): Promise<ProductReviewInfo> {
     const row = await this.db.productReview.create({
       data: {
@@ -53,6 +91,7 @@ export class PrismaProductReviewRepository implements ProductReviewRepository {
         rating: input.rating,
         title: input.title,
         body: input.body,
+        imageKeys: input.imageKeys,
         // isApproved uses the schema default (false) — every real
         // submission starts pending moderation.
       },

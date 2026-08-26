@@ -52,8 +52,24 @@ export interface ProductReview {
   rating: number;
   title: string | null;
   body: string;
+  /** Resolved presigned GET URLs (900s) — a customer's own uploaded photos. */
+  images: string[];
   isApproved: boolean;
   createdAt: string;
+}
+
+/** Cross-product admin queue row (GET /admin/v1/reviews) — the same shape
+ *  as ProductReview, plus which product it belongs to. */
+export interface AdminReviewListItem extends ProductReview {
+  productPublicId: string;
+  productName: string;
+}
+
+export interface PaginatedAdminReviews {
+  total: number;
+  page: number;
+  pageSize: number;
+  reviews: AdminReviewListItem[];
 }
 
 export interface ProductDetail {

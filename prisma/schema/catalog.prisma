@@ -523,6 +523,12 @@ model ProductReview {
   rating       Int
   title        String?
   body         String
+  /// Storage keys (not URLs — same "own the raw key, resolve a presigned
+  /// GET URL at read time" convention as ProductMedia.assetStorageKey), a
+  /// customer's own uploaded photos, e.g. unboxing/in-use shots (Amazon-
+  /// style). Capped at 5 per review at the schema-validation layer, not
+  /// here. Empty for every review predating this field.
+  imageKeys    String[] @default([]) @map("image_keys")
   isApproved   Boolean  @default(false) @map("is_approved")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 

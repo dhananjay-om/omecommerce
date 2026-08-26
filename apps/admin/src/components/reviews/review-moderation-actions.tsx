@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { moderateReview } from './moderate-review-action';
+import { moderateReview } from '@/lib/review-actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 /**
  * isApproved is a plain boolean (no separate rejected state — see
  * ProductReview's schema doc comment) so "Reject" is really "send back to
- * pending," not a distinct status.
+ * pending," not a distinct status. Shared between the per-product Reviews
+ * tab and the cross-product Commerce > Reviews queue.
  */
 export function ReviewModerationActions({
   productId,
