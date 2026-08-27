@@ -87,12 +87,12 @@ export function ProductActions({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <span className="text-sm font-medium">Quantity</span>
-        <div className="flex items-center rounded-lg border">
+        <span className="text-sm font-medium text-jet">Quantity</span>
+        <div className="flex items-center gap-1 rounded-xl border border-ghost bg-ivory px-1">
           <Button variant="ghost" size="icon-sm" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Decrease quantity">
             <MinusIcon className="size-4" />
           </Button>
-          <span className="w-8 text-center text-sm">{qty}</span>
+          <span className="w-8 text-center text-sm font-semibold text-jet">{qty}</span>
           <Button variant="ghost" size="icon-sm" onClick={() => setQty((q) => q + 1)} aria-label="Increase quantity">
             <PlusIcon className="size-4" />
           </Button>
@@ -112,7 +112,7 @@ export function ProductActions({
           aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           onClick={toggleWishlistProduct}
         >
-          {isWishlisted ? <HeartIconSolid className="size-5 text-destructive" /> : <HeartIcon className="size-5" />}
+          {isWishlisted ? <HeartIconSolid className="size-5 text-rose" /> : <HeartIcon className="size-5" />}
         </Button>
         <Button variant="outline" size="icon-lg" aria-label="Share this product" onClick={share}>
           <ShareIcon className="size-5" />

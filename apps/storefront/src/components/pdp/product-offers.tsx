@@ -19,19 +19,19 @@ export async function ProductOffers({ productId }: { productId: string }) {
   if (offers.length === 0) return null;
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <TagIcon className="size-4" />
+    <div className="rounded-xl border border-ghost p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-jet">
+        <TagIcon className="size-4 text-champagne" />
         Available Offers
       </div>
       <ul className="mt-2 space-y-2.5">
         {offers.map((offer, i) => (
           <li key={offer.code ?? `auto-${i}`} className="flex items-center justify-between gap-3 text-sm">
             <div>
-              <span className="font-medium">{formatDiscount(offer.discountType, offer.value, offer.currency)}</span>
-              {offer.description ? <span className="ml-1.5 text-muted-foreground">{offer.description}</span> : null}
+              <span className="font-medium text-jet">{formatDiscount(offer.discountType, offer.value, offer.currency)}</span>
+              {offer.description ? <span className="ml-1.5 text-charcoal">{offer.description}</span> : null}
               {offer.minSubtotal ? (
-                <span className="block text-xs text-muted-foreground">
+                <span className="block text-xs text-slate">
                   On orders above {offer.currency ?? ''}
                   {offer.minSubtotal}
                 </span>
@@ -40,7 +40,7 @@ export async function ProductOffers({ productId }: { productId: string }) {
             {offer.code ? (
               <CopyCodeButton code={offer.code} />
             ) : (
-              <span className="shrink-0 text-xs text-muted-foreground">Applied automatically</span>
+              <span className="shrink-0 text-xs text-slate">Applied automatically</span>
             )}
           </li>
         ))}

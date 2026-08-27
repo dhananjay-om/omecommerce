@@ -63,23 +63,23 @@ export async function ProductDetailView({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-foreground hover:underline">
+      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1 text-xs text-slate">
+        <Link href="/" className="hover:text-champagne">
           Home
         </Link>
         {breadcrumbCategory ? (
           <span className="flex items-center gap-1">
             <span>/</span>
-            <Link href={`/collections/${breadcrumbCategory.slug}`} className="hover:text-foreground hover:underline">
+            <Link href={`/collections/${breadcrumbCategory.slug}`} className="hover:text-champagne">
               {breadcrumbCategory.nameDefault ?? breadcrumbCategory.slug}
             </Link>
           </span>
         ) : null}
         <span className="flex items-center gap-1">
           <span>/</span>
-          <span className="text-foreground">{product.name ?? product.sku}</span>
+          <span className="text-jet">{product.name ?? product.sku}</span>
         </span>
       </nav>
 
@@ -88,24 +88,24 @@ export async function ProductDetailView({
 
         <div>
           {product.brandSlug ? (
-            <Link href={`/brands/${product.brandSlug}`} className="text-sm font-medium text-primary hover:underline">
+            <Link href={`/brands/${product.brandSlug}`} className="text-xs font-medium tracking-widest text-slate uppercase hover:text-champagne">
               {product.brandSlug}
             </Link>
           ) : null}
-          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{product.name ?? product.sku}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">SKU: {product.sku}</p>
+          <h1 className="font-display mt-1 text-3xl font-semibold text-jet sm:text-4xl">{product.name ?? product.sku}</h1>
+          <p className="mt-1 text-sm text-slate">SKU: {product.sku}</p>
 
           <div className="mt-3 flex items-center gap-2">
             <div className="flex" aria-hidden>
               {Array.from({ length: 5 }).map((_, i) =>
                 reviews.averageRating && i < Math.round(reviews.averageRating) ? (
-                  <StarIcon key={i} className="size-4 text-cta" />
+                  <StarIcon key={i} className="size-4 text-champagne" />
                 ) : (
-                  <StarOutlineIcon key={i} className={cn('size-4', reviews.averageRating ? 'text-muted-foreground/40' : 'text-cta opacity-40')} />
+                  <StarOutlineIcon key={i} className={cn('size-4', reviews.averageRating ? 'text-silver' : 'text-champagne opacity-40')} />
                 ),
               )}
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-slate">
               {reviews.total > 0 && reviews.averageRating
                 ? `${reviews.averageRating.toFixed(1)} (${reviews.total} review${reviews.total === 1 ? '' : 's'})`
                 : 'No ratings yet'}
@@ -126,7 +126,7 @@ export async function ProductDetailView({
             <ProductOffers productId={product.publicId} />
           </div>
 
-          {shortDescription ? <p className="mt-6 text-sm text-muted-foreground">{shortDescription}</p> : null}
+          {shortDescription ? <p className="mt-6 text-sm text-charcoal">{shortDescription}</p> : null}
         </div>
       </div>
 

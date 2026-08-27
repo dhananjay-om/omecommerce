@@ -53,9 +53,9 @@ export function PincodeChecker() {
   }
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <TruckIcon className="size-4" />
+    <div className="rounded-xl border border-ghost p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-jet">
+        <TruckIcon className="size-4 text-champagne" />
         Check Delivery
       </div>
       <div className="mt-2 flex gap-2">
@@ -75,7 +75,7 @@ export function PincodeChecker() {
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
       {result ? (
         result.serviceable ? (
-          <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <div className="mt-2 flex items-start gap-1.5 text-xs text-charcoal">
             <CheckCircleIcon className="mt-0.5 size-4 shrink-0 text-green-600" />
             <span>
               Delivering to {result.city}, {result.state} in ~{result.estimatedDays} day{result.estimatedDays === 1 ? '' : 's'}.{' '}
@@ -83,7 +83,7 @@ export function PincodeChecker() {
             </span>
           </div>
         ) : (
-          <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <div className="mt-2 flex items-start gap-1.5 text-xs text-charcoal">
             <XCircleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
             <span>Sorry, we don&apos;t currently deliver to this pincode.</span>
           </div>

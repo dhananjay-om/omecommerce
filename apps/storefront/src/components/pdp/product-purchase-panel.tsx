@@ -76,18 +76,18 @@ export function ProductPurchasePanel({
   return (
     <div>
       <p className="flex flex-wrap items-baseline gap-2">
-        <span className="text-3xl font-bold">
+        <span className="text-3xl font-bold text-jet">
           {priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}
         </span>
         {percentOff !== null ? (
           <>
-            <span className="text-lg text-muted-foreground line-through">{formatPrice(mrpNumber!, currency)}</span>
-            <span className="text-sm font-semibold text-success">{percentOff}% off</span>
+            <span className="text-lg text-slate line-through">{formatPrice(mrpNumber!, currency)}</span>
+            <span className="rounded-full bg-green-50 px-2 py-0.5 text-sm font-semibold text-green-700">You save {percentOff}%</span>
           </>
         ) : null}
         {priceNumber !== null && pricesIncludeTax ? <TaxInclusiveNote /> : null}
       </p>
-      <p className={`mt-1 text-sm font-medium ${selectedVariant ? (inStock ? 'text-success' : 'text-destructive') : 'text-muted-foreground'}`}>
+      <p className={`mt-1 text-sm font-medium ${selectedVariant ? (inStock ? 'text-green-700' : 'text-destructive') : 'text-slate'}`}>
         {selectedVariant ? (inStock ? 'In Stock' : 'Out of Stock') : 'Select options to see availability'}
       </p>
 
@@ -95,9 +95,9 @@ export function ProductPurchasePanel({
         <div className="mt-4 space-y-4">
           {axes.map((axis) => (
             <div key={axis.attributeCode}>
-              <p className="text-sm font-medium">
+              <p className="text-sm font-medium text-jet">
                 {axis.attributeLabel}
-                {selection[axis.attributeCode] ? <span className="text-muted-foreground">: {selection[axis.attributeCode]}</span> : null}
+                {selection[axis.attributeCode] ? <span className="text-slate">: {selection[axis.attributeCode]}</span> : null}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {axis.options.map((option) => {
@@ -108,10 +108,8 @@ export function ProductPurchasePanel({
                       type="button"
                       aria-pressed={isSelected}
                       onClick={() => setSelection((prev) => ({ ...prev, [axis.attributeCode]: option }))}
-                      className={`rounded-lg border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                        isSelected
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border text-foreground hover:border-primary/50'
+                      className={`min-w-11 rounded-xl border-2 px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                        isSelected ? 'border-jet bg-jet text-white' : 'border-ghost text-charcoal hover:border-jet/40'
                       }`}
                     >
                       {option}

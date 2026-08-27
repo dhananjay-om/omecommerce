@@ -141,9 +141,9 @@ function StarRow({ rating, size = 'size-4' }: { rating: number; size?: string })
     <div className="flex items-center gap-0.5" aria-hidden>
       {[1, 2, 3, 4, 5].map((n) =>
         n <= rating ? (
-          <StarIcon key={n} className={cn(size, 'text-cta')} />
+          <StarIcon key={n} className={cn(size, 'text-champagne')} />
         ) : (
-          <StarOutlineIcon key={n} className={cn(size, 'text-muted-foreground/40')} />
+          <StarOutlineIcon key={n} className={cn(size, 'text-silver')} />
         ),
       )}
     </div>
@@ -155,7 +155,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((n) => (
         <button key={n} type="button" onClick={() => onChange(n)} aria-label={`${n} star${n === 1 ? '' : 's'}`}>
-          {n <= value ? <StarIcon className="size-6 text-cta" /> : <StarOutlineIcon className="size-6 text-muted-foreground/40" />}
+          {n <= value ? <StarIcon className="size-6 text-champagne" /> : <StarOutlineIcon className="size-6 text-silver" />}
         </button>
       ))}
     </div>
@@ -245,9 +245,9 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
       {data.total > 0 ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="flex shrink-0 flex-col items-center gap-1 sm:w-32">
-            <span className="text-3xl font-bold">{data.averageRating!.toFixed(1)}</span>
+            <span className="text-3xl font-bold text-jet">{data.averageRating!.toFixed(1)}</span>
             <StarRow rating={Math.round(data.averageRating!)} />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-slate">
               {data.total} review{data.total === 1 ? '' : 's'}
             </span>
           </div>
@@ -256,27 +256,27 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
               const count = data.ratingBreakdown[n as 1 | 2 | 3 | 4 | 5];
               return (
                 <div key={n} className="flex items-center gap-2 text-xs">
-                  <span className="w-3 text-muted-foreground">{n}</span>
-                  <div className="h-1.5 flex-1 rounded-full bg-muted">
-                    <div className="h-1.5 rounded-full bg-cta" style={{ width: `${(count / maxCount) * 100}%` }} />
+                  <span className="w-3 text-slate">{n}</span>
+                  <div className="h-1.5 flex-1 rounded-full bg-ghost">
+                    <div className="h-1.5 rounded-full bg-champagne" style={{ width: `${(count / maxCount) * 100}%` }} />
                   </div>
-                  <span className="w-6 text-right text-muted-foreground">{count}</span>
+                  <span className="w-6 text-right text-slate">{count}</span>
                 </div>
               );
             })}
           </div>
         </div>
       ) : (
-        <p className="text-muted-foreground">No reviews yet. Be the first to review this product.</p>
+        <p className="text-slate">No reviews yet. Be the first to review this product.</p>
       )}
 
       {isLoggedIn ? (
         submitted ? (
-          <p className="text-sm text-muted-foreground">Thanks for your review — it&apos;ll appear here once approved.</p>
+          <p className="text-sm text-slate">Thanks for your review — it&apos;ll appear here once approved.</p>
         ) : showForm ? (
-          <form onSubmit={submitReview} className="space-y-3 rounded-lg border p-4">
+          <form onSubmit={submitReview} className="space-y-3 rounded-2xl border border-ghost p-4">
             <div>
-              <p className="mb-1 text-sm font-medium">Your rating</p>
+              <p className="mb-1 text-sm font-medium text-jet">Your rating</p>
               <StarPicker value={rating} onChange={setRating} />
             </div>
             <Input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={150} />
@@ -304,8 +304,8 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
           </Button>
         )
       ) : (
-        <p className="text-sm text-muted-foreground">
-          <Link href="/login" className="text-primary hover:underline">
+        <p className="text-sm text-slate">
+          <Link href="/login" className="text-champagne hover:text-jet">
             Log in
           </Link>{' '}
           to write a review.
@@ -315,24 +315,24 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
       {data.reviews.length > 0 ? (
         <div className="space-y-4">
           {data.reviews.map((r) => (
-            <div key={r.publicId} className="border-b pb-4 last:border-0">
+            <div key={r.publicId} className="border-b border-ghost pb-4 last:border-0">
               <div className="flex items-center justify-between">
                 <StarRow rating={r.rating} />
-                <span className="text-xs text-muted-foreground">{formatDate(r.createdAt)}</span>
+                <span className="text-xs text-slate">{formatDate(r.createdAt)}</span>
               </div>
-              {r.title ? <p className="mt-1 text-sm font-semibold">{r.title}</p> : null}
-              <p className="mt-1 text-sm text-muted-foreground">{r.body}</p>
+              {r.title ? <p className="mt-1 text-sm font-semibold text-jet">{r.title}</p> : null}
+              <p className="mt-1 text-sm text-charcoal">{r.body}</p>
               {r.images.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {r.images.map((url, i) => (
                     <a key={url} href={url} target="_blank" rel="noopener noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic; next/image's remote-pattern allowlist doesn't fit this */}
-                      <img src={url} alt={`Photo ${i + 1} from ${r.customerName}'s review`} className="size-16 rounded-md border object-cover" />
+                      <img src={url} alt={`Photo ${i + 1} from ${r.customerName}'s review`} className="size-16 rounded-lg border border-ghost object-cover" />
                     </a>
                   ))}
                 </div>
               ) : null}
-              <p className="mt-1 text-xs font-medium">— {r.customerName}</p>
+              <p className="mt-1 text-xs font-medium text-slate">— {r.customerName}</p>
             </div>
           ))}
           {totalPages > 1 ? (

@@ -10,20 +10,32 @@ import 'swiper/css/thumbs';
 import 'swiper/css/free-mode';
 import type { ProductMedia } from '@/types/product';
 
+/**
+ * ÉLUME restyle: on `sm:` and up, the thumbnail strip moves to a vertical
+ * column beside the main image (matching the reference theme's gallery),
+ * via Swiper's per-breakpoint `direction` override — same Zoom/Thumbs/
+ * FreeMode modules as before, only the layout direction changes. Below
+ * `sm:` it stays the original horizontal strip under the image; a narrow
+ * vertical column doesn't have room on a phone-width screen.
+ */
 export function ProductGallery({ media, productName }: { media: ProductMedia[]; productName: string }) {
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
 
   if (media.length === 0) {
-    return <div className="flex aspect-square items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">No image available</div>;
+    return (
+      <div className="flex aspect-[3/4] items-center justify-center rounded-2xl bg-sand text-sm text-slate">
+        No image available
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row-reverse sm:gap-4">
       <Swiper
         modules={[Zoom, Thumbs]}
         zoom
         thumbs={{ swiper: thumbsSwiper }}
-        className="aspect-square w-full overflow-hidden rounded-lg border bg-muted"
+        className="aspect-[3/4] w-full flex-1 overflow-hidden rounded-2xl bg-sand"
       >
         {media.map((item) => (
           <SwiperSlide key={item.productMediaId}>
@@ -42,6 +54,8 @@ export function ProductGallery({ media, productName }: { media: ProductMedia[]; 
           watchSlidesProgress
           slidesPerView={5}
           spaceBetween={8}
+          direction="horizontal"
+          breakpoints={{ 640: { direction: 'vertical', slidesPerView: 5, spaceBetween: 10 } }}
           // Swiper needs an explicit height AND width on the container
           // itself — unlike the main gallery above (sized via `aspect-
           // square w-full` on the Swiper element directly), each
@@ -51,12 +65,13 @@ export function ProductGallery({ media, productName }: { media: ProductMedia[]; 
           // whatever tiny intrinsic width the container falls back to
           // (confirmed live: ~34px instead of the real gallery width),
           // so the whole row rendered as a near-invisible sliver even
-          // after fixing the height alone.
-          className="thumbs-swiper h-16 w-full sm:h-20"
+          // after fixing the height alone. The vertical `sm:` branch needs
+          // the same for height instead of width.
+          className="thumbs-swiper h-16 w-full sm:h-[520px] sm:w-20"
         >
           {media.map((item) => (
             <SwiperSlide key={item.productMediaId} className="cursor-pointer">
-              <div className="aspect-square overflow-hidden rounded-md border bg-muted opacity-60 transition-opacity [.swiper-slide-thumb-active_&]:opacity-100 [.swiper-slide-thumb-active_&]:ring-2 [.swiper-slide-thumb-active_&]:ring-primary">
+              <div className="aspect-square overflow-hidden rounded-xl border-2 border-transparent opacity-60 transition-opacity [.swiper-slide-thumb-active_&]:border-jet [.swiper-slide-thumb-active_&]:opacity-100">
                 {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic */}
                 <img src={item.url} alt="" className="size-full object-cover" />
               </div>
@@ -64,7 +79,7 @@ export function ProductGallery({ media, productName }: { media: ProductMedia[]; 
           ))}
         </Swiper>
       ) : null}
-      <p className="text-center text-xs text-muted-foreground">Double-click or pinch to zoom</p>
+      <p className="text-center text-xs text-slate sm:hidden">Double-click or pinch to zoom</p>
     </div>
   );
 }

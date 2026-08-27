@@ -36,18 +36,18 @@ export function ProductTabs({
         <TabsTrigger value="specifications">Specifications</TabsTrigger>
         <TabsTrigger value="reviews">Reviews</TabsTrigger>
       </TabsList>
-      <TabsContent value="description" className="pt-4 text-muted-foreground">
+      <TabsContent value="description" className="pt-4 text-charcoal">
         {description ? <p className="whitespace-pre-line">{description}</p> : <p>No description available for SKU {sku} yet.</p>}
       </TabsContent>
       <TabsContent value="specifications" className="pt-4">
         {specEntries.length === 0 ? (
-          <p className="text-muted-foreground">No additional specifications for this product.</p>
+          <p className="text-slate">No additional specifications for this product.</p>
         ) : (
           <dl className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
             {specEntries.map(([code, value]) => (
-              <div key={code} className="flex justify-between border-b py-1.5 text-sm">
-                <dt className="text-muted-foreground">{formatLabel(code)}</dt>
-                <dd className="font-medium">{String(value)}</dd>
+              <div key={code} className="flex justify-between border-b border-ghost py-1.5 text-sm">
+                <dt className="text-slate">{formatLabel(code)}</dt>
+                <dd className="font-medium text-jet">{String(value)}</dd>
               </div>
             ))}
           </dl>
