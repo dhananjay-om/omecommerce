@@ -226,3 +226,13 @@
 .product-img-wrap:hover img {
   transform: scale(1.06);
 }
+
+/* ÉLUME restyle: champagne pagination dots for the homepage hero, instead
+   of Swiper's default blue. Scoped to the hero's own class hook. */
+.hero-banner-swiper .swiper-pagination-bullet {
+  background: rgba(255, 255, 255, 0.6);
+  opacity: 1;
+}
+.hero-banner-swiper .swiper-pagination-bullet-active {
+  background: var(--champagne);
+}

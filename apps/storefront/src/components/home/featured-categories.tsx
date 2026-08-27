@@ -13,24 +13,28 @@ export function FeaturedCategories({ categories, heading }: { categories: Catego
   if (categories.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10">
-      <h2 className="mb-4 text-xl font-bold sm:text-2xl">{heading ?? 'Shop by Category'}</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <h2 className="font-display mb-6 text-2xl font-semibold text-jet sm:text-3xl">{heading ?? 'Shop by Category'}</h2>
+      <div className="flex gap-6 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 md:grid-cols-4">
         {categories.map((category) => (
           <Link
             key={category.publicId}
             href={`/collections/${category.slug}`}
-            className="group flex flex-col items-center gap-3 rounded-lg border bg-background p-6 text-center transition-shadow hover:shadow-md"
+            className="group flex shrink-0 flex-col items-center gap-3 text-center"
           >
-            {category.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
-              <img src={category.imageUrl} alt="" className="size-14 rounded-full object-cover" />
-            ) : (
-              <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-                {(category.nameDefault ?? category.slug).charAt(0).toUpperCase()}
-              </span>
-            )}
-            <span className="text-sm font-medium group-hover:text-primary">{category.nameDefault ?? category.slug}</span>
+            <span className="ring-offset-background overflow-hidden rounded-full ring-1 ring-ghost transition-all group-hover:ring-2 group-hover:ring-champagne group-hover:ring-offset-2">
+              {category.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
+                <img src={category.imageUrl} alt="" className="size-24 object-cover sm:size-28" />
+              ) : (
+                <span className="flex size-24 items-center justify-center bg-sand text-2xl font-semibold text-champagne sm:size-28">
+                  {(category.nameDefault ?? category.slug).charAt(0).toUpperCase()}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-charcoal transition-colors group-hover:text-champagne">
+              {category.nameDefault ?? category.slug}
+            </span>
           </Link>
         ))}
       </div>

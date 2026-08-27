@@ -28,15 +28,15 @@ const DEFAULT_FEATURES: Feature[] = [
 export function WhyChooseUs({ features }: { features?: Feature[] }) {
   const activeFeatures = features && features.length > 0 ? features : DEFAULT_FEATURES;
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10">
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         {activeFeatures.map((feature, i) => {
           const Icon = ICON_COMPONENTS[feature.icon as keyof typeof ICON_COMPONENTS] ?? TruckIcon;
           return (
-            <div key={i} className="flex flex-col items-center gap-2 text-center">
-              <Icon className="size-8 text-primary" />
-              <span className="text-sm font-semibold">{feature.title}</span>
-              <span className="text-xs text-muted-foreground">{feature.description}</span>
+            <div key={i} className="flex flex-col items-center gap-3 rounded-2xl bg-ivory p-6 text-center">
+              <Icon className="size-7 text-champagne" />
+              <span className="text-sm font-semibold text-jet">{feature.title}</span>
+              <span className="text-xs text-slate">{feature.description}</span>
             </div>
           );
         })}

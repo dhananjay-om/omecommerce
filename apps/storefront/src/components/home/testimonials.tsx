@@ -18,19 +18,19 @@ const DEFAULT_TESTIMONIALS: Testimonial[] = [
 export function Testimonials({ testimonials }: { testimonials?: Testimonial[] }) {
   const activeTestimonials = testimonials && testimonials.length > 0 ? testimonials : DEFAULT_TESTIMONIALS;
   return (
-    <section className="bg-muted/40 py-10">
-      <div className="mx-auto max-w-7xl px-4">
-        <h2 className="mb-4 text-xl font-bold sm:text-2xl">What Our Customers Say</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <section className="bg-ivory py-14">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <h2 className="font-display mb-6 text-2xl font-semibold text-jet sm:text-3xl">What Our Customers Say</h2>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {activeTestimonials.map((t, i) => (
-            <div key={i} className="rounded-lg border bg-background p-5">
-              <div className="mb-2 flex gap-0.5 text-cta">
+            <div key={i} className="rounded-2xl bg-white p-6 ring-1 ring-ghost">
+              <div className="mb-3 flex gap-0.5 text-champagne">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <StarIcon key={i} className="size-4" />
                 ))}
               </div>
-              <p className="text-sm text-muted-foreground">&ldquo;{t.quote}&rdquo;</p>
-              <p className="mt-3 text-sm font-semibold">{t.name}</p>
+              <p className="text-sm text-charcoal">&ldquo;{t.quote}&rdquo;</p>
+              <p className="mt-4 text-sm font-semibold text-jet">{t.name}</p>
             </div>
           ))}
         </div>

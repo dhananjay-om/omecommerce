@@ -29,7 +29,7 @@ const DEFAULT_SLIDES: Slide[] = [
     subtitle: 'Fresh electronics, apparel, and home essentials — all in one place.',
     ctaLabel: 'Shop Now',
     ctaHref: '/products',
-    gradient: 'from-primary to-blue-700',
+    gradient: 'from-jet to-charcoal',
   },
   {
     eyebrow: 'Limited Time',
@@ -37,7 +37,7 @@ const DEFAULT_SLIDES: Slide[] = [
     subtitle: 'Laptops, phones, and audio — priced to move.',
     ctaLabel: 'Shop Electronics',
     ctaHref: '/collections/electronics',
-    gradient: 'from-indigo-600 to-violet-700',
+    gradient: 'from-charcoal to-champagne',
   },
   {
     eyebrow: 'Just Landed',
@@ -45,7 +45,7 @@ const DEFAULT_SLIDES: Slide[] = [
     subtitle: 'New arrivals across men’s and women’s collections.',
     ctaLabel: 'Shop Fashion',
     ctaHref: '/collections/fashion',
-    gradient: 'from-rose-600 to-orange-600',
+    gradient: 'from-rose to-jet',
   },
 ];
 
@@ -62,13 +62,17 @@ export function HeroBanner({ slides }: { slides?: Slide[] }) {
       {activeSlides.map((slide, i) => (
         <SwiperSlide key={i}>
           <div
-            className={`bg-cover bg-center px-6 py-20 text-white sm:py-28 ${slide.imageUrl ? '' : `bg-gradient-to-br ${slide.gradient}`}`}
-            style={slide.imageUrl ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${slide.imageUrl})` } : undefined}
+            className={`bg-cover bg-center px-6 py-24 text-white sm:py-36 ${slide.imageUrl ? '' : `bg-gradient-to-br ${slide.gradient}`}`}
+            style={
+              slide.imageUrl
+                ? { backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0.25) 60%, transparent), url(${slide.imageUrl})` }
+                : undefined
+            }
           >
             <div className="mx-auto flex max-w-7xl flex-col items-start gap-4">
-              <span className="text-sm font-semibold tracking-wide uppercase text-white/80">{slide.eyebrow}</span>
-              <h1 className="max-w-xl text-3xl font-bold sm:text-5xl">{slide.title}</h1>
-              <p className="max-w-md text-white/90">{slide.subtitle}</p>
+              <span className="text-xs font-semibold tracking-[0.2em] text-champagne-light uppercase">{slide.eyebrow}</span>
+              <h1 className="font-display max-w-xl text-4xl font-semibold sm:text-6xl">{slide.title}</h1>
+              <p className="max-w-md text-white/85">{slide.subtitle}</p>
               <Button variant="cta" size="lg" render={<Link href={slide.ctaHref} />} nativeButton={false} className="mt-2">
                 {slide.ctaLabel}
               </Button>

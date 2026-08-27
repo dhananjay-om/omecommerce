@@ -22,15 +22,15 @@ export function ProductCarousel({
   if (hits.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10">
-      <div className="mb-4 flex items-end justify-between">
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <div className="mb-5 flex items-end justify-between">
         <div>
-          <h2 className="text-xl font-bold sm:text-2xl">{title}</h2>
-          {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
+          <h2 className="font-display text-2xl font-semibold text-jet sm:text-3xl">{title}</h2>
+          {subtitle ? <p className="mt-1 text-sm text-slate">{subtitle}</p> : null}
         </div>
         {seeAllHref ? (
-          <Link href={seeAllHref} className="shrink-0 text-sm font-medium text-primary hover:underline">
-            See all
+          <Link href={seeAllHref} className="shrink-0 text-sm font-medium text-champagne transition-colors hover:text-jet">
+            See all →
           </Link>
         ) : null}
       </div>

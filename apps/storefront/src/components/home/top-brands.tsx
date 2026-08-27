@@ -11,15 +11,15 @@ export function TopBrands({ brands, heading }: { brands: Brand[]; heading?: stri
   if (brands.length === 0) return null;
 
   return (
-    <section className="bg-muted/40 py-10">
-      <div className="mx-auto max-w-7xl px-4">
-        <h2 className="mb-4 text-xl font-bold sm:text-2xl">{heading ?? 'Top Brands'}</h2>
+    <section className="bg-ivory py-14">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <h2 className="font-display mb-6 text-2xl font-semibold text-jet sm:text-3xl">{heading ?? 'Top Brands'}</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
           {brands.map((brand) => (
             <Link
               key={brand.publicId}
               href={`/brands/${brand.slug}`}
-              className="flex items-center justify-center rounded-lg border bg-background px-4 py-6 text-center text-sm font-semibold transition-shadow hover:shadow-md"
+              className="flex items-center justify-center rounded-2xl bg-white px-4 py-7 text-center text-sm font-semibold text-charcoal ring-1 ring-ghost transition-colors hover:text-champagne hover:ring-champagne"
             >
               {brand.name}
             </Link>
