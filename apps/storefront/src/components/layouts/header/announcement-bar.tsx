@@ -1,6 +1,8 @@
 import Link from 'next/link';
-import { PhoneIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { PhoneIcon } from '@heroicons/react/24/outline';
 import { getCmsBlockOrUndefined } from '@/services/content.service';
+import { getPublicStores, getSelectedStoreViewId } from '@/lib/store-context';
+import { StoreSwitcher } from './store-switcher';
 
 /**
  * Top bar — location/support/shipping-line content on the left, low-
@@ -16,7 +18,11 @@ import { getCmsBlockOrUndefined } from '@/services/content.service';
  * hardcoded left cluster when the block is missing/unpublished.
  */
 export async function AnnouncementBar() {
-  const block = await getCmsBlockOrUndefined('global_announcement_bar');
+  const [block, stores, selectedStoreViewId] = await Promise.all([
+    getCmsBlockOrUndefined('global_announcement_bar'),
+    getPublicStores().catch(() => []),
+    getSelectedStoreViewId(),
+  ]);
 
   return (
     <div className="hidden bg-foreground text-background md:block">
@@ -25,10 +31,7 @@ export async function AnnouncementBar() {
           <div className="flex items-center gap-4 [&_a]:underline" dangerouslySetInnerHTML={{ __html: block.body }} />
         ) : (
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <MapPinIcon className="size-3.5" />
-              Ship to United States
-            </span>
+            <StoreSwitcher stores={stores} selectedStoreViewId={selectedStoreViewId} />
             <span className="flex items-center gap-1">
               <PhoneIcon className="size-3.5" />
               +1 (800) 555-0199

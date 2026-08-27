@@ -42,6 +42,7 @@ import {
   ScrollText,
   Settings,
   Store,
+  Globe,
   Coins,
   Receipt,
   Banknote,
@@ -327,6 +328,7 @@ export const NAV: NavGroup[] = [
     label: 'Stores',
     icon: Store,
     items: [
+      { key: 'stores-websites', label: 'Websites', href: '/stores/websites', icon: Globe, status: 'live', description: 'Create and manage websites (stores) and their currencies.' },
       { key: 'stores-general', label: 'General', href: '/stores/general', icon: Store, status: 'live', description: 'Store name, logo, and general settings.' },
       { key: 'stores-currencies', label: 'Currency Setup', href: '/stores/currencies', icon: Coins, status: 'live', description: 'Supported currencies.' },
       { key: 'stores-tax-classes', label: 'Tax Classes', href: '/stores/tax-classes', icon: Receipt, status: 'live', description: 'Tax classes and rates.' },

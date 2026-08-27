@@ -403,6 +403,7 @@ export interface Website {
   publicId: string;
   code: string;
   name: string;
+  baseCurrency: string;
   gstin: string | null;
   originStateCode: string | null;
   pricesIncludeTax: boolean;

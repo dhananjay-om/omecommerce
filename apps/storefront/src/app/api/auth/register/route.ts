@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { apiPost, ApiError } from '@/lib/api-client';
 import { createSession, getCartId } from '@/lib/session';
-import { WEBSITE_CODE } from '@/lib/config';
+import { getSelectedWebsiteCode } from '@/lib/store-context';
 
 /** Registers a new customer, then immediately logs them in (the backend's register endpoint returns the customer record but no token — one extra call keeps the UX to a single "Create account" submit). */
 export async function POST(request: Request) {
@@ -15,8 +15,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    await apiPost('/store/v1/customers', { websiteCode: WEBSITE_CODE, email, password, firstName, lastName });
-    const login = await apiPost<{ token: string }>('/store/v1/customers/actions/login', { websiteCode: WEBSITE_CODE, email, password });
+    const websiteCode = await getSelectedWebsiteCode();
+    await apiPost('/store/v1/customers', { websiteCode, email, password, firstName, lastName });
+    const login = await apiPost<{ token: string }>('/store/v1/customers/actions/login', { websiteCode, email, password });
     await createSession(login.token);
 
     // plan/15 Phase 6 — same non-fatal guest-cart claim as the login route.

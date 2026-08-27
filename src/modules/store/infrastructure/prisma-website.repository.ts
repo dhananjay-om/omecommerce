@@ -1,11 +1,14 @@
+import { Prisma } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { WebsiteRepository, WebsiteInfo } from '../domain/repositories.js';
+import type { WebsiteRepository, WebsiteInfo, PublicStoreInfo } from '../domain/repositories.js';
+import { ConflictError } from '../../../shared/domain/errors.js';
 import { toMinorUnits, fromMinorUnits } from '../../../shared/domain/decimal.js';
 
 const SELECT = {
   publicId: true,
   code: true,
   name: true,
+  baseCurrency: true,
   gstin: true,
   originStateCode: true,
   pricesIncludeTax: true,
@@ -30,6 +33,7 @@ function toWebsiteInfo(row: {
   publicId: string;
   code: string;
   name: string;
+  baseCurrency: string;
   gstin: string | null;
   originStateCode: string | null;
   pricesIncludeTax: boolean;
@@ -98,5 +102,64 @@ export class PrismaWebsiteRepository implements WebsiteRepository {
       select: SELECT,
     });
     return toWebsiteInfo(row);
+  }
+
+  async createStore(input: {
+    websiteCode: string;
+    websiteName: string;
+    currency: string;
+    storeCode: string;
+    storeViewCode: string;
+    languageId: bigint;
+  }): Promise<WebsiteInfo> {
+    try {
+      const website = await this.db.$transaction(async (tx) => {
+        // Not `select: SELECT` — this needs the real numeric `id` too, to
+        // create the Store row against, which SELECT (the shared list/
+        // update projection) deliberately omits.
+        const w = await tx.website.create({
+          data: { code: input.websiteCode, name: input.websiteName, baseCurrency: input.currency },
+        });
+        const store = await tx.store.create({ data: { websiteId: w.id, code: input.storeCode, name: input.websiteName } });
+        await tx.storeView.create({
+          data: { storeId: store.id, code: input.storeViewCode, languageId: input.languageId, currency: input.currency },
+        });
+        return w;
+      });
+      return toWebsiteInfo(website);
+    } catch (err) {
+      // Belt-and-suspenders alongside CreateStore's own pre-check — closes
+      // the small TOCTOU window between that check and this transaction.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError(`website code already exists: ${input.websiteCode}`);
+      }
+      throw err;
+    }
+  }
+
+  async listPublicStores(): Promise<PublicStoreInfo[]> {
+    const rows = await this.db.storeView.findMany({
+      where: { status: 'ACTIVE', deletedAt: null, store: { deletedAt: null, website: { deletedAt: null } } },
+      select: {
+        id: true,
+        code: true,
+        currency: true,
+        store: { select: { website: { select: { code: true, name: true, isDefault: true } } } },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return rows.map((r) => ({
+      websiteCode: r.store.website.code,
+      websiteName: r.store.website.name,
+      storeViewId: r.id,
+      storeViewCode: r.code,
+      currency: r.currency,
+      isDefault: r.store.website.isDefault,
+    }));
+  }
+
+  async listLanguageIds(): Promise<bigint[]> {
+    const rows = await this.db.language.findMany({ select: { id: true } });
+    return rows.map((r) => r.id);
   }
 }

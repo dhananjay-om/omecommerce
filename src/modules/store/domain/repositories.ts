@@ -46,6 +46,7 @@ export interface WebsiteInfo {
   publicId: string;
   code: string;
   name: string;
+  baseCurrency: string;
   gstin: string | null;
   originStateCode: string | null;
   pricesIncludeTax: boolean;
@@ -66,16 +67,23 @@ export interface WebsiteInfo {
   walletMaxAmountPerOrder: string | null;
 }
 
-/** Website/Store View management is still a deliberate later addition (see
- *  store.module.ts) — this is scoped to exactly three admin-facing settings
- *  groups: GST registration (gstin/originStateCode/pricesIncludeTax), general
- *  store branding (address/logoMediaKey/supportEmail), and wallet-tender
- *  rules (walletEnabled/walletMaxPercentOfOrder/walletMinOrderValue/
- *  walletMaxAmountPerOrder, plan/17) — deliberately split into three update()
- *  call shapes even though all three write the same Website row, mirroring
- *  the separate admin pages/endpoints (General Settings vs GST Settings vs
- *  Wallet Settings) rather than one grab-bag update that also happened to
- *  carry unrelated fields. Not full Website CRUD. */
+/** Website/Store View management was a deliberate later addition (see
+ *  store.module.ts) — originally scoped to exactly three admin-facing
+ *  settings groups: GST registration (gstin/originStateCode/pricesIncludeTax),
+ *  general store branding (address/logoMediaKey/supportEmail), and
+ *  wallet-tender rules (walletEnabled/walletMaxPercentOfOrder/
+ *  walletMinOrderValue/walletMaxAmountPerOrder, plan/17) — deliberately
+ *  split into three update() call shapes even though all three write the
+ *  same Website row, mirroring the separate admin pages/endpoints (General
+ *  Settings vs GST Settings vs Wallet Settings) rather than one grab-bag
+ *  update that also happened to carry unrelated fields. `createStore` (multi-
+ *  store feature) is the one addition to real CRUD: baseCurrency is
+ *  create-time-only, deliberately with no matching update path — a cart's
+ *  currency is snapshotted once at creation and never re-derived, so a
+ *  casual "edit currency" button on an existing store would silently
+ *  reintroduce the exact stale-currency bug this session already had to
+ *  fix by hand. Still no DELETE — too many raw-SQL-FK'd tables reference
+ *  websiteId/storeId/storeViewId to safely guard/cascade in one pass. */
 export interface WebsiteRepository {
   list(): Promise<WebsiteInfo[]>;
   /** Storefront's public branding read (name/logo) — the storefront addresses a
@@ -97,4 +105,35 @@ export interface WebsiteRepository {
       walletMaxAmountPerOrder?: string | null;
     },
   ): Promise<WebsiteInfo>;
+  /** One combined write creating Website + Store + Store View together —
+   *  the admin thinks in terms of "a store," not this schema's 3-tier
+   *  hierarchy, and the existing us_retail setup is exactly 1-of-each
+   *  already. `storeCode`/`storeViewCode` are internal identifiers, not
+   *  shown as separate form fields — see CreateStore's own doc comment. */
+  createStore(input: {
+    websiteCode: string;
+    websiteName: string;
+    currency: string;
+    storeCode: string;
+    storeViewCode: string;
+    languageId: bigint;
+  }): Promise<WebsiteInfo>;
+  /** Every non-deleted, ACTIVE store view, joined up through Store->Website —
+   *  backs the storefront's public store switcher (GET /store/v1/websites).
+   *  Deliberately a separate read shape from WebsiteInfo (which has no
+   *  concept of "which store view" at all) rather than overloading list(). */
+  listPublicStores(): Promise<PublicStoreInfo[]>;
+  /** Just enough to resolve CreateStore's languageId default — Language has
+   *  no other CRUD anywhere in this codebase, doesn't warrant its own
+   *  repository for one read. */
+  listLanguageIds(): Promise<bigint[]>;
+}
+
+export interface PublicStoreInfo {
+  websiteCode: string;
+  websiteName: string;
+  storeViewId: bigint;
+  storeViewCode: string;
+  currency: string;
+  isDefault: boolean;
 }

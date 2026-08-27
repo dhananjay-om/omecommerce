@@ -1,6 +1,6 @@
 import 'server-only';
 import { apiGet, buildQuery, ApiError } from '@/lib/api-client';
-import { STORE_VIEW_ID } from '@/lib/config';
+import { getSelectedStoreViewId } from '@/lib/store-context';
 
 export interface CmsPage {
   publicId: string;
@@ -21,12 +21,14 @@ export interface CmsBlock {
 }
 
 /** Server Component reads only — direct to Express, same pattern as products.service.ts. */
-export function getCmsPage(handle: string): Promise<CmsPage> {
-  return apiGet<CmsPage>(`/store/v1/content/pages/${handle}${buildQuery({ storeViewId: STORE_VIEW_ID })}`);
+export async function getCmsPage(handle: string): Promise<CmsPage> {
+  const storeViewId = await getSelectedStoreViewId();
+  return apiGet<CmsPage>(`/store/v1/content/pages/${handle}${buildQuery({ storeViewId })}`);
 }
 
-export function getCmsBlock(code: string): Promise<CmsBlock> {
-  return apiGet<CmsBlock>(`/store/v1/content/blocks/${code}${buildQuery({ storeViewId: STORE_VIEW_ID })}`);
+export async function getCmsBlock(code: string): Promise<CmsBlock> {
+  const storeViewId = await getSelectedStoreViewId();
+  return apiGet<CmsBlock>(`/store/v1/content/blocks/${code}${buildQuery({ storeViewId })}`);
 }
 
 /** Missing/unpublished block -> undefined instead of throwing — used by the

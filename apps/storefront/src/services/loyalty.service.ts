@@ -1,6 +1,6 @@
 import 'server-only';
 import { apiGet, buildQuery } from '@/lib/api-client';
-import { STORE_VIEW_ID } from '@/lib/config';
+import { getSelectedStoreViewId } from '@/lib/store-context';
 import type { LoyaltyAccount, LoyaltyTransaction, PublicLoyaltyProgram } from '@/types/loyalty';
 
 /** Server Component reads only. */
@@ -17,6 +17,7 @@ export function getMyLoyaltyTransactions(): Promise<LoyaltyTransaction[]> {
  * the customer. Returns 404 when this website has no ACTIVE loyalty program;
  * callers should treat that as "no rewards program" rather than an error.
  */
-export function getLoyaltyProgram(): Promise<PublicLoyaltyProgram> {
-  return apiGet<PublicLoyaltyProgram>(`/store/v1/loyalty/program${buildQuery({ storeViewId: STORE_VIEW_ID })}`);
+export async function getLoyaltyProgram(): Promise<PublicLoyaltyProgram> {
+  const storeViewId = await getSelectedStoreViewId();
+  return apiGet<PublicLoyaltyProgram>(`/store/v1/loyalty/program${buildQuery({ storeViewId })}`);
 }

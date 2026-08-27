@@ -1,7 +1,7 @@
 import 'server-only';
 import { apiGet, apiPost, ApiError } from './api-client';
 import { getCartId, setCartId, getSession } from './session';
-import { STORE_VIEW_ID } from './config';
+import { getSelectedStoreViewId } from './store-context';
 import type { Cart } from '@/types/cart';
 
 /**
@@ -33,7 +33,8 @@ export async function ensureCart(): Promise<Cart> {
     }
   }
 
-  const cart = await apiPost<Cart>('/store/v1/carts', { storeViewId: STORE_VIEW_ID, customerPublicId });
+  const storeViewId = await getSelectedStoreViewId();
+  const cart = await apiPost<Cart>('/store/v1/carts', { storeViewId, customerPublicId });
   await setCartId(cart.publicId);
   return cart;
 }

@@ -11,6 +11,7 @@ export async function toWebsiteView(w: WebsiteInfo): Promise<WebsiteView> {
     publicId: w.publicId,
     code: w.code,
     name: w.name,
+    baseCurrency: w.baseCurrency,
     gstin: w.gstin,
     originStateCode: w.originStateCode,
     pricesIncludeTax: w.pricesIncludeTax,

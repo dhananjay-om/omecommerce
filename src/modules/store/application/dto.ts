@@ -25,6 +25,7 @@ export interface WebsiteView {
   publicId: string;
   code: string;
   name: string;
+  baseCurrency: string;
   gstin: string | null;
   originStateCode: string | null;
   pricesIncludeTax: boolean;
@@ -81,4 +82,26 @@ export interface LogoUploadUrl {
 export interface PublicWebsiteView {
   name: string;
   logoUrl: string | null;
+}
+
+/** Admin "Create Store" — one combined write, not raw Website/Store/
+ *  StoreView fields (see WebsiteRepository.createStore's own doc comment
+ *  for why). storeCode/storeViewCode are optional — the use case defaults
+ *  them, they're never a form field. */
+export interface CreateStoreCommand {
+  websiteCode: string;
+  websiteName: string;
+  currency: string;
+  storeCode?: string;
+  storeViewCode?: string;
+}
+
+/** Storefront's public store switcher — one row per active StoreView. */
+export interface PublicStoreView {
+  websiteCode: string;
+  websiteName: string;
+  storeViewId: string;
+  storeViewCode: string;
+  currency: string;
+  isDefault: boolean;
 }

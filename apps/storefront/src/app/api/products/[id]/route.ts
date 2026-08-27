@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { apiGet, buildQuery, ApiError } from '@/lib/api-client';
-import { STORE_VIEW_ID } from '@/lib/config';
+import { getSelectedStoreViewId } from '@/lib/store-context';
 import type { ProductDetail } from '@/types/product';
 
 /**
@@ -14,7 +14,8 @@ import type { ProductDetail } from '@/types/product';
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const product = await apiGet<ProductDetail>(`/store/v1/products/${id}${buildQuery({ storeViewId: STORE_VIEW_ID })}`);
+    const storeViewId = await getSelectedStoreViewId();
+    const product = await apiGet<ProductDetail>(`/store/v1/products/${id}${buildQuery({ storeViewId })}`);
     return NextResponse.json(product);
   } catch (err) {
     if (err instanceof ApiError) return NextResponse.json({ error: err.message }, { status: err.status });

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { apiPost, ApiError } from '@/lib/api-client';
 import { createSession, getCartId } from '@/lib/session';
-import { WEBSITE_CODE } from '@/lib/config';
+import { getSelectedWebsiteCode } from '@/lib/store-context';
 
 /** Proxies login to the Express backend and stores the resulting JWT in an httpOnly cookie — the client never sees the token itself. */
 export async function POST(request: Request) {
@@ -13,8 +13,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    const websiteCode = await getSelectedWebsiteCode();
     const result = await apiPost<{ token: string; customerPublicId: string }>('/store/v1/customers/actions/login', {
-      websiteCode: WEBSITE_CODE,
+      websiteCode,
       email,
       password,
     });

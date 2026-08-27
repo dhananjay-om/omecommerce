@@ -13,6 +13,8 @@ import { UpdateWebsiteGeneralSettings } from './application/update-website-gener
 import { UpdateWebsiteWalletSettings } from './application/update-website-wallet-settings.usecase.js';
 import { RequestWebsiteLogoUpload } from './application/request-logo-upload.usecase.js';
 import { GetPublicWebsite } from './application/get-public-website.usecase.js';
+import { CreateStore } from './application/create-store.usecase.js';
+import { ListPublicStores } from './application/list-public-stores.usecase.js';
 import {
   createCurrencySchema,
   updateCurrencySchema,
@@ -21,6 +23,7 @@ import {
   updateWebsiteWalletSettingsSchema,
   requestLogoUploadSchema,
   getPublicWebsiteQuerySchema,
+  createStoreSchema,
 } from './interface/http/schemas.js';
 
 export interface StoreRouters {
@@ -46,6 +49,8 @@ export function createStoreModule(db: Db): StoreRouters {
   const updateWebsiteWalletSettings = new UpdateWebsiteWalletSettings(websites);
   const requestWebsiteLogoUpload = new RequestWebsiteLogoUpload(websites);
   const getPublicWebsite = new GetPublicWebsite(websites);
+  const createStore = new CreateStore(websites);
+  const listPublicStores = new ListPublicStores(websites);
 
   const admin = Router();
 
@@ -86,6 +91,15 @@ export function createStoreModule(db: Db): StoreRouters {
     '/websites',
     asyncHandler(async (_req, res) => {
       res.json({ data: await listWebsites.execute() });
+    }),
+  );
+
+  admin.post(
+    '/websites',
+    asyncHandler(async (req, res) => {
+      const body = parse(createStoreSchema, req.body);
+      const view = await createStore.execute(body);
+      res.status(201).json({ data: view });
     }),
   );
 
@@ -132,6 +146,13 @@ export function createStoreModule(db: Db): StoreRouters {
     asyncHandler(async (req, res) => {
       const query = parse(getPublicWebsiteQuerySchema, req.query);
       res.json({ data: await getPublicWebsite.execute(query.code) });
+    }),
+  );
+
+  store.get(
+    '/websites',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listPublicStores.execute() });
     }),
   );
 

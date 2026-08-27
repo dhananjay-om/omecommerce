@@ -68,3 +68,11 @@ export const updateWebsiteWalletSettingsSchema = z.object({
 export const getPublicWebsiteQuerySchema = z.object({
   code: z.string().min(1),
 });
+
+export const createStoreSchema = z.object({
+  websiteCode: z.string().trim().min(1).max(32),
+  websiteName: z.string().trim().min(1).max(128),
+  currency: z.string().trim().length(3),
+  storeCode: z.string().trim().min(1).max(32).optional(),
+  storeViewCode: z.string().trim().min(1).max(32).optional(),
+});
