@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { isAxiosError } from 'axios';
 import { api } from '@/lib/axios';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -170,7 +171,7 @@ export function AddressList({ initialAddresses }: { initialAddresses: CustomerAd
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Addresses</h2>
+        <h2 className="text-lg font-semibold text-jet">Addresses</h2>
         {!showForm ? (
           <Button variant="outline" size="sm" onClick={startAdd}>
             Add Address
@@ -179,34 +180,37 @@ export function AddressList({ initialAddresses }: { initialAddresses: CustomerAd
       </div>
 
       {addresses.length === 0 && !showForm ? (
-        <p className="text-muted-foreground">No saved addresses yet.</p>
+        <p className="text-slate">No saved addresses yet.</p>
       ) : null}
 
-      <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {addresses.map((address) => (
           <div
             key={address.publicId}
-            className="flex items-start justify-between rounded-lg border p-4"
+            className={cn(
+              'flex items-start justify-between rounded-2xl border-2 p-4',
+              address.isDefaultShipping || address.isDefaultBilling ? 'border-champagne' : 'border-ghost',
+            )}
           >
             <div className="text-sm">
-              <p className="flex items-center gap-2 font-medium">
+              <p className="flex flex-wrap items-center gap-1.5 font-medium text-jet">
                 {address.name}
                 {address.isDefaultShipping ? (
-                  <Badge variant="secondary">Default shipping</Badge>
+                  <Badge className="bg-champagne text-white">Default shipping</Badge>
                 ) : null}
                 {address.isDefaultBilling ? (
-                  <Badge variant="secondary">Default billing</Badge>
+                  <Badge className="bg-champagne text-white">Default billing</Badge>
                 ) : null}
               </p>
-              {address.company ? <p className="text-muted-foreground">{address.company}</p> : null}
-              <p>{address.line1}</p>
-              {address.line2 ? <p>{address.line2}</p> : null}
-              <p>
+              {address.company ? <p className="text-slate">{address.company}</p> : null}
+              <p className="text-charcoal">{address.line1}</p>
+              {address.line2 ? <p className="text-charcoal">{address.line2}</p> : null}
+              <p className="text-charcoal">
                 {address.city}
                 {address.region ? `, ${address.region}` : ''} {address.postalCode}
               </p>
-              <p>{address.country}</p>
-              {address.phone ? <p className="text-muted-foreground">{address.phone}</p> : null}
+              <p className="text-charcoal">{address.country}</p>
+              {address.phone ? <p className="text-slate">{address.phone}</p> : null}
             </div>
             <div className="flex gap-1">
               <Button
@@ -223,7 +227,7 @@ export function AddressList({ initialAddresses }: { initialAddresses: CustomerAd
                 aria-label="Remove address"
                 onClick={() => remove(address.publicId)}
               >
-                <TrashIcon className="size-4 text-destructive" />
+                <TrashIcon className="size-4 text-rose" />
               </Button>
             </div>
           </div>
@@ -231,8 +235,8 @@ export function AddressList({ initialAddresses }: { initialAddresses: CustomerAd
       </div>
 
       {showForm ? (
-        <form onSubmit={onSubmit} className="mt-4 flex flex-col gap-3 rounded-lg border p-4">
-          <h3 className="text-sm font-semibold">
+        <form onSubmit={onSubmit} className="mt-4 flex flex-col gap-3 rounded-2xl border border-ghost p-4">
+          <h3 className="text-sm font-semibold text-jet">
             {editingAddress ? 'Edit address' : 'New address'}
           </h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

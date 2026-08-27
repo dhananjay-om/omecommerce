@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { requireSession } from '@/lib/session';
 import { apiGet, ApiError } from '@/lib/api-client';
 import { AccountNav } from '@/components/account/account-nav';
+import type { Customer } from '@/types/customer';
 
 /**
  * Gates every /account/* route in one place. requireSession() only proves
@@ -15,18 +16,19 @@ import { AccountNav } from '@/components/account/account-nav';
  */
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   await requireSession();
+  let customer: Customer;
   try {
-    await apiGet('/store/v1/me', { auth: true });
+    customer = await apiGet<Customer>('/store/v1/me', { auth: true });
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) redirect('/login');
     throw err;
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="mb-6 text-2xl font-bold">My Account</h1>
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <h1 className="font-display mb-6 text-3xl font-semibold text-jet">My Account</h1>
       <div className="flex flex-col gap-8 md:flex-row">
-        <AccountNav />
+        <AccountNav customer={customer} />
         <div className="flex-1">{children}</div>
       </div>
     </div>

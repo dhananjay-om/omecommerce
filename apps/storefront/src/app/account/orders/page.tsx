@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { apiGet, buildQuery } from '@/lib/api-client';
-import type { CustomerOrderList } from '@/types/customer';
+import type { CustomerOrderList, CustomerOrderListItem } from '@/types/customer';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,19 +11,59 @@ export const metadata = { title: 'Order History' };
 
 const PAGE_SIZE = 10;
 
-function statusColor(status: string): string {
+/** Same 3-state grouping the old table's statusColor() used (paid/delivered-ish
+ *  → success, cancelled/failed → destructive, anything else → neutral/pending)
+ *  — just rendered as a themed pill instead of colored text. */
+function statusPillClass(status: string): string {
   switch (status) {
     case 'PAID':
     case 'DELIVERED':
     case 'FULFILLED':
     case 'CLOSED':
-      return 'text-success';
+      return 'bg-green-50 text-green-700';
     case 'CANCELLED':
     case 'FAILED':
-      return 'text-destructive';
+      return 'bg-rose/10 text-rose';
     default:
-      return 'text-muted-foreground';
+      return 'bg-sand text-charcoal';
   }
+}
+
+function StatusPill({ status }: { status: string }) {
+  return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', statusPillClass(status))}>{status}</span>;
+}
+
+function OrderCard({ order }: { order: CustomerOrderListItem }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ghost">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-ivory px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+          <div>
+            <p className="text-xs text-slate">Order</p>
+            <Link href={`/account/orders/${order.publicId}`} className="font-medium text-jet hover:text-champagne">
+              #{order.orderNumber}
+            </Link>
+          </div>
+          <div>
+            <p className="text-xs text-slate">Placed</p>
+            <p className="text-jet">{new Date(order.placedAt).toLocaleDateString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate">Total</p>
+            <p className="font-semibold text-jet">{formatPrice(order.grandTotal, order.currency)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusPill status={order.financialStatus} />
+          <StatusPill status={order.fulfillmentStatus} />
+          <OrderRowActions orderPublicId={order.publicId} />
+        </div>
+      </div>
+      <div className="px-4 py-3 text-sm text-charcoal">
+        {order.itemsCount} item{order.itemsCount === 1 ? '' : 's'}
+      </div>
+    </div>
+  );
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
@@ -36,9 +76,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   if (list.total === 0 && !params.search) {
     return (
       <div>
-        <h2 className="text-lg font-semibold">Orders</h2>
-        <p className="mt-2 text-muted-foreground">You haven&apos;t placed any orders yet.</p>
-        <Link href="/products" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+        <h2 className="text-lg font-semibold text-jet">Orders</h2>
+        <p className="mt-2 text-slate">You haven&apos;t placed any orders yet.</p>
+        <Link href="/products" className="mt-3 inline-block text-sm font-medium text-champagne hover:text-jet">
           Start shopping
         </Link>
       </div>
@@ -48,7 +88,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Orders</h2>
+        <h2 className="text-lg font-semibold text-jet">Orders</h2>
         <form className="flex gap-2" action="/account/orders">
           <Input key={params.search ?? ''} name="search" placeholder="Search by order #…" defaultValue={params.search} className="max-w-[200px]" />
           <Button type="submit" variant="outline" size="sm">
@@ -63,45 +103,16 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       </div>
 
       {list.orders.length === 0 ? (
-        <p className="text-muted-foreground">No orders match your search.</p>
+        <p className="text-slate">No orders match your search.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 text-left text-xs text-muted-foreground uppercase">
-              <tr>
-                <th className="px-4 py-2 font-medium">Order</th>
-                <th className="px-4 py-2 font-medium">Date</th>
-                <th className="px-4 py-2 font-medium">Items</th>
-                <th className="px-4 py-2 font-medium">Payment</th>
-                <th className="px-4 py-2 font-medium">Fulfillment</th>
-                <th className="px-4 py-2 text-right font-medium">Total</th>
-                <th className="w-10 px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {list.orders.map((order) => (
-                <tr key={order.publicId} className="border-b last:border-b-0">
-                  <td className="px-4 py-3 font-medium">
-                    <Link href={`/account/orders/${order.publicId}`} className="hover:underline">
-                      #{order.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{new Date(order.placedAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{order.itemsCount}</td>
-                  <td className={`px-4 py-3 font-medium ${statusColor(order.financialStatus)}`}>{order.financialStatus}</td>
-                  <td className={`px-4 py-3 font-medium ${statusColor(order.fulfillmentStatus)}`}>{order.fulfillmentStatus}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{formatPrice(order.grandTotal, order.currency)}</td>
-                  <td className="px-4 py-3">
-                    <OrderRowActions orderPublicId={order.publicId} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-3">
+          {list.orders.map((order) => (
+            <OrderCard key={order.publicId} order={order} />
+          ))}
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+      <div className="mt-4 flex items-center justify-between text-sm text-slate">
         <span>
           {list.total} order{list.total === 1 ? '' : 's'} · page {list.page} of {totalPages}
         </span>
