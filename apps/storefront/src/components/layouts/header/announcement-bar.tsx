@@ -26,7 +26,7 @@ export async function AnnouncementBar() {
 
   return (
     <div className="hidden bg-foreground text-background md:block">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5 text-xs">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5 text-xs tracking-wide sm:px-6">
         {block ? (
           <div className="flex items-center gap-4 [&_a]:underline" dangerouslySetInnerHTML={{ __html: block.body }} />
         ) : (
@@ -36,14 +36,14 @@ export async function AnnouncementBar() {
               <PhoneIcon className="size-3.5" />
               +1 (800) 555-0199
             </span>
-            <span className="hidden text-background/80 lg:inline">Free shipping on orders over $50</span>
+            <span className="hidden text-background/60 lg:inline">Free shipping on orders over $50</span>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <Link href="/orders/track" className="hover:underline">
+          <Link href="/orders/track" className="transition-colors hover:text-champagne">
             Track Order
           </Link>
-          <Link href="/contact" className="hover:underline">
+          <Link href="/contact" className="transition-colors hover:text-champagne">
             Help
           </Link>
         </div>

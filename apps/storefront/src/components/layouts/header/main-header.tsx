@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { HeartIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -22,8 +23,17 @@ export function MainHeader({ categories, website }: { categories: Category[]; we
   const menuCategories = categories.filter((c) => c.includeInMenu);
   const tree = buildCategoryTree(menuCategories);
 
+  // ÉLUME restyle: a subtle shadow once the page scrolls past the top,
+  // matching the reference theme's Header.tsx scroll listener.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <div className="border-b bg-background">
+    <div className={`border-b bg-background transition-shadow duration-300 ${scrolled ? 'shadow-sm' : ''}`}>
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
         <MobileMenu tree={tree} />
         <Link href="/" className="shrink-0 text-xl font-bold text-primary">
@@ -31,9 +41,9 @@ export function MainHeader({ categories, website }: { categories: Category[]; we
             // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
             <img src={website.logoUrl} alt={website.name} className="h-14 w-auto max-w-[220px] object-contain" />
           ) : (
-            <>
-              OME<span className="text-cta">Shop</span>
-            </>
+            <span className="font-display text-2xl font-semibold tracking-[0.06em] text-jet">
+              OME<span className="text-champagne">Shop</span>
+            </span>
           )}
         </Link>
         <SearchBar className="hidden flex-1 md:block" />

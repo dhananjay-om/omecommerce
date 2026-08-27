@@ -7,9 +7,28 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* ÉLUME restyle (storefront restyle plan): Outfit for body/UI text,
+     Playfair Display for editorial headings — selective use, not a
+     blanket heading override; see each component for where font-display
+     is actually applied. */
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-playfair), 'Playfair Display', serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-display);
+  /* ÉLUME restyle: raw palette tokens, ported verbatim from the reference
+     theme (/theme/src/index.css) so its own Tailwind classes (bg-sand,
+     text-champagne, ...) port over directly during each page's restyle. */
+  --color-ivory: var(--ivory);
+  --color-sand: var(--sand);
+  --color-champagne: var(--champagne);
+  --color-champagne-light: var(--champagne-light);
+  --color-jet: var(--jet);
+  --color-charcoal: var(--charcoal);
+  --color-slate: var(--slate);
+  --color-silver: var(--silver);
+  --color-ghost: var(--ghost);
+  --color-blush: var(--blush);
+  --color-rose: var(--rose);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -55,36 +74,52 @@
 }
 
 :root {
-  /* Storefront theme (plan/14 Phase 1): white background, blue primary,
-     orange CTA — distinct from the admin's red-orange brand palette, matching
-     the requested "minimal, modern, premium" Shopify/Amazon-adjacent look.
-     Sensible defaults for now; refinable against a reference screenshot later,
-     same as the admin's own brand-color pass was. */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.2 0.02 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.02 250);
-  --primary: oklch(0.52 0.18 258);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.97 0.006 250);
-  --secondary-foreground: oklch(0.24 0.02 250);
-  --muted: oklch(0.97 0.006 250);
-  --muted-foreground: oklch(0.52 0.02 255);
-  --accent: oklch(0.955 0.015 255);
-  --accent-foreground: oklch(0.35 0.12 258);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* ÉLUME restyle (storefront restyle plan): luxury/editorial palette
+     ported verbatim from the reference theme at /theme/src/index.css —
+     ivory/sand/champagne/jet/charcoal/rose. Raw palette first, then the
+     semantic tokens every shared component (Button/Card/Badge/Input/...)
+     actually consumes are remapped onto it below, so the re-skin
+     propagates app-wide with no per-component code changes. Replaces the
+     prior "white background, blue primary, orange CTA" placeholder pass. */
+  --ivory: #faf9f7;
+  --sand: #f2efe9;
+  --champagne: #b8956a;
+  --champagne-light: #e8d5b7;
+  --jet: #111111;
+  --charcoal: #3a3a3a;
+  --slate: #717171;
+  --silver: #c8c8c4;
+  --ghost: #ebebea;
+  --blush: #f5e6e0;
+  --rose: #c4786a;
+
+  --background: #ffffff;
+  --foreground: var(--jet);
+  --card: #ffffff;
+  --card-foreground: var(--jet);
+  --popover: #ffffff;
+  --popover-foreground: var(--jet);
+  --primary: var(--jet);
+  --primary-foreground: #ffffff;
+  --secondary: var(--sand);
+  --secondary-foreground: var(--jet);
+  --muted: var(--sand);
+  --muted-foreground: var(--slate);
+  --accent: var(--champagne);
+  --accent-foreground: #ffffff;
+  --destructive: var(--rose);
   --success: oklch(0.627 0.17 149.21);
   --success-foreground: oklch(0.99 0 0);
   --warning: oklch(0.666 0.157 58.32);
   --warning-foreground: oklch(0.99 0 0);
-  /* CTA: orange, distinct from primary blue — "Add to Cart"/"Buy Now" buttons. */
-  --cta: oklch(0.68 0.19 45);
-  --cta-foreground: oklch(0.99 0 0);
-  --border: oklch(0.922 0.006 255);
-  --input: oklch(0.922 0.006 255);
-  --ring: oklch(0.52 0.18 258 / 55%);
+  /* CTA: jet — matches the theme's own black "Add to Bag"/"Checkout" pill
+     buttons; champagne (--accent) is reserved for hover/active/secondary
+     accents, not the primary purchase action. */
+  --cta: var(--jet);
+  --cta-foreground: #ffffff;
+  --border: var(--ghost);
+  --input: var(--ghost);
+  --ring: #b8956a80;
   --chart-1: oklch(0.52 0.18 258);
   --chart-2: oklch(0.627 0.17 149.21);
   --chart-3: oklch(0.68 0.19 45);
@@ -135,4 +170,59 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ÉLUME restyle: small global touches ported from the reference theme
+   (/theme/src/index.css) — selection color, scrollbar, a couple of
+   keyframes/utility classes reused across several later phases (hero
+   fade-ins, product image hover-zoom). Not gated behind .dark — the
+   reference theme has no dark mode (see the restyle plan's Decision 6). */
+::selection {
+  background: var(--champagne-light);
+  color: var(--jet);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--silver);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--champagne);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.5s ease forwards;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.product-img-wrap img {
+  transition: transform 0.5s ease;
+}
+.product-img-wrap:hover img {
+  transform: scale(1.06);
 }

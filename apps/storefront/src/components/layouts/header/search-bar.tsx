@@ -19,8 +19,14 @@ export function SearchBar({ className }: { className?: string }) {
       }}
     >
       <div className="relative w-full">
-        <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input name="q" type="search" placeholder="Search products..." className="pl-8" aria-label="Search products" />
+        <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate" />
+        <Input
+          name="q"
+          type="search"
+          placeholder="Search for styles, brands, or categories..."
+          className="rounded-full border-ghost bg-sand pl-9 focus-visible:border-champagne focus-visible:bg-white focus-visible:ring-champagne/30"
+          aria-label="Search products"
+        />
       </div>
     </form>
   );
