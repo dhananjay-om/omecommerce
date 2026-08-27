@@ -10,7 +10,10 @@ import { CartLineRow } from './cart-line-row';
 import { CouponField } from './coupon-field';
 import { GiftCardField } from './gift-card-field';
 import { WalletToggle } from './wallet-toggle';
+import { FreeShippingBar } from './free-shipping-bar';
 import type { Cart } from '@/types/cart';
+
+const PAYMENT_BADGES = ['Visa', 'Mastercard', 'Amex', 'PayPal', 'UPI'];
 
 export function CartPageClient({
   initialCart,
@@ -40,8 +43,15 @@ export function CartPageClient({
   if (displayCart.lines.length === 0) {
     return (
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-24 text-center">
-        <h1 className="text-2xl font-bold">Your cart is empty</h1>
-        <p className="text-muted-foreground">Looks like you haven&apos;t added anything yet.</p>
+        <div className="flex size-16 items-center justify-center rounded-full bg-sand">
+          <svg className="size-7 text-silver" fill="none" stroke="currentColor" strokeWidth={1.3} viewBox="0 0 24 24">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 0 1-8 0" />
+          </svg>
+        </div>
+        <h1 className="font-display text-2xl font-semibold text-jet">Your bag is empty</h1>
+        <p className="text-slate">Looks like you haven&apos;t added anything yet.</p>
         <Button variant="cta" render={<Link href="/products" />} nativeButton={false}>
           Continue Shopping
         </Button>
@@ -50,10 +60,15 @@ export function CartPageClient({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold">Shopping Cart</h1>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <h1 className="font-display mb-6 text-3xl font-semibold text-jet">
+        Your Bag <span className="text-lg font-normal text-slate">({displayCart.lines.reduce((s, l) => s + l.qty, 0)} items)</span>
+      </h1>
+
+      <FreeShippingBar subtotal={displayCart.subtotal} currency={displayCart.currency} className="mb-6" />
+
       <div className="flex flex-col gap-8 lg:flex-row">
-        <div className="flex-1 rounded-lg border p-4">
+        <div className="flex-1 divide-y divide-ghost rounded-2xl border border-ghost p-4">
           {displayCart.lines.map((line) => (
             <CartLineRow
               key={line.id}
@@ -64,32 +79,32 @@ export function CartPageClient({
           ))}
         </div>
 
-        <div className="flex w-full flex-col gap-4 rounded-lg border p-5 lg:w-80">
-          <h2 className="font-semibold">Order Summary</h2>
+        <div className="flex w-full flex-col gap-4 rounded-2xl bg-sand p-6 lg:sticky lg:top-24 lg:w-80 lg:self-start">
+          <h2 className="font-semibold text-jet">Order Summary</h2>
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>
+              <span className="text-slate">Subtotal</span>
+              <span className="text-jet">
                 {displayCart.subtotal
                   ? formatPrice(displayCart.subtotal, displayCart.currency)
                   : '—'}
               </span>
             </div>
             {displayCart.discountTotal ? (
-              <div className="flex justify-between text-success">
+              <div className="flex justify-between text-green-700">
                 <span>Discount{displayCart.couponCode ? ` (${displayCart.couponCode})` : ''}</span>
                 <span>-{formatPrice(displayCart.discountTotal, displayCart.currency)}</span>
               </div>
             ) : null}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Shipping</span>
-              <span className="text-muted-foreground">Calculated at checkout</span>
+              <span className="text-slate">Shipping</span>
+              <span className="text-slate">Calculated at checkout</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
+              <span className="text-slate">
                 Tax{!displayCart.pricesIncludeTax && displayCart.taxTotal ? ' (estimated)' : ''}
               </span>
-              <span className={displayCart.pricesIncludeTax ? 'text-muted-foreground' : undefined}>
+              <span className={displayCart.pricesIncludeTax ? 'text-slate' : 'text-jet'}>
                 {displayCart.taxTotal
                   ? displayCart.pricesIncludeTax
                     ? `${formatPrice(displayCart.taxTotal, displayCart.currency)} included above`
@@ -100,7 +115,7 @@ export function CartPageClient({
               </span>
             </div>
           </div>
-          <div className="flex justify-between border-t pt-3 text-base font-bold">
+          <div className="flex justify-between border-t border-ghost pt-3 text-base font-bold text-jet">
             <span>Estimated Total</span>
             <span>
               {displayCart.estimatedTotal
@@ -113,10 +128,8 @@ export function CartPageClient({
           </div>
 
           {displayCart.customerGroupName ? (
-            <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-              Your{' '}
-              <span className="font-medium text-foreground">{displayCart.customerGroupName}</span>{' '}
-              pricing is applied to this order.
+            <p className="rounded-lg bg-white px-3 py-2 text-xs text-charcoal">
+              Your <span className="font-medium text-jet">{displayCart.customerGroupName}</span> pricing is applied to this order.
             </p>
           ) : null}
 
@@ -124,18 +137,26 @@ export function CartPageClient({
           <GiftCardField cart={displayCart} />
           <WalletToggle cart={displayCart} walletBalance={walletBalance} />
           {displayCart.tenders.length > 0 && displayCart.amountDue !== null ? (
-            <div className="flex justify-between text-sm text-muted-foreground">
+            <div className="flex justify-between text-sm text-slate">
               <span>Amount due</span>
               <span>{formatPrice(displayCart.amountDue, displayCart.currency)}</span>
             </div>
           ) : null}
 
           <Button variant="cta" size="lg" render={<Link href="/checkout" />} nativeButton={false}>
-            Proceed to Checkout
+            Checkout securely →
           </Button>
           <Button variant="ghost" render={<Link href="/products" />} nativeButton={false}>
             Continue Shopping
           </Button>
+
+          <div className="flex flex-wrap gap-1.5 border-t border-ghost pt-4">
+            {PAYMENT_BADGES.map((p) => (
+              <span key={p} className="rounded-md border border-ghost bg-white px-2 py-1 text-[11px] text-slate">
+                {p}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>

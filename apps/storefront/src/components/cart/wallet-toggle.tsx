@@ -37,7 +37,7 @@ export function WalletToggle({
   // — plan/17. Never a checkbox in this state: there's nothing to toggle.
   if (cart.walletUnavailableReason) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-slate">
         Pay with wallet balance — {cart.walletUnavailableReason}.
       </p>
     );
@@ -68,7 +68,7 @@ export function WalletToggle({
         <Label htmlFor="wallet-toggle" className="text-sm font-normal">
           Pay with wallet balance
           {walletTender && Number(walletTender.appliedAmount) > 0 ? (
-            <span className="text-success">
+            <span className="text-green-700">
               {' '}
               (-{formatPrice(walletTender.appliedAmount, cart.currency)})
             </span>
@@ -79,7 +79,7 @@ export function WalletToggle({
           return above, including a genuine ₹0.00 — a shopper deciding whether
           to check this box needs to know their balance either way, not just
           once it's already been applied. */}
-      <p className="pl-6 text-xs text-muted-foreground">
+      <p className="pl-6 text-xs text-slate">
         Available balance: {formatPrice(walletBalance, cart.currency)}
       </p>
       {error ? (

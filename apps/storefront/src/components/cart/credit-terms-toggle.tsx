@@ -64,14 +64,14 @@ export function CreditTermsToggle({
         <Label htmlFor="credit-terms-toggle" className="text-sm font-normal">
           Pay on account ({TERMS_LABEL[account.termsType]})
           {tender && Number(tender.appliedAmount) > 0 ? (
-            <span className="text-success">
+            <span className="text-green-700">
               {' '}
               (-{formatPrice(tender.appliedAmount, cart.currency)})
             </span>
           ) : null}
         </Label>
       </div>
-      <p className="pl-6 text-xs text-muted-foreground">
+      <p className="pl-6 text-xs text-slate">
         Available credit: {formatPrice(account.available, account.currency)}
       </p>
       {error ? (

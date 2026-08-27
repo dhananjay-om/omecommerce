@@ -46,11 +46,11 @@ export function CouponField({ cart }: { cart: Cart }) {
   return (
     <div className="flex flex-col gap-1.5">
       {cart.couponCode ? (
-        <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          <span>
+        <div className="flex items-center justify-between rounded-xl border border-champagne/30 bg-white px-3 py-2 text-sm">
+          <span className="text-charcoal">
             {cart.couponIsAutoApplied ? '🎉 Auto-applied: ' : 'Coupon applied: '}
-            <span className="font-semibold">{cart.couponCode}</span>
-            {cart.discountTotal ? <span className="text-success"> (-{formatPrice(cart.discountTotal, cart.currency)})</span> : null}
+            <span className="font-semibold text-jet">{cart.couponCode}</span>
+            {cart.discountTotal ? <span className="text-green-700"> (-{formatPrice(cart.discountTotal, cart.currency)})</span> : null}
           </span>
           {/* An auto-applied coupon was never a code the customer typed — there's
               nothing persisted on the cart to remove, so no Remove action. A

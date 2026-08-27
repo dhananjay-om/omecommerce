@@ -37,21 +37,21 @@ export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLi
   }
 
   return (
-    <div className="flex gap-4 border-b py-4 last:border-b-0">
-      <div className="size-24 shrink-0 overflow-hidden rounded-lg border bg-muted">
+    <div className="flex gap-4 border-b border-ghost py-4 last:border-b-0">
+      <div className="size-24 shrink-0 overflow-hidden rounded-2xl bg-sand">
         {line.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
           <img src={line.imageUrl} alt={line.name} className="size-full object-cover" />
         ) : (
-          <div className="flex size-full items-center justify-center text-xs text-muted-foreground">No image</div>
+          <div className="flex size-full items-center justify-center text-xs text-slate">No image</div>
         )}
       </div>
 
       <div className="flex flex-1 flex-col justify-between gap-2">
         <div>
-          <p className="font-medium">{line.name}</p>
-          <p className="text-xs text-muted-foreground">SKU: {line.sku}</p>
-          <p className="mt-1 flex items-baseline gap-1.5 text-sm text-muted-foreground">
+          <p className="font-medium text-jet">{line.name}</p>
+          <p className="text-xs text-slate">SKU: {line.sku}</p>
+          <p className="mt-1 flex items-baseline gap-1.5 text-sm text-slate">
             {line.price ? `${formatPrice(line.price, currency)} each` : 'Price unavailable'}
             {line.price && line.mrp && Number(line.mrp) > Number(line.price) ? (
               <span className="line-through">{formatPrice(line.mrp, currency)}</span>
@@ -60,7 +60,7 @@ export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLi
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg border">
+          <div className="flex items-center gap-1 rounded-full bg-sand px-1">
             <Button
               variant="ghost"
               size="icon-sm"
@@ -70,24 +70,24 @@ export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLi
             >
               <MinusIcon className="size-4" />
             </Button>
-            <span className="w-8 text-center text-sm">{line.qty}</span>
+            <span className="w-8 text-center text-sm font-semibold text-jet">{line.qty}</span>
             <Button variant="ghost" size="icon-sm" disabled={pending} onClick={() => setQty(line.qty + 1)} aria-label="Increase quantity">
               <PlusIcon className="size-4" />
             </Button>
           </div>
           <Button variant="ghost" size="icon-sm" disabled={pending} onClick={remove} aria-label="Remove item">
-            <TrashIcon className="size-4 text-destructive" />
+            <TrashIcon className="size-4 text-rose" />
           </Button>
         </div>
       </div>
 
       <div className="text-right whitespace-nowrap">
-        <div className="font-semibold">
+        <div className="font-semibold text-jet">
           {line.lineTotal ? formatPrice(line.lineTotal, currency) : '—'}
           {line.lineTotal && pricesIncludeTax ? <TaxInclusiveNote /> : null}
         </div>
         {line.discountAmount && Number(line.discountAmount) > 0 ? (
-          <div className="text-xs text-success">-{formatPrice(line.discountAmount, currency)}</div>
+          <div className="text-xs text-green-700">-{formatPrice(line.discountAmount, currency)}</div>
         ) : null}
       </div>
     </div>

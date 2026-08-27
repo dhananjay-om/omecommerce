@@ -51,10 +51,10 @@ export function GiftCardField({ cart }: { cart: Cart }) {
   return (
     <div className="flex flex-col gap-1.5">
       {appliedGiftCards.map((t, i) => (
-        <div key={i} className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          <span>
+        <div key={i} className="flex items-center justify-between rounded-xl border border-champagne/30 bg-white px-3 py-2 text-sm">
+          <span className="text-charcoal">
             Gift card <span className="font-mono">•••• {t.giftCardLast4}</span>
-            {Number(t.appliedAmount) > 0 ? <span className="text-success"> (-{formatPrice(t.appliedAmount, cart.currency)})</span> : null}
+            {Number(t.appliedAmount) > 0 ? <span className="text-green-700"> (-{formatPrice(t.appliedAmount, cart.currency)})</span> : null}
           </span>
           <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => handleRemove(t.giftCardPublicId)}>
             Remove
