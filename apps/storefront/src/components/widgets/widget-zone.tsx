@@ -14,15 +14,15 @@ function fallbackWidgetsFor(section: WidgetSection): WidgetInstance[] {
   if (section === 'TOP') {
     return [{ ...base, publicId: 'fallback-hero', type: 'HERO_BANNER_SLIDER', section, position: 0, config: {} }];
   }
-  if (section === 'MIDDLE') {
-    return [
-      { ...base, publicId: 'fallback-category-grid', type: 'CATEGORY_GRID', section, position: 0, title: 'Shop by Category', config: {} },
-      { ...base, publicId: 'fallback-promo-grid', type: 'PROMO_BANNER_GRID', section, position: 1, config: {} },
-      { ...base, publicId: 'fallback-brand-grid', type: 'BRAND_GRID', section, position: 2, title: 'Top Brands', config: {} },
-      { ...base, publicId: 'fallback-why-choose-us', type: 'WHY_CHOOSE_US_LIST', section, position: 3, config: {} },
-      { ...base, publicId: 'fallback-testimonials', type: 'TESTIMONIAL_LIST', section, position: 4, config: {} },
-    ];
-  }
+  // MIDDLE has no fallback of its own (ÉLUME restyle) — Categories,
+  // Featured Collections, and Testimonials are now fixed page furniture
+  // rendered directly by app/page.tsx in the reference theme's own section
+  // order (interleaved with the product carousels, which this zone-based
+  // system can't do); Brands/Why-Choose-Us have no equivalent in the
+  // theme's home page at all. All 5 widget types stay fully renderable via
+  // WidgetRenderer below for an admin who explicitly adds a real instance
+  // (Content > Widgets) — this only changes what shows on a fresh/
+  // unconfigured install.
   return [];
 }
 

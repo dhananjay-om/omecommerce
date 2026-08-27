@@ -127,49 +127,22 @@ async function main() {
     await prisma.adminUserRole.create({ data: { adminUserId: admin.id, roleId: superAdminRole.id } });
   }
 
-  // Default home-page widget placement — matches today's hardcoded storefront
-  // section order exactly, so a freshly-seeded install's Content > Widgets
-  // screen already reflects live reality instead of looking empty, and the
-  // home page looks identical to before this feature existed. No natural
-  // unique key to upsert against (multiple widgets of the same type are a
-  // legitimate future scenario), so this is a one-time "seed only if page
-  // 'home' has nothing yet" guard rather than a per-row upsert.
+  // Default home-page widget placement — TOP (hero) only. Categories,
+  // Featured Collections, and Testimonials are now fixed page furniture
+  // rendered directly by app/page.tsx in the ÉLUME restyle's own section
+  // order (interleaved with the product carousels, which the MIDDLE zone's
+  // single flat sequence can't do) — see widget-zone.tsx's fallbackWidgetsFor
+  // doc comment. Top Brands/Why Choose Us have no equivalent in the
+  // reference theme's home page, so they're no longer seeded either; an
+  // admin can still add any of these 5 widget types for real via Content >
+  // Widgets, WidgetRenderer still fully supports every one of them. No
+  // natural unique key to upsert against (multiple widgets of the same type
+  // are a legitimate future scenario), so this is a one-time "seed only if
+  // page 'home' has nothing yet" guard rather than a per-row upsert.
   const hasHomeWidgets = (await prisma.widgetInstance.count({ where: { page: 'home' } })) > 0;
   if (!hasHomeWidgets) {
     await prisma.widgetInstance.createMany({
-      data: [
-        { type: 'HERO_BANNER_SLIDER', page: 'home', section: 'TOP', position: 0, config: {} },
-        { type: 'CATEGORY_GRID', page: 'home', section: 'MIDDLE', position: 0, title: 'Shop by Category', config: {} },
-        { type: 'PROMO_BANNER_GRID', page: 'home', section: 'MIDDLE', position: 1, config: {} },
-        { type: 'BRAND_GRID', page: 'home', section: 'MIDDLE', position: 2, title: 'Top Brands', config: {} },
-        {
-          type: 'WHY_CHOOSE_US_LIST',
-          page: 'home',
-          section: 'MIDDLE',
-          position: 3,
-          config: {
-            features: [
-              { icon: 'truck', title: 'Free Shipping', description: 'On all orders over $50' },
-              { icon: 'shield', title: 'Secure Payment', description: '100% secure checkout' },
-              { icon: 'refresh', title: 'Easy Returns', description: '30-day return policy' },
-              { icon: 'chat', title: '24/7 Support', description: 'Dedicated customer care' },
-            ],
-          },
-        },
-        {
-          type: 'TESTIMONIAL_LIST',
-          page: 'home',
-          section: 'MIDDLE',
-          position: 4,
-          config: {
-            testimonials: [
-              { name: 'Amara K.', quote: 'Fast shipping and the quality is exactly as described. My new go-to store.' },
-              { name: 'Daniel R.', quote: 'Customer support helped me swap a size within minutes. Great experience.' },
-              { name: 'Priya S.', quote: 'Love the selection — found things here I couldn’t find anywhere else.' },
-            ],
-          },
-        },
-      ],
+      data: [{ type: 'HERO_BANNER_SLIDER', page: 'home', section: 'TOP', position: 0, config: {} }],
     });
   }
 

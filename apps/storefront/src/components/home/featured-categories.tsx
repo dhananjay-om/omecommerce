@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import type { Category } from '@/types/category';
+import { categoryPhoto } from '@/lib/mock-images';
 
-/** Real data (Phase 0a) — shown as cards, using each category's own uploaded
- *  image (Categories admin) when set, falling back to a letter badge when
- *  not. `categories` is exactly the list to render, already
+/** Real data (Phase 0a) — shown as circular photo tiles, using each
+ *  category's own uploaded image (Categories admin) when set, falling back
+ *  to a curated stock photo per category slug (see lib/mock-images.ts) —
+ *  every category's `imageUrl` is null today, no admin has uploaded one
+ *  yet. `categories` is exactly the list to render, already
  *  filtered/curated/limited by the caller (widget-renderer.tsx — default
  *  behavior is root categories only; an explicit curated pick can include
  *  any category, so this component doesn't re-filter by parentId itself).
@@ -13,30 +16,31 @@ export function FeaturedCategories({ categories, heading }: { categories: Catego
   if (categories.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <h2 className="font-display mb-6 text-2xl font-semibold text-jet sm:text-3xl">{heading ?? 'Shop by Category'}</h2>
-      <div className="flex gap-6 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0 md:grid-cols-4">
-        {categories.map((category) => (
-          <Link
-            key={category.publicId}
-            href={`/collections/${category.slug}`}
-            className="group flex shrink-0 flex-col items-center gap-3 text-center"
-          >
-            <span className="ring-offset-background overflow-hidden rounded-full ring-1 ring-ghost transition-all group-hover:ring-2 group-hover:ring-champagne group-hover:ring-offset-2">
-              {category.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL, per-request/dynamic
-                <img src={category.imageUrl} alt="" className="size-24 object-cover sm:size-28" />
-              ) : (
-                <span className="flex size-24 items-center justify-center bg-sand text-2xl font-semibold text-champagne sm:size-28">
-                  {(category.nameDefault ?? category.slug).charAt(0).toUpperCase()}
-                </span>
-              )}
-            </span>
-            <span className="text-sm font-medium text-charcoal transition-colors group-hover:text-champagne">
-              {category.nameDefault ?? category.slug}
-            </span>
-          </Link>
-        ))}
+    <section className="bg-ivory py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="mb-12 text-center">
+          <p className="text-xs font-medium tracking-[0.2em] text-champagne uppercase">Start exploring</p>
+          <h2 className="font-display mt-2 text-3xl font-semibold text-jet sm:text-4xl">{heading ?? 'Shop by Category'}</h2>
+          <p className="mt-2 text-sm text-slate">Everything you need, right where you want it.</p>
+        </div>
+
+        <div className="flex flex-nowrap justify-center gap-4 overflow-x-auto pb-2 sm:gap-6 lg:gap-10">
+          {categories.map((category) => (
+            <Link key={category.publicId} href={`/collections/${category.slug}`} className="group flex shrink-0 flex-col items-center gap-3">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full shadow-md ring-2 ring-transparent transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl group-hover:ring-champagne group-hover:ring-offset-2 sm:h-28 sm:w-28 lg:h-36 lg:w-36">
+                {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL when real, curated stock photo otherwise */}
+                <img
+                  src={category.imageUrl ?? categoryPhoto(category.slug)}
+                  alt={category.nameDefault ?? category.slug}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+              </div>
+              <span className="text-center text-sm font-semibold text-charcoal transition-colors group-hover:text-champagne sm:text-base">
+                {category.nameDefault ?? category.slug}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );
