@@ -12,13 +12,13 @@ export function SortLinks({ basePath, params }: { basePath: string; params: PlpP
   const current = params.sort ?? 'relevance';
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Sort by</span>
+      <span className="text-slate">Sort by</span>
       <div className="flex flex-wrap gap-1">
         {SORT_OPTIONS.map((option) => (
           <Link
             key={option.value}
             href={buildPlpHref(basePath, params, { sort: option.value === 'relevance' ? undefined : option.value })}
-            className={`rounded-md px-2 py-1 ${current === option.value ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+            className={`rounded-full px-3 py-1 transition-colors ${current === option.value ? 'bg-jet text-white' : 'text-charcoal hover:bg-sand'}`}
           >
             {option.label}
           </Link>

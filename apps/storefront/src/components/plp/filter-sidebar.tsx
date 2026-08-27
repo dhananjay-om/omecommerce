@@ -19,15 +19,15 @@ function FilterLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted ${active ? 'font-semibold text-primary' : ''}`}
+      className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-sand ${active ? 'font-semibold text-jet' : 'text-charcoal'}`}
     >
       <span
-        className={`flex size-4 shrink-0 items-center justify-center rounded border ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-input'}`}
+        className={`flex size-4 shrink-0 items-center justify-center rounded border-2 ${active ? 'border-jet bg-jet text-white' : 'border-ghost'}`}
       >
         {active ? <CheckIcon className="size-3" /> : null}
       </span>
       <span className="line-clamp-1">{label}</span>
-      {count !== undefined ? <span className="ml-auto text-xs text-muted-foreground">{count}</span> : null}
+      {count !== undefined ? <span className="ml-auto text-xs text-slate">{count}</span> : null}
     </Link>
   );
 }
@@ -54,7 +54,7 @@ export function FilterSidebar({
     <aside className="flex w-full shrink-0 flex-col gap-6 md:w-56">
       {brandBuckets.length > 0 ? (
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Brand</h3>
+          <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Brand</h3>
           <div className="flex flex-col">
             {brandBuckets.map((bucket) => (
               <FilterLink
@@ -70,7 +70,7 @@ export function FilterSidebar({
       ) : null}
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold">Price</h3>
+        <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Price</h3>
         <form action={basePath} className="flex items-center gap-2">
           {Object.entries(params)
             .filter(([key, value]) => key !== 'minPrice' && key !== 'maxPrice' && key !== 'page' && value !== undefined)
@@ -83,25 +83,25 @@ export function FilterSidebar({
             defaultValue={params.minPrice ?? ''}
             placeholder="Min"
             min={0}
-            className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-8 w-full min-w-0 rounded-xl border border-ghost bg-transparent px-2 text-sm text-jet outline-none focus-visible:border-champagne focus-visible:ring-3 focus-visible:ring-champagne/20"
           />
-          <span className="text-muted-foreground">–</span>
+          <span className="text-slate">–</span>
           <input
             type="number"
             name="maxPrice"
             defaultValue={params.maxPrice ?? ''}
             placeholder="Max"
             min={0}
-            className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-8 w-full min-w-0 rounded-xl border border-ghost bg-transparent px-2 text-sm text-jet outline-none focus-visible:border-champagne focus-visible:ring-3 focus-visible:ring-champagne/20"
           />
-          <button type="submit" className="h-8 shrink-0 rounded-lg border px-2.5 text-sm hover:bg-muted">
+          <button type="submit" className="h-8 shrink-0 rounded-full border border-ghost px-3 text-sm text-charcoal transition-colors hover:bg-sand">
             Go
           </button>
         </form>
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold">Availability</h3>
+        <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Availability</h3>
         <FilterLink
           href={buildPlpHref(basePath, params, toggleOverride(params, 'inStock', 'true'))}
           active={params.inStock === 'true'}
@@ -111,7 +111,7 @@ export function FilterSidebar({
 
       {attributeFacetEntries.map(([code, buckets]) => (
         <div key={code}>
-          <h3 className="mb-2 text-sm font-semibold capitalize">{code.replace(/[-_]/g, ' ')}</h3>
+          <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">{code.replace(/[-_]/g, ' ')}</h3>
           <div className="flex flex-col">
             {buckets.map((bucket) => (
               <FilterLink
@@ -127,16 +127,16 @@ export function FilterSidebar({
       ))}
 
       <div>
-        <h3 className="mb-2 flex items-center gap-1 text-sm font-semibold">
-          Rating <span className="text-xs font-normal text-muted-foreground">(coming soon)</span>
+        <h3 className="mb-2 flex items-center gap-1 text-xs font-semibold tracking-widest text-jet uppercase">
+          Rating <span className="text-[10px] font-normal tracking-normal text-slate normal-case">(coming soon)</span>
         </h3>
         <div className="flex flex-col gap-1 opacity-50">
           {[4, 3, 2, 1].map((stars) => (
             <div key={stars} className="flex items-center gap-1 px-2 py-1 text-sm">
               {Array.from({ length: 5 }).map((_, i) => (
-                <StarIcon key={i} className={`size-3.5 ${i < stars ? 'text-cta' : 'text-muted-foreground'}`} />
+                <StarIcon key={i} className={`size-3.5 ${i < stars ? 'text-champagne' : 'text-silver'}`} />
               ))}
-              <span className="ml-1 text-xs text-muted-foreground">& up</span>
+              <span className="ml-1 text-xs text-slate">& up</span>
             </div>
           ))}
         </div>
