@@ -22,7 +22,7 @@ export function MegaMenu({ tree }: { tree: CategoryNode[] }) {
     'rounded-full px-3 py-1.5 text-sm font-medium text-charcoal transition-colors hover:bg-sand hover:text-jet';
 
   return (
-    <nav className="hidden items-center gap-1 lg:flex">
+    <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex">
       <Link href="/" className={linkClass}>
         Home
       </Link>
