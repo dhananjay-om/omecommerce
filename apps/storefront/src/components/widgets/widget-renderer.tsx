@@ -32,7 +32,11 @@ const whyChooseUsConfigSchema = z.object({
 });
 const testimonialListConfigSchema = z.object({ testimonials: z.array(z.object({ name: z.string(), quote: z.string() })) });
 
-const DEFAULT_SLIDE_GRADIENTS = ['from-primary to-blue-700', 'from-indigo-600 to-violet-700', 'from-rose-600 to-orange-600'];
+// ÉLUME restyle: re-paletted from the old blue/indigo/rose placeholders to
+// match the storefront's real palette — this is the fallback used when an
+// admin-created Banner has no image AND no gradient preset chosen ("None —
+// default rotation" in the Content > Banners form).
+const DEFAULT_SLIDE_GRADIENTS = ['from-jet to-charcoal', 'from-charcoal to-champagne', 'from-rose to-jet'];
 
 /**
  * One instance = one fetch of exactly the data its `type` needs, then
@@ -80,7 +84,12 @@ export async function WidgetRenderer({ widget }: { widget: WidgetInstance }) {
         ctaLabel: b.ctaLabel ?? 'Shop Now',
         ctaHref: b.ctaHref ?? '/products',
         imageUrl: b.imageUrl,
-        gradient: b.gradient ?? DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
+        // `||`, not `??` — the admin form submits an empty string (not null)
+        // for "None (default rotation)", and an empty string is exactly the
+        // case meant to fall back to a real default gradient, not render an
+        // unstyled blank backdrop (a real bug, found by actually creating a
+        // banner through the admin UI and looking at the result live).
+        gradient: b.gradient || DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
       }));
       return <HeroBanner slides={slides.length > 0 ? slides : undefined} />;
     }
@@ -94,7 +103,12 @@ export async function WidgetRenderer({ widget }: { widget: WidgetInstance }) {
         subtitle: b.subtitle ?? '',
         href: b.ctaHref ?? '/products',
         imageUrl: b.imageUrl,
-        gradient: b.gradient ?? DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
+        // `||`, not `??` — the admin form submits an empty string (not null)
+        // for "None (default rotation)", and an empty string is exactly the
+        // case meant to fall back to a real default gradient, not render an
+        // unstyled blank backdrop (a real bug, found by actually creating a
+        // banner through the admin UI and looking at the result live).
+        gradient: b.gradient || DEFAULT_SLIDE_GRADIENTS[i % DEFAULT_SLIDE_GRADIENTS.length],
       }));
       return <PromoBanners banners={bannerProps.length > 0 ? bannerProps : undefined} />;
     }
