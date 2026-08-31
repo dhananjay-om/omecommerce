@@ -84,7 +84,7 @@ export async function ProductDetailView({
       </nav>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-        <ProductGallery media={product.media} productName={product.name ?? product.sku} />
+        <ProductGallery media={product.media} productName={product.name ?? product.sku} sku={product.sku} />
 
         <div>
           {product.brandSlug ? (

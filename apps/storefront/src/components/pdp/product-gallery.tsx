@@ -9,7 +9,7 @@ import 'swiper/css/zoom';
 import 'swiper/css/thumbs';
 import 'swiper/css/free-mode';
 import type { ProductMedia } from '@/types/product';
-import { mockProductPhoto } from '@/lib/mock-images';
+import { resolveProductImage } from '@/lib/mock-images';
 
 /**
  * ÉLUME restyle: on `sm:` and up, the thumbnail strip moves to a vertical
@@ -19,18 +19,14 @@ import { mockProductPhoto } from '@/lib/mock-images';
  * `sm:` it stays the original horizontal strip under the image; a narrow
  * vertical column doesn't have room on a phone-width screen.
  *
- * Every image slot renders `mockProductPhoto(productName)`, not
- * `item.url` — same reasoning as ProductCard's own doc comment: this
- * store's real product images are all the same flat placeholder-generator
- * graphic, and `mockProductPhoto` being a pure function of the product
- * name is exactly what keeps this consistent with whatever card the
- * shopper clicked through from (same name in, same photo out, no
- * coordination needed between the two components). `media` itself still
- * comes from the real product — only the URL each slot renders is
- * swapped, so a real photo (once one exists) still needs its own
- * follow-up to stop being overridden here.
+ * Each image slot renders `resolveProductImage(sku, productName, item.url)`
+ * — a real photo (each media row's own distinct `item.url`, so a real
+ * product with several real photos still shows all of them, not one
+ * repeated mock) wins unless `sku` is one of the seed script's known-fake
+ * placeholder products, matching ProductCard's exact same resolution so
+ * the two never disagree about which image a given product shows.
  */
-export function ProductGallery({ media, productName }: { media: ProductMedia[]; productName: string }) {
+export function ProductGallery({ media, productName, sku }: { media: ProductMedia[]; productName: string; sku: string }) {
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
 
   if (media.length === 0) {
@@ -52,8 +48,8 @@ export function ProductGallery({ media, productName }: { media: ProductMedia[]; 
         {media.map((item) => (
           <SwiperSlide key={item.productMediaId}>
             <div className="swiper-zoom-container">
-              {/* eslint-disable-next-line @next/next/no-img-element -- curated stock photo, not a remote asset next/image can optimize */}
-              <img src={mockProductPhoto(productName, 1000)} alt={item.altText ?? productName} className="size-full object-cover" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL when real, curated stock photo otherwise */}
+              <img src={resolveProductImage(sku, productName, item.url, 1000)} alt={item.altText ?? productName} className="size-full object-cover" />
             </div>
           </SwiperSlide>
         ))}
@@ -84,8 +80,8 @@ export function ProductGallery({ media, productName }: { media: ProductMedia[]; 
           {media.map((item) => (
             <SwiperSlide key={item.productMediaId} className="cursor-pointer">
               <div className="aspect-square overflow-hidden rounded-xl border-2 border-transparent opacity-60 transition-opacity [.swiper-slide-thumb-active_&]:border-jet [.swiper-slide-thumb-active_&]:opacity-100">
-                {/* eslint-disable-next-line @next/next/no-img-element -- curated stock photo, not a remote asset next/image can optimize */}
-                <img src={mockProductPhoto(productName, 200)} alt="" className="size-full object-cover" />
+                {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL when real, curated stock photo otherwise */}
+                <img src={resolveProductImage(sku, productName, item.url, 200)} alt="" className="size-full object-cover" />
               </div>
             </SwiperSlide>
           ))}

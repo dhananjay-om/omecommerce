@@ -57,3 +57,33 @@ export function mockProductPhoto(name: string, size = 600): string {
   const base = PRODUCT_PHOTO_KEYWORDS.find(([re]) => re.test(name))?.[1] ?? DEFAULT_PRODUCT_PHOTO;
   return `${base}?w=${size}&h=${size}&fit=crop&auto=format`;
 }
+
+/**
+ * `scripts/seed-demo-data.mjs` uploads a real image file for each of its
+ * `DEMO-*`-SKU products — a checked-in flat placeholder graphic (a solid
+ * color square with the product name printed on it, confirmed by actually
+ * downloading and looking at one), not real photography. Every other
+ * product's `sku` (including this store's real prisma/seed.ts sample and
+ * anything created through the real admin) doesn't carry that prefix, so
+ * this is a reliable, forward-compatible signal for "this specific image
+ * is known-fake demo content" — vs. just checking "is imageUrl present",
+ * which is true for the ugly placeholders too and would hide a real photo
+ * the same way overriding unconditionally did before this fix.
+ */
+function isKnownPlaceholderSku(sku: string): boolean {
+  return sku.startsWith('DEMO-');
+}
+
+/**
+ * The single place both ProductCard and the PDP gallery call through, so
+ * they can never disagree about which image — real or mock — a given
+ * product should show. Real image wins whenever one exists and isn't a
+ * known-fake seed placeholder; `mockProductPhoto(name)` only fills a
+ * genuine gap (no image at all, or a known placeholder) — same "don't
+ * override real data" rule this file's own module doc comment sets for
+ * categories/banners, now actually honored for products too.
+ */
+export function resolveProductImage(sku: string, name: string, realUrl: string | null | undefined, size = 600): string {
+  if (realUrl && !isKnownPlaceholderSku(sku)) return realUrl;
+  return mockProductPhoto(name, size);
+}
