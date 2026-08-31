@@ -12,27 +12,12 @@ import { PromoOfferBanner } from '@/components/home/promo-offer-banner';
 import { Testimonials } from '@/components/home/testimonials';
 import { Reveal } from '@/components/motion/reveal';
 import { Skeleton } from '@/components/ui/skeleton';
-import { mockProductPhoto } from '@/lib/mock-images';
-import type { SearchHit } from '@/types/product';
 
 // Below-the-fold and its own client bundle (form state) — deferred so it
 // isn't part of the initial JS needed to render the hero/featured sections.
 const NewsletterSection = dynamic(() => import('@/components/home/newsletter-section').then((m) => m.NewsletterSection), {
   loading: () => <Skeleton className="h-48 w-full" />,
 });
-
-/** Home-page-only presentation swap: the seeded demo catalog's real images
- *  are flat placeholder graphics, not real photography — this store hasn't
- *  had real product photos uploaded yet. Scoped to the homepage carousels
- *  specifically (per the storefront restyle's "home page first" request);
- *  PLP/PDP/cart still show each product's real `imageUrl` untouched, so
- *  this doesn't change what any other page displays for the same product.
- *  A product with a genuinely different (non-placeholder) real photo would
- *  need its own opt-out, not built here since every seeded product uses
- *  the same placeholder generator today. */
-function withMockImages(hits: SearchHit[]): SearchHit[] {
-  return hits.map((hit) => ({ ...hit, imageUrl: mockProductPhoto(hit.name) }));
-}
 
 /**
  * The home page is three admin-managed layout zones (Top/Middle/Footer —
@@ -72,7 +57,7 @@ export default async function HomePage() {
       <ProductCarousel
         title="Bestsellers"
         subtitle="People keep coming back for these"
-        hits={withMockImages(bestsellers.hits)}
+        hits={bestsellers.hits}
         seeAllHref="/products"
         badge="bestseller"
       />
@@ -84,7 +69,7 @@ export default async function HomePage() {
       ) : null}
 
       <Reveal>
-        <ProductCarousel title="New Arrivals" subtitle="Fresh in" hits={withMockImages(newArrivals.hits)} seeAllHref="/products" badge="new" />
+        <ProductCarousel title="New Arrivals" subtitle="Fresh in" hits={newArrivals.hits} seeAllHref="/products" badge="new" />
       </Reveal>
 
       <Reveal>

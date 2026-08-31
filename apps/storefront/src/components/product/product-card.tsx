@@ -9,6 +9,7 @@ import { formatPrice } from '@/lib/format-price';
 import { api } from '@/lib/axios';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlistStore } from '@/store/wishlist-store';
+import { mockProductPhoto } from '@/lib/mock-images';
 import type { ProductDetail, SearchHit } from '@/types/product';
 
 /**
@@ -44,6 +45,17 @@ import type { ProductDetail, SearchHit } from '@/types/product';
  * set shown on every card. Swap these for the real thing later: a rating
  * aggregate + brand + variant colors would need adding to the search
  * index / `SearchHit` itself, not just this component.
+ *
+ * Image: `mockProductPhoto(hit.name)`, not `hit.imageUrl` — every seeded
+ * product's real image is the same flat placeholder-generator graphic, not
+ * real photography (see lib/mock-images.ts). This was Home-page-only at
+ * first; broadened to every ProductCard usage (PLP, related products,
+ * recently-viewed) plus the PDP gallery (product-gallery.tsx) after a real
+ * bug report: clicking a card showed one photo, the product page showed a
+ * completely different (real-but-ugly) one. `mockProductPhoto` is a pure
+ * function of the product name, so calling it here and on the PDP with the
+ * same name always yields the same photo — consistency by construction,
+ * no coordination needed between the two call sites.
  */
 function discountPercent(price: string, mrp: string): number | null {
   const priceNum = Number(price);
@@ -107,12 +119,8 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
     <div className="group relative flex flex-col">
       <div className="product-img-wrap relative aspect-[3/4] overflow-hidden rounded-2xl bg-sand">
         <Link href={href} className="block size-full">
-          {hit.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
-            <img src={hit.imageUrl} alt={hit.name} className="size-full object-cover" />
-          ) : (
-            <div className="flex size-full items-center justify-center text-xs text-slate">No image</div>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element -- curated stock photo, not a remote asset next/image can optimize */}
+          <img src={mockProductPhoto(hit.name)} alt={hit.name} className="size-full object-cover" />
         </Link>
 
         <div className="absolute top-3 left-3 flex flex-col gap-1.5">
