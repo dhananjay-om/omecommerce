@@ -128,6 +128,15 @@ export async function ProductDetailView({
             />
           </div>
 
+          {/* Matches the reference theme: the Details/Specifications/Shipping &
+              Returns/Reviews tabs sit inside this right-hand column, right after
+              the trust-badge row (the last thing ProductPurchasePanel renders) —
+              not as a separate full-width section below the whole two-column
+              layout, which is where it lived before this fix. */}
+          <div className="mt-6">
+            <ProductTabs productId={product.publicId} sku={product.sku} description={description} attributes={product.attributes} reviews={reviews} />
+          </div>
+
           <div className="mt-4 space-y-3">
             <PincodeChecker />
             <ProductOffers productId={product.publicId} />
@@ -135,10 +144,6 @@ export async function ProductDetailView({
 
           {shortDescription ? <p className="mt-6 text-sm text-charcoal">{shortDescription}</p> : null}
         </div>
-      </div>
-
-      <div className="mt-10">
-        <ProductTabs productId={product.publicId} sku={product.sku} description={description} attributes={product.attributes} reviews={reviews} />
       </div>
 
       <ProductCarousel title="You might also like" subtitle="Based on what you're looking at" hits={relatedHits} />
