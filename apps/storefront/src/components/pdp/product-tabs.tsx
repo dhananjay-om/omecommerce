@@ -12,6 +12,21 @@ function formatLabel(code: string): string {
  * purely for SEO metadata (<head> tags, never visible page content) — never listed as a spec. */
 const NON_SPEC_CODES = new Set(['description', 'short_description', 'url_key', 'meta_title', 'meta_keywords', 'meta_description']);
 
+/** Static store policy copy, matching the reference theme's Shipping/Returns
+ *  tabs — this store has no per-product or admin-configurable shipping/
+ *  returns content system, so these are genuinely static, same posture as
+ *  the trust badges and footer's own policy copy elsewhere on the site. */
+const SHIPPING_RETURNS_ITEMS = [
+  'Free standard delivery on orders above $50',
+  'Express delivery (1–2 days) available at checkout',
+  'International shipping to select countries',
+  'Orders placed before 2pm ship same day',
+  'Free returns within 30 days of delivery',
+  'Item must be unused, in original packaging, with tags',
+  'Start a return from your account anytime',
+  'Refund processed within 5 working days',
+];
+
 export function ProductTabs({
   productId,
   sku,
@@ -34,6 +49,7 @@ export function ProductTabs({
       <TabsList>
         <TabsTrigger value="description">Description</TabsTrigger>
         <TabsTrigger value="specifications">Specifications</TabsTrigger>
+        <TabsTrigger value="shipping">Shipping &amp; Returns</TabsTrigger>
         <TabsTrigger value="reviews">Reviews</TabsTrigger>
       </TabsList>
       <TabsContent value="description" className="pt-4 text-charcoal">
@@ -52,6 +68,16 @@ export function ProductTabs({
             ))}
           </dl>
         )}
+      </TabsContent>
+      <TabsContent value="shipping" className="pt-4">
+        <ul className="flex flex-col gap-2.5">
+          {SHIPPING_RETURNS_ITEMS.map((item) => (
+            <li key={item} className="flex items-start gap-2 text-sm text-charcoal">
+              <span className="mt-0.5 shrink-0 text-champagne">·</span>
+              {item}
+            </li>
+          ))}
+        </ul>
       </TabsContent>
       <TabsContent value="reviews" className="pt-4">
         <ProductReviews productId={productId} initialReviews={reviews} />

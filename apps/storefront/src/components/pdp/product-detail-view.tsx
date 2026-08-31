@@ -84,7 +84,14 @@ export async function ProductDetailView({
       </nav>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-        <ProductGallery media={product.media} productName={product.name ?? product.sku} sku={product.sku} />
+        <ProductGallery
+          media={product.media}
+          productName={product.name ?? product.sku}
+          sku={product.sku}
+          productId={product.publicId}
+          price={product.price}
+          mrp={product.mrp}
+        />
 
         <div>
           {product.brandSlug ? (
@@ -107,7 +114,7 @@ export async function ProductDetailView({
             </div>
             <span className="text-xs text-slate">
               {reviews.total > 0 && reviews.averageRating
-                ? `${reviews.averageRating.toFixed(1)} (${reviews.total} review${reviews.total === 1 ? '' : 's'})`
+                ? `${reviews.averageRating.toFixed(1)} · ${reviews.total} review${reviews.total === 1 ? '' : 's'}`
                 : 'No ratings yet'}
             </span>
           </div>
@@ -134,7 +141,7 @@ export async function ProductDetailView({
         <ProductTabs productId={product.publicId} sku={product.sku} description={description} attributes={product.attributes} reviews={reviews} />
       </div>
 
-      <ProductCarousel title="Related Products" hits={relatedHits} />
+      <ProductCarousel title="You might also like" subtitle="Based on what you're looking at" hits={relatedHits} />
       <RecentlyViewed currentProductId={product.publicId} />
     </div>
   );

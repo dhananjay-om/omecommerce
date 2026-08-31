@@ -10,16 +10,22 @@ import { useCartStore } from '@/store/cart-store';
 import { useWishlistStore } from '@/store/wishlist-store';
 import { useAuthStore } from '@/store/auth-store';
 import { api } from '@/lib/axios';
+import { formatPrice } from '@/lib/format-price';
 import type { ProductVariant } from '@/types/product';
 
 export function ProductActions({
   productId,
   variant,
   inStock,
+  price,
+  currency,
 }: {
   productId: string;
   variant: ProductVariant | undefined;
   inStock: boolean;
+  /** Live-selected-variant price, for the mobile sticky bar's "Add to Bag · {price}" label. */
+  price: number | null;
+  currency: string;
 }) {
   const router = useRouter();
   const [qty, setQty] = useState(1);
@@ -101,7 +107,7 @@ export function ProductActions({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="cta" size="lg" disabled={!canPurchase || pending} onClick={addToCart} className="flex-1">
-          {inStock ? 'Add to Cart' : 'Out of Stock'}
+          {inStock ? 'Add to Bag' : 'Out of Stock'}
         </Button>
         <Button variant="outline" size="lg" disabled={!canPurchase || pending} onClick={buyNow} className="flex-1">
           Buy Now
@@ -118,6 +124,25 @@ export function ProductActions({
           <ShareIcon className="size-5" />
         </Button>
       </div>
+
+      {/* Mobile sticky add-to-bag bar, matching the reference theme — reuses
+          this component's own qty/addToCart/wishlist state directly rather
+          than a second, divergent implementation elsewhere. */}
+      <div className="fixed inset-x-0 bottom-0 z-40 flex gap-3 border-t border-ghost bg-white p-4 shadow-lg lg:hidden">
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          onClick={toggleWishlistProduct}
+          className={`size-12 shrink-0 rounded-xl border-2 ${isWishlisted ? 'border-rose text-rose' : 'border-ghost text-charcoal'}`}
+        >
+          {isWishlisted ? <HeartIconSolid className="size-5" /> : <HeartIcon className="size-5" />}
+        </Button>
+        <Button variant="cta" size="lg" disabled={!canPurchase || pending} onClick={addToCart} className="h-12 flex-1 rounded-xl">
+          {inStock ? `Add to Bag${price !== null ? ` · ${formatPrice(price, currency)}` : ''}` : 'Out of Stock'}
+        </Button>
+      </div>
+      <div className="h-20 lg:hidden" />
     </div>
   );
 }

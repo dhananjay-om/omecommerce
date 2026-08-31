@@ -8,8 +8,11 @@ import 'swiper/css';
 import 'swiper/css/zoom';
 import 'swiper/css/thumbs';
 import 'swiper/css/free-mode';
+import { HeartIcon } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import type { ProductMedia } from '@/types/product';
 import { resolveProductImage } from '@/lib/mock-images';
+import { useWishlistStore } from '@/store/wishlist-store';
 
 /**
  * ÉLUME restyle: on `sm:` and up, the thumbnail strip moves to a vertical
@@ -25,9 +28,40 @@ import { resolveProductImage } from '@/lib/mock-images';
  * repeated mock) wins unless `sku` is one of the seed script's known-fake
  * placeholder products, matching ProductCard's exact same resolution so
  * the two never disagree about which image a given product shows.
+ *
+ * The discount badge and wishlist heart overlaid on the main image match
+ * the reference theme's gallery exactly — both real: the discount is
+ * computed from the product's own representative price/mrp (not the
+ * live-selected variant, which lives in a separate client component —
+ * same simplification the theme's own static badge makes), and the heart
+ * reads/writes the same `useWishlistStore` ProductActions already uses,
+ * so toggling here or in the purchase panel stays in sync automatically
+ * (same store, no prop-drilling needed). No "New" badge: there's no real
+ * signal for that on a single product page (unlike the Home carousels,
+ * which know their own section is "New Arrivals").
  */
-export function ProductGallery({ media, productName, sku }: { media: ProductMedia[]; productName: string; sku: string }) {
+export function ProductGallery({
+  media,
+  productName,
+  sku,
+  productId,
+  price,
+  mrp,
+}: {
+  media: ProductMedia[];
+  productName: string;
+  sku: string;
+  productId: string;
+  price: string | null;
+  mrp: string | null;
+}) {
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
+  const isWishlisted = useWishlistStore((s) => s.has(productId));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
+
+  const priceNum = price ? Number(price) : null;
+  const mrpNum = mrp ? Number(mrp) : null;
+  const percentOff = priceNum !== null && mrpNum !== null && mrpNum > priceNum ? Math.round(((mrpNum - priceNum) / mrpNum) * 100) : null;
 
   if (media.length === 0) {
     return (
@@ -39,21 +73,40 @@ export function ProductGallery({ media, productName, sku }: { media: ProductMedi
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row-reverse sm:gap-4">
-      <Swiper
-        modules={[Zoom, Thumbs]}
-        zoom
-        thumbs={{ swiper: thumbsSwiper }}
-        className="aspect-[3/4] w-full flex-1 overflow-hidden rounded-2xl bg-sand"
-      >
-        {media.map((item) => (
-          <SwiperSlide key={item.productMediaId}>
-            <div className="swiper-zoom-container">
-              {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL when real, curated stock photo otherwise */}
-              <img src={resolveProductImage(sku, productName, item.url, 1000)} alt={item.altText ?? productName} className="size-full object-cover" />
-            </div>
-          </SwiperSlide>
-        ))}
-      </Swiper>
+      <div className="relative flex-1">
+        <Swiper
+          modules={[Zoom, Thumbs]}
+          zoom
+          thumbs={{ swiper: thumbsSwiper }}
+          className="aspect-[3/4] w-full overflow-hidden rounded-2xl bg-sand"
+        >
+          {media.map((item) => (
+            <SwiperSlide key={item.productMediaId}>
+              <div className="swiper-zoom-container">
+                {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL when real, curated stock photo otherwise */}
+                <img src={resolveProductImage(sku, productName, item.url, 1000)} alt={item.altText ?? productName} className="size-full object-cover" />
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+
+        {percentOff !== null ? (
+          <span className="pointer-events-none absolute top-4 left-4 z-10 rounded-full bg-rose px-2.5 py-1 text-[10px] font-semibold text-white">
+            {percentOff}% off
+          </span>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => toggleWishlist(productId)}
+          aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          className={`absolute top-4 right-4 z-10 flex size-9 items-center justify-center rounded-full shadow-sm transition-all ${
+            isWishlisted ? 'bg-rose text-white' : 'bg-white text-charcoal hover:bg-rose hover:text-white'
+          }`}
+        >
+          {isWishlisted ? <HeartIconSolid className="size-4" /> : <HeartIcon className="size-4" />}
+        </button>
+      </div>
       {media.length > 1 ? (
         <Swiper
           modules={[Thumbs, FreeMode]}

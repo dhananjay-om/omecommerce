@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { TruckIcon, ArrowUturnLeftIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
 import { ProductActions } from './product-actions';
 import { formatPrice } from '@/lib/format-price';
 import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
+import { colorSwatchHex, isColorAxis } from '@/lib/color-swatches';
 import type { ProductVariant } from '@/types/product';
 
 interface VariantAxis {
@@ -11,6 +13,12 @@ interface VariantAxis {
   attributeLabel: string;
   options: string[];
 }
+
+const TRUST_BADGES = [
+  { Icon: TruckIcon, label: 'Free shipping', sub: 'over $50' },
+  { Icon: ArrowUturnLeftIcon, label: '30-day returns', sub: 'no questions' },
+  { Icon: CheckBadgeIcon, label: '100% authentic', sub: 'guaranteed' },
+];
 
 /** Derives the distinct axis attributes (Size, Color, ...) and their option values from every
  * variant's axisValues — a SIMPLE/DIGITAL/VIRTUAL product's single variant has none, so this
@@ -43,7 +51,10 @@ function selectionOf(variant: ProductVariant | undefined, axes: VariantAxis[]): 
 
 /** Price, stock status, the Size/Color axis picker (for a configurable product), and the
  * Add to Cart/Buy Now actions — grouped into one client component because selecting a different
- * Size or Color needs to swap all three together to the matching variant's own price/stock. */
+ * Size or Color needs to swap all three together to the matching variant's own price/stock.
+ * `priceNumber`/`currency` are threaded down to ProductActions too, which owns the mobile
+ * sticky add-to-bag bar (matching the reference theme) — that bar needs the live-selected
+ * variant's price, and ProductActions already owns the qty/add-to-cart state it also needs. */
 export function ProductPurchasePanel({
   productId,
   currency,
@@ -67,10 +78,8 @@ export function ProductPurchasePanel({
 
   const priceNumber = selectedVariant?.price ? Number(selectedVariant.price) : null;
   const mrpNumber = selectedVariant?.mrp ? Number(selectedVariant.mrp) : null;
-  const percentOff =
-    priceNumber !== null && mrpNumber !== null && mrpNumber > priceNumber
-      ? Math.round(((mrpNumber - priceNumber) / mrpNumber) * 100)
-      : null;
+  const hasSavings = priceNumber !== null && mrpNumber !== null && mrpNumber > priceNumber;
+  const savings = hasSavings ? mrpNumber! - priceNumber! : 0;
   const inStock = selectedVariant?.inStock ?? false;
 
   return (
@@ -79,51 +88,104 @@ export function ProductPurchasePanel({
         <span className="text-3xl font-bold text-jet">
           {priceNumber !== null ? formatPrice(priceNumber, currency) : 'Price unavailable'}
         </span>
-        {percentOff !== null ? (
+        {hasSavings ? (
           <>
             <span className="text-lg text-slate line-through">{formatPrice(mrpNumber!, currency)}</span>
-            <span className="rounded-full bg-green-50 px-2 py-0.5 text-sm font-semibold text-green-700">You save {percentOff}%</span>
+            <span className="rounded-full bg-green-50 px-2 py-0.5 text-sm font-semibold text-green-700">
+              You save {formatPrice(savings, currency)}
+            </span>
           </>
         ) : null}
-        {priceNumber !== null && pricesIncludeTax ? <TaxInclusiveNote /> : null}
       </p>
-      <p className={`mt-1 text-sm font-medium ${selectedVariant ? (inStock ? 'text-green-700' : 'text-destructive') : 'text-slate'}`}>
+      <p className="mt-1 text-xs text-slate">
+        {pricesIncludeTax ? (
+          <>
+            Inclusive of all taxes <TaxInclusiveNote /> · Free returns within 30 days
+          </>
+        ) : (
+          'Free returns within 30 days'
+        )}
+      </p>
+      <p className={`mt-2 text-sm font-medium ${selectedVariant ? (inStock ? 'text-green-700' : 'text-destructive') : 'text-slate'}`}>
         {selectedVariant ? (inStock ? 'In Stock' : 'Out of Stock') : 'Select options to see availability'}
       </p>
 
       {axes.length > 0 ? (
-        <div className="mt-4 space-y-4">
-          {axes.map((axis) => (
-            <div key={axis.attributeCode}>
-              <p className="text-sm font-medium text-jet">
-                {axis.attributeLabel}
-                {selection[axis.attributeCode] ? <span className="text-slate">: {selection[axis.attributeCode]}</span> : null}
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {axis.options.map((option) => {
-                  const isSelected = selection[axis.attributeCode] === option;
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setSelection((prev) => ({ ...prev, [axis.attributeCode]: option }))}
-                      className={`min-w-11 rounded-xl border-2 px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                        isSelected ? 'border-jet bg-jet text-white' : 'border-ghost text-charcoal hover:border-jet/40'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
+        <div className="mt-4 space-y-4 border-t border-ghost pt-4">
+          {axes.map((axis) =>
+            isColorAxis(axis.attributeCode, axis.attributeLabel) ? (
+              <div key={axis.attributeCode}>
+                <p className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">
+                  {axis.attributeLabel} —{' '}
+                  <span className="text-sm font-normal tracking-normal text-charcoal normal-case">
+                    {selection[axis.attributeCode] ?? ''}
+                  </span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {axis.options.map((option) => {
+                    const isSelected = selection[axis.attributeCode] === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        title={option}
+                        aria-pressed={isSelected}
+                        onClick={() => setSelection((prev) => ({ ...prev, [axis.attributeCode]: option }))}
+                        className={`size-8 rounded-full border-2 transition-all ${
+                          isSelected ? 'scale-110 border-jet shadow-md' : 'border-transparent hover:border-silver'
+                        }`}
+                        style={{ backgroundColor: colorSwatchHex(option) }}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div key={axis.attributeCode}>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold tracking-widest text-jet uppercase">{axis.attributeLabel}</p>
+                  {/* Presentational only, matching the reference theme's own non-functional
+                      "Size guide" link — this store has no real size-chart content to link to. */}
+                  {axis.attributeLabel.toLowerCase() === 'size' ? (
+                    <span className="text-xs font-medium text-champagne">Size guide</span>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {axis.options.map((option) => {
+                    const isSelected = selection[axis.attributeCode] === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setSelection((prev) => ({ ...prev, [axis.attributeCode]: option }))}
+                        className={`min-w-11 rounded-xl border-2 px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                          isSelected ? 'border-jet bg-jet text-white' : 'border-ghost text-charcoal hover:border-jet/40'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ),
+          )}
         </div>
       ) : null}
 
       <div className="mt-6">
-        <ProductActions productId={productId} variant={selectedVariant} inStock={inStock} />
+        <ProductActions productId={productId} variant={selectedVariant} inStock={inStock} price={priceNumber} currency={currency} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        {TRUST_BADGES.map(({ Icon, label, sub }) => (
+          <div key={label} className="rounded-xl bg-ivory p-3 text-center">
+            <Icon className="mx-auto mb-1 size-5 text-champagne" />
+            <p className="text-[11px] leading-tight font-semibold text-jet">{label}</p>
+            <p className="mt-0.5 text-[10px] text-slate">{sub}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
