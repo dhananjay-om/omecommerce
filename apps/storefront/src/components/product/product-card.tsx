@@ -41,7 +41,7 @@ function discountPercent(price: string, mrp: string): number | null {
   return Math.round(((mrpNum - priceNum) / mrpNum) * 100);
 }
 
-export function ProductCard({ hit }: { hit: SearchHit }) {
+export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'bestseller' }) {
   const percentOff =
     hit.priceDisplay && hit.mrpDisplay ? discountPercent(hit.priceDisplay, hit.mrpDisplay) : null;
   // Falls back to the old id-based URL (itself now a permanent redirect to
@@ -85,11 +85,17 @@ export function ProductCard({ hit }: { hit: SearchHit }) {
           )}
         </Link>
 
-        {percentOff !== null ? (
-          <span className="absolute top-3 left-3 bg-rose px-2 py-0.5 text-[10px] font-medium tracking-widest text-white uppercase">
-            {percentOff}% off
-          </span>
-        ) : null}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+          {badge === 'new' ? (
+            <span className="bg-jet px-2 py-0.5 text-[10px] font-medium tracking-widest text-white uppercase">New</span>
+          ) : null}
+          {badge === 'bestseller' ? (
+            <span className="bg-champagne px-2 py-0.5 text-[10px] font-medium tracking-widest text-white uppercase">Bestseller</span>
+          ) : null}
+          {percentOff !== null ? (
+            <span className="bg-rose px-2 py-0.5 text-[10px] font-medium tracking-widest text-white uppercase">{percentOff}% off</span>
+          ) : null}
+        </div>
 
         <button
           type="button"

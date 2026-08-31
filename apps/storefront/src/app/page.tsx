@@ -69,7 +69,13 @@ export default async function HomePage() {
 
       {!hasMiddleWidget('CATEGORY_GRID') ? <FeaturedCategories categories={rootCategories} /> : null}
 
-      <ProductCarousel title="Bestsellers" subtitle="People keep coming back for these" hits={withMockImages(bestsellers.hits)} seeAllHref="/products" />
+      <ProductCarousel
+        title="Bestsellers"
+        subtitle="People keep coming back for these"
+        hits={withMockImages(bestsellers.hits)}
+        seeAllHref="/products"
+        badge="bestseller"
+      />
 
       {!hasMiddleWidget('PROMO_BANNER_GRID') ? (
         <Reveal>
@@ -78,7 +84,7 @@ export default async function HomePage() {
       ) : null}
 
       <Reveal>
-        <ProductCarousel title="New Arrivals" subtitle="Fresh in" hits={withMockImages(newArrivals.hits)} seeAllHref="/products" />
+        <ProductCarousel title="New Arrivals" subtitle="Fresh in" hits={withMockImages(newArrivals.hits)} seeAllHref="/products" badge="new" />
       </Reveal>
 
       <Reveal>

@@ -13,24 +13,37 @@ export function ProductCarousel({
   subtitle,
   hits,
   seeAllHref,
+  badge,
 }: {
   title: string;
+  /** Rendered as the small champagne eyebrow ABOVE the heading — matches the
+   *  reference theme's section-header treatment (used everywhere else on the
+   *  page too: Shop by Category, Featured Collections, ...). Not a
+   *  description under the title. */
   subtitle?: string;
   hits: SearchHit[];
   seeAllHref?: string;
+  /** Applied to every card in this carousel — real context the caller
+   *  already has (e.g. "this is the Bestsellers rail"), not fabricated
+   *  per-product data. Omit for a carousel with no such context (related
+   *  products, recently viewed). */
+  badge?: 'new' | 'bestseller';
 }) {
   if (hits.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <div className="mb-5 flex items-end justify-between">
+      <div className="mb-10 flex items-end justify-between">
         <div>
-          <h2 className="font-display text-2xl font-semibold text-jet sm:text-3xl">{title}</h2>
-          {subtitle ? <p className="mt-1 text-sm text-slate">{subtitle}</p> : null}
+          {subtitle ? <p className="text-xs font-medium tracking-[0.2em] text-champagne uppercase">{subtitle}</p> : null}
+          <h2 className="font-display mt-1.5 text-4xl font-semibold text-jet">{title}</h2>
         </div>
         {seeAllHref ? (
-          <Link href={seeAllHref} className="shrink-0 text-sm font-medium text-champagne transition-colors hover:text-jet">
-            See all →
+          <Link
+            href={seeAllHref}
+            className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-champagne transition-colors hover:text-jet sm:flex"
+          >
+            See all <span>→</span>
           </Link>
         ) : null}
       </div>
@@ -48,7 +61,7 @@ export function ProductCarousel({
       >
         {hits.map((hit) => (
           <SwiperSlide key={hit.productId}>
-            <ProductCard hit={hit} />
+            <ProductCard hit={hit} badge={badge} />
           </SwiperSlide>
         ))}
       </Swiper>
