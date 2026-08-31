@@ -31,14 +31,44 @@ import type { ProductDetail, SearchHit } from '@/types/product';
  * the product's first in-stock variant via the same `/api/products/:id`
  * route `recently-viewed.tsx` already calls, then adds it through the same
  * `useCartStore.addLine` the PDP's own Add to Cart button uses — a real
- * extra round trip, not a shortcut. No rating stars here: `SearchHit` has
- * no rating aggregate at grid scale — that stays PDP-only, where it's real.
+ * extra round trip, not a shortcut.
+ *
+ * Placeholder-until-real-data (per the user's own explicit call, not this
+ * component's usual "don't fabricate" default): `SearchHit` carries no
+ * brand, rating, or color-variant fields at grid scale, so the brand
+ * eyebrow/star rating/color swatches below are NOT real — the rating is a
+ * deterministic per-product placeholder (stable across renders, not
+ * literally `Math.random()`, so it doesn't jump around or cause a
+ * hydration mismatch), the brand eyebrow cycles through this store's own
+ * real brand names as a stand-in, and the swatches are one fixed static
+ * set shown on every card. Swap these for the real thing later: a rating
+ * aggregate + brand + variant colors would need adding to the search
+ * index / `SearchHit` itself, not just this component.
  */
 function discountPercent(price: string, mrp: string): number | null {
   const priceNum = Number(price);
   const mrpNum = Number(mrp);
   if (!(mrpNum > priceNum) || mrpNum <= 0) return null;
   return Math.round(((mrpNum - priceNum) / mrpNum) * 100);
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+const PLACEHOLDER_BRANDS = ['Nova Electronics', 'Urban Threads', 'HomeStyle'];
+const PLACEHOLDER_RATINGS = [3.5, 4, 4.5, 5];
+/** One fixed set, same on every card for now — per the user's own "static for now" call. */
+const STATIC_SWATCHES = ['#111111', '#B8956A', '#C4786A', '#EBEBEA'];
+
+function placeholderBrand(productId: string): string {
+  return PLACEHOLDER_BRANDS[hashString(productId) % PLACEHOLDER_BRANDS.length]!;
+}
+
+function placeholderRating(productId: string): number {
+  return PLACEHOLDER_RATINGS[hashString(`${productId}-rating`) % PLACEHOLDER_RATINGS.length]!;
 }
 
 export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'bestseller' }) {
@@ -126,19 +156,36 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
       </div>
 
       <div className="mt-3 flex flex-1 flex-col px-0.5">
+        <p className="text-[10px] tracking-widest text-slate uppercase">{placeholderBrand(hit.productId)}</p>
         <Link href={href}>
-          <h3 className="line-clamp-2 text-sm leading-snug font-medium text-jet transition-colors hover:text-champagne">
+          <h3 className="mt-0.5 line-clamp-2 text-sm leading-snug font-medium text-jet transition-colors hover:text-champagne">
             {hit.name}
           </h3>
         </Link>
-        <span className="mt-auto flex flex-wrap items-baseline gap-1.5 pt-1.5">
-          <span className="text-sm font-semibold text-jet">
-            {hit.priceDisplay && hit.currency ? formatPrice(hit.priceDisplay, hit.currency) : 'Price unavailable'}
-          </span>
-          {percentOff !== null && hit.currency ? (
-            <span className="text-xs text-slate line-through">{formatPrice(hit.mrpDisplay!, hit.currency)}</span>
-          ) : null}
-        </span>
+        <div className="mt-auto pt-1.5">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="flex flex-wrap items-baseline gap-1.5">
+              <span className="text-sm font-semibold text-jet">
+                {hit.priceDisplay && hit.currency ? formatPrice(hit.priceDisplay, hit.currency) : 'Price unavailable'}
+              </span>
+              {percentOff !== null && hit.currency ? (
+                <span className="text-xs text-slate line-through">{formatPrice(hit.mrpDisplay!, hit.currency)}</span>
+              ) : null}
+            </span>
+            <span className="flex shrink-0 gap-0.5" aria-hidden>
+              {Array.from({ length: 5 }, (_, i) => (
+                <span key={i} className={`text-[10px] ${i < Math.round(placeholderRating(hit.productId)) ? 'text-champagne' : 'text-silver'}`}>
+                  ★
+                </span>
+              ))}
+            </span>
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            {STATIC_SWATCHES.map((hex) => (
+              <span key={hex} className="size-3 rounded-full border border-ghost" style={{ backgroundColor: hex }} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
