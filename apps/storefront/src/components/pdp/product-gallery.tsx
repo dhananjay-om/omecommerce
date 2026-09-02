@@ -65,7 +65,7 @@ export function ProductGallery({
 
   if (media.length === 0) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-2xl bg-sand text-sm text-slate">
+      <div className="flex aspect-[5/6] items-center justify-center rounded-2xl bg-sand text-sm text-slate">
         No image available
       </div>
     );
@@ -81,12 +81,16 @@ export function ProductGallery({
           which visually blanks the image and pushes the whole right-hand column (product
           tabs included) off-screen. The Swiper itself just fills this fixed-aspect box via
           absolute positioning, so its own layout can never feed back into its container's size. */}
-      {/* aspect-square (was aspect-[3/4]) — real product photos here tend to have a lot
-          of blank margin baked into the photo itself (product centered on a mostly-empty
-          background), and the taller 3:4 box was showing more of that margin as visible
-          empty space above/below the actual product. A square crop pulls in tighter and
-          crops more of that margin away, on both the main image and the thumbnails below. */}
-      <div className="relative aspect-square flex-1 overflow-hidden rounded-2xl bg-sand">
+      {/* aspect-[5/6] — a middle ground, confirmed live against real product photos: many
+          are outdoor shots with background (trees, props) visible on both sides of the
+          subject at full frame width. Cropping width is never possible here (object-cover
+          on a box this shape or wider never trims left/right, only top/bottom), so a full
+          square crop just removes the sky/ground that used to dilute those side edges,
+          making the background more prominent, not less. 5/6 (~20% taller than square)
+          keeps more of that breathing room while staying meaningfully shorter than the
+          original 3/4. A real fix for the side backgrounds themselves needs tighter-
+          cropped source photos, not a box-shape change — flagged to the user as such. */}
+      <div className="relative aspect-[5/6] flex-1 overflow-hidden rounded-2xl bg-sand">
         <Swiper
           modules={[Zoom, Thumbs]}
           zoom
