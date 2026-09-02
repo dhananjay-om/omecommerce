@@ -73,12 +73,20 @@ export function ProductGallery({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row-reverse sm:gap-4">
-      <div className="relative flex-1">
+      {/* aspect-ratio lives on THIS wrapper, not on the Swiper element itself — Swiper
+          (especially with the Zoom module) actively measures/resizes its own root, and an
+          aspect-ratio box whose height depends on a width Swiper can influence creates a
+          resize-observer feedback loop; confirmed live (a real production PDP) that this
+          loop runs away until Chromium clamps it at its ~33,554,432px max render size,
+          which visually blanks the image and pushes the whole right-hand column (product
+          tabs included) off-screen. The Swiper itself just fills this fixed-aspect box via
+          absolute positioning, so its own layout can never feed back into its container's size. */}
+      <div className="relative aspect-[3/4] flex-1 overflow-hidden rounded-2xl bg-sand">
         <Swiper
           modules={[Zoom, Thumbs]}
           zoom
           thumbs={{ swiper: thumbsSwiper }}
-          className="aspect-[3/4] w-full overflow-hidden rounded-2xl bg-sand"
+          className="absolute inset-0 size-full"
         >
           {media.map((item) => (
             <SwiperSlide key={item.productMediaId}>
