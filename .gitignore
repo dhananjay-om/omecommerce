@@ -8,3 +8,4 @@ raw_err.log
 coverage/
 .DS_Store
 prisma/.tmp/
+theme/
