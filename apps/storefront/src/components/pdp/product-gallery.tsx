@@ -65,7 +65,7 @@ export function ProductGallery({
 
   if (media.length === 0) {
     return (
-      <div className="flex aspect-[3/4] items-center justify-center rounded-2xl bg-sand text-sm text-slate">
+      <div className="flex aspect-square items-center justify-center rounded-2xl bg-sand text-sm text-slate">
         No image available
       </div>
     );
@@ -81,7 +81,12 @@ export function ProductGallery({
           which visually blanks the image and pushes the whole right-hand column (product
           tabs included) off-screen. The Swiper itself just fills this fixed-aspect box via
           absolute positioning, so its own layout can never feed back into its container's size. */}
-      <div className="relative aspect-[3/4] flex-1 overflow-hidden rounded-2xl bg-sand">
+      {/* aspect-square (was aspect-[3/4]) — real product photos here tend to have a lot
+          of blank margin baked into the photo itself (product centered on a mostly-empty
+          background), and the taller 3:4 box was showing more of that margin as visible
+          empty space above/below the actual product. A square crop pulls in tighter and
+          crops more of that margin away, on both the main image and the thumbnails below. */}
+      <div className="relative aspect-square flex-1 overflow-hidden rounded-2xl bg-sand">
         <Swiper
           modules={[Zoom, Thumbs]}
           zoom

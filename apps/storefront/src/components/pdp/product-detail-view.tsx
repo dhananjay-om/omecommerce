@@ -84,15 +84,25 @@ export async function ProductDetailView({
         </span>
       </nav>
 
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-        <ProductGallery
-          media={product.media}
-          productName={product.name ?? product.sku}
-          sku={product.sku}
-          productId={product.publicId}
-          price={product.price}
-          mrp={product.mrp}
-        />
+      {/* items-start (instead of the grid default of stretch) keeps this row's height
+          driven only by the right column's real content — the left column's own box
+          then hugs just the gallery's height, which is what lets `sticky` below actually
+          have room to scroll within once the right column (title/tabs/reviews) runs
+          longer than the image. */}
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start">
+        {/* Sticky on lg+ only — below that the columns stack, so there's no "left column"
+            to pin against. top-24 clears the sticky site header (announcement bar +
+            main nav) so the image never sits underneath it while scrolling. */}
+        <div className="lg:sticky lg:top-24">
+          <ProductGallery
+            media={product.media}
+            productName={product.name ?? product.sku}
+            sku={product.sku}
+            productId={product.publicId}
+            price={product.price}
+            mrp={product.mrp}
+          />
+        </div>
 
         <div>
           {product.brandSlug ? (
