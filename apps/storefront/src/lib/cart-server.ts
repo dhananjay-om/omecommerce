@@ -35,6 +35,19 @@ export async function ensureCart(): Promise<Cart> {
 
   const storeViewId = await getSelectedStoreViewId();
   const cart = await apiPost<Cart>('/store/v1/carts', { storeViewId, customerPublicId });
-  await setCartId(cart.publicId);
+  try {
+    await setCartId(cart.publicId);
+  } catch {
+    // ensureCart() is called both from Route Handlers/Server Actions (where
+    // writing a cookie is allowed) and directly from plain Server Component
+    // pages (/cart, /checkout — where Next.js forbids it and throws). A
+    // brand-new visitor with no cart cookie yet hitting one of those pages
+    // directly used to crash the whole page with a 500 here — confirmed
+    // live in production. The cart above was still created successfully in
+    // the backend and is fine to render with; it just won't be remembered
+    // across requests from this call site. The moment the visitor actually
+    // adds an item, that goes through a real Route Handler/Server Action,
+    // which sets the cookie correctly from that point on.
+  }
   return cart;
 }
