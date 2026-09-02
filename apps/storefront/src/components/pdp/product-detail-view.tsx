@@ -11,6 +11,7 @@ import { ProductPurchasePanel } from '@/components/pdp/product-purchase-panel';
 import { ProductTabs } from '@/components/pdp/product-tabs';
 import { PincodeChecker } from '@/components/pdp/pincode-checker';
 import { ProductOffers } from '@/components/pdp/product-offers';
+import { ProductReviews } from '@/components/pdp/product-reviews';
 import { RecentlyViewed } from '@/components/pdp/recently-viewed';
 import { ProductCarousel } from '@/components/product/product-carousel';
 
@@ -129,12 +130,16 @@ export async function ProductDetailView({
           </div>
 
           {/* Matches the reference theme: the Details/Specifications/Shipping &
-              Returns/Reviews tabs sit inside this right-hand column, right after
-              the trust-badge row (the last thing ProductPurchasePanel renders) —
+              Returns tabs sit inside this right-hand column, right after the
+              trust-badge row (the last thing ProductPurchasePanel renders) —
               not as a separate full-width section below the whole two-column
-              layout, which is where it lived before this fix. */}
+              layout, which is where it lived before this fix. Reviews used to
+              be a 4th tab here too, but that put the pincode/offers section
+              directly underneath the Reviews panel with no visual separation —
+              confusing since Reviews can run long. It's now its own full-width
+              section below the grid instead, see the bottom of this component. */}
           <div className="mt-6">
-            <ProductTabs productId={product.publicId} sku={product.sku} description={description} attributes={product.attributes} reviews={reviews} />
+            <ProductTabs sku={product.sku} description={description} attributes={product.attributes} />
           </div>
 
           <div className="mt-4 space-y-3">
@@ -143,6 +148,13 @@ export async function ProductDetailView({
           </div>
 
           {shortDescription ? <p className="mt-6 text-sm text-charcoal">{shortDescription}</p> : null}
+        </div>
+      </div>
+
+      <div className="mt-12 border-t border-ghost pt-8">
+        <h2 className="font-display text-2xl font-semibold text-jet">Customer Reviews</h2>
+        <div className="mt-4">
+          <ProductReviews productId={product.publicId} initialReviews={reviews} />
         </div>
       </div>
 

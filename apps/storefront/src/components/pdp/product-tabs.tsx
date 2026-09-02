@@ -1,8 +1,6 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ProductReviews } from './product-reviews';
-import type { ProductReviewList } from '@/types/review';
 
 function formatLabel(code: string): string {
   return code.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -28,17 +26,13 @@ const SHIPPING_RETURNS_ITEMS = [
 ];
 
 export function ProductTabs({
-  productId,
   sku,
   description,
   attributes,
-  reviews,
 }: {
-  productId: string;
   sku: string;
   description: string | null;
   attributes: Record<string, unknown>;
-  reviews: ProductReviewList;
 }) {
   const specEntries = Object.entries(attributes).filter(
     ([code, value]) => !NON_SPEC_CODES.has(code) && value !== null && value !== undefined && value !== '',
@@ -50,7 +44,6 @@ export function ProductTabs({
         <TabsTrigger value="description">Description</TabsTrigger>
         <TabsTrigger value="specifications">Specifications</TabsTrigger>
         <TabsTrigger value="shipping">Shipping &amp; Returns</TabsTrigger>
-        <TabsTrigger value="reviews">Reviews</TabsTrigger>
       </TabsList>
       <TabsContent value="description" className="pt-4 text-charcoal">
         {description ? <p className="whitespace-pre-line">{description}</p> : <p>No description available for SKU {sku} yet.</p>}
@@ -78,9 +71,6 @@ export function ProductTabs({
             </li>
           ))}
         </ul>
-      </TabsContent>
-      <TabsContent value="reviews" className="pt-4">
-        <ProductReviews productId={productId} initialReviews={reviews} />
       </TabsContent>
     </Tabs>
   );
