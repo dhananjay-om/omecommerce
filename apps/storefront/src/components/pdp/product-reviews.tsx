@@ -5,7 +5,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { StarIcon } from '@heroicons/react/24/solid';
-import { StarIcon as StarOutlineIcon, XMarkIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { StarIcon as StarOutlineIcon, XMarkIcon, CameraIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -243,7 +243,13 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
   return (
     <div className="space-y-6">
       {data.total > 0 ? (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        // max-w-md — this section now spans the full page width (moved out of the
+        // narrower two-column layout), and the breakdown bars used flex-1 to fill
+        // whatever space they're given. Left unconstrained, that meant stretching
+        // across nearly the entire page, which read as an odd, oversized bar. Capping
+        // the whole summary block keeps it a normal, compact size regardless of the
+        // section's own width.
+        <div className="flex max-w-md flex-col gap-4 sm:flex-row sm:items-start">
           <div className="flex shrink-0 flex-col items-center gap-1 sm:w-32">
             <span className="text-3xl font-bold text-jet">{data.averageRating!.toFixed(1)}</span>
             <StarRow rating={Math.round(data.averageRating!)} />
@@ -299,7 +305,8 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
             </div>
           </form>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+          <Button variant="cta" size="sm" onClick={() => setShowForm(true)}>
+            <PencilSquareIcon className="size-4" />
             Write a Review
           </Button>
         )
