@@ -159,7 +159,10 @@ export function ProductPurchasePanel({
                         type="button"
                         aria-pressed={isSelected}
                         onClick={() => setSelection((prev) => ({ ...prev, [axis.attributeCode]: option }))}
-                        className={`min-w-11 rounded-xl border-2 px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                        // Fixed size-12 square (was min-w-11 + padding, which sized each pill off
+                        // its own label length — "XS" and "M" rendered visibly different widths,
+                        // an uneven row instead of a clean uniform grid).
+                        className={`flex size-12 items-center justify-center rounded-xl border-2 text-sm font-medium transition-colors ${
                           isSelected ? 'border-jet bg-jet text-white' : 'border-ghost text-charcoal hover:border-jet/40'
                         }`}
                       >
