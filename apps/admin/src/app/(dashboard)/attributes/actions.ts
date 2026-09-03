@@ -1,12 +1,20 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
-import type { Attribute, AttributeDataType, AttributeInputType } from '@/lib/types';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, ApiError } from '@/lib/api-client';
+import type { Attribute, AttributeDataType, AttributeInputType, AttributeOption } from '@/lib/types';
 
 export interface ActionState {
   error: string | null;
   success: boolean;
+}
+
+/** Called directly from EditAttributeDialog (a plain function call, not a form action) when
+ *  it opens for a SELECT/MULTISELECT attribute, to pre-fill the options editor with what's
+ *  already there — reuses the same read the standalone /attributes/:code/options route
+ *  already serves elsewhere (the coupon condition builder). */
+export async function getAttributeOptions(code: string): Promise<AttributeOption[]> {
+  return apiGet<AttributeOption[]>(`/admin/v1/attributes/${code}/options`);
 }
 
 export async function createAttribute(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -63,6 +71,20 @@ export async function updateAttribute(_prevState: ActionState, formData: FormDat
     return { error: 'Missing attribute code or label.', success: false };
   }
 
+  // Present (possibly empty) only for a SELECT/MULTISELECT attribute — see EditOptionsEditor.
+  // Each row already has its real id (an existing option being edited) or none (a new one),
+  // straight from the fetched-on-open list plus whatever the admin added — the PUT endpoint
+  // sorts out update-vs-create per row itself, so this is forwarded as-is.
+  const optionsRaw = String(formData.get('options') ?? '');
+  let options: Array<{ id?: string; value: string; label: string }> = [];
+  if (optionsRaw) {
+    try {
+      options = JSON.parse(optionsRaw);
+    } catch {
+      return { error: 'Options were malformed.', success: false };
+    }
+  }
+
   try {
     await apiPatch<Attribute>(`/admin/v1/attributes/${code}`, {
       label,
@@ -72,6 +94,9 @@ export async function updateAttribute(_prevState: ActionState, formData: FormDat
       isComparable: formData.get('isComparable') === 'on',
       isVariantForming: formData.get('isVariantForming') === 'on',
     });
+    if (options.length > 0) {
+      await apiPut(`/admin/v1/attributes/${code}/options`, { options });
+    }
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

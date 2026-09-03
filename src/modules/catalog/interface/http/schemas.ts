@@ -150,6 +150,20 @@ export const updateAttributeSchema = z.object({
   isVariantForming: z.boolean().optional(),
 });
 
+export const updateAttributeOptionsSchema = z.object({
+  options: z
+    .array(
+      z.object({
+        id: z.string().regex(/^\d+$/, 'expected numeric id').optional(),
+        value: z.string().trim().min(1).max(255),
+        label: z.string().trim().min(1).max(255),
+        swatch: z.string().trim().min(1).optional().nullable(),
+        sortOrder: z.number().int().optional(),
+      }),
+    )
+    .min(1),
+});
+
 export const assignAttributeToGroupSchema = z.object({
   groupId: z.string().regex(/^\d+$/, 'expected numeric id'),
   attributeCode: z.string().min(1),

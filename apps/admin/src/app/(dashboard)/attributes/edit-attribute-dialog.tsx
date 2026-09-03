@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { updateAttribute, type ActionState } from './actions';
+import { EditOptionsEditor } from './edit-options-editor';
 import type { Attribute } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,10 +120,13 @@ export function EditAttributeDialog({ attribute }: { attribute: Attribute }) {
             ) : null}
           </div>
           {showVariantForming ? (
-            <p className="text-xs text-muted-foreground">
-              Variant Forming attributes (like Size or Color) can be used to generate a configurable
-              product&apos;s variants once assigned to its attribute set.
-            </p>
+            <>
+              <p className="text-xs text-muted-foreground">
+                Variant Forming attributes (like Size or Color) can be used to generate a configurable
+                product&apos;s variants once assigned to its attribute set.
+              </p>
+              <EditOptionsEditor code={attribute.code} />
+            </>
           ) : null}
           {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
           <DialogFooter>

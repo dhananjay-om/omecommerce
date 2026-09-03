@@ -228,6 +228,23 @@ export interface AttributeRepository {
    *  powers the coupon admin condition builder's "pick a Value" dropdown. Empty
    *  array for non-option-backed data types. */
   listOptions(code: string): Promise<AttributeOptionInfo[]>;
+  /** Options were originally create-time-only (set once via CreateAttributeInput.options,
+   *  no path to add/edit them afterward) — this closes that gap. Each entry with an `id`
+   *  updates that existing AttributeOption row (safe: VariantAxisValue/ProductAttributeValue
+   *  reference options by id, never by the `value` string, so editing value/label never
+   *  breaks an already-generated variant); each entry without one creates a new option.
+   *  Never deletes — removing an option a real variant already references is a separate,
+   *  more consequential action this doesn't take a position on. Returns the full,
+   *  refreshed option list. */
+  upsertOptions(attributeId: bigint, options: UpsertAttributeOptionInput[]): Promise<AttributeOptionInfo[]>;
+}
+
+export interface UpsertAttributeOptionInput {
+  id?: bigint;
+  value: string;
+  label: string;
+  swatch?: string | null;
+  sortOrder?: number;
 }
 
 export interface AttributeSetInfo {

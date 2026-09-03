@@ -33,7 +33,7 @@ export class ListAttributes {
   }
 }
 
-function toOptionView(o: AttributeOptionInfo): AttributeOptionView {
+export function toOptionView(o: AttributeOptionInfo): AttributeOptionView {
   return { id: o.id.toString(), value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder };
 }
 

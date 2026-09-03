@@ -20,6 +20,7 @@ import type {
   UpdateProductInput,
   VariantStockLookup,
   AttributeOptionInfo,
+  UpsertAttributeOptionInput,
 } from '../domain/repositories.js';
 import { Prisma } from '@prisma/client';
 import { ConflictError } from '../../../shared/domain/errors.js';
@@ -427,6 +428,31 @@ export class PrismaAttributeRepository implements AttributeRepository {
       orderBy: { sortOrder: 'asc' },
     });
     return rows.map((o) => ({ id: o.id, value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder }));
+  }
+
+  async upsertOptions(attributeId: bigint, options: UpsertAttributeOptionInput[]): Promise<AttributeOptionInfo[]> {
+    try {
+      await this.db.$transaction(
+        options.map((o) =>
+          o.id
+            ? this.db.attributeOption.update({
+                where: { id: o.id },
+                data: { value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder ?? 0 },
+              })
+            : this.db.attributeOption.create({
+                data: { attributeId, value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder ?? 0 },
+              }),
+        ),
+      );
+    } catch (err) {
+      if (isCodeUniqueViolation(err)) {
+        throw new ConflictError('one or more option values already exist on this attribute');
+      }
+      throw err;
+    }
+    return this.db.attributeOption
+      .findMany({ where: { attributeId }, orderBy: { sortOrder: 'asc' } })
+      .then((rows) => rows.map((o) => ({ id: o.id, value: o.value, label: o.label, swatch: o.swatch, sortOrder: o.sortOrder })));
   }
 
   async isAssignedToAnySet(id: bigint): Promise<boolean> {
