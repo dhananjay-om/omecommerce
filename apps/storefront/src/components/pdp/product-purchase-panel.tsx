@@ -159,10 +159,14 @@ export function ProductPurchasePanel({
                         type="button"
                         aria-pressed={isSelected}
                         onClick={() => setSelection((prev) => ({ ...prev, [axis.attributeCode]: option }))}
-                        // Fixed size-12 square (was min-w-11 + padding, which sized each pill off
-                        // its own label length — "XS" and "M" rendered visibly different widths,
-                        // an uneven row instead of a clean uniform grid).
-                        className={`flex size-12 items-center justify-center rounded-xl border-2 text-sm font-medium transition-colors ${
+                        // h-12 + min-w-12 + px-2.5 (was a fixed size-12 square) — a truly fixed
+                        // square worked for short labels (S/M/L) but real option labels aren't
+                        // always that short ("Medium", "X-Large"); confirmed live that "Medium"
+                        // measured 2px WIDER than a 48px square, rendering with the text jammed
+                        // against the edges. min-w-12 keeps short labels as clean uniform squares
+                        // (their content is well under 48px, so the minimum wins) while letting
+                        // longer labels grow just enough to keep comfortable padding.
+                        className={`flex h-12 min-w-12 items-center justify-center rounded-xl border-2 px-2.5 text-sm font-medium transition-colors ${
                           isSelected ? 'border-jet bg-jet text-white' : 'border-ghost text-charcoal hover:border-jet/40'
                         }`}
                       >
