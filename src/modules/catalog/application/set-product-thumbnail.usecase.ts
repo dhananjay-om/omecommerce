@@ -1,5 +1,6 @@
 import type { ProductRepository, ProductMediaRepository, MediaStorage } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { SetProductThumbnailCommand, ProductMediaView } from './dto.js';
 
 /**
@@ -16,6 +17,7 @@ export class SetProductThumbnail {
     private readonly products: ProductRepository,
     private readonly productMedia: ProductMediaRepository,
     private readonly storage: MediaStorage,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: SetProductThumbnailCommand): Promise<ProductMediaView> {
@@ -29,6 +31,17 @@ export class SetProductThumbnail {
     }
 
     await this.productMedia.setThumbnail(product.props.id, id);
+
+    // The search index's imageKey is exactly "whichever image this use case designates the
+    // thumbnail" (per this class's own doc comment — "search hits" is explicitly one of the
+    // places this is meant to control) — changing it without reindexing would silently break
+    // that promise the same way attaching/detaching media does.
+    await this.outbox.write({
+      aggregateType: 'Product',
+      aggregateId: cmd.productPublicId,
+      eventType: 'ProductAttributeChanged',
+      payload: { reason: 'thumbnail-changed' },
+    });
 
     const updated = await this.productMedia.findById(id);
     const url = await this.storage.presignGetUrl(updated!.assetStorageKey);

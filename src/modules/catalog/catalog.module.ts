@@ -199,10 +199,10 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const getBrandBySlug = new GetBrandBySlug(brands);
   const requestMediaUpload = new RequestMediaUpload(mediaStorage);
   const createMediaAsset = new CreateMediaAsset(mediaAssets);
-  const attachProductMedia = new AttachProductMedia(products, mediaAssets, productMedia, mediaStorage);
-  const detachProductMedia = new DetachProductMedia(products, productMedia);
+  const attachProductMedia = new AttachProductMedia(products, mediaAssets, productMedia, mediaStorage, outbox);
+  const detachProductMedia = new DetachProductMedia(products, productMedia, outbox);
   const updateProductMediaAltText = new UpdateProductMediaAltText(products, productMedia);
-  const setProductThumbnail = new SetProductThumbnail(products, productMedia, mediaStorage);
+  const setProductThumbnail = new SetProductThumbnail(products, productMedia, mediaStorage, outbox);
 
   // --- Admin API ---
   const admin = Router();

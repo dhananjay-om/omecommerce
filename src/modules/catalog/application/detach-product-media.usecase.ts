@@ -1,5 +1,6 @@
 import type { ProductRepository, ProductMediaRepository } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
+import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
 import type { DetachProductMediaCommand } from './dto.js';
 
 /** Detaches a ProductMedia row (does not delete the underlying MediaAsset, in case it's reused elsewhere — plan/13 Phase J). */
@@ -7,6 +8,7 @@ export class DetachProductMedia {
   constructor(
     private readonly products: ProductRepository,
     private readonly productMedia: ProductMediaRepository,
+    private readonly outbox: OutboxWriter,
   ) {}
 
   async execute(cmd: DetachProductMediaCommand): Promise<void> {
@@ -20,5 +22,14 @@ export class DetachProductMedia {
     }
 
     await this.productMedia.detach(id);
+
+    // Same reindex-trigger reasoning as AttachProductMedia — detaching the primary image
+    // needs to refresh the search index's imageKey just as much as attaching one does.
+    await this.outbox.write({
+      aggregateType: 'Product',
+      aggregateId: cmd.productPublicId,
+      eventType: 'ProductAttributeChanged',
+      payload: { reason: 'media-detached' },
+    });
   }
 }
