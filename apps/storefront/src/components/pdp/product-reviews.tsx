@@ -238,7 +238,6 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
   }
 
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
-  const maxCount = Math.max(1, ...[5, 4, 3, 2, 1].map((n) => data.ratingBreakdown[n as 1 | 2 | 3 | 4 | 5]));
 
   return (
     <div className="space-y-6">
@@ -257,16 +256,20 @@ export function ProductReviews({ productId, initialReviews }: { productId: strin
               {data.total} review{data.total === 1 ? '' : 's'}
             </span>
           </div>
-          <div className="flex-1 space-y-1">
+          <div className="flex-1 space-y-1.5">
+            {/* "N star" label + a percentage-of-total bar/label (not raw count, and not
+                relative to whichever star count happens to be highest) — matches the
+                familiar Amazon-style rating breakdown the user asked to match. */}
             {[5, 4, 3, 2, 1].map((n) => {
               const count = data.ratingBreakdown[n as 1 | 2 | 3 | 4 | 5];
+              const pct = data.total > 0 ? Math.round((count / data.total) * 100) : 0;
               return (
                 <div key={n} className="flex items-center gap-2 text-xs">
-                  <span className="w-3 text-slate">{n}</span>
-                  <div className="h-1.5 flex-1 rounded-full bg-ghost">
-                    <div className="h-1.5 rounded-full bg-champagne" style={{ width: `${(count / maxCount) * 100}%` }} />
+                  <span className="w-11 shrink-0 text-slate">{n} star</span>
+                  <div className="h-3 flex-1 rounded-sm border border-ghost bg-white">
+                    <div className="h-full rounded-sm bg-champagne" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="w-6 text-right text-slate">{count}</span>
+                  <span className="w-9 shrink-0 text-right text-slate">{pct}%</span>
                 </div>
               );
             })}
