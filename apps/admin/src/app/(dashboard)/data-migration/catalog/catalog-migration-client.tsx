@@ -13,6 +13,7 @@ import {
   testConnection,
   analyzeCatalog,
   startMigration,
+  cancelMigration,
   getRun,
   type ActionState,
   type TestConnectionState,
@@ -47,6 +48,8 @@ export function CatalogMigrationClient({
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -85,6 +88,23 @@ export function CatalogMigrationClient({
     }
     setRun(result.run);
     poll(run.publicId);
+  }
+
+  async function handleCancel() {
+    if (!run) return;
+    setCancelling(true);
+    setCancelError(null);
+    const result = await cancelMigration(run.publicId);
+    setCancelling(false);
+    if (result.error || !result.run) {
+      setCancelError(result.error ?? 'Something went wrong.');
+      return;
+    }
+    // Cancelling is cooperative — the run often still reads RUNNING for a
+    // moment (the worker stops between products, not instantly) until the
+    // next poll picks up CANCELLED. cancelRequested is already set either
+    // way, so the worker will stop on its own even if this tab is closed.
+    setRun(result.run);
   }
 
   if (!connection) {
@@ -142,7 +162,7 @@ export function CatalogMigrationClient({
         </CardContent>
       </Card>
 
-      {!run || run.status === 'COMPLETED' || run.status === 'FAILED' ? (
+      {!run || run.status === 'COMPLETED' || run.status === 'FAILED' || run.status === 'CANCELLED' ? (
         <Card>
           <CardHeader className="border-b pb-4">
             <CardTitle className="text-base">Catalog Migration</CardTitle>
@@ -207,6 +227,14 @@ export function CatalogMigrationClient({
             <p className="text-sm text-muted-foreground">
               {run.skippedItems} skipped, {run.failedItems} failed so far.
             </p>
+            <Button variant="outline" size="sm" onClick={handleCancel} disabled={cancelling}>
+              {cancelling ? 'Stopping…' : 'Stop'}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Stops after the product currently in progress — nothing already migrated is undone, and you can
+              resume later by running Check Migration again.
+            </p>
+            {cancelError ? <p className="text-sm text-destructive">{cancelError}</p> : null}
           </CardContent>
         </Card>
       ) : null}
@@ -235,6 +263,15 @@ function RunResultSummary({ run }: { run: MigrationRun }) {
     return (
       <p className="text-sm text-destructive">
         Last run failed{run.result?.fatalError ? `: ${run.result.fatalError}` : '.'}
+      </p>
+    );
+  }
+  if (run.status === 'CANCELLED') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Last run was stopped after{' '}
+        <span className="font-medium text-foreground">{run.result?.productsCreated ?? run.processedItems}</span>{' '}
+        product(s) — nothing already migrated was undone. Check Migration again to pick up where it left off.
       </p>
     );
   }

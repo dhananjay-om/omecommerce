@@ -63,6 +63,22 @@ export class PrismaMigrationRunRepository implements MigrationRunRepository {
       data: { status: 'FAILED', completedAt: new Date(), resultJson: resultJson as object },
     });
   }
+
+  async requestCancel(id: bigint): Promise<void> {
+    await this.db.migrationRun.update({ where: { id }, data: { cancelRequested: true } });
+  }
+
+  async isCancelRequested(id: bigint): Promise<boolean> {
+    const row = await this.db.migrationRun.findUnique({ where: { id }, select: { cancelRequested: true } });
+    return row?.cancelRequested ?? false;
+  }
+
+  async markCancelled(id: bigint, resultJson: unknown): Promise<void> {
+    await this.db.migrationRun.update({
+      where: { id },
+      data: { status: 'CANCELLED', completedAt: new Date(), resultJson: resultJson as object },
+    });
+  }
 }
 
 function toInfo(row: {
@@ -72,6 +88,7 @@ function toInfo(row: {
   dataType: string;
   status: string;
   jobId: string | null;
+  cancelRequested: boolean;
   totalItems: number | null;
   processedItems: number;
   skippedItems: number;
@@ -89,6 +106,7 @@ function toInfo(row: {
     dataType: row.dataType,
     status: row.status as MigrationRunStatus,
     jobId: row.jobId,
+    cancelRequested: row.cancelRequested,
     totalItems: row.totalItems,
     processedItems: row.processedItems,
     skippedItems: row.skippedItems,

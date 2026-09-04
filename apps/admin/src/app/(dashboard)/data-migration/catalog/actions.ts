@@ -86,6 +86,25 @@ export async function startMigration(runPublicId: string): Promise<StartState> {
   }
 }
 
+export interface CancelState {
+  error: string | null;
+  run: MigrationRun | null;
+}
+
+/** "Stop" — a cooperative request, not a hard kill (see CancelMigrationRun's
+ *  own doc comment): the worker finishes whatever product it's on, then
+ *  stops before starting the next one. Whatever already migrated stays
+ *  migrated; re-running later picks up where this left off. */
+export async function cancelMigration(runPublicId: string): Promise<CancelState> {
+  try {
+    const run = await apiPost<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}/cancel`);
+    return { error: null, run };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, run: null };
+    throw err;
+  }
+}
+
 /** Poll target for the progress bar while RUNNING. */
 export async function getRun(runPublicId: string): Promise<MigrationRun> {
   return apiGet<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}`);

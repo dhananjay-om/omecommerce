@@ -1286,7 +1286,7 @@ export interface MerchandisingSuggestionList {
 }
 
 export type MigrationChannel = 'SHOPIFY' | 'MAGENTO';
-export type MigrationRunStatus = 'ANALYZING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+export type MigrationRunStatus = 'ANALYZING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface MigrationConnection {
   channel: MigrationChannel;

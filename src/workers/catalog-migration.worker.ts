@@ -280,9 +280,22 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
     // --- Phase 4: products, paginated ---
     let cursor: string | null = null;
     let processed = 0;
-    do {
+    let cancelled = false;
+    productPages: do {
       const page = await client.listProducts(cursor);
       for (const sourceProduct of page.products) {
+        // Cooperative stop, checked before every product — never a hard
+        // kill mid-product (see this function's own doc comment on why:
+        // a product's category/attribute/variant/media writes aren't one
+        // DB transaction, so killing the job mid-way could leave a
+        // half-created product). A single indexed PK read is cheap next
+        // to the ~300ms Shopify rate-limit pacing already paid per
+        // request, so checking this often stays responsive without
+        // meaningfully slowing the run down.
+        if (await deps.runs.isCancelRequested(run.id)) {
+          cancelled = true;
+          break productPages;
+        }
         processed++;
         try {
           await processProduct(sourceProduct, {
@@ -308,7 +321,11 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
     } while (cursor);
 
     await deps.runs.updateProgress(run.id, processed, result.skipped.length, result.failed.length);
-    await deps.runs.markCompleted(run.id, result);
+    if (cancelled) {
+      await deps.runs.markCancelled(run.id, result);
+    } else {
+      await deps.runs.markCompleted(run.id, result);
+    }
     return result;
   } catch (err) {
     result.fatalError = err instanceof Error ? err.message : String(err);

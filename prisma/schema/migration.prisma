@@ -30,6 +30,7 @@ enum MigrationRunStatus {
   RUNNING
   COMPLETED
   FAILED
+  CANCELLED
 }
 
 model MigrationConnection {
@@ -58,34 +59,40 @@ model MigrationConnection {
 }
 
 model MigrationRun {
-  id             BigInt              @id @default(autoincrement())
-  publicId       String              @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
-  connectionId   BigInt              @map("connection_id")
+  id              BigInt             @id @default(autoincrement())
+  publicId        String             @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  connectionId    BigInt             @map("connection_id")
   /// Fixed vocabulary in app code ('CATALOG' only today) — room for
   /// 'CUSTOMER'/'ORDER' later with no migration, same reasoning as
   /// ruleCode/metricCode elsewhere in this schema.
-  dataType       String              @default("CATALOG") @map("data_type")
-  status         MigrationRunStatus  @default(ANALYZING)
+  dataType        String             @default("CATALOG") @map("data_type")
+  status          MigrationRunStatus @default(ANALYZING)
   /// BullMQ job id, set once "Start Migration" is clicked — lets a page
   /// reload during a run resume polling the right job.
-  jobId          String?             @map("job_id")
-  totalItems     Int?                @map("total_items")
-  processedItems Int                 @default(0) @map("processed_items")
-  skippedItems   Int                 @default(0) @map("skipped_items")
-  failedItems    Int                 @default(0) @map("failed_items")
+  jobId           String?            @map("job_id")
+  /// Set by CancelMigrationRun, cleared to false on a fresh run (a new row
+  /// is created per run anyway, so this only ever starts false). Checked
+  /// by the worker's own per-product loop — a cooperative stop, never a
+  /// hard kill, so it never leaves a product half-created (see the
+  /// worker's own doc comment).
+  cancelRequested Boolean            @default(false) @map("cancel_requested")
+  totalItems      Int?               @map("total_items")
+  processedItems  Int                @default(0) @map("processed_items")
+  skippedItems    Int                @default(0) @map("skipped_items")
+  failedItems     Int                @default(0) @map("failed_items")
   /// The AI-generated mapping plan, snapshotted at Analyze time — Start
   /// applies THIS, it never re-analyzes, which is what makes Start a single
   /// click with no re-run of the (slower, LLM-calling) analysis step.
-  planJson       Json?               @map("plan_json") @db.JsonB
+  planJson        Json?              @map("plan_json") @db.JsonB
   /// Populated once RUNNING finishes (COMPLETED or FAILED): entity counts
   /// created, the full skip/fail list with real reasons, any fatal error.
-  resultJson     Json?               @map("result_json") @db.JsonB
-  startedAt      DateTime?           @map("started_at") @db.Timestamptz(6)
-  completedAt    DateTime?           @map("completed_at") @db.Timestamptz(6)
-  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  createdBy      BigInt?             @map("created_by")
+  resultJson      Json?              @map("result_json") @db.JsonB
+  startedAt       DateTime?          @map("started_at") @db.Timestamptz(6)
+  completedAt     DateTime?          @map("completed_at") @db.Timestamptz(6)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy       BigInt?            @map("created_by")
 
-  connection MigrationConnection   @relation(fields: [connectionId], references: [id])
+  connection MigrationConnection    @relation(fields: [connectionId], references: [id])
   refs       MigrationExternalRef[]
 
   @@index([connectionId, createdAt])

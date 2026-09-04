@@ -1,5 +1,5 @@
 export type MigrationChannel = 'SHOPIFY' | 'MAGENTO';
-export type MigrationRunStatus = 'ANALYZING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+export type MigrationRunStatus = 'ANALYZING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface MigrationConnectionInfo {
   id: bigint;
@@ -37,6 +37,7 @@ export interface MigrationRunInfo {
   dataType: string;
   status: MigrationRunStatus;
   jobId: string | null;
+  cancelRequested: boolean;
   totalItems: number | null;
   processedItems: number;
   skippedItems: number;
@@ -69,6 +70,14 @@ export interface MigrationRunRepository {
   updateProgress(id: bigint, processedItems: number, skippedItems: number, failedItems: number): Promise<void>;
   markCompleted(id: bigint, resultJson: unknown): Promise<void>;
   markFailed(id: bigint, resultJson: unknown): Promise<void>;
+  /** Sets cancelRequested — only meaningful on a RUNNING run (validated by
+   *  CancelMigrationRun, not here). The worker's own loop is what actually
+   *  stops, cooperatively, the next time it checks. */
+  requestCancel(id: bigint): Promise<void>;
+  /** A cheap, single-column read — called before every product in the
+   *  worker's loop (see its own doc comment on why that's fine cost-wise). */
+  isCancelRequested(id: bigint): Promise<boolean>;
+  markCancelled(id: bigint, resultJson: unknown): Promise<void>;
 }
 
 export interface MigrationExternalRefInfo {

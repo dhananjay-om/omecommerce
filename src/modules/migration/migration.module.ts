@@ -10,6 +10,7 @@ import { GetMigrationConnection } from './application/get-migration-connection.u
 import { TestMigrationConnection } from './application/test-migration-connection.usecase.js';
 import { AnalyzeCatalog } from './application/analyze-catalog.usecase.js';
 import { StartCatalogMigration } from './application/start-catalog-migration.usecase.js';
+import { CancelMigrationRun } from './application/cancel-migration-run.usecase.js';
 import { GetMigrationRun } from './application/get-migration-run.usecase.js';
 import { ListMigrationRuns } from './application/list-migration-runs.usecase.js';
 import {
@@ -36,6 +37,7 @@ export function createMigrationModule(db: Db, authorize: (permission: string) =>
   const testMigrationConnection = new TestMigrationConnection(connections);
   const analyzeCatalog = new AnalyzeCatalog(db, connections, runs, attributes, attributeSets, categories);
   const startCatalogMigration = new StartCatalogMigration(connections, runs);
+  const cancelMigrationRun = new CancelMigrationRun(connections, runs);
   const getMigrationRun = new GetMigrationRun(connections, runs);
   const listMigrationRuns = new ListMigrationRuns(connections, runs);
 
@@ -85,6 +87,15 @@ export function createMigrationModule(db: Db, authorize: (permission: string) =>
     asyncHandler(async (req, res) => {
       const { runId } = parse(migrationRunParamSchema, req.params);
       res.json({ data: await startCatalogMigration.execute(runId) });
+    }),
+  );
+
+  admin.post(
+    '/migration/runs/:runId/cancel',
+    manage,
+    asyncHandler(async (req, res) => {
+      const { runId } = parse(migrationRunParamSchema, req.params);
+      res.json({ data: await cancelMigrationRun.execute(runId) });
     }),
   );
 
