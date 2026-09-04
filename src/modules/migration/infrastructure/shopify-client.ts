@@ -20,12 +20,8 @@ const PAGE_SIZE = 250; // Shopify's own max per page
  *  "GET a JSON list with a static header" isn't). */
 export class ShopifyClient implements SourceCatalogClient {
   private readonly baseUrl: string;
-  /** Lazily loaded once per client instance (see ensureCollectsLoaded) —
-   *  product_id -> [collection_id, ...], from /collects.json. One
-   *  paginated read for the WHOLE store's product/collection memberships
-   *  is far cheaper than an N+1 per-product call, and Shopify's REST
-   *  product list endpoint doesn't inline this the way it inlines
-   *  variants/images/options. */
+  /** Lazily loaded once per client instance (see ensureCollectionMembership
+   *  below) — product_id -> [collection_id, ...]. */
   private collectsByProductId: Map<string, string[]> | null = null;
 
   constructor(
@@ -36,20 +32,38 @@ export class ShopifyClient implements SourceCatalogClient {
     this.baseUrl = `https://${host}/admin/api/${API_VERSION}`;
   }
 
-  private async ensureCollectsLoaded(): Promise<Map<string, string[]>> {
+  /**
+   * Real bug fixed here: this used to read /collects.json once for the
+   * whole store, which is cheap but only ever returns MANUAL collection
+   * memberships — a Shopify smart/automated collection (rule-based, e.g.
+   * "everything tagged Summer") has no collect rows at all, its membership
+   * is computed dynamically. That silently produced empty categories: the
+   * collection itself still got created locally (listCategories() sees
+   * every collection regardless of type), but zero products ever linked to
+   * it. Fixed by asking each collection's own /products.json endpoint
+   * instead — the one Shopify endpoint that returns real membership
+   * correctly for BOTH collection types. One paginated read per
+   * collection (collections are typically tens, not thousands, so this
+   * stays cheap) rather than one read for the whole store, but it's
+   * actually correct.
+   */
+  private async ensureCollectionMembership(): Promise<Map<string, string[]>> {
     if (this.collectsByProductId) return this.collectsByProductId;
     const map = new Map<string, string[]>();
-    let path: string | null = '/collects.json?limit=250';
-    while (path) {
-      const { body, linkHeader }: { body: unknown; linkHeader: string | null } = await this.request(path);
-      for (const c of (body as { collects: Array<{ product_id: number; collection_id: number }> }).collects ?? []) {
-        const key = String(c.product_id);
-        const list = map.get(key) ?? [];
-        list.push(String(c.collection_id));
-        map.set(key, list);
+    const categories = await this.listCategories();
+    for (const category of categories) {
+      let path: string | null = `/collections/${category.externalId}/products.json?limit=${PAGE_SIZE}`;
+      while (path) {
+        const { body, linkHeader }: { body: unknown; linkHeader: string | null } = await this.request(path);
+        for (const p of (body as { products: Array<{ id: number }> }).products ?? []) {
+          const key = String(p.id);
+          const list = map.get(key) ?? [];
+          list.push(category.externalId);
+          map.set(key, list);
+        }
+        const cursor = parseNextCursor(linkHeader);
+        path = cursor ? `/collections/${category.externalId}/products.json?limit=${PAGE_SIZE}&page_info=${encodeURIComponent(cursor)}` : null;
       }
-      const cursor = parseNextCursor(linkHeader);
-      path = cursor ? `/collects.json?limit=250&page_info=${encodeURIComponent(cursor)}` : null;
     }
     this.collectsByProductId = map;
     return map;
@@ -95,13 +109,13 @@ export class ShopifyClient implements SourceCatalogClient {
   }
 
   async sampleProducts(limit: number): Promise<SourceProduct[]> {
-    const collects = await this.ensureCollectsLoaded();
+    const collects = await this.ensureCollectionMembership();
     const { body } = await this.request(`/products.json?limit=${Math.min(limit, PAGE_SIZE)}`);
     return ((body as { products: ShopifyProduct[] }).products ?? []).map((p) => toSourceProduct(p, collects));
   }
 
   async listProducts(cursor: string | null): Promise<{ products: SourceProduct[]; nextCursor: string | null }> {
-    const collects = await this.ensureCollectsLoaded();
+    const collects = await this.ensureCollectionMembership();
     const path = cursor ? `/products.json?limit=${PAGE_SIZE}&page_info=${encodeURIComponent(cursor)}` : `/products.json?limit=${PAGE_SIZE}`;
     const { body, linkHeader } = await this.request(path);
     const products = ((body as { products: ShopifyProduct[] }).products ?? []).map((p) => toSourceProduct(p, collects));

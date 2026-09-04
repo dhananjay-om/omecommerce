@@ -337,6 +337,20 @@ async function processProduct(source: SourceProduct, ctx: ProcessProductCtx): Pr
 
   const existingRef = await deps.externalRefs.find(connection.id, 'PRODUCT', source.externalId);
   if (existingRef) {
+    // Still backfill category assignment for an already-migrated product —
+    // this is what makes re-running a migration actually fix a product
+    // that imported correctly but landed in no category (e.g. the
+    // /collects.json smart-collection bug this same file's ShopifyClient
+    // fix addresses) instead of silently skipping it forever. Cheap and
+    // safe: setProductCategories just replaces the assigned set, and only
+    // runs at all when there's something real to assign.
+    const categoryIds = source.categoryExternalIds.map((id) => ctx.categoryPublicIdByExternalId.get(id)).filter((id): id is string => !!id);
+    if (categoryIds.length > 0) {
+      await deps.setProductCategories.execute({ productPublicId: existingRef, categoryIds }).catch(() => {
+        // Best-effort — an already-migrated product that's since been
+        // deleted locally shouldn't fail the whole run over a backfill.
+      });
+    }
     result.skipped.push({ sku: source.sku, externalId: source.externalId, reason: 'already migrated in a previous run' });
     return;
   }
