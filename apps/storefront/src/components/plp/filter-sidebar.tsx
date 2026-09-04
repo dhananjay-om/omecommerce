@@ -4,6 +4,18 @@ import type { FacetBucket } from '@/types/product';
 import type { Brand } from '@/types/category';
 import { buildPlpHref, toggleOverride, type PlpParams } from '@/lib/plp-query';
 import { BRAND_FACET_CODE } from '@/lib/facet-codes';
+import { PriceRangeSlider } from './price-range-slider';
+
+/** The current category's real "family" for the sidebar Category list —
+ *  matches theme's own `ProductListing.tsx` Filters (an "All {parent}" link
+ *  + every one of its children, the active one highlighted) — built by the
+ *  page from real `listCategories()` data, not a mock. */
+export interface CategoryNav {
+  parentLabel: string;
+  parentHref: string;
+  parentActive: boolean;
+  items: Array<{ publicId: string; slug: string; label: string; active: boolean }>;
+}
 
 function FilterLink({
   href,
@@ -37,11 +49,18 @@ export function FilterSidebar({
   params,
   facets,
   brands,
+  categoryNav,
+  currency,
 }: {
   basePath: string;
   params: PlpParams;
   facets: Record<string, FacetBucket[]>;
   brands: Brand[];
+  /** Only collections pages pass this — see CategoryNav's own doc comment. */
+  categoryNav?: CategoryNav;
+  /** ISO currency code for the price slider's bounds/labels — defaults to
+   *  USD (this store's default) when a page has no hits to read it from. */
+  currency?: string;
 }) {
   const brandBuckets = facets[BRAND_FACET_CODE] ?? [];
   const brandNameByPublicId = new Map(brands.map((b) => [b.publicId, b.name]));
@@ -52,6 +71,29 @@ export function FilterSidebar({
 
   return (
     <aside className="flex w-full shrink-0 flex-col gap-6 md:w-56">
+      {categoryNav ? (
+        <div>
+          <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Category</h3>
+          <div className="flex flex-col gap-1.5">
+            <Link
+              href={categoryNav.parentHref}
+              className={`py-1 text-sm transition-colors ${categoryNav.parentActive ? 'font-medium text-champagne' : 'text-charcoal hover:text-champagne'}`}
+            >
+              All {categoryNav.parentLabel}
+            </Link>
+            {categoryNav.items.map((item) => (
+              <Link
+                key={item.publicId}
+                href={`/collections/${item.slug}`}
+                className={`py-1 text-sm transition-colors ${item.active ? 'font-medium text-champagne' : 'text-charcoal hover:text-champagne'}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {brandBuckets.length > 0 ? (
         <div>
           <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Brand</h3>
@@ -69,36 +111,7 @@ export function FilterSidebar({
         </div>
       ) : null}
 
-      <div>
-        <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Price</h3>
-        <form action={basePath} className="flex items-center gap-2">
-          {Object.entries(params)
-            .filter(([key, value]) => key !== 'minPrice' && key !== 'maxPrice' && key !== 'page' && value !== undefined)
-            .map(([key, value]) => (
-              <input key={key} type="hidden" name={key} value={value} />
-            ))}
-          <input
-            type="number"
-            name="minPrice"
-            defaultValue={params.minPrice ?? ''}
-            placeholder="Min"
-            min={0}
-            className="h-8 w-full min-w-0 rounded-xl border border-ghost bg-transparent px-2 text-sm text-jet outline-none focus-visible:border-champagne focus-visible:ring-3 focus-visible:ring-champagne/20"
-          />
-          <span className="text-slate">–</span>
-          <input
-            type="number"
-            name="maxPrice"
-            defaultValue={params.maxPrice ?? ''}
-            placeholder="Max"
-            min={0}
-            className="h-8 w-full min-w-0 rounded-xl border border-ghost bg-transparent px-2 text-sm text-jet outline-none focus-visible:border-champagne focus-visible:ring-3 focus-visible:ring-champagne/20"
-          />
-          <button type="submit" className="h-8 shrink-0 rounded-full border border-ghost px-3 text-sm text-charcoal transition-colors hover:bg-sand">
-            Go
-          </button>
-        </form>
-      </div>
+      <PriceRangeSlider basePath={basePath} params={params} currency={currency} />
 
       <div>
         <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">Availability</h3>

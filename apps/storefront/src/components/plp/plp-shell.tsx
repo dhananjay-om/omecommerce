@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { SearchResult } from '@/types/product';
 import type { Brand, Category } from '@/types/category';
 import type { PlpParams } from '@/lib/plp-query';
-import { FilterSidebar } from './filter-sidebar';
+import { FilterSidebar, type CategoryNav } from './filter-sidebar';
 import { SortLinks } from './sort-links';
 import { ProductGrid } from './product-grid';
 import { PlpPagination } from './plp-pagination';
@@ -16,6 +16,7 @@ export function PlpShell({
   breadcrumb,
   banner,
   subcategories,
+  categoryNav,
 }: {
   basePath: string;
   params: PlpParams;
@@ -32,6 +33,9 @@ export function PlpShell({
    *  reference `ProductListing.tsx`. Omitted/empty renders nothing, same as
    *  every other "don't pad with nothing real" empty-state in this app. */
   subcategories?: Category[];
+  /** The sidebar "Category" list (All {parent} + siblings) — only
+   *  collections pages pass this. See CategoryNav's own doc comment. */
+  categoryNav?: CategoryNav;
 }) {
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
 
@@ -92,7 +96,14 @@ export function PlpShell({
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-col gap-8 md:flex-row">
-          <FilterSidebar basePath={basePath} params={params} facets={result.facets} brands={brands} />
+          <FilterSidebar
+            basePath={basePath}
+            params={params}
+            facets={result.facets}
+            brands={brands}
+            categoryNav={categoryNav}
+            currency={result.hits[0]?.currency ?? undefined}
+          />
           <div className="flex-1">
             <ProductGrid hits={result.hits} />
             <PlpPagination basePath={basePath} params={params} page={result.page} totalPages={totalPages} />

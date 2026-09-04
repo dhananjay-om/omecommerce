@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api-client';
 import { normalizeSearchParams, toSearchServiceParams } from '@/lib/plp-query';
 import { CATEGORY_FACET_CODE } from '@/lib/facet-codes';
 import { PlpShell } from '@/components/plp/plp-shell';
+import type { CategoryNav } from '@/components/plp/filter-sidebar';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -72,6 +73,31 @@ export default async function CollectionPage({ params, searchParams }: Props) {
     .filter((c) => c.parentId === category.publicId)
     .sort((a, b) => a.position - b.position);
 
+  // Sidebar "Category" list (theme's own Filters component) — "All {parent}"
+  // + every sibling under it. When the current category itself has children,
+  // it's its own "family parent" (matches theme browsing a top-level
+  // category); otherwise its real parent (from the breadcrumb) is. A
+  // category with neither (a standalone top-level leaf) gets no section —
+  // nothing real to list, same "don't pad with nothing real" posture as
+  // `subcategories` above.
+  const familyParent = subcategories.length > 0 ? category : (breadcrumb.at(-1) ?? null);
+  const categoryNav: CategoryNav | undefined = familyParent
+    ? {
+        parentLabel: familyParent.nameDefault ?? familyParent.slug,
+        parentHref: `/collections/${familyParent.slug}`,
+        parentActive: category.publicId === familyParent.publicId,
+        items: allCategories
+          .filter((c) => c.parentId === familyParent.publicId)
+          .sort((a, b) => a.position - b.position)
+          .map((c) => ({
+            publicId: c.publicId,
+            slug: c.slug,
+            label: c.nameDefault ?? c.slug,
+            active: c.publicId === category.publicId,
+          })),
+      }
+    : undefined;
+
   return (
     <PlpShell
       basePath={`/collections/${slug}`}
@@ -82,6 +108,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
       breadcrumb={breadcrumb}
       banner={{ imageUrl: category.imageUrl, description: category.description }}
       subcategories={subcategories}
+      categoryNav={categoryNav}
     />
   );
 }
