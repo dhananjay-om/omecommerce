@@ -586,6 +586,13 @@ export interface MediaStorage {
   presignPutUrl(key: string, contentType: string): Promise<string>;
   presignGetUrl(key: string): Promise<string>;
   deleteObject(key: string): Promise<void>;
+  /** Backend-originated bytes (e.g. fetched from a remote URL server-side —
+   *  the Data Migration feature's own reason for adding this) written
+   *  directly, bypassing the presigned-PUT-from-browser flow every other
+   *  media upload in this app uses. Same primitive already used for
+   *  generated invoice PDFs (see s3-client.ts's own putObject), just not
+   *  previously exposed through this port. */
+  putObjectFromBuffer(key: string, buffer: Buffer, contentType: string): Promise<void>;
 }
 
 export interface BrandInfo {

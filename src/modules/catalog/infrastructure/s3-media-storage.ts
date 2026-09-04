@@ -1,5 +1,5 @@
 import type { MediaStorage } from '../domain/repositories.js';
-import { presignPutUrl, presignGetUrl, deleteObject } from '../../../shared/infrastructure/storage/s3-client.js';
+import { presignPutUrl, presignGetUrl, deleteObject, putObject } from '../../../shared/infrastructure/storage/s3-client.js';
 
 /** Thin adapter over the shared S3 client module, so use-cases depend on the `MediaStorage` port rather than the module directly. */
 export class S3MediaStorage implements MediaStorage {
@@ -13,5 +13,9 @@ export class S3MediaStorage implements MediaStorage {
 
   deleteObject(key: string): Promise<void> {
     return deleteObject(key);
+  }
+
+  putObjectFromBuffer(key: string, buffer: Buffer, contentType: string): Promise<void> {
+    return putObject(key, buffer, contentType);
   }
 }

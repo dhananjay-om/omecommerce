@@ -8,6 +8,7 @@ import { createReservationSweepHandler, scheduleReservationSweep } from './reser
 import { createStoredValueHoldSweepHandler, scheduleStoredValueHoldSweep } from './stored-value-hold-sweep.worker.js';
 import { createSearchIndexHandler } from './search-indexer.worker.js';
 import { startBulkImportWorker } from './bulk-import.worker.js';
+import { startCatalogMigrationWorker } from './catalog-migration.worker.js';
 import { createLoyaltyEarnHandler } from './loyalty-earn.worker.js';
 import { createReferralQualifyHandler } from './referral-qualify.worker.js';
 import { createAnalyticsProjectorHandler } from './analytics-projector.worker.js';
@@ -101,20 +102,21 @@ export async function startWorkers(): Promise<WorkerHandles> {
   const domainEventsWorker = startDomainEventsWorker();
   const maintenanceWorker = startMaintenanceWorker();
   const bulkImportWorker = startBulkImportWorker();
+  const catalogMigrationWorker = startCatalogMigrationWorker();
   await scheduleReservationSweep();
   await scheduleStoredValueHoldSweep();
   await scheduleAnalyticsRefresh();
   await scheduleAiRefresh();
 
   logger.info(
-    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify, analytics projector], maintenance [reservation sweep, stored-value hold sweep, analytics nightly refresh, AI insights nightly refresh], bulk import)',
+    'background workers started (outbox relay, domain events [order confirmation, search indexer, loyalty earn, referral qualify, analytics projector], maintenance [reservation sweep, stored-value hold sweep, analytics nightly refresh, AI insights nightly refresh], bulk import, catalog migration)',
   );
 
   return {
     outboxRelay,
     async stop() {
       outboxRelay.stop();
-      await Promise.allSettled([domainEventsWorker.close(), maintenanceWorker.close(), bulkImportWorker.close()]);
+      await Promise.allSettled([domainEventsWorker.close(), maintenanceWorker.close(), bulkImportWorker.close(), catalogMigrationWorker.close()]);
     },
   };
 }

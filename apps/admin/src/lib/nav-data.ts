@@ -5,6 +5,7 @@ import {
   Bot,
   Radar,
   Target,
+  Database,
   ShoppingCart,
   Package,
   FolderTree,
@@ -139,6 +140,27 @@ export const NAV: NavGroup[] = [
       {
         key: 'ai-settings', label: 'AI Settings', href: '/ai/settings', icon: Settings, status: 'live',
         description: 'Configure the LLM provider key (OpenAI) used by AI features.',
+      },
+    ],
+  },
+  {
+    key: 'data-migration',
+    label: 'Data Migration',
+    icon: Database,
+    items: [
+      {
+        key: 'migration-catalog', label: 'Catalog', href: '/data-migration/catalog', icon: Package, status: 'live',
+        description: 'Connect an existing Shopify or Magento store and migrate its product catalog — AI builds the mapping plan, no manual field-by-field setup.',
+      },
+      {
+        key: 'migration-customers', label: 'Customers', href: '/data-migration/customers', icon: Users, status: 'comingSoon',
+        description: 'Migrate customer accounts and addresses from a connected store.',
+        planned: ['Connect the same Shopify/Magento credential already saved for Catalog', 'AI-assisted field mapping, same one-click flow as Catalog', 'Duplicate-email detection with a skip-and-log policy'],
+      },
+      {
+        key: 'migration-orders', label: 'Orders', href: '/data-migration/orders', icon: ShoppingCart, status: 'comingSoon',
+        description: 'Migrate historical orders from a connected store.',
+        planned: ['Order history import scoped to a date range', 'Line-item SKU matching against the already-migrated catalog', 'Read-only import — no payment/fulfillment actions replayed'],
       },
     ],
   },

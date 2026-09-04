@@ -1,0 +1,117 @@
+// =============================================================================
+// migration.prisma — Data Migration (Shopify/Magento -> this catalog).
+//
+// This pass is Catalog only (Customer/Order migration is a reserved future
+// concern, not built here — see MigrationRun.dataType's own comment). Two
+// source channels planned: Shopify ships first, Magento reuses the same
+// engine as a second SourceCatalogClient implementation (src/modules/
+// migration/domain/source-client.ts) once Shopify is verified live.
+//
+// MigrationConnection is a singleton-per-channel credential, same "DB row,
+// plaintext token, documented tradeoff, never round-tripped to the client"
+// precedent as EmailSettings/AiSettings (see system.prisma/ai.prisma's own
+// header comments for that precedent in full). MigrationRun is one row per
+// "Check Migration" -> "Start" cycle, carrying the AI-generated mapping plan
+// (built once, applied deterministically — see the migration module's own
+// AnalyzeCatalog use case doc comment) and the resulting skip/fail report.
+// MigrationExternalRef is what makes re-running a migration safe: it maps a
+// source platform's id to whatever local entity it became, so a second run
+// (or resuming after a rate-limit interruption) never recreates anything.
+// =============================================================================
+
+enum MigrationChannel {
+  SHOPIFY
+  MAGENTO
+}
+
+enum MigrationRunStatus {
+  ANALYZING
+  READY
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model MigrationConnection {
+  id           BigInt           @id @default(autoincrement())
+  publicId     String           @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  channel      MigrationChannel
+  /// e.g. "my-shop.myshopify.com" (Shopify) — no scheme, just the host.
+  storeUrl     String           @map("store_url")
+  /// Plaintext — same documented tradeoff as EmailSettings.password (must be
+  /// presented in full on every source-API call, can't be one-way hashed).
+  apiToken     String           @map("api_token")
+  isActive     Boolean          @default(true) @map("is_active")
+  lastTestedAt DateTime?        @map("last_tested_at") @db.Timestamptz(6)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy    BigInt?          @map("created_by")
+  updatedBy    BigInt?          @map("updated_by")
+
+  runs MigrationRun[]
+
+  /// One active connection per channel for this pass (matches AI Settings'
+  /// own singleton precedent) — multiple simultaneous stores per channel is
+  /// a real future need, not built here.
+  @@unique([channel])
+  @@map("migration_connection")
+}
+
+model MigrationRun {
+  id             BigInt              @id @default(autoincrement())
+  publicId       String              @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  connectionId   BigInt              @map("connection_id")
+  /// Fixed vocabulary in app code ('CATALOG' only today) — room for
+  /// 'CUSTOMER'/'ORDER' later with no migration, same reasoning as
+  /// ruleCode/metricCode elsewhere in this schema.
+  dataType       String              @default("CATALOG") @map("data_type")
+  status         MigrationRunStatus  @default(ANALYZING)
+  /// BullMQ job id, set once "Start Migration" is clicked — lets a page
+  /// reload during a run resume polling the right job.
+  jobId          String?             @map("job_id")
+  totalItems     Int?                @map("total_items")
+  processedItems Int                 @default(0) @map("processed_items")
+  skippedItems   Int                 @default(0) @map("skipped_items")
+  failedItems    Int                 @default(0) @map("failed_items")
+  /// The AI-generated mapping plan, snapshotted at Analyze time — Start
+  /// applies THIS, it never re-analyzes, which is what makes Start a single
+  /// click with no re-run of the (slower, LLM-calling) analysis step.
+  planJson       Json?               @map("plan_json") @db.JsonB
+  /// Populated once RUNNING finishes (COMPLETED or FAILED): entity counts
+  /// created, the full skip/fail list with real reasons, any fatal error.
+  resultJson     Json?               @map("result_json") @db.JsonB
+  startedAt      DateTime?           @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?           @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      BigInt?             @map("created_by")
+
+  connection MigrationConnection   @relation(fields: [connectionId], references: [id])
+  refs       MigrationExternalRef[]
+
+  @@index([connectionId, createdAt])
+  @@map("migration_run")
+}
+
+model MigrationExternalRef {
+  id            BigInt   @id @default(autoincrement())
+  runId         BigInt   @map("run_id")
+  /// Scoped to the CONNECTION, not just one run — a second run against the
+  /// same store reuses refs a prior run already created, which is exactly
+  /// what makes re-running safe (see this file's own header comment).
+  connectionId  BigInt   @map("connection_id")
+  /// Fixed vocabulary in app code: 'CATEGORY' | 'ATTRIBUTE' |
+  /// 'ATTRIBUTE_OPTION' | 'ATTRIBUTE_SET' | 'PRODUCT' | 'MEDIA'.
+  externalType  String   @map("external_type")
+  /// The source platform's id for that entity, as a string (Shopify ids are
+  /// numeric but large enough to be unsafe as a JS number; Magento's are
+  /// numeric too — string avoids ever caring which).
+  externalId    String   @map("external_id")
+  localPublicId String   @map("local_public_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  run MigrationRun @relation(fields: [runId], references: [id])
+
+  @@unique([connectionId, externalType, externalId], map: "ux_migration_ref_connection_type_external")
+  @@index([runId])
+  @@map("migration_external_ref")
+}

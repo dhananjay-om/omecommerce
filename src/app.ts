@@ -27,6 +27,7 @@ import { createReferralModule } from './modules/referral/referral.module.js';
 import { createCompanyModule } from './modules/company/company.module.js';
 import { createAnalyticsModule } from './modules/analytics/analytics.module.js';
 import { createAiModule } from './modules/ai/ai.module.js';
+import { createMigrationModule } from './modules/migration/migration.module.js';
 import { createPincodeModule } from './modules/pincode/pincode.module.js';
 
 /**
@@ -135,6 +136,9 @@ export function createApp(): Express {
 
   const ai = createAiModule(prisma, auth.authorize);
   app.use('/admin/v1', ai.admin);
+
+  const migration = createMigrationModule(prisma, auth.authorize);
+  app.use('/admin/v1', migration.admin);
 
   app.use(notFound);
   app.use(errorHandler);

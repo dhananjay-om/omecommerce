@@ -48,4 +48,5 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { code: 'alerts:manage', description: 'Configure analytics alert rules' },
   { code: 'ai:view', description: 'View AI-generated insights' },
   { code: 'ai:manage', description: 'Configure AI provider settings (API keys)' },
+  { code: 'migration:manage', description: 'Connect source stores and run catalog/customer/order data migrations' },
 ];

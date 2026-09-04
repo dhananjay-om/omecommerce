@@ -54,7 +54,15 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     throw new ApiError(res.status, body?.title ?? `Request failed with status ${res.status}`, body?.type, body?.errors);
   }
 
-  return (body?.data ?? body) as T;
+  // `body?.data ?? body` looked equivalent but isn't: `??` falls through to
+  // `body` whenever `data` is null/undefined, not just when the `data` key
+  // is absent — so an endpoint that legitimately responds `{ data: null }`
+  // (e.g. "no migration connection saved yet") returned the whole envelope
+  // object instead of null, which callers then treat as truthy. Checking
+  // for the key's presence, not its value's truthiness, is what actually
+  // distinguishes "no envelope" (a 204 already returned above, or a
+  // non-enveloped response) from "enveloped, value is null".
+  return (body && typeof body === 'object' && 'data' in body ? body.data : body) as T;
 }
 
 export function apiGet<T>(path: string): Promise<T> {

@@ -10,9 +10,19 @@ export const MAINTENANCE_QUEUE = 'maintenance';
 /** User-triggered async admin jobs (bulk import/export) with per-job status polling (plan/04 §4). */
 export const BULK_JOBS_QUEUE = 'bulk-jobs';
 
+/** Data Migration catalog import runs — deliberately its OWN queue, not
+ *  piggybacked on bulk-jobs: BullMQ's default Worker concurrency is 1 job
+ *  at a time and nothing in this app overrides that, so a multi-minute/
+ *  hour catalog migration would otherwise block every other admin's CSV
+ *  import/bulk-stock-update/bulk-description-generation for its entire
+ *  duration. Also a genuinely different job shape (few, long-running,
+ *  high-value vs. many, short, routine). */
+export const CATALOG_MIGRATION_QUEUE = 'catalog-migration';
+
 let domainEventsQueue: Queue | undefined;
 let maintenanceQueue: Queue | undefined;
 let bulkJobsQueue: Queue | undefined;
+let catalogMigrationQueue: Queue | undefined;
 
 /**
  * No consumer ever polls a domain-event job's result by id after the fact
@@ -44,4 +54,12 @@ export function getMaintenanceQueue(): Queue {
 export function getBulkJobsQueue(): Queue {
   bulkJobsQueue ??= new Queue(BULK_JOBS_QUEUE, { connection: getQueueConnectionOptions() });
   return bulkJobsQueue;
+}
+
+/** No removeOnComplete/removeOnFail — same reasoning as getBulkJobsQueue():
+ *  GetMigrationRunStatus polls this job by id, including after it finishes,
+ *  to build the final skip/fail report. */
+export function getCatalogMigrationQueue(): Queue {
+  catalogMigrationQueue ??= new Queue(CATALOG_MIGRATION_QUEUE, { connection: getQueueConnectionOptions() });
+  return catalogMigrationQueue;
 }

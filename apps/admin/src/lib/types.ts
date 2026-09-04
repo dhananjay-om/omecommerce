@@ -1284,3 +1284,52 @@ export interface MerchandisingSuggestionList {
   pageSize: number;
   suggestions: MerchandisingSuggestion[];
 }
+
+export type MigrationChannel = 'SHOPIFY' | 'MAGENTO';
+export type MigrationRunStatus = 'ANALYZING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export interface MigrationConnection {
+  channel: MigrationChannel;
+  storeUrl: string;
+  hasApiToken: boolean;
+  isActive: boolean;
+  lastTestedAt: string | null;
+  updatedAt: string;
+}
+
+export interface MigrationPlan {
+  summary: string;
+  totalProducts: number;
+  categoryPlan: Array<{ name: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedCategoryName?: string }>;
+  attributePlan: Array<{ sourceOptionName: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedAttributeCode?: string; newAttributeCode?: string }>;
+  attributeSetPlan: Array<{ sourceProductType: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedAttributeSetCode?: string; newAttributeSetCode?: string }>;
+  warnings: string[];
+}
+
+export interface MigrationRunResult {
+  categoriesCreated: number;
+  attributesCreated: number;
+  attributeSetsCreated: number;
+  productsCreated: number;
+  variantsCreated: number;
+  imagesAttached: number;
+  skipped: Array<{ sku: string | null; externalId: string; reason: string }>;
+  failed: Array<{ sku: string | null; externalId: string; reason: string }>;
+  fatalError?: string;
+}
+
+export interface MigrationRun {
+  publicId: string;
+  channel: MigrationChannel;
+  dataType: string;
+  status: MigrationRunStatus;
+  totalItems: number | null;
+  processedItems: number;
+  skippedItems: number;
+  failedItems: number;
+  plan: MigrationPlan | null;
+  result: MigrationRunResult | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
