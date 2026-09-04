@@ -80,10 +80,16 @@ export class PrismaAttributeFlagsLookup implements AttributeFlagsLookup {
   constructor(private readonly db: Db) {}
 
   async facetable(): Promise<FacetableAttribute[]> {
-    return this.db.attribute.findMany({
+    const rows = await this.db.attribute.findMany({
       where: { OR: [{ isFilterable: true }, { usedInLayeredNav: true }] },
-      select: { id: true, code: true },
+      select: {
+        id: true,
+        code: true,
+        dataType: true,
+        options: { where: { deletedAt: null }, select: { id: true, value: true, label: true, swatch: true } },
+      },
     });
+    return rows.map((r) => ({ id: r.id, code: r.code, dataType: r.dataType, options: r.options }));
   }
 }
 

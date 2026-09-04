@@ -51,6 +51,7 @@ export class IndexProduct {
       this.productMedia.primaryImageKey(product.id),
     ]);
     const facetableCodes = new Set(facetable.map((a) => a.code));
+    const facetableByCode = new Map(facetable.map((a) => [a.code, a]));
 
     for (const sv of storeViews) {
       const resolved = await this.attributeStore.resolveForStoreView(product.id, {
@@ -63,10 +64,29 @@ export class IndexProduct {
       for (const r of resolved) {
         if (!facetableCodes.has(r.code)) continue;
         const value = fromRow(r.dataType, r.columns);
+        // SELECT/MULTISELECT store the option's row id, not a display string
+        // (see AttributeOptionInfo's own doc comment) — resolve it to the
+        // option's real label (+ swatch, when set) instead of indexing the
+        // raw internal id verbatim. Anything that doesn't resolve to a known
+        // option (e.g. a non-SELECT attribute, or a stale/deleted option id)
+        // falls back to the previous raw-stringify behaviour unchanged.
+        const attr = facetableByCode.get(r.code);
+        const optionById =
+          attr && (r.dataType === 'SELECT' || r.dataType === 'MULTISELECT') && attr.options.length > 0
+            ? new Map(attr.options.map((o) => [o.id.toString(), o]))
+            : null;
+        const pushValue = (raw: unknown) => {
+          const option = optionById?.get(String(raw));
+          if (option) {
+            facets.push({ code: r.code, value: option.label, ...(option.swatch ? { swatch: option.swatch } : {}) });
+          } else {
+            facets.push({ code: r.code, value: String(raw) });
+          }
+        };
         if (Array.isArray(value)) {
-          for (const v of value) facets.push({ code: r.code, value: String(v) });
+          for (const v of value) pushValue(v);
         } else if (value !== null && value !== undefined) {
-          facets.push({ code: r.code, value: String(value) });
+          pushValue(value);
         }
       }
       for (const categoryId of categoryIds) facets.push({ code: CATEGORY_FACET_CODE, value: categoryId });

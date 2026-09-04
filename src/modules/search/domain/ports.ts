@@ -1,6 +1,11 @@
 export interface FacetPair {
   code: string;
   value: string;
+  /** Hex color (or other swatch representation) — only ever set for a SELECT/
+   *  MULTISELECT option that has one (`AttributeOption.swatch`). Carried
+   *  alongside `value` so the storefront can render a real colour circle
+   *  instead of a text checkbox, without fabricating a color it doesn't have. */
+  swatch?: string;
 }
 
 /** Reserved facet code for category membership (plan/14 Phase 0a) — a product carries one of these per DIRECTLY assigned category's publicId AND every one of that category's ancestors (plan/14 Phase 3a: browsing "Electronics" must also surface a product only assigned to "Laptops"), via CategoryMembershipLookup. Not a real attribute, just reuses the existing generic facet-filter mechanism. */
@@ -55,6 +60,10 @@ export interface SearchQuery {
 export interface FacetBucket {
   value: string;
   count: number;
+  /** Present only when every product carrying this bucket's value agrees on
+   *  the same swatch (a SELECT option's swatch is per-option, so this is
+   *  always consistent in practice — see `FacetPair.swatch`). */
+  swatch?: string;
 }
 
 export interface SearchResult {

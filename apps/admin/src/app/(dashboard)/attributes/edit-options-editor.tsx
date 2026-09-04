@@ -12,7 +12,11 @@ interface OptionRow {
   id?: string;
   value: string;
   label: string;
+  /** Hex color, optional — see OptionsBuilder's own doc comment on this field. */
+  swatch: string;
 }
+
+const DEFAULT_SWATCH = '#000000';
 
 /** The edit-dialog counterpart to OptionsBuilder (new-attribute-dialog.tsx) — that one only
  *  ever builds brand-new rows, since a SELECT/MULTISELECT attribute's options used to be
@@ -32,7 +36,7 @@ export function EditOptionsEditor({ code }: { code: string }) {
       .then((options) => {
         if (cancelled) return;
         setRows(
-          options.map((o) => ({ key: `existing-${o.id}`, id: o.id, value: o.value, label: o.label })),
+          options.map((o) => ({ key: `existing-${o.id}`, id: o.id, value: o.value, label: o.label, swatch: o.swatch ?? '' })),
         );
       })
       .catch(() => {
@@ -47,20 +51,20 @@ export function EditOptionsEditor({ code }: { code: string }) {
 
   function addRow() {
     nextId.current += 1;
-    setRows((prev) => [...(prev ?? []), { key: `new-${nextId.current}`, value: '', label: '' }]);
+    setRows((prev) => [...(prev ?? []), { key: `new-${nextId.current}`, value: '', label: '', swatch: '' }]);
   }
 
   function removeRow(key: string) {
     setRows((prev) => (prev ?? []).filter((r) => r.key !== key));
   }
 
-  function updateRow(key: string, field: 'value' | 'label', text: string) {
+  function updateRow(key: string, field: 'value' | 'label' | 'swatch', text: string) {
     setRows((prev) => (prev ?? []).map((r) => (r.key === key ? { ...r, [field]: text } : r)));
   }
 
   const serialized = JSON.stringify(
     (rows ?? [])
-      .map((r) => ({ id: r.id, value: r.value, label: r.label }))
+      .map((r) => ({ id: r.id, value: r.value, label: r.label, ...(r.swatch ? { swatch: r.swatch } : {}) }))
       .filter((o) => o.value && o.label),
   );
 
@@ -76,6 +80,13 @@ export function EditOptionsEditor({ code }: { code: string }) {
             <div className="space-y-2">
               {rows.map((row) => (
                 <div key={row.key} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    title="Swatch colour (optional)"
+                    value={row.swatch || DEFAULT_SWATCH}
+                    onChange={(e) => updateRow(row.key, 'swatch', e.target.value)}
+                    className="h-9 w-9 shrink-0 cursor-pointer rounded border border-input p-0.5"
+                  />
                   <Input placeholder="Value" value={row.value} onChange={(e) => updateRow(row.key, 'value', e.target.value)} />
                   <Input placeholder="Label" value={row.label} onChange={(e) => updateRow(row.key, 'label', e.target.value)} />
                   {/* Only a not-yet-saved row can be removed here — an existing option (has an

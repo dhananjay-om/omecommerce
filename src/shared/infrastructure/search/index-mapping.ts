@@ -6,7 +6,7 @@
  * point. Document _id = `${productId}_${storeViewId}` so re-indexing a product
  * for one store view is a plain upsert, never a duplicate.
  *
- * `facets` is a `nested` array of {code, value} pairs — the standard exact-match
+ * `facets` is a `nested` array of {code, value, swatch?} pairs — the standard exact-match
  * attribute-faceting pattern (unlike `flattened`, whose aggregation semantics are
  * less standardized): a `nested` aggregation on `facets` + a `terms` agg on
  * `facets.code` then `facets.value` gives per-attribute facet counts, and query
@@ -46,6 +46,11 @@ export const PRODUCT_INDEX_MAPPING = {
         properties: {
           code: { type: 'keyword' },
           value: { type: 'keyword' },
+          // Only set for a SELECT/MULTISELECT option that has one — see
+          // FacetPair's own doc comment. Read back via a size-1 terms
+          // sub-aggregation under the value bucket (a value's swatch is
+          // always the same option's, so any single doc's swatch answers it).
+          swatch: { type: 'keyword' },
         },
       },
       updatedAt: { type: 'date' },

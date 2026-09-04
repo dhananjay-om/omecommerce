@@ -30,7 +30,7 @@ export interface SearchProductsResult {
   page: number;
   pageSize: number;
   hits: SearchProductHit[];
-  facets: Record<string, Array<{ value: string; count: number }>>;
+  facets: Record<string, Array<{ value: string; count: number; swatch?: string }>>;
 }
 
 const VALID_SORTS = new Set(['relevance', 'price_asc', 'price_desc', 'name_asc']);

@@ -68,6 +68,9 @@ export interface SearchHit {
 export interface FacetBucket {
   value: string;
   count: number;
+  /** Real hex color from the option's own `AttributeOption.swatch` — only
+   *  ever present for a SELECT/MULTISELECT option that has one set. */
+  swatch?: string;
 }
 
 export interface SearchResult {

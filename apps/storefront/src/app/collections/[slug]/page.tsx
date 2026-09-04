@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getCategory } from '@/services/category.service';
+import { getCategory, listCategories } from '@/services/category.service';
 import { listBrands } from '@/services/brand.service';
 import { searchProducts } from '@/services/products.service';
 import { ApiError } from '@/lib/api-client';
@@ -59,10 +59,18 @@ export default async function CollectionPage({ params, searchParams }: Props) {
   }
   const { category, breadcrumb } = categoryData;
 
-  const [result, brands] = await Promise.all([
+  const [result, brands, allCategories] = await Promise.all([
     searchProducts(toSearchServiceParams(plpParams, { extraFilter: { [CATEGORY_FACET_CODE]: category.publicId } })),
     listBrands(),
+    listCategories(),
   ]);
+
+  // Theme reference (`ProductListing.tsx`) shows a row of subcategory pills
+  // next to the hero title when browsing a parent category — real children,
+  // not a mock, sorted the same way the mega-menu already sorts siblings.
+  const subcategories = allCategories
+    .filter((c) => c.parentId === category.publicId)
+    .sort((a, b) => a.position - b.position);
 
   return (
     <PlpShell
@@ -73,6 +81,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
       brands={brands}
       breadcrumb={breadcrumb}
       banner={{ imageUrl: category.imageUrl, description: category.description }}
+      subcategories={subcategories}
     />
   );
 }

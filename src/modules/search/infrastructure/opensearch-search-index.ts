@@ -92,7 +92,14 @@ export class OpenSearchIndex implements SearchIndex {
             aggs: {
               by_code: {
                 terms: { field: 'facets.code', size: FACET_SIZE },
-                aggs: { by_value: { terms: { field: 'facets.value', size: FACET_SIZE } } },
+                aggs: {
+                  by_value: {
+                    terms: { field: 'facets.value', size: FACET_SIZE },
+                    // A value's swatch is always the same option's (per FacetPair's
+                    // doc comment) — size 1 just reads it back, not a real aggregation.
+                    aggs: { swatch: { terms: { field: 'facets.swatch', size: 1 } } },
+                  },
+                },
               },
             },
           },
@@ -114,7 +121,10 @@ export class OpenSearchIndex implements SearchIndex {
 
     const facets: Record<string, FacetBucket[]> = {};
     for (const codeBucket of body.aggregations?.facets.by_code.buckets ?? []) {
-      facets[codeBucket.key] = codeBucket.by_value.buckets.map((v) => ({ value: v.key, count: v.doc_count }));
+      facets[codeBucket.key] = codeBucket.by_value.buckets.map((v) => {
+        const swatch = v.swatch.buckets[0]?.key;
+        return { value: v.key, count: v.doc_count, ...(swatch ? { swatch } : {}) };
+      });
     }
 
     return {
@@ -148,7 +158,12 @@ interface OpenSearchResponse {
   aggregations?: {
     facets: {
       by_code: {
-        buckets: Array<{ key: string; by_value: { buckets: Array<{ key: string; doc_count: number }> } }>;
+        buckets: Array<{
+          key: string;
+          by_value: {
+            buckets: Array<{ key: string; doc_count: number; swatch: { buckets: Array<{ key: string }> } }>;
+          };
+        }>;
       };
     };
   };

@@ -15,6 +15,7 @@ export function PlpShell({
   brands,
   breadcrumb,
   banner,
+  subcategories,
 }: {
   basePath: string;
   params: PlpParams;
@@ -26,6 +27,11 @@ export function PlpShell({
    *  collections pages pass this today; other PlpShell callers (search,
    *  brand pages) omit it and the layout is unchanged for them. */
   banner?: { imageUrl: string | null; description: string | null };
+  /** Real child categories of the current one — only collections pages pass
+   *  this. Rendered as a pill row next to the title, matching the theme's
+   *  reference `ProductListing.tsx`. Omitted/empty renders nothing, same as
+   *  every other "don't pad with nothing real" empty-state in this app. */
+  subcategories?: Category[];
 }) {
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
 
@@ -64,6 +70,21 @@ export function PlpShell({
               <h1 className="font-display text-3xl font-semibold text-jet sm:text-4xl">{heading}</h1>
               <p className="mt-1 text-sm text-slate">{result.total} products</p>
             </div>
+            {subcategories && subcategories.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {subcategories.slice(0, 6).map((sub) => (
+                  <Link
+                    key={sub.publicId}
+                    href={`/collections/${sub.slug}`}
+                    className="rounded-full border border-ghost bg-white px-3 py-1.5 text-xs font-medium text-charcoal transition-colors hover:border-champagne hover:text-champagne"
+                  >
+                    {sub.nameDefault ?? sub.slug}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-3 flex justify-end">
             <SortLinks basePath={basePath} params={params} />
           </div>
         </div>

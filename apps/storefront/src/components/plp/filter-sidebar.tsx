@@ -109,22 +109,46 @@ export function FilterSidebar({
         />
       </div>
 
-      {attributeFacetEntries.map(([code, buckets]) => (
-        <div key={code}>
-          <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">{code.replace(/[-_]/g, ' ')}</h3>
-          <div className="flex flex-col">
-            {buckets.map((bucket) => (
-              <FilterLink
-                key={bucket.value}
-                href={buildPlpHref(basePath, params, toggleOverride(params, code, bucket.value))}
-                active={params[code] === bucket.value}
-                label={bucket.value}
-                count={bucket.count}
-              />
-            ))}
+      {attributeFacetEntries.map(([code, buckets]) => {
+        // A colour-style attribute (real `AttributeOption.swatch` hex on every
+        // option) gets the theme's circle-swatch filter instead of a text
+        // checkbox list — matches `theme/src/pages/ProductListing.tsx`'s own
+        // "Colour" filter, but only when the data backing it is real.
+        const hasSwatches = buckets.every((b) => b.swatch);
+        return (
+          <div key={code}>
+            <h3 className="mb-2 text-xs font-semibold tracking-widest text-jet uppercase">{code.replace(/[-_]/g, ' ')}</h3>
+            {hasSwatches ? (
+              <div className="flex flex-wrap gap-2">
+                {buckets.map((bucket) => {
+                  const active = params[code] === bucket.value;
+                  return (
+                    <Link
+                      key={bucket.value}
+                      href={buildPlpHref(basePath, params, toggleOverride(params, code, bucket.value))}
+                      title={`${bucket.value} (${bucket.count})`}
+                      className={`size-7 shrink-0 rounded-full border-2 transition-all ${active ? 'scale-110 border-jet shadow' : 'border-ghost hover:border-silver'}`}
+                      style={{ backgroundColor: bucket.swatch }}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {buckets.map((bucket) => (
+                  <FilterLink
+                    key={bucket.value}
+                    href={buildPlpHref(basePath, params, toggleOverride(params, code, bucket.value))}
+                    active={params[code] === bucket.value}
+                    label={bucket.value}
+                    count={bucket.count}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       <div>
         <h3 className="mb-2 flex items-center gap-1 text-xs font-semibold tracking-widest text-jet uppercase">

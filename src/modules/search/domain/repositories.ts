@@ -43,6 +43,12 @@ export interface StoreViewLookup {
 export interface FacetableAttribute {
   id: bigint;
   code: string;
+  dataType: string;
+  /** Only populated (non-empty) for SELECT/MULTISELECT attributes — a SELECT-type
+   *  attribute value is stored as the option's row id (see `AttributeOptionInfo`'s
+   *  doc comment), not a display string, so indexing needs this id→{value,label,
+   *  swatch} table to resolve a real facet bucket instead of a raw internal id. */
+  options: Array<{ id: bigint; value: string; label: string; swatch: string | null }>;
 }
 
 export interface AttributeFlagsLookup {
