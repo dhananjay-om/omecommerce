@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { HeartIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { buildCategoryTree } from '@/lib/category-tree';
 import type { Category } from '@/types/category';
@@ -12,6 +12,7 @@ import { SearchBar } from './search-bar';
 import { UserMenu } from './user-menu';
 import { MiniCart } from './mini-cart';
 import { MobileMenu } from './mobile-menu';
+import { WishlistIcon } from './wishlist-icon';
 
 /**
  * ÉLUME restyle: a single row (hamburger, logo, centered nav, icon
@@ -72,16 +73,7 @@ export function MainHeader({ categories, website }: { categories: Category[]; we
           >
             <MagnifyingGlassIcon className="size-5" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Wishlist"
-            render={<Link href="/account/wishlist" />}
-            nativeButton={false}
-            className="hidden sm:inline-flex"
-          >
-            <HeartIcon className="size-5" />
-          </Button>
+          <WishlistIcon />
           <UserMenu />
           <MiniCart />
         </div>
