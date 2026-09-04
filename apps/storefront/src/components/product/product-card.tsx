@@ -136,9 +136,11 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
 
         <button
           type="button"
-          onClick={(e) => {
+          onClick={async (e) => {
             e.preventDefault();
-            toggleWishlist(hit.productId);
+            const result = await toggleWishlist(hit.productId);
+            if (result === 'login-required') toast.error('Log in to save items to your wishlist.');
+            else if (result === 'error') toast.error('Could not update your wishlist. Please try again.');
           }}
           aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-white focus-visible:opacity-100"

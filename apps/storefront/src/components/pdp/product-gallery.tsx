@@ -10,6 +10,7 @@ import 'swiper/css/thumbs';
 import 'swiper/css/free-mode';
 import { HeartIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
+import { toast } from 'sonner';
 import type { ProductMedia } from '@/types/product';
 import { resolveProductImage } from '@/lib/mock-images';
 import { useWishlistStore } from '@/store/wishlist-store';
@@ -115,7 +116,11 @@ export function ProductGallery({
 
         <button
           type="button"
-          onClick={() => toggleWishlist(productId)}
+          onClick={async () => {
+            const result = await toggleWishlist(productId);
+            if (result === 'login-required') toast.error('Log in to save items to your wishlist.');
+            else if (result === 'error') toast.error('Could not update your wishlist. Please try again.');
+          }}
           aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           className={`absolute top-4 right-4 z-10 flex size-9 items-center justify-center rounded-full shadow-sm transition-all ${
             isWishlisted ? 'bg-rose text-white' : 'bg-white text-charcoal hover:bg-rose hover:text-white'

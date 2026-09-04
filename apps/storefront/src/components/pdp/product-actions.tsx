@@ -8,8 +8,6 @@ import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlistStore } from '@/store/wishlist-store';
-import { useAuthStore } from '@/store/auth-store';
-import { api } from '@/lib/axios';
 import { formatPrice } from '@/lib/format-price';
 import type { ProductVariant } from '@/types/product';
 
@@ -33,7 +31,6 @@ export function ProductActions({
   const addLine = useCartStore((s) => s.addLine);
   const isWishlisted = useWishlistStore((s) => s.has(productId));
   const toggleWishlist = useWishlistStore((s) => s.toggle);
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
 
   const canPurchase = inStock && !!variant;
 
@@ -62,23 +59,10 @@ export function ProductActions({
     }
   }
 
-  // Local wishlistStore is the UI's source of truth for the heart icon (it
-  // isn't persisted or hydrated from the backend on load, see its own doc
-  // comment) — this just also syncs a logged-in customer's toggle to the
-  // real backend wishlist, one-way, so the account wishlist page (Phase 6)
-  // has something real to show. Not a full reconciliation (no read-back into
-  // this heart's state elsewhere in the app), a deliberate scope cut.
   async function toggleWishlistProduct() {
-    const wasWishlisted = isWishlisted;
-    toggleWishlist(productId);
-    if (!isLoggedIn) return;
-    try {
-      if (wasWishlisted) await api.delete(`/wishlist/${productId}`);
-      else await api.post('/wishlist', { productId });
-    } catch {
-      toast.error('Could not update your wishlist. Please try again.');
-      toggleWishlist(productId);
-    }
+    const result = await toggleWishlist(productId);
+    if (result === 'login-required') toast.error('Log in to save items to your wishlist.');
+    else if (result === 'error') toast.error('Could not update your wishlist. Please try again.');
   }
 
   function share() {

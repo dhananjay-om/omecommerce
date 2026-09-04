@@ -15,14 +15,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/store/auth-store';
+import { useWishlistStore } from '@/store/wishlist-store';
 
 export function UserMenu() {
   const router = useRouter();
   const { isLoggedIn, firstName, hydrated, hydrate, logout } = useAuthStore();
+  const { hydrated: wishlistHydrated, hydrate: hydrateWishlist, reset: resetWishlist } = useWishlistStore();
 
   useEffect(() => {
     if (!hydrated) void hydrate();
   }, [hydrated, hydrate]);
+
+  // Chained off auth's own hydration (not a separate isLoggedIn check up
+  // front) — wishlist hydrate() needs to know isLoggedIn, and auth-store
+  // itself resolves that asynchronously, so this only fires once that's
+  // actually settled. Real per-customer state (like the cart), not local.
+  useEffect(() => {
+    if (hydrated && !wishlistHydrated) void hydrateWishlist();
+  }, [hydrated, wishlistHydrated, hydrateWishlist]);
 
   if (!isLoggedIn) {
     return (
@@ -59,7 +69,10 @@ export function UserMenu() {
         <DropdownMenuItem
           variant="destructive"
           onClick={() => {
-            void logout().then(() => router.refresh());
+            void logout().then(() => {
+              resetWishlist();
+              router.refresh();
+            });
           }}
         >
           Logout

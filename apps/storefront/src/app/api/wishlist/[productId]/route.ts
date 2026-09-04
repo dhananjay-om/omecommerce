@@ -4,8 +4,8 @@ import { ensureWishlist } from '@/lib/wishlist-server';
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ productId: string }> }) {
   const { productId } = await params;
-  const wishlist = await ensureWishlist();
   try {
+    const wishlist = await ensureWishlist();
     await apiDelete(`/store/v1/me/wishlists/${wishlist.publicId}/items/${productId}`, { auth: true });
     return new NextResponse(null, { status: 204 });
   } catch (err) {
