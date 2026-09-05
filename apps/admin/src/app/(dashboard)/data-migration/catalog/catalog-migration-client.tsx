@@ -48,6 +48,7 @@ export function CatalogMigrationClient({
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [approved, setApproved] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,6 +74,7 @@ export function CatalogMigrationClient({
       setAnalyzeError(result.error ?? 'Something went wrong.');
       return;
     }
+    setApproved(false); // a fresh plan needs its own fresh review, not the last one's approval
     setRun(result.run);
   }
 
@@ -188,6 +190,7 @@ export function CatalogMigrationClient({
             <p className="text-sm">
               <span className="font-medium text-foreground">{run.plan.totalProducts}</span> products found.
             </p>
+            <PlanCounts plan={run.plan} />
             <PlanSection title="Categories" entries={run.plan.categoryPlan.map((c) => ({ label: c.name, matched: c.action === 'MATCH_EXISTING' ? c.matchedCategoryName : undefined }))} />
             <AttributePlanSection entries={run.plan.attributePlan} />
             <PlanSection title="Attribute sets" entries={run.plan.attributeSetPlan.map((s) => ({ label: s.sourceProductType, matched: s.action === 'MATCH_EXISTING' ? s.matchedAttributeSetCode : undefined }))} />
@@ -201,8 +204,20 @@ export function CatalogMigrationClient({
                 </ul>
               </div>
             ) : null}
-            <Button onClick={handleStart} disabled={starting}>
-              {starting ? 'Starting…' : 'Start Migration'}
+            <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={approved}
+                onChange={(e) => setApproved(e.target.checked)}
+              />
+              <span>
+                I&apos;ve reviewed the categories, attributes, and attribute sets above and approve this plan.
+                Nothing runs until Start Migration is clicked below.
+              </span>
+            </label>
+            <Button onClick={handleStart} disabled={starting || !approved}>
+              {starting ? 'Starting…' : 'Approve & Start Migration'}
             </Button>
             {startError ? <p className="text-sm text-destructive">{startError}</p> : null}
           </CardContent>
@@ -238,6 +253,43 @@ export function CatalogMigrationClient({
           </CardContent>
         </Card>
       ) : null}
+    </div>
+  );
+}
+
+/** A clear "how many of each will actually be created vs. reused" count —
+ *  the plan's detail sections below already show this per-item, but an
+ *  admin managing a catalog with many product types/options needs the
+ *  numbers up front, not a count they have to tally themselves. */
+function PlanCounts({
+  plan,
+}: {
+  plan: {
+    categoryPlan: Array<{ action: 'CREATE' | 'MATCH_EXISTING' }>;
+    attributePlan: Array<{ action: 'CREATE' | 'MATCH_EXISTING' }>;
+    attributeSetPlan: Array<{ action: 'CREATE' | 'MATCH_EXISTING' }>;
+  };
+}) {
+  const tiles = [
+    { label: 'Categories', entries: plan.categoryPlan },
+    { label: 'Attributes', entries: plan.attributePlan },
+    { label: 'Attribute sets', entries: plan.attributeSetPlan },
+  ];
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {tiles.map((t) => {
+        const created = t.entries.filter((e) => e.action === 'CREATE').length;
+        const matched = t.entries.filter((e) => e.action === 'MATCH_EXISTING').length;
+        return (
+          <div key={t.label} className="rounded-md border p-3">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t.label}</p>
+            <p className="mt-1 text-sm">
+              <span className="font-medium text-foreground">{created}</span> new,{' '}
+              <span className="font-medium text-foreground">{matched}</span> matched to existing
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }

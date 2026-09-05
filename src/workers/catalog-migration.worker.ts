@@ -157,6 +157,19 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
     const attributeByCode = new Map(localAttributes.map((a) => [a.code, a]));
     const attributeSetByCode = new Map(localAttributeSets.map((s) => [s.code, s]));
     const defaultAttributeSet = localAttributeSets.find((s) => s.isDefault) ?? localAttributeSets[0] ?? null;
+    // Duplicate-prevention safety net, independent of the plan's own
+    // (code-based) matching: the AI's `newAttributeCode`/`newAttributeSetCode`
+    // is free-text and isn't guaranteed to be the same string across two
+    // separate Analyze calls for the same real-world concept (e.g. "color"
+    // one time, "colour_option" another) — the code-based findByCode/
+    // findSetByCode lookup below would miss that and create a genuine
+    // duplicate. This catches it by label/name instead (case-insensitive,
+    // trimmed) BEFORE ever creating one, no matter what the plan said to
+    // do — reusing a real match beats trusting a CREATE decision the plan
+    // got wrong, same "never let a model mistake create a duplicate" spirit
+    // as normalizePlan's own downgrade-a-hallucinated-match rule.
+    const attributeByLabelLower = new Map(localAttributes.map((a) => [a.label.trim().toLowerCase(), a]));
+    const attributeSetByNameLower = new Map(localAttributeSets.map((s) => [s.name.trim().toLowerCase(), s]));
 
     // --- Phase 1: categories (Shopify collections are flat, so every one is root-level) ---
     const categoryPublicIdByExternalId = new Map<string, string>();
@@ -183,8 +196,14 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
     const attributeSetByProductType = new Map<string, { id: bigint; groupId: bigint }>();
     for (const entry of plan.attributeSetPlan) {
       let set: AttributeSetInfo;
+      const nameLower = entry.sourceProductType.trim().toLowerCase();
       if (entry.action === 'MATCH_EXISTING' && attributeSetByCode.has(entry.matchedAttributeSetCode)) {
         set = attributeSetByCode.get(entry.matchedAttributeSetCode)!;
+      } else if (attributeSetByNameLower.has(nameLower)) {
+        // The plan said CREATE (or pointed at a code that no longer
+        // resolves), but a set with this exact name already exists —
+        // reuse it instead of creating a duplicate.
+        set = attributeSetByNameLower.get(nameLower)!;
       } else {
         const code = entry.action === 'CREATE' ? entry.newAttributeSetCode : entry.matchedAttributeSetCode;
         const existing = await deps.attributeSets.findSetByCode(code);
@@ -194,6 +213,8 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
           const created = await deps.createAttributeSet.execute({ code, name: entry.sourceProductType });
           result.attributeSetsCreated++;
           set = { id: BigInt(created.id), code: created.code, name: created.name, isDefault: created.isDefault };
+          attributeSetByCode.set(set.code, set);
+          attributeSetByNameLower.set(nameLower, set);
         }
       }
       const existingGroup = await deps.attributeSets.findGroupByName(set.id, 'General');
@@ -223,8 +244,15 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
     const optionsCacheByAttributeCode = new Map<string, Map<string, bigint>>(); // value -> optionId
     for (const entry of plan.attributePlan) {
       let attribute: AttributeInfo;
+      const labelLower = entry.sourceOptionName.trim().toLowerCase();
       if (entry.action === 'MATCH_EXISTING' && attributeByCode.has(entry.matchedAttributeCode)) {
         attribute = attributeByCode.get(entry.matchedAttributeCode)!;
+      } else if (attributeByLabelLower.has(labelLower)) {
+        // Same safety net as the attribute-set branch above: the plan said
+        // CREATE, but an attribute with this exact label already exists —
+        // reuse it rather than creating a second attribute for the same
+        // real-world concept under a different code.
+        attribute = attributeByLabelLower.get(labelLower)!;
       } else {
         const code = entry.action === 'CREATE' ? entry.newAttributeCode : entry.matchedAttributeCode;
         const existing = await deps.attributes.findByCode(code);
@@ -241,6 +269,8 @@ async function runCatalogMigration(job: Job, deps: Deps): Promise<MigrationRunRe
           });
           result.attributesCreated++;
           attribute = { id: BigInt(created.id), code: created.code, label: created.label } as AttributeInfo;
+          attributeByCode.set(attribute.code, attribute);
+          attributeByLabelLower.set(labelLower, attribute);
         }
       }
       attributeCodeByOptionName.set(entry.sourceOptionName, attribute.code);
