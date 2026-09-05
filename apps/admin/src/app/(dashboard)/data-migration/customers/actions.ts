@@ -9,6 +9,11 @@ export interface ActionState {
   success: boolean;
 }
 
+// Connect/Test hit the exact same connection as the Catalog migration page
+// — a Shopify connection isn't per-migration-type, so connecting here (or
+// there) makes both pages see it immediately. Duplicated here rather than
+// shared, matching the Catalog page's own self-contained-page shape (each
+// migration page owns its whole flow end to end).
 export async function getConnection(): Promise<MigrationConnection | null> {
   return apiGet<MigrationConnection | null>('/admin/v1/migration/connections/SHOPIFY');
 }
@@ -22,15 +27,13 @@ export async function connectShopify(_prevState: ActionState, formData: FormData
   }
 
   try {
-    // Blank apiToken means "leave the currently-saved token unchanged" —
-    // same contract as AI Settings' apiKey. Never sent as an empty string.
     await apiPut<MigrationConnection>('/admin/v1/migration/connections/SHOPIFY', { storeUrl, apiToken: apiToken || undefined });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;
   }
 
-  revalidatePath('/data-migration/catalog');
+  revalidatePath('/data-migration/customers');
   return { error: null, success: true };
 }
 
@@ -55,13 +58,13 @@ export interface AnalyzeState {
   run: MigrationRun | null;
 }
 
-/** "Check Migration" — analyzes the real catalog and builds the AI mapping
- *  plan (a real request, not instant — bounded to a sample + one LLM call,
- *  see AnalyzeCatalog's own doc comment; no BullMQ job needed for this
- *  step). */
-export async function analyzeCatalog(): Promise<AnalyzeState> {
+/** "Check Migration" — no AI call, unlike Catalog's (see AnalyzeCustomers'
+ *  own doc comment on why a customer record has no real mapping ambiguity
+ *  to resolve). Still a real request against the source store, not
+ *  instant. */
+export async function analyzeCustomers(): Promise<AnalyzeState> {
   try {
-    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel: 'SHOPIFY', dataType: 'CATALOG' });
+    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel: 'SHOPIFY', dataType: 'CUSTOMER' });
     return { error: null, run };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, run: null };
@@ -74,8 +77,6 @@ export interface StartState {
   run: MigrationRun | null;
 }
 
-/** "Start Migration" — applies the already-built plan. The single click
- *  the "no manual intervention" requirement is about. */
 export async function startMigration(runPublicId: string): Promise<StartState> {
   try {
     const run = await apiPost<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}/start`);
@@ -91,10 +92,9 @@ export interface CancelState {
   run: MigrationRun | null;
 }
 
-/** "Stop" — a cooperative request, not a hard kill (see CancelMigrationRun's
- *  own doc comment): the worker finishes whatever product it's on, then
- *  stops before starting the next one. Whatever already migrated stays
- *  migrated; re-running later picks up where this left off. */
+/** "Stop" — same cooperative-stop contract as Catalog's own Stop button
+ *  (see CancelMigrationRun's doc comment): finishes whatever customer it's
+ *  currently on, then stops before starting the next one. */
 export async function cancelMigration(runPublicId: string): Promise<CancelState> {
   try {
     const run = await apiPost<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}/cancel`);
@@ -111,9 +111,5 @@ export async function getRun(runPublicId: string): Promise<MigrationRun> {
 }
 
 export async function listRuns(): Promise<MigrationRun[]> {
-  // Scoped to dataType=CATALOG — Catalog and Customer migration each have
-  // their own independent Check Migration / Start / Stop history even
-  // though they share one Shopify connection (see ListMigrationRuns' own
-  // doc comment).
-  return apiGet<MigrationRun[]>('/admin/v1/migration/runs?channel=SHOPIFY&dataType=CATALOG');
+  return apiGet<MigrationRun[]>('/admin/v1/migration/runs?channel=SHOPIFY&dataType=CUSTOMER');
 }

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { MigrationConnection, MigrationRun } from '@/lib/types';
+import type { MigrationConnection, MigrationRun, MigrationPlan, MigrationRunResult } from '@/lib/types';
 import {
   connectShopify,
   testConnection,
@@ -181,24 +181,33 @@ export function CatalogMigrationClient({
       ) : null}
 
       {run && run.status === 'READY' && run.plan ? (
+        (() => {
+          // This page only ever fetches dataType=CATALOG runs (see
+          // actions.ts's listRuns) — MigrationRun.plan is typed as a union
+          // because the SAME type is shared with the Customers migration
+          // page, which gets a CustomerMigrationPlan instead; narrow here
+          // rather than threading a dataType generic through this whole
+          // component for one field.
+          const plan = run.plan as MigrationPlan;
+          return (
         <Card>
           <CardHeader className="border-b pb-4">
             <CardTitle className="text-base">Migration Plan</CardTitle>
-            <CardDescription>{run.plan.summary}</CardDescription>
+            <CardDescription>{plan.summary}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
             <p className="text-sm">
-              <span className="font-medium text-foreground">{run.plan.totalProducts}</span> products found.
+              <span className="font-medium text-foreground">{plan.totalProducts}</span> products found.
             </p>
-            <PlanCounts plan={run.plan} />
-            <PlanSection title="Categories" entries={run.plan.categoryPlan.map((c) => ({ label: c.name, matched: c.action === 'MATCH_EXISTING' ? c.matchedCategoryName : undefined }))} />
-            <AttributePlanSection entries={run.plan.attributePlan} />
-            <PlanSection title="Attribute sets" entries={run.plan.attributeSetPlan.map((s) => ({ label: s.sourceProductType, matched: s.action === 'MATCH_EXISTING' ? s.matchedAttributeSetCode : undefined }))} />
-            {run.plan.warnings.length > 0 ? (
+            <PlanCounts plan={plan} />
+            <PlanSection title="Categories" entries={plan.categoryPlan.map((c) => ({ label: c.name, matched: c.action === 'MATCH_EXISTING' ? c.matchedCategoryName : undefined }))} />
+            <AttributePlanSection entries={plan.attributePlan} />
+            <PlanSection title="Attribute sets" entries={plan.attributeSetPlan.map((s) => ({ label: s.sourceProductType, matched: s.action === 'MATCH_EXISTING' ? s.matchedAttributeSetCode : undefined }))} />
+            {plan.warnings.length > 0 ? (
               <div className="space-y-1">
                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Warnings</p>
                 <ul className="list-inside list-disc text-sm text-muted-foreground">
-                  {run.plan.warnings.map((w, i) => (
+                  {plan.warnings.map((w, i) => (
                     <li key={i}>{w}</li>
                   ))}
                 </ul>
@@ -222,6 +231,8 @@ export function CatalogMigrationClient({
             {startError ? <p className="text-sm text-destructive">{startError}</p> : null}
           </CardContent>
         </Card>
+          );
+        })()
       ) : null}
 
       {run && run.status === 'RUNNING' ? (
@@ -343,13 +354,16 @@ function AttributePlanSection({
 }
 
 function RunResultSummary({ run }: { run: MigrationRun }) {
+  // Same narrowing reasoning as the Migration Plan card above — this page
+  // only ever deals with CATALOG runs.
+  const result = run.result as MigrationRunResult | null;
   if (run.status === 'FAILED') {
     return (
       <div className="space-y-2">
         <p className="text-sm text-destructive">
-          Last run failed{run.result?.fatalError ? `: ${run.result.fatalError}` : '.'}
+          Last run failed{result?.fatalError ? `: ${result.fatalError}` : '.'}
         </p>
-        <SkipFailDetails result={run.result} />
+        <SkipFailDetails result={result} />
       </div>
     );
   }
@@ -358,23 +372,23 @@ function RunResultSummary({ run }: { run: MigrationRun }) {
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
           Last run was stopped after{' '}
-          <span className="font-medium text-foreground">{run.result?.productsCreated ?? run.processedItems}</span>{' '}
+          <span className="font-medium text-foreground">{result?.productsCreated ?? run.processedItems}</span>{' '}
           product(s) — nothing already migrated was undone. Check Migration again to pick up where it left off.
         </p>
-        <SkipFailDetails result={run.result} />
+        <SkipFailDetails result={result} />
       </div>
     );
   }
-  if (!run.result) return null;
+  if (!result) return null;
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">
-        Last run: <span className="font-medium text-foreground">{run.result.productsCreated}</span> products,{' '}
-        <span className="font-medium text-foreground">{run.result.variantsCreated}</span> variants,{' '}
-        <span className="font-medium text-foreground">{run.result.categoriesCreated}</span> categories created,{' '}
-        {run.result.skipped.length} skipped, {run.result.failed.length} failed.
+        Last run: <span className="font-medium text-foreground">{result.productsCreated}</span> products,{' '}
+        <span className="font-medium text-foreground">{result.variantsCreated}</span> variants,{' '}
+        <span className="font-medium text-foreground">{result.categoriesCreated}</span> categories created,{' '}
+        {result.skipped.length} skipped, {result.failed.length} failed.
       </p>
-      <SkipFailDetails result={run.result} />
+      <SkipFailDetails result={result} />
     </div>
   );
 }
@@ -384,7 +398,7 @@ function RunResultSummary({ run }: { run: MigrationRun }) {
  *  product") — this just surfaces that list instead of leaving the admin
  *  with only a bare count to wonder about. Collapsed by default since a
  *  large catalog can produce a long list. */
-function SkipFailDetails({ result }: { result: MigrationRun['result'] }) {
+function SkipFailDetails({ result }: { result: MigrationRunResult | null }) {
   const [open, setOpen] = useState(false);
   if (!result) return null;
   const items = [

@@ -1,8 +1,11 @@
 import type {
   SourceCatalogClient,
+  SourceCustomerClient,
   SourceProduct,
   SourceProductVariant,
   SourceCategory,
+  SourceCustomer,
+  SourceCustomerAddress,
 } from '../domain/source-client.js';
 
 const API_VERSION = '2024-10';
@@ -18,7 +21,7 @@ const PAGE_SIZE = 250; // Shopify's own max per page
  *  never raw fetch" convention (S3/OpenSearch/SMTP/OpenAI all integrate
  *  through their real SDK because those ARE genuinely complex protocols;
  *  "GET a JSON list with a static header" isn't). */
-export class ShopifyClient implements SourceCatalogClient {
+export class ShopifyClient implements SourceCatalogClient, SourceCustomerClient {
   private readonly baseUrl: string;
   /** Lazily loaded once per client instance (see ensureCollectionMembership
    *  below) — product_id -> [collection_id, ...]. */
@@ -139,6 +142,20 @@ export class ShopifyClient implements SourceCatalogClient {
       parentExternalId: null,
     }));
   }
+
+  async countCustomers(): Promise<number> {
+    const { body } = await this.request('/customers/count.json');
+    return (body as { count: number }).count;
+  }
+
+  async listCustomers(cursor: string | null): Promise<{ customers: SourceCustomer[]; nextCursor: string | null }> {
+    const path = cursor
+      ? `/customers.json?limit=${PAGE_SIZE}&page_info=${encodeURIComponent(cursor)}`
+      : `/customers.json?limit=${PAGE_SIZE}`;
+    const { body, linkHeader } = await this.request(path);
+    const customers = ((body as { customers: ShopifyCustomer[] }).customers ?? []).map(toSourceCustomer);
+    return { customers, nextCursor: parseNextCursor(linkHeader) };
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -194,6 +211,62 @@ interface ShopifyProduct {
 interface ShopifyCollection {
   id: number;
   title: string;
+}
+
+interface ShopifyCustomerAddress {
+  id: number;
+  first_name: string | null;
+  last_name: string | null;
+  company: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  province: string | null;
+  country_code: string | null;
+  zip: string | null;
+  phone: string | null;
+  default?: boolean;
+}
+
+interface ShopifyCustomer {
+  id: number;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  tags: string; // comma-separated, same shape as ShopifyProduct.tags
+  accepts_marketing: boolean;
+  addresses: ShopifyCustomerAddress[];
+  default_address: ShopifyCustomerAddress | null;
+}
+
+function toSourceCustomer(c: ShopifyCustomer): SourceCustomer {
+  const defaultAddressId = c.default_address?.id;
+  const addresses: SourceCustomerAddress[] = (c.addresses ?? []).map((a) => ({
+    externalId: String(a.id),
+    firstName: a.first_name,
+    lastName: a.last_name,
+    company: a.company,
+    address1: a.address1,
+    address2: a.address2,
+    city: a.city,
+    province: a.province,
+    countryCode: a.country_code,
+    zip: a.zip,
+    phone: a.phone,
+    isDefault: a.id === defaultAddressId,
+  }));
+
+  return {
+    externalId: String(c.id),
+    email: c.email,
+    firstName: c.first_name,
+    lastName: c.last_name,
+    phone: c.phone,
+    acceptsMarketing: c.accepts_marketing ?? false,
+    tags: c.tags ? c.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+    addresses,
+  };
 }
 
 function toSourceProduct(p: ShopifyProduct, collectsByProductId: Map<string, string[]>): SourceProduct {

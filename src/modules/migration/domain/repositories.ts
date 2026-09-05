@@ -61,7 +61,7 @@ export interface MigrationRunRepository {
   create(input: CreateMigrationRunInput): Promise<MigrationRunInfo>;
   findByPublicId(publicId: string): Promise<MigrationRunInfo | null>;
   findById(id: bigint): Promise<MigrationRunInfo | null>;
-  listByConnectionId(connectionId: bigint, limit: number): Promise<MigrationRunInfo[]>;
+  listByConnectionId(connectionId: bigint, limit: number, dataType?: string): Promise<MigrationRunInfo[]>;
   markStarted(id: bigint, jobId: string): Promise<void>;
   /** Cheap, frequent write — the worker calls this every few products, not
    *  every single one (see the worker's own doc comment), so

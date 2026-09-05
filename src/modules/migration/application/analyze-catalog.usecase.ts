@@ -5,7 +5,7 @@ import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { getOpenAiClient } from '../../ai/infrastructure/dynamic-openai-client.js';
 import { generateMigrationPlan } from '../infrastructure/migration-plan-openai.js';
 import { buildSourceClient } from '../infrastructure/source-client-factory.js';
-import type { AnalyzeCatalogCommand, MigrationRunView } from './dto.js';
+import type { AnalyzeMigrationCommand, MigrationRunView } from './dto.js';
 import { toMigrationRunView } from './migration-run-view.js';
 
 const SAMPLE_SIZE = 50;
@@ -29,7 +29,7 @@ export class AnalyzeCatalog {
     private readonly categories: CategoryRepository,
   ) {}
 
-  async execute(cmd: AnalyzeCatalogCommand): Promise<MigrationRunView> {
+  async execute(cmd: AnalyzeMigrationCommand): Promise<MigrationRunView> {
     const connection = await this.connections.getByChannel(cmd.channel);
     if (!connection) throw new NotFoundError('migration connection', cmd.channel);
 

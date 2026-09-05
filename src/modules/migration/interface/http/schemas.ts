@@ -18,9 +18,9 @@ export const connectMigrationSourceSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-export const analyzeCatalogSchema = z.object({
+export const analyzeMigrationRunSchema = z.object({
   channel: z.enum(['SHOPIFY', 'MAGENTO']),
-  dataType: z.literal('CATALOG'),
+  dataType: z.enum(['CATALOG', 'CUSTOMER']),
 });
 
 export const migrationRunParamSchema = z.object({
@@ -29,4 +29,9 @@ export const migrationRunParamSchema = z.object({
 
 export const listMigrationRunsQuerySchema = z.object({
   channel: z.enum(['SHOPIFY', 'MAGENTO']),
+  // Optional — the Catalog and Customer migration pages each poll their
+  // own history separately (two independent Check Migration / Start / Stop
+  // flows sharing the same connection), so a run list needs to be
+  // filterable by which flow it belongs to, not just which store.
+  dataType: z.enum(['CATALOG', 'CUSTOMER']).optional(),
 });

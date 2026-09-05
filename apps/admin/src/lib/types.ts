@@ -1318,6 +1318,26 @@ export interface MigrationRunResult {
   fatalError?: string;
 }
 
+/** AnalyzeCustomers' output — no attribute/category mapping, since a
+ *  customer record has no such ambiguity (see that use case's own doc
+ *  comment on why no AI call is involved). */
+export interface CustomerMigrationPlan {
+  summary: string;
+  totalCustomers: number;
+  sampleSize: number;
+  duplicateEmailsInSample: number;
+  customersWithoutEmailInSample: number;
+  warnings: string[];
+}
+
+export interface CustomerMigrationRunResult {
+  customersCreated: number;
+  addressesCreated: number;
+  skipped: Array<{ email: string | null; externalId: string; reason: string }>;
+  failed: Array<{ email: string | null; externalId: string; reason: string }>;
+  fatalError?: string;
+}
+
 export interface MigrationRun {
   publicId: string;
   channel: MigrationChannel;
@@ -1327,8 +1347,12 @@ export interface MigrationRun {
   processedItems: number;
   skippedItems: number;
   failedItems: number;
-  plan: MigrationPlan | null;
-  result: MigrationRunResult | null;
+  /** Shaped by `dataType` — a CATALOG run's plan/result vs. a CUSTOMER
+   *  run's. Each migration page only ever fetches its own dataType, so the
+   *  client component there narrows with an `as` the same way it already
+   *  does when reading typed JSON off the wire elsewhere in this app. */
+  plan: MigrationPlan | CustomerMigrationPlan | null;
+  result: MigrationRunResult | CustomerMigrationRunResult | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;

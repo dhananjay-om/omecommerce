@@ -40,7 +40,10 @@ export interface MigrationPlan {
   warnings: string[];
 }
 
-export interface AnalyzeCatalogCommand {
+/** Shared by AnalyzeCatalog and AnalyzeCustomers — both take exactly a
+ *  channel, nothing dataType-specific (dataType is decided by which use
+ *  case is called, not passed in). */
+export interface AnalyzeMigrationCommand {
   channel: MigrationChannel;
 }
 
@@ -53,8 +56,11 @@ export interface MigrationRunView {
   processedItems: number;
   skippedItems: number;
   failedItems: number;
-  plan: MigrationPlan | null;
-  result: MigrationRunResult | null;
+  /** Shaped by `dataType` — CATALOG runs carry a MigrationPlan, CUSTOMER
+   *  runs a CustomerMigrationPlan. The frontend switches on `dataType`,
+   *  same as it already switches on `status`. */
+  plan: MigrationPlan | CustomerMigrationPlan | null;
+  result: MigrationRunResult | CustomerMigrationRunResult | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -72,5 +78,27 @@ export interface MigrationRunResult {
   imagesAttached: number;
   skipped: Array<{ sku: string | null; externalId: string; reason: string }>;
   failed: Array<{ sku: string | null; externalId: string; reason: string }>;
+  fatalError?: string;
+}
+
+/** AnalyzeCustomers' output — deterministic, not AI-generated (see that use
+ *  case's own doc comment on why mapping a customer record has no real
+ *  ambiguity the way a foreign catalog's attribute/category names do). */
+export interface CustomerMigrationPlan {
+  summary: string;
+  totalCustomers: number;
+  sampleSize: number;
+  duplicateEmailsInSample: number;
+  customersWithoutEmailInSample: number;
+  warnings: string[];
+}
+
+/** Populated once a CUSTOMER run reaches COMPLETED/FAILED/CANCELLED — same
+ *  "every skip/failure names a real reason" contract as MigrationRunResult. */
+export interface CustomerMigrationRunResult {
+  customersCreated: number;
+  addressesCreated: number;
+  skipped: Array<{ email: string | null; externalId: string; reason: string }>;
+  failed: Array<{ email: string | null; externalId: string; reason: string }>;
   fatalError?: string;
 }

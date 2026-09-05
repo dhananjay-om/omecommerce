@@ -11,10 +11,14 @@ export class ListMigrationRuns {
     private readonly runs: MigrationRunRepository,
   ) {}
 
-  async execute(channel: MigrationChannel): Promise<MigrationRunView[]> {
+  /** `dataType` is optional — the Catalog and Customer migration pages each
+   *  pass their own, so a customer run never shows up as "the latest run"
+   *  on the Catalog page or vice versa (they share one connection, but each
+   *  has its own independent Check Migration / Start / Stop history). */
+  async execute(channel: MigrationChannel, dataType?: string): Promise<MigrationRunView[]> {
     const connection = await this.connections.getByChannel(channel);
     if (!connection) throw new NotFoundError('migration connection', channel);
-    const rows = await this.runs.listByConnectionId(connection.id, DEFAULT_LIMIT);
+    const rows = await this.runs.listByConnectionId(connection.id, DEFAULT_LIMIT, dataType);
     return rows.map((r) => toMigrationRunView(r, channel));
   }
 }

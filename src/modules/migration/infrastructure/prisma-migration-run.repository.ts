@@ -33,9 +33,9 @@ export class PrismaMigrationRunRepository implements MigrationRunRepository {
     return row ? toInfo(row) : null;
   }
 
-  async listByConnectionId(connectionId: bigint, limit: number): Promise<MigrationRunInfo[]> {
+  async listByConnectionId(connectionId: bigint, limit: number, dataType?: string): Promise<MigrationRunInfo[]> {
     const rows = await this.db.migrationRun.findMany({
-      where: { connectionId },
+      where: { connectionId, ...(dataType ? { dataType } : {}) },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });

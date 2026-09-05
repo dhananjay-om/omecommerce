@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { Worker, type Job } from 'bullmq';
 import { CATALOG_MIGRATION_QUEUE } from '../shared/infrastructure/queue/queues.js';
 import { getQueueConnectionOptions } from '../shared/infrastructure/queue/connection.js';
@@ -34,29 +34,38 @@ import type { AttributeInfo, AttributeSetInfo, AttributeOptionInfo } from '../mo
 import { PrismaMigrationRunRepository } from '../modules/migration/infrastructure/prisma-migration-run.repository.js';
 import { PrismaMigrationConnectionRepository } from '../modules/migration/infrastructure/prisma-migration-connection.repository.js';
 import { PrismaMigrationExternalRefRepository } from '../modules/migration/infrastructure/prisma-migration-external-ref.repository.js';
-import { buildSourceClient } from '../modules/migration/infrastructure/source-client-factory.js';
-import type { SourceProduct } from '../modules/migration/domain/source-client.js';
-import type { MigrationPlan, MigrationRunResult } from '../modules/migration/application/dto.js';
+import { buildSourceClient, buildCustomerSourceClient } from '../modules/migration/infrastructure/source-client-factory.js';
+import type { SourceProduct, SourceCustomer } from '../modules/migration/domain/source-client.js';
+import type { MigrationPlan, MigrationRunResult, CustomerMigrationRunResult } from '../modules/migration/application/dto.js';
+import { PrismaCustomerRepository } from '../modules/customer/infrastructure/prisma-customer.repository.js';
+import { PrismaCustomerAddressRepository } from '../modules/customer/infrastructure/prisma-customer-address.repository.js';
+import { ScryptPasswordHasher } from '../modules/auth/infrastructure/scrypt-password-hasher.js';
 
 /**
  * The single Worker on CATALOG_MIGRATION_QUEUE (its own queue — see
  * queues.ts's own doc comment on why this doesn't share BULK_JOBS_QUEUE).
- * One job name: `migrate-catalog`, payload `{ runId: string }`.
+ * Two job names now: `migrate-catalog` (runCatalogMigration) and
+ * `migrate-customers` (runCustomerMigration), both `{ runId: string }` —
+ * dispatched by `job.name` below, same "one Worker, several job types"
+ * shape bulk-import.worker.ts already established on BULK_JOBS_QUEUE. They
+ * share a queue (and so serialize against each other — BullMQ's default
+ * Worker concurrency is 1) but each is its own independent run, gated by
+ * its own run row's `dataType`.
  *
- * Applies the MigrationPlan a prior AnalyzeCatalog call already built
- * DETERMINISTICALLY — no further AI calls happen in this loop (see
+ * Applies the plan a prior Analyze call already built DETERMINISTICALLY —
+ * no further AI calls happen in this loop for catalog migration (see
  * migration-plan-openai.ts's own doc comment on why the plan is decided
- * once, not per product): every category/attribute/attribute-set decision
- * was already made, this just executes it with plain code, the same
- * "reuse the real create use cases, per-row try/catch, progress after each
- * row" shape bulk-import.worker.ts already established for CSV import.
+ * once, not per product), and customer migration never used AI to begin
+ * with (see analyze-customers.usecase.ts's own doc comment on why): every
+ * decision was already made, this just executes it with plain code, the
+ * same "reuse the real create use cases, per-row try/catch, progress after
+ * each row" shape bulk-import.worker.ts already established for CSV import.
  *
  * Progress is reported BOTH ways: `job.updateProgress()` after every single
- * product (BullMQ-native, cheap, what GetMigrationRun prefers while
- * RUNNING) and a MigrationRun DB row update every 10 products (a fallback
- * so the row is never wildly stale even if nobody's actively polling the
- * job — not every single product, to avoid hammering Postgres on a large
- * catalog).
+ * row (BullMQ-native, cheap, what GetMigrationRun prefers while RUNNING)
+ * and a MigrationRun DB row update every 10 rows (a fallback so the row is
+ * never wildly stale even if nobody's actively polling the job — not every
+ * single row, to avoid hammering Postgres on a large catalog/customer list).
  */
 export function startCatalogMigrationWorker(): Worker {
   const products = new PrismaProductRepository(prisma);
@@ -71,15 +80,18 @@ export function startCatalogMigrationWorker(): Worker {
   const mediaStorage = new S3MediaStorage();
   const cache = new CacheAside(redis);
   const outbox = new OutboxWriter(prisma);
+  const runs = new PrismaMigrationRunRepository(prisma);
+  const connections = new PrismaMigrationConnectionRepository(prisma);
+  const externalRefs = new PrismaMigrationExternalRefRepository(prisma);
 
   const deps: Deps = {
     products,
     attributes,
     attributeSets,
     categories,
-    runs: new PrismaMigrationRunRepository(prisma),
-    connections: new PrismaMigrationConnectionRepository(prisma),
-    externalRefs: new PrismaMigrationExternalRefRepository(prisma),
+    runs,
+    connections,
+    externalRefs,
     createProduct: new CreateProduct(products, outbox, attributes, attrStore),
     createCategory: new CreateCategory(categories),
     createAttribute: new CreateAttribute(attributes),
@@ -95,12 +107,22 @@ export function startCatalogMigrationWorker(): Worker {
     mediaStorage,
   };
 
+  const customerDeps: CustomerDeps = {
+    runs,
+    connections,
+    externalRefs,
+    customers: new PrismaCustomerRepository(prisma),
+    customerAddresses: new PrismaCustomerAddressRepository(prisma),
+    passwordHasher: new ScryptPasswordHasher(),
+  };
+
   const worker = new Worker(
     CATALOG_MIGRATION_QUEUE,
-    async (job: Job): Promise<MigrationRunResult> => runCatalogMigration(job, deps),
+    async (job: Job): Promise<MigrationRunResult | CustomerMigrationRunResult> =>
+      job.name === 'migrate-customers' ? runCustomerMigration(job, customerDeps) : runCatalogMigration(job, deps),
     { connection: getQueueConnectionOptions() },
   );
-  worker.on('failed', (job, err) => logger.error({ err, jobId: job?.id }, 'catalog migration job failed'));
+  worker.on('failed', (job, err) => logger.error({ err, jobId: job?.id, jobName: job?.name }, 'data migration job failed'));
   return worker;
 }
 
@@ -493,6 +515,179 @@ async function processProduct(source: SourceProduct, ctx: ProcessProductCtx): Pr
     } catch {
       // One bad image (a dead URL, an unsupported format) shouldn't fail an
       // otherwise-successful product — soft-skip, not pushed to result.failed.
+    }
+  }
+}
+
+// ============================================================================
+// Customer migration — `migrate-customers` job, added alongside the catalog
+// migration above (same file, same queue, dispatched by job.name — see
+// startCatalogMigrationWorker's own doc comment on why). Deterministic:
+// AnalyzeCustomers never calls AI (there's no mapping ambiguity to resolve —
+// see its own doc comment), so there's no plan to "apply" here beyond the
+// fixed email/name/address mapping every source platform shares.
+// ============================================================================
+
+interface CustomerDeps {
+  runs: PrismaMigrationRunRepository;
+  connections: PrismaMigrationConnectionRepository;
+  externalRefs: PrismaMigrationExternalRefRepository;
+  customers: PrismaCustomerRepository;
+  customerAddresses: PrismaCustomerAddressRepository;
+  passwordHasher: ScryptPasswordHasher;
+}
+
+/** Resolves the website new migrated customers belong to — this codebase
+ *  now supports multiple websites (see the Multi-Store feature), but
+ *  Shopify/Magento customers carry no per-website concept of their own, so
+ *  there's nothing meaningful to map a source customer's "website" onto.
+ *  Falls back through the same `isDefault` convention used elsewhere in
+ *  this schema (Currency.isDefault, AttributeSet.isDefault, ...), then to
+ *  the oldest website if somehow none is flagged default. Throws (a real,
+ *  loud failure, not a silent bad-data create) if no website exists at
+ *  all — that's a store-setup problem, not something this job can recover
+ *  from on its own. */
+async function resolveDefaultWebsiteId(db: typeof prisma): Promise<bigint> {
+  const preferred = await db.website.findFirst({ where: { isDefault: true, deletedAt: null }, select: { id: true } });
+  if (preferred) return preferred.id;
+  const fallback = await db.website.findFirst({ where: { deletedAt: null }, orderBy: { id: 'asc' }, select: { id: true } });
+  if (!fallback) throw new Error('no website exists to assign migrated customers to');
+  return fallback.id;
+}
+
+async function runCustomerMigration(job: Job, deps: CustomerDeps): Promise<CustomerMigrationRunResult> {
+  const { runId } = job.data as { runId: string };
+  const run = await deps.runs.findById(BigInt(runId));
+  if (!run) throw new Error(`migration run ${runId} not found`);
+  const connection = await deps.connections.getById(run.connectionId);
+  if (!connection) throw new Error(`migration connection ${run.connectionId} not found`);
+  const client = buildCustomerSourceClient(connection.channel, connection.storeUrl, connection.apiToken);
+  const websiteId = await resolveDefaultWebsiteId(prisma);
+
+  const result: CustomerMigrationRunResult = {
+    customersCreated: 0,
+    addressesCreated: 0,
+    skipped: [],
+    failed: [],
+  };
+
+  try {
+    let cursor: string | null = null;
+    let processed = 0;
+    let cancelled = false;
+    customerPages: do {
+      const page = await client.listCustomers(cursor);
+      for (const source of page.customers) {
+        // Cooperative stop, checked before every customer — same "never a
+        // hard kill mid-row" reasoning as the catalog migration's own loop
+        // (a customer's address rows aren't created in the same DB
+        // transaction as the customer itself).
+        if (await deps.runs.isCancelRequested(run.id)) {
+          cancelled = true;
+          break customerPages;
+        }
+        processed++;
+        try {
+          await processCustomer(source, { run, connection, deps, result, websiteId });
+        } catch (err) {
+          result.failed.push({ email: source.email, externalId: source.externalId, reason: err instanceof Error ? err.message : String(err) });
+        }
+        await job.updateProgress({ processed, skipped: result.skipped.length, failed: result.failed.length, total: run.totalItems ?? processed });
+        if (processed % 10 === 0) {
+          await deps.runs.updateProgress(run.id, processed, result.skipped.length, result.failed.length);
+        }
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    await deps.runs.updateProgress(run.id, processed, result.skipped.length, result.failed.length);
+    if (cancelled) {
+      await deps.runs.markCancelled(run.id, result);
+    } else {
+      await deps.runs.markCompleted(run.id, result);
+    }
+    return result;
+  } catch (err) {
+    result.fatalError = err instanceof Error ? err.message : String(err);
+    // Whatever was already created stays created — same "each row is its
+    // own unit of work" posture as the catalog migration.
+    await deps.runs.markFailed(run.id, result);
+    throw err;
+  }
+}
+
+interface ProcessCustomerCtx {
+  run: { id: bigint };
+  connection: { id: bigint };
+  deps: CustomerDeps;
+  result: CustomerMigrationRunResult;
+  websiteId: bigint;
+}
+
+async function processCustomer(source: SourceCustomer, ctx: ProcessCustomerCtx): Promise<void> {
+  const { run, connection, deps, result } = ctx;
+
+  const existingRef = await deps.externalRefs.find(connection.id, 'CUSTOMER', source.externalId);
+  if (existingRef) {
+    result.skipped.push({ email: source.email, externalId: source.externalId, reason: 'already migrated in a previous run' });
+    return;
+  }
+
+  const email = source.email?.trim().toLowerCase() ?? null;
+  if (!email) {
+    result.skipped.push({ email: null, externalId: source.externalId, reason: 'no email on the source customer — an email is required to sign in here' });
+    return;
+  }
+
+  const localExisting = await deps.customers.findByWebsiteAndEmail(ctx.websiteId, email);
+  if (localExisting) {
+    result.skipped.push({ email, externalId: source.externalId, reason: 'a customer with this email already exists locally' });
+    return;
+  }
+
+  // Shopify (and every other platform) never exposes a real password via
+  // its API — it's one-way hashed on their end too. A random, unknown
+  // password is the only honest option here; see analyze-customers.
+  // usecase.ts's own warning about this shown to the admin before Start.
+  const randomPassword = randomBytes(24).toString('hex');
+  const passwordHash = await deps.passwordHasher.hash(randomPassword);
+
+  const created = await deps.customers.create({
+    websiteId: ctx.websiteId,
+    email,
+    passwordHash,
+    firstName: source.firstName,
+    lastName: source.lastName,
+  });
+  result.customersCreated++;
+  await deps.externalRefs.record(run.id, connection.id, 'CUSTOMER', source.externalId, created.publicId);
+
+  for (const addr of source.addresses) {
+    // Required locally: name, line1, city, postalCode, country. A Shopify
+    // address missing any of these (rare, but real-world data is messy) is
+    // silently skipped for just that one address — never fails the whole
+    // customer over one incomplete saved address.
+    const name = [addr.firstName, addr.lastName].filter(Boolean).join(' ').trim() || [source.firstName, source.lastName].filter(Boolean).join(' ').trim();
+    if (!name || !addr.address1 || !addr.city || !addr.zip || !addr.countryCode) continue;
+    try {
+      await deps.customerAddresses.create({
+        customerId: created.id,
+        name,
+        company: addr.company,
+        line1: addr.address1,
+        line2: addr.address2,
+        city: addr.city,
+        region: addr.province,
+        postalCode: addr.zip,
+        country: addr.countryCode,
+        phone: addr.phone,
+        isDefaultShipping: addr.isDefault,
+        isDefaultBilling: addr.isDefault,
+      });
+      result.addressesCreated++;
+    } catch {
+      // One bad address shouldn't fail an otherwise-successful customer —
+      // same soft-skip posture as a bad product image in the catalog job.
     }
   }
 }

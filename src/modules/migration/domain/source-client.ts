@@ -66,3 +66,57 @@ export interface SourceCategory {
   name: string;
   parentExternalId: string | null;
 }
+
+/**
+ * Customer migration's own channel-agnostic port — a separate interface
+ * from SourceCatalogClient (not folded into it) since Customer and Catalog
+ * are migrated independently (their own Check Migration / Start / Stop
+ * flow each, per the confirmed "Catalog first, Customer next" phasing) and
+ * a connector may reasonably support one without the other. ShopifyClient
+ * implements both, since it's the same authenticated REST client either
+ * way; Magento becomes a second implementation of each port separately,
+ * whenever it's built.
+ */
+export interface SourceCustomerClient {
+  countCustomers(): Promise<number>;
+  /** Full, paginated read — cursor is opaque, same round-trip contract as
+   *  SourceCatalogClient.listProducts. */
+  listCustomers(cursor: string | null): Promise<{ customers: SourceCustomer[]; nextCursor: string | null }>;
+}
+
+export interface SourceCustomerAddress {
+  externalId: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  province: string | null;
+  /** ISO-3166-1 alpha-2 (e.g. "US", "IN") — matches CustomerAddress.country's
+   *  own 2-letter contract (see customer's interface schema), not the
+   *  full country name Shopify also exposes separately. */
+  countryCode: string | null;
+  zip: string | null;
+  phone: string | null;
+  isDefault: boolean;
+}
+
+export interface SourceCustomer {
+  externalId: string;
+  /** Required to sign in on this platform — a customer with none is
+   *  skipped (see analyze-customers.usecase.ts's own warning about this). */
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  /** Top-level phone/tags/marketing-consent have no home on this catalog's
+   *  Customer model today (same "field doesn't exist yet" situation
+   *  Product.tags was in before it got a real column) — carried through
+   *  here for a future schema addition, but NOT persisted by
+   *  catalog-migration.worker.ts's runCustomerMigration yet. Only email,
+   *  name, and addresses (which DO have their own phone field) migrate. */
+  phone: string | null;
+  acceptsMarketing: boolean;
+  tags: string[];
+  addresses: SourceCustomerAddress[];
+}

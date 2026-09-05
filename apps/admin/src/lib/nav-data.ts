@@ -153,9 +153,8 @@ export const NAV: NavGroup[] = [
         description: 'Connect an existing Shopify or Magento store and migrate its product catalog — AI builds the mapping plan, no manual field-by-field setup.',
       },
       {
-        key: 'migration-customers', label: 'Customers', href: '/data-migration/customers', icon: Users, status: 'comingSoon',
-        description: 'Migrate customer accounts and addresses from a connected store.',
-        planned: ['Connect the same Shopify/Magento credential already saved for Catalog', 'AI-assisted field mapping, same one-click flow as Catalog', 'Duplicate-email detection with a skip-and-log policy'],
+        key: 'migration-customers', label: 'Customers', href: '/data-migration/customers', icon: Users, status: 'live',
+        description: 'Connect an existing Shopify or Magento store and migrate customer accounts and their saved addresses — a duplicate email is skipped, never overwritten.',
       },
       {
         key: 'migration-orders', label: 'Orders', href: '/data-migration/orders', icon: ShoppingCart, status: 'comingSoon',
