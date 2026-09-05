@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrderStatus, FinancialStatus, FulfillmentStatus } from '@prisma/client';
+import { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus } from '@prisma/client';
 
 /** Normalizes a whitespace-only or blank string to undefined before the real
  *  schema sees it — an untouched optional field can arrive as '' or ' ' (a
@@ -195,6 +195,25 @@ export const listOrdersQuerySchema = z.object({
   // full ISO datetime — both parse fine via `new Date(...)` in the usecase.
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+});
+
+export const listFulfillmentsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  status: z.nativeEnum(ShipmentStatus).optional(),
+  carrier: z.string().min(1).optional(),
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+});
+
+/** Every field optional — same "blank means leave unchanged" contract as
+ *  UpdateFulfillmentTrackingInput's own doc comment. */
+export const updateFulfillmentTrackingSchema = z.object({
+  carrier: z.string().max(128).optional(),
+  trackingNumber: z.string().max(128).optional(),
+  carrierTrackingUrl: z.string().url().max(2048).optional(),
+  estimatedDeliveryAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+  shippingNotes: z.string().max(2000).optional(),
 });
 
 /** Same filters as listOrdersQuerySchema (minus pagination — export always returns everything up to the cap) plus format (plan/15 Phase 4). */

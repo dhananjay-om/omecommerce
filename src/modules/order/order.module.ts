@@ -42,6 +42,8 @@ import { RemoveCartLine } from './application/remove-cart-line.usecase.js';
 import { CompleteCheckout } from './application/complete-checkout.usecase.js';
 import { GetOrder } from './application/get-order.usecase.js';
 import { ListOrders } from './application/list-orders.usecase.js';
+import { ListFulfillments } from './application/list-fulfillments.usecase.js';
+import { UpdateShipmentTracking } from './application/update-fulfillment-tracking.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
@@ -125,6 +127,8 @@ import {
   markOrderPaidSchema,
   listOrdersQuerySchema,
   exportOrdersQuerySchema,
+  listFulfillmentsQuerySchema,
+  updateFulfillmentTrackingSchema,
   updateEmailSettingsSchema,
   sendTestEmailSchema,
 } from './interface/http/schemas.js';
@@ -320,6 +324,8 @@ export function createOrderModule(
   );
   const getOrder = new GetOrder(orders, companies);
   const listOrders = new ListOrders(orders);
+  const listFulfillments = new ListFulfillments(orders);
+  const updateShipmentTracking = new UpdateShipmentTracking(orders);
   const listShippingMethods = new ListShippingMethods(shippingMethods);
   // walletLedger is already constructed above (shared with EnrichCartView).
   // Own instance of the customer-context lookup — CreditWallet is reused
@@ -555,6 +561,23 @@ export function createOrderModule(
       res.json({
         data: await fulfillOrder.execute({ orderPublicId: req.params.publicId!, ...body }),
       });
+    }),
+  );
+  admin.get(
+    '/fulfillments',
+    authorize('orders:view'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listFulfillmentsQuerySchema, req.query);
+      res.json({ data: await listFulfillments.execute(query) });
+    }),
+  );
+  admin.patch(
+    '/fulfillments/:publicId',
+    authorize('orders:fulfill'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateFulfillmentTrackingSchema, req.body);
+      await updateShipmentTracking.execute({ fulfillmentPublicId: req.params.publicId!, ...body });
+      res.status(204).send();
     }),
   );
   admin.get(

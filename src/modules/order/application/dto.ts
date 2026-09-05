@@ -1,4 +1,4 @@
-import type { OrderStatus, FinancialStatus, FulfillmentStatus, TenderType } from '@prisma/client';
+import type { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, TenderType } from '@prisma/client';
 
 /** plan/15 Phase 6 — customerGroupCode was removed: the pricing group is
  *  always server-derived now, see CreateCart/resolveCustomerGroupId. */
@@ -302,6 +302,48 @@ export interface OrderViewDto {
   returns: OrderReturnDto[];
   notes: OrderNoteDto[];
   invoices: OrderInvoiceDto[];
+}
+
+export interface ListFulfillmentsQuery {
+  page?: number;
+  pageSize?: number;
+  status?: ShipmentStatus;
+  carrier?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface FulfillmentListItemDto {
+  publicId: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  status: string;
+  carrier: string | null;
+  trackingNumber: string | null;
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: string | null;
+  currentStatus: string | null;
+  shippedAt: string | null;
+  createdAt: string;
+}
+
+export interface FulfillmentListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  fulfillments: FulfillmentListItemDto[];
+}
+
+/** Every field optional — see UpdateFulfillmentTrackingInput's own doc
+ *  comment on the blank-means-unchanged contract this mirrors. */
+export interface UpdateFulfillmentTrackingCommand {
+  fulfillmentPublicId: string;
+  carrier?: string;
+  trackingNumber?: string;
+  carrierTrackingUrl?: string;
+  estimatedDeliveryAt?: string;
+  shippingNotes?: string;
 }
 
 export interface ListOrdersQuery {

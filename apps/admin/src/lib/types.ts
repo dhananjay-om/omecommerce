@@ -546,6 +546,8 @@ export interface OrderPayment {
   createdAt: string;
 }
 
+export type ShipmentStatus = 'PENDING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'PACKED';
+
 export interface OrderFulfillmentLine {
   sku: string;
   qty: number;
@@ -553,7 +555,7 @@ export interface OrderFulfillmentLine {
 
 export interface OrderFulfillment {
   publicId: string;
-  status: 'PENDING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'PACKED';
+  status: ShipmentStatus;
   trackingNumber: string | null;
   carrier: string | null;
   carrierTrackingUrl: string | null;
@@ -564,6 +566,31 @@ export interface OrderFulfillment {
   shippedAt: string | null;
   createdAt: string;
   lines: OrderFulfillmentLine[];
+}
+
+/** Cross-order Shipments list row (Fulfillment feature area) — see
+ *  FulfillmentListItem's own doc comment on the backend, a denormalized
+ *  display shape, not the full per-order OrderFulfillment. */
+export interface FulfillmentListItem {
+  publicId: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  status: ShipmentStatus;
+  carrier: string | null;
+  trackingNumber: string | null;
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: string | null;
+  currentStatus: string | null;
+  shippedAt: string | null;
+  createdAt: string;
+}
+
+export interface FulfillmentList {
+  total: number;
+  page: number;
+  pageSize: number;
+  fulfillments: FulfillmentListItem[];
 }
 
 export interface OrderReturnLine {

@@ -220,9 +220,8 @@ export const NAV: NavGroup[] = [
         planned: ['A pick list by bin location for orders ready to fulfill', 'A pack station view with package type/weight capture'],
       },
       {
-        key: 'shipments', label: 'Shipments', href: '/fulfillment/shipments', icon: Send, status: 'comingSoon',
-        description: 'Every shipment across every order, in one list.',
-        planned: ['A cross-order shipment list with courier and tracking status', 'Sourced from the fulfillment records already created per-order today'],
+        key: 'shipments', label: 'Shipments', href: '/fulfillment/shipments', icon: Send, status: 'live',
+        description: 'Every shipment across every order, in one list, with carrier/status/date filters and an edit-tracking action.',
       },
       {
         key: 'delivery', label: 'Delivery', href: '/fulfillment/delivery', icon: Map, status: 'comingSoon',

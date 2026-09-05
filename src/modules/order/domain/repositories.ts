@@ -476,6 +476,54 @@ export interface FulfillmentView {
   lines: FulfillmentLineView[];
 }
 
+/** Cross-order Shipments list row (Fulfillment feature area) — a
+ *  denormalized display shape, not the full per-order FulfillmentView
+ *  (no lines here; a list row doesn't need per-line detail, matching the
+ *  same "denormalized label for a list, full detail only per-record"
+ *  posture as OrderListItem vs OrderView). */
+export interface FulfillmentListItem {
+  publicId: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  status: ShipmentStatus;
+  carrier: string | null;
+  trackingNumber: string | null;
+  carrierTrackingUrl: string | null;
+  estimatedDeliveryAt: Date | null;
+  currentStatus: string | null;
+  shippedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ListFulfillmentsFilter {
+  page: number;
+  pageSize: number;
+  status?: ShipmentStatus;
+  carrier?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+export interface ListFulfillmentsResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  fulfillments: FulfillmentListItem[];
+}
+
+/** Every field optional — only what's provided gets overwritten (same
+ *  "blank means leave unchanged" contract this session's AI Settings/
+ *  Migration Connection forms already use), since a correction usually
+ *  touches one or two fields, not the whole record. */
+export interface UpdateFulfillmentTrackingInput {
+  carrier?: string | null;
+  trackingNumber?: string | null;
+  carrierTrackingUrl?: string | null;
+  estimatedDeliveryAt?: Date | null;
+  shippingNotes?: string | null;
+}
+
 export interface OrderReturnLineView {
   orderLineId: bigint;
   qty: number;
@@ -740,6 +788,18 @@ export interface OrderRepository {
   }): Promise<{ id: bigint; publicId: string }>;
   /** plan/15 Phase 2 — stores the rendered packing-slip PDF's key on the fulfillment's 1:1 shipment_tracking row. */
   setPackingSlipKey(fulfillmentId: bigint, key: string): Promise<void>;
+  /** Fulfillment feature area — cross-order shipments list, the one
+   *  genuinely missing piece over data FulfillOrder already writes. */
+  listFulfillments(filter: ListFulfillmentsFilter): Promise<ListFulfillmentsResult>;
+  /** Resolves a fulfillment by its own publicId to the orderId/
+   *  orderPublicId it belongs to — needed by UpdateFulfillmentTracking to
+   *  scope the update and to write the order's own history row. */
+  findFulfillmentByPublicId(publicId: string): Promise<{ id: bigint; orderId: bigint; orderPublicId: string } | null>;
+  /** FulfillOrder is the only OTHER write path for tracking fields, and
+   *  it's one-shot at creation time — this is the missing "fix a mistake
+   *  after the fact" path (see UpdateFulfillmentTrackingInput's own doc
+   *  comment on the blank-means-unchanged contract). */
+  updateFulfillmentTracking(fulfillmentId: bigint, input: UpdateFulfillmentTrackingInput): Promise<void>;
   /** plan/15 Phase 0b — appends one timeline row; called alongside (not instead of) the existing outbox.write() calls in every mutating usecase. */
   recordHistory(input: RecordOrderHistoryInput): Promise<void>;
   listHistory(orderId: bigint): Promise<OrderHistoryView[]>;

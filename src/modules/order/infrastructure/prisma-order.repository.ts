@@ -18,6 +18,9 @@ import type {
   OrderInvoiceView,
   RecordEmailLogInput,
   OrderEmailLogView,
+  ListFulfillmentsFilter,
+  ListFulfillmentsResult,
+  UpdateFulfillmentTrackingInput,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -438,6 +441,103 @@ export class PrismaOrderRepository implements OrderRepository {
 
   async setPackingSlipKey(fulfillmentId: bigint, key: string): Promise<void> {
     await this.db.shipmentTracking.update({ where: { fulfillmentId }, data: { packingSlipStorageKey: key } });
+  }
+
+  async listFulfillments(filter: ListFulfillmentsFilter): Promise<ListFulfillmentsResult> {
+    const conditions: Prisma.Sql[] = [];
+    if (filter.status) conditions.push(Prisma.sql`f.status = ${filter.status}::"ShipmentStatus"`);
+    if (filter.carrier) conditions.push(Prisma.sql`f.carrier ILIKE ${`%${filter.carrier}%`}`);
+    if (filter.dateFrom) conditions.push(Prisma.sql`f.created_at >= ${filter.dateFrom}`);
+    if (filter.dateTo) conditions.push(Prisma.sql`f.created_at <= ${filter.dateTo}`);
+    const where = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
+
+    const fromJoin = Prisma.sql`
+      FROM fulfillment f
+      JOIN "order" o ON o.id = f.order_id
+      LEFT JOIN shipment_tracking st ON st.fulfillment_id = f.id
+      ${where}`;
+
+    const [countRows, rows] = await Promise.all([
+      this.db.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS n ${fromJoin}`),
+      this.db.$queryRaw<
+        Array<{
+          public_id: string;
+          order_public_id: string;
+          order_number: bigint;
+          email: string;
+          status: string;
+          carrier: string | null;
+          tracking_number: string | null;
+          carrier_tracking_url: string | null;
+          estimated_delivery_at: Date | null;
+          current_status: string | null;
+          shipped_at: Date | null;
+          created_at: Date;
+        }>
+      >(Prisma.sql`
+        SELECT f.public_id, o.public_id AS order_public_id, o.order_number, o.email, f.status, f.carrier,
+               f.tracking_number, st.carrier_tracking_url, st.estimated_delivery_at, st.current_status,
+               f.shipped_at, f.created_at
+        ${fromJoin}
+        ORDER BY f.created_at DESC
+        LIMIT ${filter.pageSize} OFFSET ${(filter.page - 1) * filter.pageSize}`),
+    ]);
+
+    return {
+      total: Number(countRows[0]?.n ?? 0n),
+      page: filter.page,
+      pageSize: filter.pageSize,
+      fulfillments: rows.map((row) => ({
+        publicId: row.public_id,
+        orderPublicId: row.order_public_id,
+        orderNumber: row.order_number.toString(),
+        email: row.email,
+        status: row.status as ShipmentStatus,
+        carrier: row.carrier,
+        trackingNumber: row.tracking_number,
+        carrierTrackingUrl: row.carrier_tracking_url,
+        estimatedDeliveryAt: row.estimated_delivery_at,
+        currentStatus: row.current_status,
+        shippedAt: row.shipped_at,
+        createdAt: row.created_at,
+      })),
+    };
+  }
+
+  async findFulfillmentByPublicId(publicId: string): Promise<{ id: bigint; orderId: bigint; orderPublicId: string } | null> {
+    const row = await this.db.fulfillment.findFirst({
+      where: { publicId },
+      select: { id: true, orderId: true, order: { select: { publicId: true } } },
+    });
+    return row ? { id: row.id, orderId: row.orderId, orderPublicId: row.order.publicId } : null;
+  }
+
+  async updateFulfillmentTracking(fulfillmentId: bigint, input: UpdateFulfillmentTrackingInput): Promise<void> {
+    await this.db.$transaction([
+      // carrier is denormalized onto Fulfillment itself too (see
+      // createFulfillment's own precedent — set in both places at
+      // creation time) — kept in sync here for the same reason.
+      ...(input.carrier !== undefined || input.trackingNumber !== undefined
+        ? [
+            this.db.fulfillment.update({
+              where: { id: fulfillmentId },
+              data: {
+                ...(input.carrier !== undefined ? { carrier: input.carrier } : {}),
+                ...(input.trackingNumber !== undefined ? { trackingNumber: input.trackingNumber } : {}),
+              },
+            }),
+          ]
+        : []),
+      this.db.shipmentTracking.update({
+        where: { fulfillmentId },
+        data: {
+          ...(input.carrier !== undefined ? { carrier: input.carrier } : {}),
+          ...(input.carrierTrackingUrl !== undefined ? { carrierTrackingUrl: input.carrierTrackingUrl } : {}),
+          ...(input.estimatedDeliveryAt !== undefined ? { estimatedDeliveryAt: input.estimatedDeliveryAt } : {}),
+          ...(input.shippingNotes !== undefined ? { shippingNotes: input.shippingNotes } : {}),
+        },
+      }),
+    ]);
   }
 
   async recordHistory(input: RecordOrderHistoryInput): Promise<void> {
