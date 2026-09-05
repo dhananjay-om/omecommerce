@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { MigrationConnection, MigrationRun, OrderMigrationPlan, OrderMigrationRunResult } from '@/lib/types';
+import type { MigrationChannel, MigrationConnection, MigrationRun, OrderMigrationPlan, OrderMigrationRunResult } from '@/lib/types';
 import {
-  connectShopify,
+  connectSource,
   testConnection,
   analyzeOrders,
   startMigration,
@@ -23,16 +23,19 @@ const initialConnectState: ActionState = { error: null, success: false };
 const initialTestState: TestConnectionState = { error: null, success: false, storeName: null };
 
 export function OrderMigrationClient({
+  channel,
   initialConnection,
   initialRun,
 }: {
+  channel: MigrationChannel;
   initialConnection: MigrationConnection | null;
   initialRun: MigrationRun | null;
 }) {
   const router = useRouter();
+  const channelLabel = channel === 'SHOPIFY' ? 'Shopify' : 'Magento';
   const connection = initialConnection;
-  const [connectState, connectAction, connecting] = useActionState(connectShopify, initialConnectState);
-  const [testState, testAction, testing] = useActionState(testConnection, initialTestState);
+  const [connectState, connectAction, connecting] = useActionState(connectSource.bind(null, channel), initialConnectState);
+  const [testState, testAction, testing] = useActionState(testConnection.bind(null, channel), initialTestState);
 
   useEffect(() => {
     if (connectState.success) router.refresh();
@@ -63,7 +66,7 @@ export function OrderMigrationClient({
   async function handleAnalyze() {
     setAnalyzing(true);
     setAnalyzeError(null);
-    const result = await analyzeOrders();
+    const result = await analyzeOrders(channel);
     setAnalyzing(false);
     if (result.error || !result.run) {
       setAnalyzeError(result.error ?? 'Something went wrong.');
@@ -104,22 +107,39 @@ export function OrderMigrationClient({
     return (
       <Card className="max-w-xl">
         <CardHeader className="border-b pb-4">
-          <CardTitle className="text-base">Connect Shopify</CardTitle>
+          <CardTitle className="text-base">Connect {channelLabel}</CardTitle>
           <CardDescription>
-            The same connection Catalog and Customer migration use — connecting here (or there) works everywhere.
-            Paste an Admin API access token from a custom app (Shopify Admin &gt; Settings &gt; Apps and sales
-            channels &gt; Develop apps).
+            {channel === 'SHOPIFY' ? (
+              <>
+                The same connection Catalog and Customer migration use — connecting here (or there) works
+                everywhere. Paste an Admin API access token from a custom app (Shopify Admin &gt; Settings &gt; Apps
+                and sales channels &gt; Develop apps).
+              </>
+            ) : (
+              <>
+                The same connection Catalog and Customer migration use. Paste an Integration Access Token (Magento
+                Admin &gt; System &gt; Extensions &gt; Integrations &gt; create or open one, then Activate to get
+                its token).
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">
           <form action={connectAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="dmo-store-url">Store URL</Label>
-              <Input id="dmo-store-url" name="storeUrl" placeholder="my-shop.myshopify.com" required />
+              <Input id="dmo-store-url" name="storeUrl" placeholder={channel === 'SHOPIFY' ? 'my-shop.myshopify.com' : 'my-store.example.com'} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dmo-api-token">Admin API Access Token</Label>
-              <Input id="dmo-api-token" name="apiToken" type="password" autoComplete="off" required placeholder="shpat_..." />
+              <Label htmlFor="dmo-api-token">{channel === 'SHOPIFY' ? 'Admin API Access Token' : 'Integration Access Token'}</Label>
+              <Input
+                id="dmo-api-token"
+                name="apiToken"
+                type="password"
+                autoComplete="off"
+                required
+                placeholder={channel === 'SHOPIFY' ? 'shpat_...' : undefined}
+              />
             </div>
             {connectState.error ? <p className="text-sm text-destructive">{connectState.error}</p> : null}
             <Button type="submit" disabled={connecting}>
@@ -135,7 +155,7 @@ export function OrderMigrationClient({
     <div className="space-y-6">
       <Card>
         <CardHeader className="border-b pb-4">
-          <CardTitle className="text-base">Shopify</CardTitle>
+          <CardTitle className="text-base">{channelLabel}</CardTitle>
           <CardDescription>{connection.storeUrl}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 pt-4">

@@ -2,18 +2,21 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiGet, apiPut, apiPost, ApiError } from '@/lib/api-client';
-import type { MigrationConnection, MigrationRun } from '@/lib/types';
+import type { MigrationChannel, MigrationConnection, MigrationRun } from '@/lib/types';
 
 export interface ActionState {
   error: string | null;
   success: boolean;
 }
 
-export async function getConnection(): Promise<MigrationConnection | null> {
-  return apiGet<MigrationConnection | null>('/admin/v1/migration/connections/SHOPIFY');
+export async function getConnection(channel: MigrationChannel): Promise<MigrationConnection | null> {
+  return apiGet<MigrationConnection | null>(`/admin/v1/migration/connections/${channel}`);
 }
 
-export async function connectShopify(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+/** Bound to a channel client-side via `.bind(null, channel)` before being
+ *  passed to useActionState — same pattern this app already uses for
+ *  e.g. `refundOrder.bind(null, orderPublicId)`. */
+export async function connectSource(channel: MigrationChannel, _prevState: ActionState, formData: FormData): Promise<ActionState> {
   const storeUrl = String(formData.get('storeUrl') ?? '').trim();
   const apiToken = String(formData.get('apiToken') ?? '').trim();
 
@@ -24,12 +27,15 @@ export async function connectShopify(_prevState: ActionState, formData: FormData
   try {
     // Blank apiToken means "leave the currently-saved token unchanged" —
     // same contract as AI Settings' apiKey. Never sent as an empty string.
-    await apiPut<MigrationConnection>('/admin/v1/migration/connections/SHOPIFY', { storeUrl, apiToken: apiToken || undefined });
+    await apiPut<MigrationConnection>(`/admin/v1/migration/connections/${channel}`, { storeUrl, apiToken: apiToken || undefined });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;
   }
 
+  // Not `revalidatePath('/data-migration/catalog?channel=...')` — Next
+  // revalidates by path, not by search params, so the plain path covers
+  // whichever channel is currently selected.
   revalidatePath('/data-migration/catalog');
   return { error: null, success: true };
 }
@@ -40,9 +46,9 @@ export interface TestConnectionState {
   storeName: string | null;
 }
 
-export async function testConnection(_prevState: TestConnectionState): Promise<TestConnectionState> {
+export async function testConnection(channel: MigrationChannel, _prevState: TestConnectionState): Promise<TestConnectionState> {
   try {
-    const result = await apiPost<{ storeName?: string }>('/admin/v1/migration/connections/SHOPIFY/test');
+    const result = await apiPost<{ storeName?: string }>(`/admin/v1/migration/connections/${channel}/test`);
     return { error: null, success: true, storeName: result.storeName ?? null };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false, storeName: null };
@@ -59,9 +65,9 @@ export interface AnalyzeState {
  *  plan (a real request, not instant — bounded to a sample + one LLM call,
  *  see AnalyzeCatalog's own doc comment; no BullMQ job needed for this
  *  step). */
-export async function analyzeCatalog(): Promise<AnalyzeState> {
+export async function analyzeCatalog(channel: MigrationChannel): Promise<AnalyzeState> {
   try {
-    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel: 'SHOPIFY', dataType: 'CATALOG' });
+    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel, dataType: 'CATALOG' });
     return { error: null, run };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, run: null };
@@ -110,10 +116,10 @@ export async function getRun(runPublicId: string): Promise<MigrationRun> {
   return apiGet<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}`);
 }
 
-export async function listRuns(): Promise<MigrationRun[]> {
+export async function listRuns(channel: MigrationChannel): Promise<MigrationRun[]> {
   // Scoped to dataType=CATALOG — Catalog and Customer migration each have
   // their own independent Check Migration / Start / Stop history even
-  // though they share one Shopify connection (see ListMigrationRuns' own
-  // doc comment).
-  return apiGet<MigrationRun[]>('/admin/v1/migration/runs?channel=SHOPIFY&dataType=CATALOG');
+  // though they can share the same connection (see ListMigrationRuns'
+  // own doc comment).
+  return apiGet<MigrationRun[]>(`/admin/v1/migration/runs?channel=${channel}&dataType=CATALOG`);
 }

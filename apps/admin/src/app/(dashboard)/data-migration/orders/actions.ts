@@ -2,20 +2,20 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiGet, apiPut, apiPost, ApiError } from '@/lib/api-client';
-import type { MigrationConnection, MigrationRun } from '@/lib/types';
+import type { MigrationChannel, MigrationConnection, MigrationRun } from '@/lib/types';
 
 export interface ActionState {
   error: string | null;
   success: boolean;
 }
 
-// Same shared Shopify connection as Catalog/Customer migration — connect
-// on any of the three pages, all three see it.
-export async function getConnection(): Promise<MigrationConnection | null> {
-  return apiGet<MigrationConnection | null>('/admin/v1/migration/connections/SHOPIFY');
+// Same per-channel connection Catalog/Customer migration use — connect on
+// any of the three pages, all three see it.
+export async function getConnection(channel: MigrationChannel): Promise<MigrationConnection | null> {
+  return apiGet<MigrationConnection | null>(`/admin/v1/migration/connections/${channel}`);
 }
 
-export async function connectShopify(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function connectSource(channel: MigrationChannel, _prevState: ActionState, formData: FormData): Promise<ActionState> {
   const storeUrl = String(formData.get('storeUrl') ?? '').trim();
   const apiToken = String(formData.get('apiToken') ?? '').trim();
 
@@ -24,7 +24,7 @@ export async function connectShopify(_prevState: ActionState, formData: FormData
   }
 
   try {
-    await apiPut<MigrationConnection>('/admin/v1/migration/connections/SHOPIFY', { storeUrl, apiToken: apiToken || undefined });
+    await apiPut<MigrationConnection>(`/admin/v1/migration/connections/${channel}`, { storeUrl, apiToken: apiToken || undefined });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;
@@ -40,9 +40,9 @@ export interface TestConnectionState {
   storeName: string | null;
 }
 
-export async function testConnection(_prevState: TestConnectionState): Promise<TestConnectionState> {
+export async function testConnection(channel: MigrationChannel, _prevState: TestConnectionState): Promise<TestConnectionState> {
   try {
-    const result = await apiPost<{ storeName?: string }>('/admin/v1/migration/connections/SHOPIFY/test');
+    const result = await apiPost<{ storeName?: string }>(`/admin/v1/migration/connections/${channel}/test`);
     return { error: null, success: true, storeName: result.storeName ?? null };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false, storeName: null };
@@ -59,9 +59,9 @@ export interface AnalyzeState {
  *  order fields have no mapping ambiguity, the one real unknown is how
  *  many line-item SKUs already match this catalog, which this checks
  *  directly against the real product_variant table. */
-export async function analyzeOrders(): Promise<AnalyzeState> {
+export async function analyzeOrders(channel: MigrationChannel): Promise<AnalyzeState> {
   try {
-    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel: 'SHOPIFY', dataType: 'ORDER' });
+    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel, dataType: 'ORDER' });
     return { error: null, run };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, run: null };
@@ -106,6 +106,6 @@ export async function getRun(runPublicId: string): Promise<MigrationRun> {
   return apiGet<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}`);
 }
 
-export async function listRuns(): Promise<MigrationRun[]> {
-  return apiGet<MigrationRun[]>('/admin/v1/migration/runs?channel=SHOPIFY&dataType=ORDER');
+export async function listRuns(channel: MigrationChannel): Promise<MigrationRun[]> {
+  return apiGet<MigrationRun[]>(`/admin/v1/migration/runs?channel=${channel}&dataType=ORDER`);
 }

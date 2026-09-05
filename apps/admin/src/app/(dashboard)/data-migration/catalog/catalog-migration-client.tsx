@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { MigrationConnection, MigrationRun, MigrationPlan, MigrationRunResult } from '@/lib/types';
+import type { MigrationChannel, MigrationConnection, MigrationRun, MigrationPlan, MigrationRunResult } from '@/lib/types';
 import {
-  connectShopify,
+  connectSource,
   testConnection,
   analyzeCatalog,
   startMigration,
@@ -23,21 +23,24 @@ const initialConnectState: ActionState = { error: null, success: false };
 const initialTestState: TestConnectionState = { error: null, success: false, storeName: null };
 
 export function CatalogMigrationClient({
+  channel,
   initialConnection,
   initialRun,
 }: {
+  channel: MigrationChannel;
   initialConnection: MigrationConnection | null;
   initialRun: MigrationRun | null;
 }) {
   const router = useRouter();
-  // No local mirror of the connection needed — connectShopify's own server
+  const channelLabel = channel === 'SHOPIFY' ? 'Shopify' : 'Magento';
+  // No local mirror of the connection needed — connectSource's own server
   // action already calls revalidatePath, so router.refresh() re-fetches
   // this page's Server Component (getConnection) with fresh data and
   // re-renders this component with the real saved connection as a new
   // `initialConnection` prop directly.
   const connection = initialConnection;
-  const [connectState, connectAction, connecting] = useActionState(connectShopify, initialConnectState);
-  const [testState, testAction, testing] = useActionState(testConnection, initialTestState);
+  const [connectState, connectAction, connecting] = useActionState(connectSource.bind(null, channel), initialConnectState);
+  const [testState, testAction, testing] = useActionState(testConnection.bind(null, channel), initialTestState);
 
   useEffect(() => {
     if (connectState.success) router.refresh();
@@ -68,7 +71,7 @@ export function CatalogMigrationClient({
   async function handleAnalyze() {
     setAnalyzing(true);
     setAnalyzeError(null);
-    const result = await analyzeCatalog();
+    const result = await analyzeCatalog(channel);
     setAnalyzing(false);
     if (result.error || !result.run) {
       setAnalyzeError(result.error ?? 'Something went wrong.');
@@ -113,32 +116,43 @@ export function CatalogMigrationClient({
     return (
       <Card className="max-w-xl">
         <CardHeader className="border-b pb-4">
-          <CardTitle className="text-base">Connect Shopify</CardTitle>
+          <CardTitle className="text-base">Connect {channelLabel}</CardTitle>
           <CardDescription>
-            Paste an Admin API access token from a custom app (Shopify Admin &gt; Settings &gt; Apps and sales
-            channels &gt; Develop apps). No OAuth install needed.
+            {channel === 'SHOPIFY' ? (
+              <>
+                Paste an Admin API access token from a custom app (Shopify Admin &gt; Settings &gt; Apps and sales
+                channels &gt; Develop apps). No OAuth install needed.
+              </>
+            ) : (
+              <>
+                Paste an Integration Access Token (Magento Admin &gt; System &gt; Extensions &gt; Integrations &gt;
+                create or open one, then Activate to get its token). No admin login is stored.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">
           <form action={connectAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="dm-store-url">Store URL</Label>
-              <Input id="dm-store-url" name="storeUrl" placeholder="my-shop.myshopify.com" required />
+              <Input id="dm-store-url" name="storeUrl" placeholder={channel === 'SHOPIFY' ? 'my-shop.myshopify.com' : 'my-store.example.com'} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dm-api-token">Admin API Access Token</Label>
-              <Input id="dm-api-token" name="apiToken" type="password" autoComplete="off" required placeholder="shpat_..." />
+              <Label htmlFor="dm-api-token">{channel === 'SHOPIFY' ? 'Admin API Access Token' : 'Integration Access Token'}</Label>
+              <Input
+                id="dm-api-token"
+                name="apiToken"
+                type="password"
+                autoComplete="off"
+                required
+                placeholder={channel === 'SHOPIFY' ? 'shpat_...' : undefined}
+              />
             </div>
             {connectState.error ? <p className="text-sm text-destructive">{connectState.error}</p> : null}
             <Button type="submit" disabled={connecting}>
               {connecting ? 'Connecting…' : 'Connect'}
             </Button>
           </form>
-
-          <div className="rounded-lg border border-dashed p-4 opacity-60">
-            <p className="text-sm font-medium">Magento</p>
-            <p className="text-sm text-muted-foreground">Coming soon — the same engine, once Shopify is verified.</p>
-          </div>
         </CardContent>
       </Card>
     );
@@ -148,7 +162,7 @@ export function CatalogMigrationClient({
     <div className="space-y-6">
       <Card>
         <CardHeader className="border-b pb-4">
-          <CardTitle className="text-base">Shopify</CardTitle>
+          <CardTitle className="text-base">{channelLabel}</CardTitle>
           <CardDescription>{connection.storeUrl}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 pt-4">

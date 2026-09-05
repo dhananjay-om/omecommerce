@@ -62,7 +62,7 @@ export class AnalyzeCustomers {
       warnings.push(`${withoutEmail} customer(s) in the sample have no email and will be skipped — an email is required to sign in on this store.`);
     }
     warnings.push(
-      'A migrated customer gets a random, unknown password (Shopify never exposes real passwords via its API — no platform migration can carry them over) — they will need a way to set a new one before they can sign in.',
+      `A migrated customer gets a random, unknown password (${cmd.channel === 'SHOPIFY' ? 'Shopify' : 'Magento'} never exposes real passwords via its API — no platform migration can carry them over) — they will need a way to set a new one before they can sign in.`,
     );
     warnings.push(
       'Phone number, tags, and marketing consent on the customer record itself are not migrated yet (this catalog\'s Customer record has no field for them) — only email, name, and saved addresses (which do carry their own phone) are.',

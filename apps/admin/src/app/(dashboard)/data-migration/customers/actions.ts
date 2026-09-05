@@ -2,23 +2,23 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiGet, apiPut, apiPost, ApiError } from '@/lib/api-client';
-import type { MigrationConnection, MigrationRun } from '@/lib/types';
+import type { MigrationChannel, MigrationConnection, MigrationRun } from '@/lib/types';
 
 export interface ActionState {
   error: string | null;
   success: boolean;
 }
 
-// Connect/Test hit the exact same connection as the Catalog migration page
-// — a Shopify connection isn't per-migration-type, so connecting here (or
-// there) makes both pages see it immediately. Duplicated here rather than
-// shared, matching the Catalog page's own self-contained-page shape (each
-// migration page owns its whole flow end to end).
-export async function getConnection(): Promise<MigrationConnection | null> {
-  return apiGet<MigrationConnection | null>('/admin/v1/migration/connections/SHOPIFY');
+// Connect/Test hit the exact same per-channel connection Catalog/Orders
+// migration use — connecting on any of the 3 pages makes all 3 see it
+// immediately. Duplicated here rather than shared, matching each
+// migration page's own self-contained-page shape (each owns its whole
+// flow end to end).
+export async function getConnection(channel: MigrationChannel): Promise<MigrationConnection | null> {
+  return apiGet<MigrationConnection | null>(`/admin/v1/migration/connections/${channel}`);
 }
 
-export async function connectShopify(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function connectSource(channel: MigrationChannel, _prevState: ActionState, formData: FormData): Promise<ActionState> {
   const storeUrl = String(formData.get('storeUrl') ?? '').trim();
   const apiToken = String(formData.get('apiToken') ?? '').trim();
 
@@ -27,7 +27,7 @@ export async function connectShopify(_prevState: ActionState, formData: FormData
   }
 
   try {
-    await apiPut<MigrationConnection>('/admin/v1/migration/connections/SHOPIFY', { storeUrl, apiToken: apiToken || undefined });
+    await apiPut<MigrationConnection>(`/admin/v1/migration/connections/${channel}`, { storeUrl, apiToken: apiToken || undefined });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;
@@ -43,9 +43,9 @@ export interface TestConnectionState {
   storeName: string | null;
 }
 
-export async function testConnection(_prevState: TestConnectionState): Promise<TestConnectionState> {
+export async function testConnection(channel: MigrationChannel, _prevState: TestConnectionState): Promise<TestConnectionState> {
   try {
-    const result = await apiPost<{ storeName?: string }>('/admin/v1/migration/connections/SHOPIFY/test');
+    const result = await apiPost<{ storeName?: string }>(`/admin/v1/migration/connections/${channel}/test`);
     return { error: null, success: true, storeName: result.storeName ?? null };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false, storeName: null };
@@ -62,9 +62,9 @@ export interface AnalyzeState {
  *  own doc comment on why a customer record has no real mapping ambiguity
  *  to resolve). Still a real request against the source store, not
  *  instant. */
-export async function analyzeCustomers(): Promise<AnalyzeState> {
+export async function analyzeCustomers(channel: MigrationChannel): Promise<AnalyzeState> {
   try {
-    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel: 'SHOPIFY', dataType: 'CUSTOMER' });
+    const run = await apiPost<MigrationRun>('/admin/v1/migration/runs', { channel, dataType: 'CUSTOMER' });
     return { error: null, run };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, run: null };
@@ -110,6 +110,6 @@ export async function getRun(runPublicId: string): Promise<MigrationRun> {
   return apiGet<MigrationRun>(`/admin/v1/migration/runs/${runPublicId}`);
 }
 
-export async function listRuns(): Promise<MigrationRun[]> {
-  return apiGet<MigrationRun[]>('/admin/v1/migration/runs?channel=SHOPIFY&dataType=CUSTOMER');
+export async function listRuns(channel: MigrationChannel): Promise<MigrationRun[]> {
+  return apiGet<MigrationRun[]>(`/admin/v1/migration/runs?channel=${channel}&dataType=CUSTOMER`);
 }
