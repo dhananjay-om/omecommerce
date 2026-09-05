@@ -1,5 +1,13 @@
 import type { MigrationRunInfo, MigrationChannel } from '../domain/repositories.js';
-import type { MigrationRunView, MigrationPlan, MigrationRunResult, CustomerMigrationPlan, CustomerMigrationRunResult } from './dto.js';
+import type {
+  MigrationRunView,
+  MigrationPlan,
+  MigrationRunResult,
+  CustomerMigrationPlan,
+  CustomerMigrationRunResult,
+  OrderMigrationPlan,
+  OrderMigrationRunResult,
+} from './dto.js';
 
 /** Shared by every use case that returns a run (Analyze/Start/Get/List) so
  *  the shape is defined exactly once. `channel` isn't stored on the run row
@@ -15,8 +23,8 @@ export function toMigrationRunView(run: MigrationRunInfo, channel: MigrationChan
     processedItems: run.processedItems,
     skippedItems: run.skippedItems,
     failedItems: run.failedItems,
-    plan: (run.planJson as MigrationPlan | CustomerMigrationPlan | null) ?? null,
-    result: (run.resultJson as MigrationRunResult | CustomerMigrationRunResult | null) ?? null,
+    plan: (run.planJson as MigrationPlan | CustomerMigrationPlan | OrderMigrationPlan | null) ?? null,
+    result: (run.resultJson as MigrationRunResult | CustomerMigrationRunResult | OrderMigrationRunResult | null) ?? null,
     startedAt: run.startedAt ? run.startedAt.toISOString() : null,
     completedAt: run.completedAt ? run.completedAt.toISOString() : null,
     createdAt: run.createdAt.toISOString(),

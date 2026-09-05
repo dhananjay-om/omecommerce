@@ -673,9 +673,31 @@ export interface OrderListResult {
   orders: OrderListItem[];
 }
 
+/** Data Migration's own historical-order write path — a deliberate sibling
+ *  to CreateOrderInput/create(), not a reuse of it. create() unconditionally
+ *  writes an OrderPlaced outbox event in the same transaction (order
+ *  confirmation email, loyalty earn, referral qualify, analytics
+ *  projector...) — exactly the "no payment/fulfillment actions replayed"
+ *  behavior this session's Order migration plan explicitly ruled out for a
+ *  years-old imported order. This input additionally carries the real
+ *  source `placedAt` (never "now") and the already-decided status/
+ *  financialStatus/fulfillmentStatus (derived once, deterministically, by
+ *  the migration worker — never re-computed by checkout-style logic here). */
+export interface ImportOrderInput extends CreateOrderInput {
+  placedAt: Date;
+  status: OrderStatus;
+  financialStatus: FinancialStatus;
+  fulfillmentStatus: FulfillmentStatus;
+  /** Timeline message for the one OrderStatusHistory row this creates, e.g. "Imported from Shopify". */
+  historyMessage: string;
+}
+
 export interface OrderRepository {
   nextOrderNumber(websiteId: bigint): Promise<bigint>;
   create(input: CreateOrderInput, orderNumber: bigint): Promise<OrderView>;
+  /** See ImportOrderInput's own doc comment for why this isn't just create()
+   *  with extra fields — it deliberately skips the OrderPlaced outbox event. */
+  createImported(input: ImportOrderInput, orderNumber: bigint): Promise<OrderView>;
   findByPublicId(publicId: string): Promise<OrderView | null>;
   list(filter: ListOrdersFilter): Promise<OrderListResult>;
   setFinancialStatus(orderId: bigint, status: FinancialStatus): Promise<void>;

@@ -157,9 +157,8 @@ export const NAV: NavGroup[] = [
         description: 'Connect an existing Shopify or Magento store and migrate customer accounts and their saved addresses — a duplicate email is skipped, never overwritten.',
       },
       {
-        key: 'migration-orders', label: 'Orders', href: '/data-migration/orders', icon: ShoppingCart, status: 'comingSoon',
-        description: 'Migrate historical orders from a connected store.',
-        planned: ['Order history import scoped to a date range', 'Line-item SKU matching against the already-migrated catalog', 'Read-only import — no payment/fulfillment actions replayed'],
+        key: 'migration-orders', label: 'Orders', href: '/data-migration/orders', icon: ShoppingCart, status: 'live',
+        description: 'Import historical orders as read-only records, matched to your catalog by SKU — no payment, fulfillment, or loyalty action is replayed.',
       },
     ],
   },

@@ -4,6 +4,7 @@ import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import type {
   OrderRepository,
   CreateOrderInput,
+  ImportOrderInput,
   OrderView,
   ListOrdersFilter,
   OrderListResult,
@@ -126,6 +127,90 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       await tx.orderStatusHistory.create({
         data: { orderId: order.id, eventType: 'ORDER_CREATED', message: 'Order placed', actorType: 'SYSTEM' },
+      });
+      return order.id;
+    });
+
+    const detail = await this.db.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_DETAIL_INCLUDE });
+    return toView(detail);
+  }
+
+  /** See ImportOrderInput's own doc comment — a deliberate near-duplicate of
+   *  create() above, NOT a thin wrapper around it: it sets the real
+   *  historical `placedAt` and the already-decided status fields directly
+   *  in the insert (not via a follow-up call), and skips the OutboxWriter
+   *  write entirely — no OrderPlaced event, so no order-confirmation email/
+   *  loyalty earn/referral qualify/analytics-projector side effects fire
+   *  for a years-old imported order. */
+  async createImported(input: ImportOrderInput, orderNumber: bigint): Promise<OrderView> {
+    const orderId = await this.db.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          websiteId: input.websiteId,
+          storeId: input.storeId,
+          storeViewId: input.storeViewId,
+          cartId: input.cartId,
+          customerId: input.customerId,
+          customerGroupId: input.customerGroupId,
+          companyId: input.companyId,
+          taxExempt: input.taxExempt,
+          poNumber: input.poNumber,
+          email: input.email,
+          currency: input.currency,
+          customerIp: input.customerIp ?? null,
+          placedAt: input.placedAt,
+          status: input.status,
+          financialStatus: input.financialStatus,
+          fulfillmentStatus: input.fulfillmentStatus,
+          subtotal: fromMinorUnits(input.subtotalMinor),
+          discountTotal: fromMinorUnits(input.discountTotalMinor),
+          taxTotal: fromMinorUnits(input.taxTotalMinor),
+          shippingTotal: fromMinorUnits(input.shippingTotalMinor),
+          grandTotal: fromMinorUnits(input.grandTotalMinor),
+          shippingMethodCode: input.shippingMethodCode,
+          paymentMethodCode: input.paymentMethodCode,
+          couponCode: input.couponCode,
+        },
+      });
+      await Promise.all(
+        input.lines.map((l) =>
+          tx.orderLine.create({
+            data: {
+              orderId: order.id,
+              variantId: l.variantId,
+              sku: l.sku,
+              name: l.name,
+              qty: l.qty,
+              unitPrice: fromMinorUnits(l.unitPriceMinor),
+              mrp: l.mrpMinor !== null ? fromMinorUnits(l.mrpMinor) : null,
+              taxAmount: fromMinorUnits(l.taxAmountMinor),
+              discountAmount: fromMinorUnits(l.discountAmountMinor),
+              rowTotal: fromMinorUnits(l.rowTotalMinor),
+              taxClassCode: l.taxClassCode,
+              hsnCode: l.hsnCode,
+            },
+          }),
+        ),
+      );
+      await tx.orderAddress.createMany({
+        data: input.addresses.map((a) => ({ orderId: order.id, ...a })),
+      });
+      if (input.taxLines.length > 0) {
+        await tx.orderTaxLine.createMany({
+          data: input.taxLines.map((t) => ({
+            orderId: order.id,
+            taxClassCode: t.taxClassCode,
+            taxType: t.taxType,
+            rate: fromMinorUnits(t.rateMinor),
+            amount: fromMinorUnits(t.amountMinor),
+          })),
+        });
+      }
+      // No OutboxWriter.write() here — deliberately, see this method's own
+      // doc comment.
+      await tx.orderStatusHistory.create({
+        data: { orderId: order.id, eventType: 'ORDER_IMPORTED', message: input.historyMessage, actorType: 'SYSTEM' },
       });
       return order.id;
     });

@@ -34,23 +34,30 @@ import type { AttributeInfo, AttributeSetInfo, AttributeOptionInfo } from '../mo
 import { PrismaMigrationRunRepository } from '../modules/migration/infrastructure/prisma-migration-run.repository.js';
 import { PrismaMigrationConnectionRepository } from '../modules/migration/infrastructure/prisma-migration-connection.repository.js';
 import { PrismaMigrationExternalRefRepository } from '../modules/migration/infrastructure/prisma-migration-external-ref.repository.js';
-import { buildSourceClient, buildCustomerSourceClient } from '../modules/migration/infrastructure/source-client-factory.js';
-import type { SourceProduct, SourceCustomer } from '../modules/migration/domain/source-client.js';
-import type { MigrationPlan, MigrationRunResult, CustomerMigrationRunResult } from '../modules/migration/application/dto.js';
+import { buildSourceClient, buildCustomerSourceClient, buildOrderSourceClient } from '../modules/migration/infrastructure/source-client-factory.js';
+import type { SourceProduct, SourceCustomer, SourceOrder } from '../modules/migration/domain/source-client.js';
+import type { MigrationPlan, MigrationRunResult, CustomerMigrationRunResult, OrderMigrationRunResult } from '../modules/migration/application/dto.js';
 import { PrismaCustomerRepository } from '../modules/customer/infrastructure/prisma-customer.repository.js';
 import { PrismaCustomerAddressRepository } from '../modules/customer/infrastructure/prisma-customer-address.repository.js';
 import { ScryptPasswordHasher } from '../modules/auth/infrastructure/scrypt-password-hasher.js';
+import { PrismaOrderRepository } from '../modules/order/infrastructure/prisma-order.repository.js';
+import { PrismaStoreContextResolver } from '../shared/infrastructure/store-context.repository.js';
+import type { StoreContextResolver } from '../shared/application/scope.js';
+import { toMinorUnits, multiplyByQty } from '../shared/domain/decimal.js';
+import type { FinancialStatus, FulfillmentStatus, OrderStatus } from '@prisma/client';
+import type { OrderAddressInput, OrderLineInput } from '../modules/order/domain/repositories.js';
 
 /**
  * The single Worker on CATALOG_MIGRATION_QUEUE (its own queue — see
  * queues.ts's own doc comment on why this doesn't share BULK_JOBS_QUEUE).
- * Two job names now: `migrate-catalog` (runCatalogMigration) and
- * `migrate-customers` (runCustomerMigration), both `{ runId: string }` —
- * dispatched by `job.name` below, same "one Worker, several job types"
- * shape bulk-import.worker.ts already established on BULK_JOBS_QUEUE. They
- * share a queue (and so serialize against each other — BullMQ's default
- * Worker concurrency is 1) but each is its own independent run, gated by
- * its own run row's `dataType`.
+ * Three job names now: `migrate-catalog` (runCatalogMigration),
+ * `migrate-customers` (runCustomerMigration), and `migrate-orders`
+ * (runOrderMigration) — all `{ runId: string }`, dispatched by `job.name`
+ * below, same "one Worker, several job types" shape bulk-import.worker.ts
+ * already established on BULK_JOBS_QUEUE. They share a queue (and so
+ * serialize against each other — BullMQ's default Worker concurrency is 1)
+ * but each is its own independent run, gated by its own run row's
+ * `dataType`.
  *
  * Applies the plan a prior Analyze call already built DETERMINISTICALLY —
  * no further AI calls happen in this loop for catalog migration (see
@@ -116,10 +123,22 @@ export function startCatalogMigrationWorker(): Worker {
     passwordHasher: new ScryptPasswordHasher(),
   };
 
+  const orderDeps: OrderDeps = {
+    runs,
+    connections,
+    externalRefs,
+    orders: new PrismaOrderRepository(prisma),
+    customers: new PrismaCustomerRepository(prisma),
+    storeContext: new PrismaStoreContextResolver(prisma),
+  };
+
   const worker = new Worker(
     CATALOG_MIGRATION_QUEUE,
-    async (job: Job): Promise<MigrationRunResult | CustomerMigrationRunResult> =>
-      job.name === 'migrate-customers' ? runCustomerMigration(job, customerDeps) : runCatalogMigration(job, deps),
+    async (job: Job): Promise<MigrationRunResult | CustomerMigrationRunResult | OrderMigrationRunResult> => {
+      if (job.name === 'migrate-customers') return runCustomerMigration(job, customerDeps);
+      if (job.name === 'migrate-orders') return runOrderMigration(job, orderDeps);
+      return runCatalogMigration(job, deps);
+    },
     { connection: getQueueConnectionOptions() },
   );
   worker.on('failed', (job, err) => logger.error({ err, jobId: job?.id, jobName: job?.name }, 'data migration job failed'));
@@ -690,4 +709,281 @@ async function processCustomer(source: SourceCustomer, ctx: ProcessCustomerCtx):
       // same soft-skip posture as a bad product image in the catalog job.
     }
   }
+}
+
+// ============================================================================
+// Order migration — `migrate-orders` job. Third and last of the original
+// Catalog/Customer/Order scope. Deterministic, same as Customer migration
+// (no AI — see analyze-orders.usecase.ts's own doc comment). The one real
+// design constraint here (from the original plan's own scoping): a
+// historical order is a READ-ONLY record — no payment is captured, no
+// stock is reserved/decremented, no confirmation email fires, no loyalty/
+// referral credit is earned. That's exactly why this uses
+// OrderRepository.createImported() (see its own doc comment) instead of
+// the real create() checkout uses — create() fires a real OrderPlaced
+// event in the same transaction, which is precisely the side-effect chain
+// a years-old imported order must never trigger.
+// ============================================================================
+
+interface OrderDeps {
+  runs: PrismaMigrationRunRepository;
+  connections: PrismaMigrationConnectionRepository;
+  externalRefs: PrismaMigrationExternalRefRepository;
+  orders: PrismaOrderRepository;
+  customers: PrismaCustomerRepository;
+  storeContext: StoreContextResolver;
+}
+
+function mapFinancialStatus(raw: string | null): FinancialStatus {
+  switch (raw) {
+    case 'authorized':
+      return 'AUTHORIZED';
+    case 'partially_paid':
+      return 'PARTIALLY_PAID';
+    case 'paid':
+      return 'PAID';
+    case 'partially_refunded':
+      return 'PARTIALLY_REFUNDED';
+    case 'refunded':
+      return 'REFUNDED';
+    case 'voided':
+      return 'VOIDED';
+    default:
+      return 'PENDING';
+  }
+}
+
+function mapFulfillmentStatus(raw: string | null): FulfillmentStatus {
+  switch (raw) {
+    case 'partial':
+      return 'PARTIALLY_FULFILLED';
+    case 'fulfilled':
+      return 'FULFILLED';
+    case 'restocked':
+      return 'RETURNED';
+    default:
+      return 'UNFULFILLED';
+  }
+}
+
+/** Best-effort, not a real workflow engine — see this section's own doc
+ *  comment on why nothing here re-derives from scratch: an imported
+ *  order's own overall OrderStatus is inferred from the same signals
+ *  Shopify itself exposes (cancelled_at/closed_at + the financial/
+ *  fulfillment status already mapped), never guessed beyond that. */
+function deriveOrderStatus(source: SourceOrder, financialStatus: FinancialStatus, fulfillmentStatus: FulfillmentStatus): OrderStatus {
+  if (source.cancelledAt) return 'CANCELLED';
+  if (source.closedAt) return 'CLOSED';
+  if (fulfillmentStatus === 'FULFILLED' && financialStatus === 'PAID') return 'COMPLETED';
+  return 'CONFIRMED';
+}
+
+function toOrderAddressInput(type: 'BILLING' | 'SHIPPING', addr: SourceOrder['shippingAddress']): OrderAddressInput | null {
+  // Required locally: name, line1, city, postalCode, country — same
+  // "silently skip this one address, never fail the whole order over it"
+  // posture as a bad customer address during Customer migration.
+  if (!addr || !addr.name || !addr.address1 || !addr.city || !addr.zip || !addr.countryCode) return null;
+  return {
+    type,
+    name: addr.name,
+    company: addr.company,
+    line1: addr.address1,
+    line2: addr.address2,
+    city: addr.city,
+    region: addr.province,
+    postalCode: addr.zip,
+    country: addr.countryCode,
+    phone: addr.phone,
+  };
+}
+
+async function runOrderMigration(job: Job, deps: OrderDeps): Promise<OrderMigrationRunResult> {
+  const { runId } = job.data as { runId: string };
+  const run = await deps.runs.findById(BigInt(runId));
+  if (!run) throw new Error(`migration run ${runId} not found`);
+  const connection = await deps.connections.getById(run.connectionId);
+  if (!connection) throw new Error(`migration connection ${run.connectionId} not found`);
+  const client = buildOrderSourceClient(connection.channel, connection.storeUrl, connection.apiToken);
+
+  const websiteId = await resolveDefaultWebsiteId(prisma);
+  const defaultStoreView = await prisma.storeView.findFirst({
+    where: { status: 'ACTIVE', deletedAt: null, store: { websiteId, deletedAt: null } },
+    orderBy: { id: 'asc' },
+    select: { id: true },
+  });
+  if (!defaultStoreView) throw new Error('no store view exists on the default website to assign imported orders to');
+  const storeContext = await deps.storeContext.byStoreViewId(defaultStoreView.id);
+  if (!storeContext) throw new Error('could not resolve the default store view context');
+
+  const result: OrderMigrationRunResult = {
+    ordersCreated: 0,
+    lineItemsImported: 0,
+    lineItemsSkipped: 0,
+    skipped: [],
+    failed: [],
+  };
+
+  try {
+    let cursor: string | null = null;
+    let processed = 0;
+    let cancelled = false;
+    orderPages: do {
+      const page = await client.listOrders(cursor);
+      for (const source of page.orders) {
+        // Cooperative stop, same as the other two migration types.
+        if (await deps.runs.isCancelRequested(run.id)) {
+          cancelled = true;
+          break orderPages;
+        }
+        processed++;
+        try {
+          await processOrder(source, { run, connection, deps, result, websiteId, storeContext });
+        } catch (err) {
+          result.failed.push({ orderNumber: source.displayNumber, externalId: source.externalId, reason: err instanceof Error ? err.message : String(err) });
+        }
+        await job.updateProgress({ processed, skipped: result.skipped.length, failed: result.failed.length, total: run.totalItems ?? processed });
+        if (processed % 10 === 0) {
+          await deps.runs.updateProgress(run.id, processed, result.skipped.length, result.failed.length);
+        }
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    await deps.runs.updateProgress(run.id, processed, result.skipped.length, result.failed.length);
+    if (cancelled) {
+      await deps.runs.markCancelled(run.id, result);
+    } else {
+      await deps.runs.markCompleted(run.id, result);
+    }
+    return result;
+  } catch (err) {
+    result.fatalError = err instanceof Error ? err.message : String(err);
+    await deps.runs.markFailed(run.id, result);
+    throw err;
+  }
+}
+
+interface ProcessOrderCtx {
+  run: { id: bigint };
+  connection: { id: bigint; channel: string };
+  deps: OrderDeps;
+  result: OrderMigrationRunResult;
+  websiteId: bigint;
+  storeContext: NonNullable<Awaited<ReturnType<StoreContextResolver['byStoreViewId']>>>;
+}
+
+async function processOrder(source: SourceOrder, ctx: ProcessOrderCtx): Promise<void> {
+  const { run, connection, deps, result, storeContext } = ctx;
+
+  const existingRef = await deps.externalRefs.find(connection.id, 'ORDER', source.externalId);
+  if (existingRef) {
+    result.skipped.push({ orderNumber: source.displayNumber, externalId: source.externalId, reason: 'already migrated in a previous run' });
+    return;
+  }
+
+  if (source.currency !== storeContext.currency) {
+    result.skipped.push({
+      orderNumber: source.displayNumber,
+      externalId: source.externalId,
+      reason: `order is in ${source.currency}, this store's default is ${storeContext.currency} — currency mismatch, not imported`,
+    });
+    return;
+  }
+
+  // Match each line item's SKU against the LOCAL catalog (product_variant —
+  // the same table Catalog migration itself populates). An order with zero
+  // matchable lines has nothing real to attach here and is skipped
+  // entirely, never imported as an empty shell (see analyze-orders.
+  // usecase.ts's own plan warning about this).
+  const skus = source.lineItems.map((l) => l.sku).filter((s): s is string => !!s);
+  const variantBySku = new Map<string, bigint>();
+  if (skus.length > 0) {
+    const rows = await prisma.productVariant.findMany({ where: { sku: { in: skus }, deletedAt: null }, select: { id: true, sku: true } });
+    for (const r of rows) variantBySku.set(r.sku, r.id);
+  }
+
+  const lines: OrderLineInput[] = [];
+  let unmatchedCount = 0;
+  for (const li of source.lineItems) {
+    const variantId = li.sku ? variantBySku.get(li.sku) : undefined;
+    if (!variantId) {
+      unmatchedCount++;
+      continue;
+    }
+    const unitPriceMinor = toMinorUnits(li.unitPrice);
+    lines.push({
+      variantId,
+      sku: li.sku!,
+      name: li.title,
+      qty: li.qty,
+      unitPriceMinor,
+      mrpMinor: null,
+      taxAmountMinor: toMinorUnits(li.taxAmount || '0'),
+      discountAmountMinor: toMinorUnits(li.totalDiscount || '0'),
+      rowTotalMinor: multiplyByQty(unitPriceMinor, li.qty),
+      taxClassCode: null,
+      hsnCode: null,
+    });
+  }
+  result.lineItemsSkipped += unmatchedCount;
+
+  if (lines.length === 0) {
+    result.skipped.push({
+      orderNumber: source.displayNumber,
+      externalId: source.externalId,
+      reason: source.lineItems.length === 0 ? 'no line items on the source order' : 'no line item matched a product already in this catalog',
+    });
+    return;
+  }
+
+  const customerId = source.email
+    ? (await deps.customers.findByWebsiteAndEmail(ctx.websiteId, source.email.trim().toLowerCase()))?.id ?? null
+    : null;
+
+  const addresses: OrderAddressInput[] = [];
+  const shipping = toOrderAddressInput('SHIPPING', source.shippingAddress);
+  const billing = toOrderAddressInput('BILLING', source.billingAddress ?? source.shippingAddress);
+  if (shipping) addresses.push(shipping);
+  if (billing) addresses.push(billing);
+
+  const financialStatus = mapFinancialStatus(source.financialStatus);
+  const fulfillmentStatus = mapFulfillmentStatus(source.fulfillmentStatus);
+  const status = deriveOrderStatus(source, financialStatus, fulfillmentStatus);
+
+  const orderNumber = await deps.orders.nextOrderNumber(ctx.websiteId);
+  const created = await deps.orders.createImported(
+    {
+      cartId: null,
+      websiteId: ctx.websiteId,
+      storeId: storeContext.storeId,
+      storeViewId: storeContext.storeViewId,
+      customerId,
+      customerGroupId: null,
+      companyId: null,
+      taxExempt: false,
+      poNumber: null,
+      email: source.email ?? 'unknown@imported.invalid',
+      currency: source.currency,
+      subtotalMinor: toMinorUnits(source.subtotalPrice || '0'),
+      discountTotalMinor: toMinorUnits(source.totalDiscounts || '0'),
+      taxTotalMinor: toMinorUnits(source.totalTax || '0'),
+      shippingTotalMinor: toMinorUnits(source.totalShipping || '0'),
+      grandTotalMinor: toMinorUnits(source.totalPrice || '0'),
+      shippingMethodCode: 'IMPORTED',
+      paymentMethodCode: source.gateway ?? 'IMPORTED',
+      couponCode: source.discountCode,
+      lines,
+      addresses,
+      taxLines: [], // no real CGST/SGST/IGST breakdown exists for a foreign order — see ImportOrderInput's own doc comment; the real taxTotal is still recorded on the order itself, just with no per-class split.
+      placedAt: new Date(source.createdAt),
+      status,
+      financialStatus,
+      fulfillmentStatus,
+      historyMessage: `Imported from ${connection.channel === 'SHOPIFY' ? 'Shopify' : connection.channel} (source order ${source.displayNumber})`,
+    },
+    orderNumber,
+  );
+  result.ordersCreated++;
+  result.lineItemsImported += lines.length;
+  await deps.externalRefs.record(run.id, connection.id, 'ORDER', source.externalId, created.publicId);
 }

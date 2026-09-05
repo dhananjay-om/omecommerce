@@ -10,6 +10,7 @@ import { GetMigrationConnection } from './application/get-migration-connection.u
 import { TestMigrationConnection } from './application/test-migration-connection.usecase.js';
 import { AnalyzeCatalog } from './application/analyze-catalog.usecase.js';
 import { AnalyzeCustomers } from './application/analyze-customers.usecase.js';
+import { AnalyzeOrders } from './application/analyze-orders.usecase.js';
 import { StartMigrationRun } from './application/start-migration-run.usecase.js';
 import { CancelMigrationRun } from './application/cancel-migration-run.usecase.js';
 import { GetMigrationRun } from './application/get-migration-run.usecase.js';
@@ -38,6 +39,7 @@ export function createMigrationModule(db: Db, authorize: (permission: string) =>
   const testMigrationConnection = new TestMigrationConnection(connections);
   const analyzeCatalog = new AnalyzeCatalog(db, connections, runs, attributes, attributeSets, categories);
   const analyzeCustomers = new AnalyzeCustomers(connections, runs);
+  const analyzeOrders = new AnalyzeOrders(db, connections, runs);
   const startMigrationRun = new StartMigrationRun(connections, runs);
   const cancelMigrationRun = new CancelMigrationRun(connections, runs);
   const getMigrationRun = new GetMigrationRun(connections, runs);
@@ -82,7 +84,9 @@ export function createMigrationModule(db: Db, authorize: (permission: string) =>
       const run =
         body.dataType === 'CUSTOMER'
           ? await analyzeCustomers.execute({ channel: body.channel })
-          : await analyzeCatalog.execute({ channel: body.channel });
+          : body.dataType === 'ORDER'
+            ? await analyzeOrders.execute({ channel: body.channel })
+            : await analyzeCatalog.execute({ channel: body.channel });
       res.status(201).json({ data: run });
     }),
   );

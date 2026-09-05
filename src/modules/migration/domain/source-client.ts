@@ -120,3 +120,69 @@ export interface SourceCustomer {
   tags: string[];
   addresses: SourceCustomerAddress[];
 }
+
+/**
+ * Order migration's own channel-agnostic port — third and last of the
+ * original Catalog/Customer/Order scope. A separate port from the other
+ * two (an order references both a customer and a product's SKU, but
+ * doesn't require either to exist locally — see analyze-orders.usecase.ts
+ * and the worker's own doc comments on how a missing match is handled).
+ */
+export interface SourceOrderClient {
+  countOrders(): Promise<number>;
+  listOrders(cursor: string | null): Promise<{ orders: SourceOrder[]; nextCursor: string | null }>;
+}
+
+export interface SourceOrderLine {
+  sku: string | null;
+  title: string;
+  qty: number;
+  /** Decimal strings, matching this project's own "money is never a
+   *  float" convention (shared/domain/decimal.ts) — converted to minor
+   *  units by the worker via toMinorUnits(), never parsed as Number. */
+  unitPrice: string;
+  totalDiscount: string;
+  taxAmount: string;
+}
+
+export interface SourceOrderAddress {
+  name: string | null;
+  company: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  province: string | null;
+  countryCode: string | null;
+  zip: string | null;
+  phone: string | null;
+}
+
+export interface SourceOrder {
+  externalId: string;
+  /** The source platform's own display number (e.g. "#1001") — shown for
+   *  reference only, never used as this store's real order number (that's
+   *  always freshly assigned via OrderRepository.nextOrderNumber, same
+   *  sequence every real order uses). */
+  displayNumber: string;
+  email: string | null;
+  currency: string;
+  createdAt: string; // ISO — becomes the imported order's real placedAt, never "now"
+  cancelledAt: string | null;
+  closedAt: string | null;
+  /** Raw source vocabulary (e.g. Shopify's "paid"/"pending"/"refunded") —
+   *  mapped onto this platform's own FinancialStatus/FulfillmentStatus
+   *  enums by the worker, not here (keeps this port's shape channel-
+   *  agnostic; Magento's own vocabulary would map the same way later). */
+  financialStatus: string | null;
+  fulfillmentStatus: string | null;
+  gateway: string | null;
+  discountCode: string | null;
+  subtotalPrice: string;
+  totalTax: string;
+  totalShipping: string;
+  totalDiscounts: string;
+  totalPrice: string;
+  lineItems: SourceOrderLine[];
+  shippingAddress: SourceOrderAddress | null;
+  billingAddress: SourceOrderAddress | null;
+}

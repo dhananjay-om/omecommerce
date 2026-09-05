@@ -1,11 +1,15 @@
 import type {
   SourceCatalogClient,
   SourceCustomerClient,
+  SourceOrderClient,
   SourceProduct,
   SourceProductVariant,
   SourceCategory,
   SourceCustomer,
   SourceCustomerAddress,
+  SourceOrder,
+  SourceOrderLine,
+  SourceOrderAddress,
 } from '../domain/source-client.js';
 
 const API_VERSION = '2024-10';
@@ -21,7 +25,7 @@ const PAGE_SIZE = 250; // Shopify's own max per page
  *  never raw fetch" convention (S3/OpenSearch/SMTP/OpenAI all integrate
  *  through their real SDK because those ARE genuinely complex protocols;
  *  "GET a JSON list with a static header" isn't). */
-export class ShopifyClient implements SourceCatalogClient, SourceCustomerClient {
+export class ShopifyClient implements SourceCatalogClient, SourceCustomerClient, SourceOrderClient {
   private readonly baseUrl: string;
   /** Lazily loaded once per client instance (see ensureCollectionMembership
    *  below) — product_id -> [collection_id, ...]. */
@@ -155,6 +159,23 @@ export class ShopifyClient implements SourceCatalogClient, SourceCustomerClient 
     const { body, linkHeader } = await this.request(path);
     const customers = ((body as { customers: ShopifyCustomer[] }).customers ?? []).map(toSourceCustomer);
     return { customers, nextCursor: parseNextCursor(linkHeader) };
+  }
+
+  async countOrders(): Promise<number> {
+    // status=any — the default only counts OPEN orders, silently excluding
+    // every archived/cancelled/closed order, which would badly undercount
+    // a real store's order history.
+    const { body } = await this.request('/orders/count.json?status=any');
+    return (body as { count: number }).count;
+  }
+
+  async listOrders(cursor: string | null): Promise<{ orders: SourceOrder[]; nextCursor: string | null }> {
+    const path = cursor
+      ? `/orders.json?status=any&limit=${PAGE_SIZE}&page_info=${encodeURIComponent(cursor)}`
+      : `/orders.json?status=any&limit=${PAGE_SIZE}`;
+    const { body, linkHeader } = await this.request(path);
+    const orders = ((body as { orders: ShopifyOrder[] }).orders ?? []).map(toSourceOrder);
+    return { orders, nextCursor: parseNextCursor(linkHeader) };
   }
 }
 
@@ -297,5 +318,110 @@ function toSourceProduct(p: ShopifyProduct, collectsByProductId: Map<string, str
     options: realOptions.map((o) => ({ name: o.name, values: o.values })),
     images: (p.images ?? []).map((img) => ({ url: img.src, position: img.position })),
     categoryExternalIds: collectsByProductId.get(String(p.id)) ?? [],
+  };
+}
+
+interface ShopifyOrderAddress {
+  first_name: string | null;
+  last_name: string | null;
+  name: string | null;
+  company: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  province: string | null;
+  country_code: string | null;
+  zip: string | null;
+  phone: string | null;
+}
+
+interface ShopifyOrderLineTax {
+  price: string;
+}
+
+interface ShopifyOrderLine {
+  sku: string | null;
+  title: string;
+  quantity: number;
+  price: string;
+  total_discount: string;
+  tax_lines: ShopifyOrderLineTax[];
+}
+
+interface ShopifyDiscountCode {
+  code: string;
+}
+
+interface ShopifyShopMoney {
+  shop_money?: { amount: string };
+}
+
+interface ShopifyOrder {
+  id: number;
+  name: string; // e.g. "#1001"
+  email: string | null;
+  currency: string;
+  created_at: string;
+  cancelled_at: string | null;
+  closed_at: string | null;
+  financial_status: string | null;
+  fulfillment_status: string | null;
+  gateway: string | null;
+  discount_codes: ShopifyDiscountCode[];
+  subtotal_price: string;
+  total_tax: string;
+  total_discounts: string;
+  total_price: string;
+  total_shipping_price_set?: ShopifyShopMoney;
+  line_items: ShopifyOrderLine[];
+  shipping_address: ShopifyOrderAddress | null;
+  billing_address: ShopifyOrderAddress | null;
+}
+
+function toSourceOrderAddress(a: ShopifyOrderAddress | null): SourceOrderAddress | null {
+  if (!a) return null;
+  return {
+    name: a.name ?? ([a.first_name, a.last_name].filter(Boolean).join(' ').trim() || null),
+    company: a.company,
+    address1: a.address1,
+    address2: a.address2,
+    city: a.city,
+    province: a.province,
+    countryCode: a.country_code,
+    zip: a.zip,
+    phone: a.phone,
+  };
+}
+
+function toSourceOrder(o: ShopifyOrder): SourceOrder {
+  const lineItems: SourceOrderLine[] = (o.line_items ?? []).map((li) => ({
+    sku: li.sku,
+    title: li.title,
+    qty: li.quantity,
+    unitPrice: li.price,
+    totalDiscount: li.total_discount ?? '0',
+    taxAmount: (li.tax_lines ?? []).reduce((sum, t) => sum + Number(t.price || '0'), 0).toFixed(4),
+  }));
+
+  return {
+    externalId: String(o.id),
+    displayNumber: o.name,
+    email: o.email,
+    currency: o.currency,
+    createdAt: o.created_at,
+    cancelledAt: o.cancelled_at,
+    closedAt: o.closed_at,
+    financialStatus: o.financial_status,
+    fulfillmentStatus: o.fulfillment_status,
+    gateway: o.gateway,
+    discountCode: o.discount_codes?.[0]?.code ?? null,
+    subtotalPrice: o.subtotal_price,
+    totalTax: o.total_tax,
+    totalShipping: o.total_shipping_price_set?.shop_money?.amount ?? '0',
+    totalDiscounts: o.total_discounts,
+    totalPrice: o.total_price,
+    lineItems,
+    shippingAddress: toSourceOrderAddress(o.shipping_address),
+    billingAddress: toSourceOrderAddress(o.billing_address),
   };
 }

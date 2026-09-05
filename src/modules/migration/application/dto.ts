@@ -56,11 +56,11 @@ export interface MigrationRunView {
   processedItems: number;
   skippedItems: number;
   failedItems: number;
-  /** Shaped by `dataType` — CATALOG runs carry a MigrationPlan, CUSTOMER
-   *  runs a CustomerMigrationPlan. The frontend switches on `dataType`,
-   *  same as it already switches on `status`. */
-  plan: MigrationPlan | CustomerMigrationPlan | null;
-  result: MigrationRunResult | CustomerMigrationRunResult | null;
+  /** Shaped by `dataType` — CATALOG/CUSTOMER/ORDER each carry their own
+   *  plan/result shape. The frontend switches on `dataType`, same as it
+   *  already switches on `status`. */
+  plan: MigrationPlan | CustomerMigrationPlan | OrderMigrationPlan | null;
+  result: MigrationRunResult | CustomerMigrationRunResult | OrderMigrationRunResult | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -100,5 +100,36 @@ export interface CustomerMigrationRunResult {
   addressesCreated: number;
   skipped: Array<{ email: string | null; externalId: string; reason: string }>;
   failed: Array<{ email: string | null; externalId: string; reason: string }>;
+  fatalError?: string;
+}
+
+/** AnalyzeOrders' output — deterministic, same reasoning as
+ *  AnalyzeCustomers (no AI needed; see analyze-orders.usecase.ts's own doc
+ *  comment). */
+export interface OrderMigrationPlan {
+  summary: string;
+  totalOrders: number;
+  sampleSize: number;
+  /** How many orders in the sample have at least one line item whose SKU
+   *  doesn't match anything already migrated locally — a real, expected
+   *  number if Catalog migration hasn't run yet or only covers a subset. */
+  ordersWithUnmatchedLinesInSample: number;
+  /** How many orders in the sample would import with ZERO real line items
+   *  (every SKU unmatched) — these are skipped entirely, not imported as
+   *  empty orders. */
+  ordersWithNoMatchableLinesInSample: number;
+  oldestOrderDate: string | null;
+  newestOrderDate: string | null;
+  warnings: string[];
+}
+
+/** Populated once an ORDER run reaches COMPLETED/FAILED/CANCELLED — same
+ *  "every skip/failure names a real reason" contract as the other two. */
+export interface OrderMigrationRunResult {
+  ordersCreated: number;
+  lineItemsImported: number;
+  lineItemsSkipped: number;
+  skipped: Array<{ orderNumber: string | null; externalId: string; reason: string }>;
+  failed: Array<{ orderNumber: string | null; externalId: string; reason: string }>;
   fatalError?: string;
 }

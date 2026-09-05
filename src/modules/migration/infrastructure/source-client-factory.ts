@@ -1,6 +1,6 @@
 import { DomainError } from '../../../shared/domain/errors.js';
 import type { MigrationChannel } from '../domain/repositories.js';
-import type { SourceCatalogClient, SourceCustomerClient } from '../domain/source-client.js';
+import type { SourceCatalogClient, SourceCustomerClient, SourceOrderClient } from '../domain/source-client.js';
 import { ShopifyClient } from './shopify-client.js';
 
 const MAGENTO_NOT_CONNECTED = new DomainError(
@@ -27,6 +27,16 @@ export function buildSourceClient(channel: MigrationChannel, storeUrl: string, a
  *  (not a shared generic) since the two ports are genuinely independent
  *  (see SourceCustomerClient's own doc comment). */
 export function buildCustomerSourceClient(channel: MigrationChannel, storeUrl: string, apiToken: string): SourceCustomerClient {
+  switch (channel) {
+    case 'SHOPIFY':
+      return new ShopifyClient(storeUrl, apiToken);
+    case 'MAGENTO':
+      throw MAGENTO_NOT_CONNECTED;
+  }
+}
+
+/** Same shape again, for the Order migration's own port. */
+export function buildOrderSourceClient(channel: MigrationChannel, storeUrl: string, apiToken: string): SourceOrderClient {
   switch (channel) {
     case 'SHOPIFY':
       return new ShopifyClient(storeUrl, apiToken);

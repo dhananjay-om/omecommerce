@@ -20,7 +20,7 @@ export const connectMigrationSourceSchema = z.object({
 
 export const analyzeMigrationRunSchema = z.object({
   channel: z.enum(['SHOPIFY', 'MAGENTO']),
-  dataType: z.enum(['CATALOG', 'CUSTOMER']),
+  dataType: z.enum(['CATALOG', 'CUSTOMER', 'ORDER']),
 });
 
 export const migrationRunParamSchema = z.object({
@@ -33,5 +33,5 @@ export const listMigrationRunsQuerySchema = z.object({
   // own history separately (two independent Check Migration / Start / Stop
   // flows sharing the same connection), so a run list needs to be
   // filterable by which flow it belongs to, not just which store.
-  dataType: z.enum(['CATALOG', 'CUSTOMER']).optional(),
+  dataType: z.enum(['CATALOG', 'CUSTOMER', 'ORDER']).optional(),
 });

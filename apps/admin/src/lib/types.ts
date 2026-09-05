@@ -1338,6 +1338,28 @@ export interface CustomerMigrationRunResult {
   fatalError?: string;
 }
 
+/** AnalyzeOrders' output — same "no AI needed" reasoning as
+ *  CustomerMigrationPlan. */
+export interface OrderMigrationPlan {
+  summary: string;
+  totalOrders: number;
+  sampleSize: number;
+  ordersWithUnmatchedLinesInSample: number;
+  ordersWithNoMatchableLinesInSample: number;
+  oldestOrderDate: string | null;
+  newestOrderDate: string | null;
+  warnings: string[];
+}
+
+export interface OrderMigrationRunResult {
+  ordersCreated: number;
+  lineItemsImported: number;
+  lineItemsSkipped: number;
+  skipped: Array<{ orderNumber: string | null; externalId: string; reason: string }>;
+  failed: Array<{ orderNumber: string | null; externalId: string; reason: string }>;
+  fatalError?: string;
+}
+
 export interface MigrationRun {
   publicId: string;
   channel: MigrationChannel;
@@ -1351,8 +1373,8 @@ export interface MigrationRun {
    *  run's. Each migration page only ever fetches its own dataType, so the
    *  client component there narrows with an `as` the same way it already
    *  does when reading typed JSON off the wire elsewhere in this app. */
-  plan: MigrationPlan | CustomerMigrationPlan | null;
-  result: MigrationRunResult | CustomerMigrationRunResult | null;
+  plan: MigrationPlan | CustomerMigrationPlan | OrderMigrationPlan | null;
+  result: MigrationRunResult | CustomerMigrationRunResult | OrderMigrationRunResult | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
