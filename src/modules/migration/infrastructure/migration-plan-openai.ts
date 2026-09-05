@@ -107,13 +107,13 @@ function normalizePlan(draft: RawMigrationPlan, inputs: MigrationPlanInputs): Mi
     return { name, action: 'CREATE' };
   });
 
-  const attributePlan: MigrationPlan['attributePlan'] = inputs.sourceOptionNames.map(({ name }) => {
+  const attributePlan: MigrationPlan['attributePlan'] = inputs.sourceOptionNames.map(({ name, sampleValues }) => {
     const found = (draft.attributePlan ?? []).find((a) => a.sourceOptionName === name);
     const matchedCode = found?.action === 'MATCH_EXISTING' ? found.matchedAttributeCode : undefined;
     if (matchedCode && attrByCode.has(matchedCode)) {
-      return { sourceOptionName: name, action: 'MATCH_EXISTING', matchedAttributeCode: matchedCode };
+      return { sourceOptionName: name, action: 'MATCH_EXISTING', matchedAttributeCode: matchedCode, sampleValues };
     }
-    return { sourceOptionName: name, action: 'CREATE', newAttributeCode: found?.newAttributeCode || slugify(name) };
+    return { sourceOptionName: name, action: 'CREATE', newAttributeCode: found?.newAttributeCode || slugify(name), sampleValues };
   });
 
   const attributeSetPlan: MigrationPlan['attributeSetPlan'] = inputs.sourceProductTypes.map((type) => {

@@ -189,7 +189,7 @@ export function CatalogMigrationClient({
               <span className="font-medium text-foreground">{run.plan.totalProducts}</span> products found.
             </p>
             <PlanSection title="Categories" entries={run.plan.categoryPlan.map((c) => ({ label: c.name, matched: c.action === 'MATCH_EXISTING' ? c.matchedCategoryName : undefined }))} />
-            <PlanSection title="Variant attributes" entries={run.plan.attributePlan.map((a) => ({ label: a.sourceOptionName, matched: a.action === 'MATCH_EXISTING' ? a.matchedAttributeCode : undefined }))} />
+            <AttributePlanSection entries={run.plan.attributePlan} />
             <PlanSection title="Attribute sets" entries={run.plan.attributeSetPlan.map((s) => ({ label: s.sourceProductType, matched: s.action === 'MATCH_EXISTING' ? s.matchedAttributeSetCode : undefined }))} />
             {run.plan.warnings.length > 0 ? (
               <div className="space-y-1">
@@ -258,30 +258,117 @@ function PlanSection({ title, entries }: { title: string; entries: Array<{ label
   );
 }
 
+/** Unlike the other plan sections (a bare name badge), this one shows the
+ *  REAL attribute that will be created or matched, plus a few real example
+ *  values seen on the source store — so the admin can actually judge
+ *  whether "Color" mapping to a new attribute with values Red/Blue/Green
+ *  is correct before clicking Start, not just see that "something" will
+ *  happen to it. */
+function AttributePlanSection({
+  entries,
+}: {
+  entries: Array<{ sourceOptionName: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedAttributeCode?: string; newAttributeCode?: string; sampleValues?: string[] }>;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Variant attributes</p>
+      <div className="space-y-2 rounded-md border p-3">
+        {entries.map((e) => (
+          <div key={e.sourceOptionName} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="font-medium text-foreground">{e.sourceOptionName}</span>
+            <Badge variant={e.action === 'MATCH_EXISTING' ? 'secondary' : 'outline'}>
+              {e.action === 'MATCH_EXISTING' ? `→ ${e.matchedAttributeCode}` : `new attribute "${e.newAttributeCode}"`}
+            </Badge>
+            {e.sampleValues && e.sampleValues.length > 0 ? (
+              <span className="text-xs text-muted-foreground">values seen: {e.sampleValues.join(', ')}</span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RunResultSummary({ run }: { run: MigrationRun }) {
   if (run.status === 'FAILED') {
     return (
-      <p className="text-sm text-destructive">
-        Last run failed{run.result?.fatalError ? `: ${run.result.fatalError}` : '.'}
-      </p>
+      <div className="space-y-2">
+        <p className="text-sm text-destructive">
+          Last run failed{run.result?.fatalError ? `: ${run.result.fatalError}` : '.'}
+        </p>
+        <SkipFailDetails result={run.result} />
+      </div>
     );
   }
   if (run.status === 'CANCELLED') {
     return (
-      <p className="text-sm text-muted-foreground">
-        Last run was stopped after{' '}
-        <span className="font-medium text-foreground">{run.result?.productsCreated ?? run.processedItems}</span>{' '}
-        product(s) — nothing already migrated was undone. Check Migration again to pick up where it left off.
-      </p>
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Last run was stopped after{' '}
+          <span className="font-medium text-foreground">{run.result?.productsCreated ?? run.processedItems}</span>{' '}
+          product(s) — nothing already migrated was undone. Check Migration again to pick up where it left off.
+        </p>
+        <SkipFailDetails result={run.result} />
+      </div>
     );
   }
   if (!run.result) return null;
   return (
-    <p className="text-sm text-muted-foreground">
-      Last run: <span className="font-medium text-foreground">{run.result.productsCreated}</span> products,{' '}
-      <span className="font-medium text-foreground">{run.result.variantsCreated}</span> variants,{' '}
-      <span className="font-medium text-foreground">{run.result.categoriesCreated}</span> categories created,{' '}
-      {run.result.skipped.length} skipped, {run.result.failed.length} failed.
-    </p>
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">
+        Last run: <span className="font-medium text-foreground">{run.result.productsCreated}</span> products,{' '}
+        <span className="font-medium text-foreground">{run.result.variantsCreated}</span> variants,{' '}
+        <span className="font-medium text-foreground">{run.result.categoriesCreated}</span> categories created,{' '}
+        {run.result.skipped.length} skipped, {run.result.failed.length} failed.
+      </p>
+      <SkipFailDetails result={run.result} />
+    </div>
+  );
+}
+
+/** Every skip/failure the worker records already names a real reason (e.g.
+ *  "a product with this SKU already exists locally", "no SKU on the source
+ *  product") — this just surfaces that list instead of leaving the admin
+ *  with only a bare count to wonder about. Collapsed by default since a
+ *  large catalog can produce a long list. */
+function SkipFailDetails({ result }: { result: MigrationRun['result'] }) {
+  const [open, setOpen] = useState(false);
+  if (!result) return null;
+  const items = [
+    ...result.skipped.map((s) => ({ ...s, kind: 'Skipped' as const })),
+    ...result.failed.map((f) => ({ ...f, kind: 'Failed' as const })),
+  ];
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setOpen((v) => !v)}>
+        {open ? 'Hide' : 'View'} the {items.length} skipped/failed item{items.length === 1 ? '' : 's'} and why
+      </Button>
+      {open ? (
+        <div className="mt-2 max-h-64 overflow-y-auto rounded-md border">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-muted/50 text-left text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1 font-medium">SKU</th>
+                <th className="px-2 py-1 font-medium">Status</th>
+                <th className="px-2 py-1 font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={`${item.kind}-${item.externalId}-${i}`} className="border-t">
+                  <td className="px-2 py-1 font-mono">{item.sku ?? `(external id ${item.externalId})`}</td>
+                  <td className="px-2 py-1">
+                    <Badge variant={item.kind === 'Failed' ? 'destructive' : 'outline'}>{item.kind}</Badge>
+                  </td>
+                  <td className="px-2 py-1 text-muted-foreground">{item.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
   );
 }

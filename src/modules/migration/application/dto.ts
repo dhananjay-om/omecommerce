@@ -30,8 +30,8 @@ export interface MigrationPlan {
     { name: string; action: 'CREATE' } | { name: string; action: 'MATCH_EXISTING'; matchedCategoryName: string }
   >;
   attributePlan: Array<
-    | { sourceOptionName: string; action: 'CREATE'; newAttributeCode: string }
-    | { sourceOptionName: string; action: 'MATCH_EXISTING'; matchedAttributeCode: string }
+    | { sourceOptionName: string; action: 'CREATE'; newAttributeCode: string; sampleValues: string[] }
+    | { sourceOptionName: string; action: 'MATCH_EXISTING'; matchedAttributeCode: string; sampleValues: string[] }
   >;
   attributeSetPlan: Array<
     | { sourceProductType: string; action: 'CREATE'; newAttributeSetCode: string }

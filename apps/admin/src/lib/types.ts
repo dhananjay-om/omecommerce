@@ -1301,7 +1301,7 @@ export interface MigrationPlan {
   summary: string;
   totalProducts: number;
   categoryPlan: Array<{ name: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedCategoryName?: string }>;
-  attributePlan: Array<{ sourceOptionName: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedAttributeCode?: string; newAttributeCode?: string }>;
+  attributePlan: Array<{ sourceOptionName: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedAttributeCode?: string; newAttributeCode?: string; sampleValues?: string[] }>;
   attributeSetPlan: Array<{ sourceProductType: string; action: 'CREATE' | 'MATCH_EXISTING'; matchedAttributeSetCode?: string; newAttributeSetCode?: string }>;
   warnings: string[];
 }
