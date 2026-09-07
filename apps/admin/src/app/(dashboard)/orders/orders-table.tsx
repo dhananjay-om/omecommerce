@@ -57,10 +57,17 @@ export function OrdersTable({
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrderListItem | null>(null);
 
-  const allSelected = orders.length > 0 && orders.every((o) => selected.has(o.publicId));
+  // Only CANCELLED/CLOSED orders are ever deletable (DeleteOrder's own
+  // guard — see delete-order-dialog.tsx's deleteEligible, which the
+  // row-level "Delete Order" menu item already respects). Bulk-select only
+  // ever offers eligible rows too, rather than letting an admin select a
+  // typical active order and have the bulk action silently no-op/error on
+  // it — the same rule, just enforced before the click instead of after.
+  const eligibleOrders = orders.filter((o) => deleteEligible(o.status));
+  const allSelected = eligibleOrders.length > 0 && eligibleOrders.every((o) => selected.has(o.publicId));
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(orders.map((o) => o.publicId)));
+    setSelected(allSelected ? new Set() : new Set(eligibleOrders.map((o) => o.publicId)));
   }
 
   function toggleOne(publicId: string) {
@@ -105,7 +112,15 @@ export function OrdersTable({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-10 pl-6">
-                <input type="checkbox" className="size-4" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  disabled={eligibleOrders.length === 0}
+                  aria-label="Select all deletable orders"
+                  title="Selects every cancelled/closed order on this page — only those are deletable"
+                />
               </TableHead>
               <TableHead>Order #</TableHead>
               <SortableHeader label="Customer" sortKey="customerName" sortLinks={sortLinks} activeSortBy={activeSortBy} activeSortDir={activeSortDir} />
@@ -127,7 +142,15 @@ export function OrdersTable({
               orders.map((o) => (
                 <TableRow key={o.publicId} className="cursor-pointer" onClick={() => router.push(`/orders/${o.publicId}`)}>
                   <TableCell className="pl-6" onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" className="size-4" checked={selected.has(o.publicId)} onChange={() => toggleOne(o.publicId)} aria-label={`Select order ${o.orderNumber}`} />
+                    <input
+                      type="checkbox"
+                      className="size-4 disabled:cursor-not-allowed disabled:opacity-30"
+                      checked={selected.has(o.publicId)}
+                      onChange={() => toggleOne(o.publicId)}
+                      disabled={!deleteEligible(o.status)}
+                      aria-label={`Select order ${o.orderNumber}`}
+                      title={deleteEligible(o.status) ? undefined : 'Only cancelled or closed orders can be deleted — cancel this order first'}
+                    />
                   </TableCell>
                   <TableCell className="font-semibold">#{o.orderNumber}</TableCell>
                   <TableCell>
