@@ -8,8 +8,6 @@ export interface ActionState {
   success: boolean;
 }
 
-export const initialActionState: ActionState = { error: null, success: false };
-
 /** Moves a return through its non-monetary lifecycle (REQUESTED ->
  *  APPROVED -> RECEIVED, or REJECTED from either) — see
  *  UpdateReturnStatus's own doc comment on why REFUNDED isn't reachable

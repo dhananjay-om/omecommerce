@@ -1,8 +1,10 @@
 'use client';
 
 import { useActionState } from 'react';
-import { updateReturnStatus, refundReturn, initialActionState } from './actions';
+import { updateReturnStatus, refundReturn, type ActionState } from './actions';
 import { Button } from '@/components/ui/button';
+
+const initialState: ActionState = { error: null, success: false };
 
 /** One action per legal next step, matching UpdateReturnStatus's own
  *  state machine exactly (see its doc comment) — REFUNDED is its own
@@ -10,10 +12,10 @@ import { Button } from '@/components/ui/button';
  *  another option in the same status dropdown, so it's never one
  *  careless click away from a plain status change. */
 export function ReturnRowActions({ publicId, status }: { publicId: string; status: string }) {
-  const [approveState, approveAction, approvePending] = useActionState(updateReturnStatus.bind(null, publicId, 'APPROVED'), initialActionState);
-  const [receiveState, receiveAction, receivePending] = useActionState(updateReturnStatus.bind(null, publicId, 'RECEIVED'), initialActionState);
-  const [rejectState, rejectAction, rejectPending] = useActionState(updateReturnStatus.bind(null, publicId, 'REJECTED'), initialActionState);
-  const [refundState, refundAction, refundPending] = useActionState(refundReturn.bind(null, publicId), initialActionState);
+  const [approveState, approveAction, approvePending] = useActionState(updateReturnStatus.bind(null, publicId, 'APPROVED'), initialState);
+  const [receiveState, receiveAction, receivePending] = useActionState(updateReturnStatus.bind(null, publicId, 'RECEIVED'), initialState);
+  const [rejectState, rejectAction, rejectPending] = useActionState(updateReturnStatus.bind(null, publicId, 'REJECTED'), initialState);
+  const [refundState, refundAction, refundPending] = useActionState(refundReturn.bind(null, publicId), initialState);
 
   const error = approveState.error || receiveState.error || rejectState.error || refundState.error;
 

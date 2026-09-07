@@ -1,13 +1,15 @@
 'use client';
 
 import { useActionState } from 'react';
-import { setBinLocation, initialActionState } from './actions';
+import { setBinLocation, type ActionState } from './actions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
+const initialState: ActionState = { error: null, success: false };
+
 export function BinLocationField({ sku, warehouseCode, binLocation }: { sku: string; warehouseCode: string; binLocation: string | null }) {
   const action = setBinLocation.bind(null, sku, warehouseCode);
-  const [state, formAction, pending] = useActionState(action, initialActionState);
+  const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
     <form action={formAction} className="flex items-center gap-1.5">

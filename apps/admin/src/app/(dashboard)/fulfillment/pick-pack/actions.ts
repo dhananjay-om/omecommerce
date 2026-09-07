@@ -8,8 +8,6 @@ export interface ActionState {
   success: boolean;
 }
 
-export const initialActionState: ActionState = { error: null, success: false };
-
 /** Records where a variant's stock physically sits at one warehouse — a
  *  blank value clears a previously-set location (see SetBinLocation's own
  *  doc comment on the backend). Edited inline, right where it's actually
