@@ -603,6 +603,32 @@ export interface FulfillmentList {
   fulfillments: FulfillmentListItem[];
 }
 
+/** Cross-order Refunds ledger row (Fulfillment feature area) — every
+ *  field already written when an admin issues a refund; see
+ *  RefundListItem's own doc comment on the backend for why `id` (not a
+ *  publicId) is the row key here. */
+export interface RefundListItem {
+  id: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  method: string;
+  gateway: string;
+  amount: string;
+  currency: string;
+  status: string;
+  gatewayRef: string | null;
+  createdAt: string;
+}
+
+export interface RefundList {
+  total: number;
+  page: number;
+  pageSize: number;
+  refunds: RefundListItem[];
+  totalsByCurrency: Array<{ currency: string; total: string }>;
+}
+
 export interface OrderReturnLine {
   sku: string;
   qty: number;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus } from '@prisma/client';
+import { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, PaymentTxnStatus } from '@prisma/client';
 
 /** Normalizes a whitespace-only or blank string to undefined before the real
  *  schema sees it — an untouched optional field can arrive as '' or ' ' (a
@@ -210,6 +210,15 @@ export const listFulfillmentsQuerySchema = z.object({
   // ListAllProductReviews' own isApproved fix). An explicit enum, parsed
   // to a real boolean at the route call site, avoids it here from the start.
   delayed: z.enum(['true', 'false']).optional(),
+});
+
+export const listRefundsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  method: z.string().min(1).optional(),
+  status: z.nativeEnum(PaymentTxnStatus).optional(),
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
 });
 
 /** Every field optional — same "blank means leave unchanged" contract as

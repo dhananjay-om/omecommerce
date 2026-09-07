@@ -45,6 +45,7 @@ import { ListOrders } from './application/list-orders.usecase.js';
 import { ListFulfillments } from './application/list-fulfillments.usecase.js';
 import { UpdateShipmentTracking } from './application/update-fulfillment-tracking.usecase.js';
 import { GetDeliveryBreakdown } from './application/get-delivery-breakdown.usecase.js';
+import { ListRefunds } from './application/list-refunds.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
@@ -130,6 +131,7 @@ import {
   exportOrdersQuerySchema,
   listFulfillmentsQuerySchema,
   updateFulfillmentTrackingSchema,
+  listRefundsQuerySchema,
   updateEmailSettingsSchema,
   sendTestEmailSchema,
 } from './interface/http/schemas.js';
@@ -328,6 +330,7 @@ export function createOrderModule(
   const listFulfillments = new ListFulfillments(orders);
   const updateShipmentTracking = new UpdateShipmentTracking(orders);
   const getDeliveryBreakdown = new GetDeliveryBreakdown(orders);
+  const listRefunds = new ListRefunds(orders);
   const listShippingMethods = new ListShippingMethods(shippingMethods);
   // walletLedger is already constructed above (shared with EnrichCartView).
   // Own instance of the customer-context lookup — CreditWallet is reused
@@ -587,6 +590,14 @@ export function createOrderModule(
       const body = parse(updateFulfillmentTrackingSchema, req.body);
       await updateShipmentTracking.execute({ fulfillmentPublicId: req.params.publicId!, ...body });
       res.status(204).send();
+    }),
+  );
+  admin.get(
+    '/refunds',
+    authorize('orders:view'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listRefundsQuerySchema, req.query);
+      res.json({ data: await listRefunds.execute(query) });
     }),
   );
   admin.get(

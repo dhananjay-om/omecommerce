@@ -533,6 +533,50 @@ export interface DeliveryBreakdown {
   delayed: number;
 }
 
+/** Cross-order Refunds ledger row (Fulfillment feature area) — every
+ *  field already written by RefundOrder's own recordPayment(type:
+ *  'REFUND') call; this is purely the missing cross-order aggregation,
+ *  same posture as FulfillmentListItem. No `id` publicId exists on
+ *  PaymentTransaction (same precedent as OrderNoteView/OrderHistoryView —
+ *  an internal, admin-only, read-only sub-resource plainly exposes its
+ *  numeric id, not a UUID). No `reason` field exists on PaymentTransaction
+ *  either — filtering by refund reason isn't possible without a new
+ *  column; scoped out of this pass, not silently pretended to work. */
+export interface RefundListItem {
+  id: bigint;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  method: string;
+  gateway: string;
+  amount: string;
+  currency: string;
+  status: PaymentTxnStatus;
+  gatewayRef: string | null;
+  createdAt: Date;
+}
+
+export interface ListRefundsFilter {
+  page: number;
+  pageSize: number;
+  method?: string;
+  status?: PaymentTxnStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+/** `totalsByCurrency` reflects the SAME filter as `refunds` — a real,
+ *  currency-safe summary (this store can hold orders in more than one
+ *  currency, see the Multi-Store feature), never a single fabricated sum
+ *  across currencies. */
+export interface ListRefundsResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  refunds: RefundListItem[];
+  totalsByCurrency: Array<{ currency: string; total: string }>;
+}
+
 /** Every field optional — only what's provided gets overwritten (same
  *  "blank means leave unchanged" contract this session's AI Settings/
  *  Migration Connection forms already use), since a correction usually
@@ -815,6 +859,10 @@ export interface OrderRepository {
   /** Delivery feature area — the summary stat row above the (same)
    *  fulfillments list. */
   getDeliveryBreakdown(): Promise<DeliveryBreakdown>;
+  /** Refunds feature area — cross-order ledger over PaymentTransaction
+   *  rows RefundOrder already writes, same "aggregation-only gap" shape
+   *  as Shipments. */
+  listRefunds(filter: ListRefundsFilter): Promise<ListRefundsResult>;
   /** Resolves a fulfillment by its own publicId to the orderId/
    *  orderPublicId it belongs to — needed by UpdateFulfillmentTracking to
    *  scope the update and to write the order's own history row. */

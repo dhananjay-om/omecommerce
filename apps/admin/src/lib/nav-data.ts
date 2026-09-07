@@ -233,9 +233,8 @@ export const NAV: NavGroup[] = [
         planned: ['A cross-order returns list with reason, condition, and restock status', 'Sourced from the return records already created per-order today'],
       },
       {
-        key: 'refunds', label: 'Refunds', href: '/fulfillment/refunds', icon: CreditCard, status: 'comingSoon',
-        description: 'Every refund issued, in one list.',
-        planned: ['A cross-order refund ledger, filterable by reason and method'],
+        key: 'refunds', label: 'Refunds', href: '/fulfillment/refunds', icon: CreditCard, status: 'live',
+        description: 'Every refund issued, in one list, filterable by method/status/date, with a real per-currency total.',
       },
     ],
   },

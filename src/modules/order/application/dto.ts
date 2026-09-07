@@ -1,4 +1,4 @@
-import type { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, TenderType } from '@prisma/client';
+import type { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, PaymentTxnStatus, TenderType } from '@prisma/client';
 
 /** plan/15 Phase 6 — customerGroupCode was removed: the pricing group is
  *  always server-derived now, see CreateCart/resolveCustomerGroupId. */
@@ -344,6 +344,37 @@ export interface DeliveryBreakdownDto {
   delivered: number;
   cancelled: number;
   delayed: number;
+}
+
+export interface ListRefundsQuery {
+  page?: number;
+  pageSize?: number;
+  method?: string;
+  status?: PaymentTxnStatus;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface RefundListItemDto {
+  id: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  method: string;
+  gateway: string;
+  amount: string;
+  currency: string;
+  status: string;
+  gatewayRef: string | null;
+  createdAt: string;
+}
+
+export interface RefundListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  refunds: RefundListItemDto[];
+  totalsByCurrency: Array<{ currency: string; total: string }>;
 }
 
 /** Every field optional — see UpdateFulfillmentTrackingInput's own doc

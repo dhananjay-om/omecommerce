@@ -22,6 +22,8 @@ import type {
   ListFulfillmentsResult,
   UpdateFulfillmentTrackingInput,
   DeliveryBreakdown,
+  ListRefundsFilter,
+  ListRefundsResult,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -548,6 +550,73 @@ export class PrismaOrderRepository implements OrderRepository {
       delivered: Number(r.delivered),
       cancelled: Number(r.cancelled),
       delayed: Number(r.delayed),
+    };
+  }
+
+  async listRefunds(filter: ListRefundsFilter): Promise<ListRefundsResult> {
+    const conditions: Prisma.Sql[] = [Prisma.sql`pt.type = 'REFUND'`];
+    if (filter.method) conditions.push(Prisma.sql`pt.method ILIKE ${`%${filter.method}%`}`);
+    if (filter.status) conditions.push(Prisma.sql`pt.status = ${filter.status}::"PaymentTxnStatus"`);
+    if (filter.dateFrom) conditions.push(Prisma.sql`pt.created_at >= ${filter.dateFrom}`);
+    if (filter.dateTo) conditions.push(Prisma.sql`pt.created_at <= ${filter.dateTo}`);
+    const where = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+    const fromJoin = Prisma.sql`
+      FROM payment_transaction pt
+      JOIN "order" o ON o.id = pt.order_id
+      ${where}`;
+
+    const [countRows, rows, totalsRows] = await Promise.all([
+      this.db.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS n ${fromJoin}`),
+      this.db.$queryRaw<
+        Array<{
+          id: bigint;
+          order_public_id: string;
+          order_number: bigint;
+          email: string;
+          method: string;
+          gateway: string;
+          amount: string;
+          currency: string;
+          status: string;
+          gateway_ref: string | null;
+          created_at: Date;
+        }>
+      >(Prisma.sql`
+        SELECT pt.id, o.public_id AS order_public_id, o.order_number, o.email, pt.method, pt.gateway,
+               pt.amount::text AS amount, pt.currency, pt.status, pt.gateway_ref, pt.created_at
+        ${fromJoin}
+        ORDER BY pt.created_at DESC
+        LIMIT ${filter.pageSize} OFFSET ${(filter.page - 1) * filter.pageSize}`),
+      // Same filters, grouped by currency — a real "how much have we
+      // refunded" summary that never sums across currencies into one
+      // misleading number (this store can hold orders in more than one
+      // currency, see the Multi-Store feature).
+      this.db.$queryRaw<Array<{ currency: string; total: string }>>(Prisma.sql`
+        SELECT pt.currency, SUM(pt.amount)::text AS total
+        ${fromJoin}
+        GROUP BY pt.currency
+        ORDER BY pt.currency`),
+    ]);
+
+    return {
+      total: Number(countRows[0]?.n ?? 0n),
+      page: filter.page,
+      pageSize: filter.pageSize,
+      refunds: rows.map((row) => ({
+        id: row.id,
+        orderPublicId: row.order_public_id,
+        orderNumber: row.order_number.toString(),
+        email: row.email,
+        method: row.method,
+        gateway: row.gateway,
+        amount: formatDecimal(row.amount),
+        currency: row.currency,
+        status: row.status as PaymentTxnStatus,
+        gatewayRef: row.gateway_ref,
+        createdAt: row.created_at,
+      })),
+      totalsByCurrency: totalsRows.map((r) => ({ currency: r.currency, total: formatDecimal(r.total) })),
     };
   }
 
