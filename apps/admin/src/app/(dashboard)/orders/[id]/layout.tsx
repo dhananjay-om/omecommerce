@@ -8,6 +8,7 @@ import { PageBreadcrumb } from '@/components/page-breadcrumb';
 import { OrderStepper } from '../order-stepper';
 import { FulfillDialog } from '../fulfill-dialog';
 import { RefundDialog } from '../refund-dialog';
+import { CreateReturnDialog } from '../create-return-dialog';
 import { MarkPaidDialog } from '../mark-paid-dialog';
 import { OrderActionsMenu } from '../order-actions-menu';
 
@@ -60,6 +61,7 @@ export default async function OrderDetailLayout({ children, params }: { children
           <MarkPaidDialog order={order} />
           <FulfillDialog orderPublicId={order.publicId} lines={order.lines} />
           <RefundDialog orderPublicId={order.publicId} lines={order.lines} />
+          <CreateReturnDialog orderPublicId={order.publicId} lines={order.lines} />
           <OrderActionsMenu order={order} />
         </div>
       </div>

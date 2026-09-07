@@ -46,6 +46,10 @@ import { ListFulfillments } from './application/list-fulfillments.usecase.js';
 import { UpdateShipmentTracking } from './application/update-fulfillment-tracking.usecase.js';
 import { GetDeliveryBreakdown } from './application/get-delivery-breakdown.usecase.js';
 import { ListRefunds } from './application/list-refunds.usecase.js';
+import { CreateReturn } from './application/create-return.usecase.js';
+import { UpdateReturnStatus } from './application/update-return-status.usecase.js';
+import { RefundReturn } from './application/refund-return.usecase.js';
+import { ListReturns } from './application/list-returns.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
@@ -132,6 +136,9 @@ import {
   listFulfillmentsQuerySchema,
   updateFulfillmentTrackingSchema,
   listRefundsQuerySchema,
+  createReturnSchema,
+  updateReturnStatusSchema,
+  listReturnsQuerySchema,
   updateEmailSettingsSchema,
   sendTestEmailSchema,
 } from './interface/http/schemas.js';
@@ -357,6 +364,10 @@ export function createOrderModule(
     companyCredit,
   );
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
+  const createReturn = new CreateReturn(orders);
+  const updateReturnStatus = new UpdateReturnStatus(orders);
+  const refundReturn = new RefundReturn(orders, refundOrder);
+  const listReturns = new ListReturns(orders);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const listTaxClasses = new ListTaxClasses(taxClasses);
   const updateTaxClass = new UpdateTaxClass(taxClasses);
@@ -619,6 +630,40 @@ export function createOrderModule(
       res.json({
         data: await refundOrder.execute({ orderPublicId: req.params.publicId!, ...body }),
       });
+    }),
+  );
+  admin.post(
+    '/orders/:publicId/returns',
+    authorize('orders:refund'),
+    asyncHandler(async (req, res) => {
+      const body = parse(createReturnSchema, req.body);
+      res.status(201).json({
+        data: await createReturn.execute({ orderPublicId: req.params.publicId!, ...body }),
+      });
+    }),
+  );
+  admin.get(
+    '/returns',
+    authorize('orders:view'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listReturnsQuerySchema, req.query);
+      res.json({ data: await listReturns.execute(query) });
+    }),
+  );
+  admin.patch(
+    '/returns/:publicId/status',
+    authorize('orders:refund'),
+    asyncHandler(async (req, res) => {
+      const body = parse(updateReturnStatusSchema, req.body);
+      await updateReturnStatus.execute({ returnPublicId: req.params.publicId!, ...body });
+      res.status(204).send();
+    }),
+  );
+  admin.post(
+    '/returns/:publicId/refund',
+    authorize('orders:refund'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await refundReturn.execute(req.params.publicId!) });
     }),
   );
   admin.post(

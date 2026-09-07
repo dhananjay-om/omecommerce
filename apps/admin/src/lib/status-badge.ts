@@ -13,6 +13,7 @@ const POSITIVE = new Set([
   'REDEEMED',
   'REWARDED',
   'SUCCEEDED',
+  'REFUNDED',
 ]);
 const NEGATIVE = new Set([
   'DISABLED',
@@ -42,6 +43,9 @@ const NEUTRAL_WARNING = new Set([
   'SIGNED_UP',
   'QUALIFIED',
   'SUSPENDED',
+  'REQUESTED',
+  'APPROVED',
+  'RECEIVED',
 ]);
 
 /** Maps the many status-like enum strings across products/orders/customers to a consistent badge color. */

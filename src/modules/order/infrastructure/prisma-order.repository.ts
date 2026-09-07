@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import type { PaymentTxnType, PaymentTxnStatus, ShipmentStatus, FinancialStatus, OrderStatus, FulfillmentStatus } from '@prisma/client';
+import type { PaymentTxnType, PaymentTxnStatus, ShipmentStatus, FinancialStatus, OrderStatus, FulfillmentStatus, ReturnStatus } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
 import type {
   OrderRepository,
@@ -24,6 +24,10 @@ import type {
   DeliveryBreakdown,
   ListRefundsFilter,
   ListRefundsResult,
+  CreateReturnInput,
+  ReturnDetail,
+  ListReturnsFilter,
+  ListReturnsResult,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -617,6 +621,89 @@ export class PrismaOrderRepository implements OrderRepository {
         createdAt: row.created_at,
       })),
       totalsByCurrency: totalsRows.map((r) => ({ currency: r.currency, total: formatDecimal(r.total) })),
+    };
+  }
+
+  async createReturn(input: CreateReturnInput): Promise<{ id: bigint; publicId: string }> {
+    const orderReturn = await this.db.orderReturn.create({
+      data: {
+        orderId: input.orderId,
+        reason: input.reason,
+        lines: { createMany: { data: input.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty, restock: l.restock })) } },
+      },
+    });
+    return { id: orderReturn.id, publicId: orderReturn.publicId };
+  }
+
+  async findReturnByPublicId(publicId: string): Promise<ReturnDetail | null> {
+    const row = await this.db.orderReturn.findFirst({
+      where: { publicId },
+      include: { order: { select: { publicId: true } }, lines: { include: { orderLine: { select: { sku: true } } } } },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      publicId: row.publicId,
+      orderId: row.orderId,
+      orderPublicId: row.order.publicId,
+      reason: row.reason,
+      status: row.status,
+      createdAt: row.createdAt,
+      lines: row.lines.map((l) => ({ orderLineId: l.orderLineId, sku: l.orderLine.sku, qty: l.qty, restock: l.restock })),
+    };
+  }
+
+  async setReturnStatus(returnId: bigint, status: ReturnStatus): Promise<void> {
+    await this.db.orderReturn.update({ where: { id: returnId }, data: { status } });
+  }
+
+  async listReturns(filter: ListReturnsFilter): Promise<ListReturnsResult> {
+    const conditions: Prisma.Sql[] = [];
+    if (filter.status) conditions.push(Prisma.sql`r.status = ${filter.status}::"ReturnStatus"`);
+    if (filter.dateFrom) conditions.push(Prisma.sql`r.created_at >= ${filter.dateFrom}`);
+    if (filter.dateTo) conditions.push(Prisma.sql`r.created_at <= ${filter.dateTo}`);
+    const where = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
+
+    const fromJoin = Prisma.sql`
+      FROM order_return r
+      JOIN "order" o ON o.id = r.order_id
+      ${where}`;
+
+    const [countRows, rows] = await Promise.all([
+      this.db.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS n ${fromJoin}`),
+      this.db.$queryRaw<
+        Array<{
+          public_id: string;
+          order_public_id: string;
+          order_number: bigint;
+          email: string;
+          reason: string;
+          status: string;
+          line_count: bigint;
+          created_at: Date;
+        }>
+      >(Prisma.sql`
+        SELECT r.public_id, o.public_id AS order_public_id, o.order_number, o.email, r.reason, r.status, r.created_at,
+               (SELECT COUNT(*) FROM order_return_line rl WHERE rl.return_id = r.id) AS line_count
+        ${fromJoin}
+        ORDER BY r.created_at DESC
+        LIMIT ${filter.pageSize} OFFSET ${(filter.page - 1) * filter.pageSize}`),
+    ]);
+
+    return {
+      total: Number(countRows[0]?.n ?? 0n),
+      page: filter.page,
+      pageSize: filter.pageSize,
+      returns: rows.map((row) => ({
+        publicId: row.public_id,
+        orderPublicId: row.order_public_id,
+        orderNumber: row.order_number.toString(),
+        email: row.email,
+        reason: row.reason,
+        status: row.status as ReturnStatus,
+        lineCount: Number(row.line_count),
+        createdAt: row.created_at,
+      })),
     };
   }
 

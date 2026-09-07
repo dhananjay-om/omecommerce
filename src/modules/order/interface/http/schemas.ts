@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, PaymentTxnStatus } from '@prisma/client';
+import { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, PaymentTxnStatus, ReturnStatus } from '@prisma/client';
 
 /** Normalizes a whitespace-only or blank string to undefined before the real
  *  schema sees it — an untouched optional field can arrive as '' or ' ' (a
@@ -91,6 +91,27 @@ export const refundOrderSchema = z.object({
   lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive() })).min(1),
   restock: z.boolean().optional(),
   refundTo: refundToSchema.optional(),
+});
+
+export const createReturnSchema = z.object({
+  reason: z.string().trim().min(1).max(1024),
+  // restock defaults to true in CreateReturn itself (matching the schema
+  // column's own @default(true)) — not defaulted here, same "optional in
+  // the zod schema, defaulted in the usecase" shape as refundOrderSchema's
+  // own restock field.
+  lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive(), restock: z.boolean().optional() })).min(1),
+});
+
+export const updateReturnStatusSchema = z.object({
+  status: z.enum(['APPROVED', 'RECEIVED', 'REJECTED']),
+});
+
+export const listReturnsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+  status: z.nativeEnum(ReturnStatus).optional(),
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
 });
 
 /** Every field optional — a bare `POST .../cancel` with an empty body keeps working exactly as before (plan/15 Phase 0e added reason/refundTo, didn't require them). */

@@ -1,4 +1,4 @@
-import type { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, PaymentTxnStatus, TenderType } from '@prisma/client';
+import type { OrderStatus, FinancialStatus, FulfillmentStatus, ShipmentStatus, PaymentTxnStatus, ReturnStatus, TenderType } from '@prisma/client';
 
 /** plan/15 Phase 6 — customerGroupCode was removed: the pricing group is
  *  always server-derived now, see CreateCart/resolveCustomerGroupId. */
@@ -238,6 +238,46 @@ export interface OrderReturnDto {
   status: string;
   createdAt: string;
   lines: OrderReturnLineDto[];
+}
+
+/** Admin-recorded only (confirmed decision — no customer self-service in
+ *  this pass). Same "addressed by sku, not orderLineId" contract as
+ *  FulfillOrderCommand/RefundOrderCommand. */
+export interface CreateReturnCommand {
+  orderPublicId: string;
+  reason: string;
+  lines: Array<{ sku: string; qty: number; restock?: boolean }>;
+}
+
+export interface UpdateReturnStatusCommand {
+  returnPublicId: string;
+  status: 'APPROVED' | 'RECEIVED' | 'REJECTED';
+}
+
+export interface ListReturnsQuery {
+  page?: number;
+  pageSize?: number;
+  status?: ReturnStatus;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface ReturnListItemDto {
+  publicId: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  reason: string;
+  status: string;
+  lineCount: number;
+  createdAt: string;
+}
+
+export interface ReturnListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  returns: ReturnListItemDto[];
 }
 
 export interface OrderNoteDto {

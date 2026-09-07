@@ -70,6 +70,42 @@ export async function refundOrder(orderPublicId: string, _prevState: ActionState
   return { error: null, success: true };
 }
 
+/** restock is per LINE (unlike refund's one shared checkbox), so each
+ *  line's checkbox is uniquely named (`restock-${sku}`) rather than
+ *  sharing the `restock` name every other checkbox-in-a-repeated-row
+ *  form on this page uses — a shared name would drop the sku<->restock
+ *  pairing entirely for whichever lines' checkboxes are unchecked
+ *  (unchecked checkboxes never appear in FormData at all). */
+export async function createReturn(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const skus = formData.getAll('sku') as string[];
+  const qtys = formData.getAll('qty') as string[];
+  const lines: Array<{ sku: string; qty: number; restock: boolean }> = [];
+  skus.forEach((sku, i) => {
+    const qty = Number(qtys[i]);
+    if (sku && Number.isInteger(qty) && qty > 0) {
+      lines.push({ sku, qty, restock: formData.get(`restock-${sku}`) === 'on' });
+    }
+  });
+  const reason = formData.get('reason');
+  if (lines.length === 0) {
+    return { error: 'Enter a quantity to return for at least one line.', success: false };
+  }
+  if (typeof reason !== 'string' || !reason.trim()) {
+    return { error: 'A reason is required.', success: false };
+  }
+
+  try {
+    await apiPost<{ publicId: string }>(`/admin/v1/orders/${orderPublicId}/returns`, { reason: reason.trim(), lines });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message, success: false };
+    throw err;
+  }
+
+  revalidatePath(`/orders/${orderPublicId}`);
+  revalidatePath('/fulfillment/returns');
+  return { error: null, success: true };
+}
+
 export async function cancelOrder(orderPublicId: string, _prevState: ActionState, formData: FormData): Promise<ActionState> {
   const reason = formData.get('reason');
   const refundTo = formData.get('refundTo');

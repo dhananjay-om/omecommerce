@@ -14,6 +14,7 @@ import type {
   OrderEmailType,
   TenderType,
   PaymentMethodType,
+  ReturnStatus,
 } from '@prisma/client';
 import type { WalletSettings } from './wallet-rules.js';
 
@@ -603,6 +604,60 @@ export interface OrderReturnView {
   lines: OrderReturnLineView[];
 }
 
+/** Returns feature area — admin-recorded only (confirmed decision: no
+ *  customer self-service in this pass). An admin logs a return that
+ *  already happened over phone/email/support, moving it through
+ *  REQUESTED -> APPROVED -> RECEIVED -> REFUNDED/REJECTED. REFUNDED is
+ *  reached only via RefundReturn, which reuses the existing RefundOrder
+ *  usecase for the money part — no second refund engine. */
+export interface CreateReturnInput {
+  orderId: bigint;
+  reason: string;
+  lines: Array<{ orderLineId: bigint; qty: number; restock: boolean }>;
+}
+
+/** Unlike OrderReturnView (nested inside a full OrderView, no back-
+ *  reference needed), this is fetched standalone by return publicId — it
+ *  needs orderId/orderPublicId to act on, and each line's real `sku` (not
+ *  just orderLineId) to build a RefundOrderCommand, which addresses lines
+ *  by sku like every other order mutation in this module. */
+export interface ReturnDetail {
+  id: bigint;
+  publicId: string;
+  orderId: bigint;
+  orderPublicId: string;
+  reason: string;
+  status: ReturnStatus;
+  createdAt: Date;
+  lines: Array<{ orderLineId: bigint; sku: string; qty: number; restock: boolean }>;
+}
+
+export interface ReturnListItem {
+  publicId: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  reason: string;
+  status: ReturnStatus;
+  lineCount: number;
+  createdAt: Date;
+}
+
+export interface ListReturnsFilter {
+  page: number;
+  pageSize: number;
+  status?: ReturnStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+export interface ListReturnsResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  returns: ReturnListItem[];
+}
+
 export interface OrderNoteView {
   id: bigint;
   type: OrderNoteType;
@@ -863,6 +918,11 @@ export interface OrderRepository {
    *  rows RefundOrder already writes, same "aggregation-only gap" shape
    *  as Shipments. */
   listRefunds(filter: ListRefundsFilter): Promise<ListRefundsResult>;
+  /** Returns feature area — see CreateReturnInput's own doc comment. */
+  createReturn(input: CreateReturnInput): Promise<{ id: bigint; publicId: string }>;
+  findReturnByPublicId(publicId: string): Promise<ReturnDetail | null>;
+  setReturnStatus(returnId: bigint, status: ReturnStatus): Promise<void>;
+  listReturns(filter: ListReturnsFilter): Promise<ListReturnsResult>;
   /** Resolves a fulfillment by its own publicId to the orderId/
    *  orderPublicId it belongs to — needed by UpdateFulfillmentTracking to
    *  scope the update and to write the order's own history row. */

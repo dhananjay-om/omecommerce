@@ -629,6 +629,28 @@ export interface RefundList {
   totalsByCurrency: Array<{ currency: string; total: string }>;
 }
 
+/** Cross-order Returns list row (Fulfillment feature area) — the per-
+ *  order OrderReturn type below (with real per-line detail) is what
+ *  GetOrder's own DTO already exposes; this is the denormalized list
+ *  shape for the new cross-order queue view. */
+export interface ReturnListItem {
+  publicId: string;
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  reason: string;
+  status: string;
+  lineCount: number;
+  createdAt: string;
+}
+
+export interface ReturnList {
+  total: number;
+  page: number;
+  pageSize: number;
+  returns: ReturnListItem[];
+}
+
 export interface OrderReturnLine {
   sku: string;
   qty: number;

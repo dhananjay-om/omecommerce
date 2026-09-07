@@ -228,9 +228,8 @@ export const NAV: NavGroup[] = [
         description: 'Delivered/in-transit/delayed breakdown with real SLA-breach flags across shipments.',
       },
       {
-        key: 'returns', label: 'Returns', href: '/fulfillment/returns', icon: Undo2, status: 'comingSoon',
-        description: 'Every return request across every order, in one list.',
-        planned: ['A cross-order returns list with reason, condition, and restock status', 'Sourced from the return records already created per-order today'],
+        key: 'returns', label: 'Returns', href: '/fulfillment/returns', icon: Undo2, status: 'live',
+        description: 'Log and process returns — Approve, Mark Received, Refund, or Reject — from a real cross-order queue.',
       },
       {
         key: 'refunds', label: 'Refunds', href: '/fulfillment/refunds', icon: CreditCard, status: 'live',
