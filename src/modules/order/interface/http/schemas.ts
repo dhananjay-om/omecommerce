@@ -114,6 +114,11 @@ export const listReturnsQuerySchema = z.object({
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
 });
 
+export const listPickListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+});
+
 /** Every field optional — a bare `POST .../cancel` with an empty body keeps working exactly as before (plan/15 Phase 0e added reason/refundTo, didn't require them). */
 export const cancelOrderSchema = z.object({
   reason: z.string().max(1024).optional(),

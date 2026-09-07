@@ -212,6 +212,32 @@ export class PrismaStockLedger implements StockLedger {
     return rows[0]?.exists ?? false;
   }
 
+  async setBinLocation(variantId: bigint, warehouseId: bigint, binLocation: string | null): Promise<void> {
+    await this.db.stockItem.upsert({
+      where: { variantId_warehouseId: { variantId, warehouseId } },
+      update: { binLocation },
+      create: { variantId, warehouseId, binLocation },
+    });
+  }
+
+  async getBinLocations(pairs: Array<{ variantId: bigint; warehouseId: bigint }>): Promise<Map<string, string | null>> {
+    const map = new Map<string, string | null>();
+    if (pairs.length === 0) return map;
+    const variantIds = [...new Set(pairs.map((p) => p.variantId))];
+    const warehouseIds = [...new Set(pairs.map((p) => p.warehouseId))];
+    // Over-fetches by variantId/warehouseId sets rather than the exact
+    // pair list (a real composite IN-list needs a different query shape
+    // Prisma's typed client doesn't offer cleanly) — cheap here since a
+    // pick list's warehouse set is always 1 (see ListPickList's own doc
+    // comment: one resolved warehouse per call).
+    const rows = await this.db.stockItem.findMany({
+      where: { variantId: { in: variantIds }, warehouseId: { in: warehouseIds } },
+      select: { variantId: true, warehouseId: true, binLocation: true },
+    });
+    for (const row of rows) map.set(`${row.variantId}:${row.warehouseId}`, row.binLocation);
+    return map;
+  }
+
   private async releaseByStatus(
     reservationPublicId: string,
     toStatus: 'RELEASED' | 'EXPIRED',

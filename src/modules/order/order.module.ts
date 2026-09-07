@@ -50,6 +50,7 @@ import { CreateReturn } from './application/create-return.usecase.js';
 import { UpdateReturnStatus } from './application/update-return-status.usecase.js';
 import { RefundReturn } from './application/refund-return.usecase.js';
 import { ListReturns } from './application/list-returns.usecase.js';
+import { ListPickList } from './application/list-pick-list.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
@@ -139,6 +140,7 @@ import {
   createReturnSchema,
   updateReturnStatusSchema,
   listReturnsQuerySchema,
+  listPickListQuerySchema,
   updateEmailSettingsSchema,
   sendTestEmailSchema,
 } from './interface/http/schemas.js';
@@ -368,6 +370,7 @@ export function createOrderModule(
   const updateReturnStatus = new UpdateReturnStatus(orders);
   const refundReturn = new RefundReturn(orders, refundOrder);
   const listReturns = new ListReturns(orders);
+  const listPickList = new ListPickList(orders, warehouses, ledger);
   const createTaxClass = new CreateTaxClass(taxClasses);
   const listTaxClasses = new ListTaxClasses(taxClasses);
   const updateTaxClass = new UpdateTaxClass(taxClasses);
@@ -648,6 +651,14 @@ export function createOrderModule(
     asyncHandler(async (req, res) => {
       const query = parse(listReturnsQuerySchema, req.query);
       res.json({ data: await listReturns.execute(query) });
+    }),
+  );
+  admin.get(
+    '/pick-list',
+    authorize('orders:view'),
+    asyncHandler(async (req, res) => {
+      const query = parse(listPickListQuerySchema, req.query);
+      res.json({ data: await listPickList.execute(query) });
     }),
   );
   admin.patch(

@@ -28,6 +28,8 @@ import type {
   ReturnDetail,
   ListReturnsFilter,
   ListReturnsResult,
+  ListPickableOrdersFilter,
+  ListPickableOrdersResult,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -621,6 +623,55 @@ export class PrismaOrderRepository implements OrderRepository {
         createdAt: row.created_at,
       })),
       totalsByCurrency: totalsRows.map((r) => ({ currency: r.currency, total: formatDecimal(r.total) })),
+    };
+  }
+
+  async listPickableOrders(filter: ListPickableOrdersFilter): Promise<ListPickableOrdersResult> {
+    const where: Prisma.OrderWhereInput = {
+      financialStatus: { in: ['PAID', 'ON_ACCOUNT'] },
+      fulfillmentStatus: { in: ['UNFULFILLED', 'PARTIALLY_FULFILLED'] },
+    };
+    const [total, rows] = await Promise.all([
+      this.db.order.count({ where }),
+      this.db.order.findMany({
+        where,
+        // Oldest first — real warehouse picking priority (FIFO), the
+        // opposite default of every other list page in this app.
+        orderBy: { createdAt: 'asc' },
+        skip: (filter.page - 1) * filter.pageSize,
+        take: filter.pageSize,
+        include: { lines: true },
+      }),
+    ]);
+
+    return {
+      total,
+      page: filter.page,
+      pageSize: filter.pageSize,
+      orders: rows.map((order) => ({
+        publicId: order.publicId,
+        orderNumber: order.orderNumber.toString(),
+        email: order.email,
+        createdAt: order.createdAt,
+        storeId: order.storeId,
+        lines: order.lines.map((l) => ({
+          id: l.id,
+          variantId: l.variantId,
+          sku: l.sku,
+          name: l.name,
+          qty: l.qty,
+          unitPrice: formatDecimal(l.unitPrice),
+          mrp: l.mrp !== null ? formatDecimal(l.mrp) : null,
+          taxAmount: formatDecimal(l.taxAmount),
+          discountAmount: formatDecimal(l.discountAmount),
+          rowTotal: formatDecimal(l.rowTotal),
+          taxClassCode: l.taxClassCode,
+          hsnCode: l.hsnCode,
+          fulfilledQty: l.fulfilledQty,
+          refundedQty: l.refundedQty,
+          version: l.version,
+        })),
+      })),
     };
   }
 

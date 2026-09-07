@@ -117,4 +117,13 @@ export interface StockLedger {
   listByVariant(variantId: bigint): Promise<VariantStockRow[]>;
   /** True if the warehouse has any non-zero on-hand or reserved stock anywhere — guards warehouse deletion. */
   hasStock(warehouseId: bigint): Promise<boolean>;
+  /** Pick & Pack (Fulfillment feature area) — same upsert-on-write shape
+   *  as getOrCreateStockItem: setting a location for a (variant,
+   *  warehouse) pair with no stock_item row yet creates one, rather than
+   *  requiring stock to exist first just to record where it'll go. `null`
+   *  clears a previously-set location. */
+  setBinLocation(variantId: bigint, warehouseId: bigint, binLocation: string | null): Promise<void>;
+  /** Batched — the pick list resolves a location per order line, and a
+   *  real pick queue can easily span dozens of lines; one query beats N. */
+  getBinLocations(pairs: Array<{ variantId: bigint; warehouseId: bigint }>): Promise<Map<string, string | null>>;
 }

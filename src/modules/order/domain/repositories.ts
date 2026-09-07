@@ -557,6 +557,32 @@ export interface RefundListItem {
   createdAt: Date;
 }
 
+export interface PickListOrder {
+  publicId: string;
+  orderNumber: string;
+  email: string;
+  createdAt: Date;
+  /** Needed to resolve the SAME warehouse FulfillOrder itself would pick
+   *  from (WarehouseResolver.resolveForStore) — different orders can
+   *  belong to different stores/warehouses (Multi-Store feature). */
+  storeId: bigint;
+  /** Full order lines (see OrderLineView), not a denormalized summary —
+   *  reused as-is by the existing FulfillDialog. */
+  lines: OrderLineView[];
+}
+
+export interface ListPickableOrdersFilter {
+  page: number;
+  pageSize: number;
+}
+
+export interface ListPickableOrdersResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: PickListOrder[];
+}
+
 export interface ListRefundsFilter {
   page: number;
   pageSize: number;
@@ -918,6 +944,13 @@ export interface OrderRepository {
    *  rows RefundOrder already writes, same "aggregation-only gap" shape
    *  as Shipments. */
   listRefunds(filter: ListRefundsFilter): Promise<ListRefundsResult>;
+  /** Pick & Pack (Fulfillment feature area) — every order that's paid and
+   *  not yet fully fulfilled, oldest first (FIFO — the real warehouse
+   *  picking priority, unlike every other list page's newest-first
+   *  default). Full `lines` per order (not a denormalized list row, see
+   *  ListOrdersFilter/OrderListItem's own shape) so the same data can
+   *  feed the existing FulfillDialog with zero changes to it. */
+  listPickableOrders(filter: ListPickableOrdersFilter): Promise<ListPickableOrdersResult>;
   /** Returns feature area — see CreateReturnInput's own doc comment. */
   createReturn(input: CreateReturnInput): Promise<{ id: bigint; publicId: string }>;
   findReturnByPublicId(publicId: string): Promise<ReturnDetail | null>;

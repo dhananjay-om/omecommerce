@@ -49,6 +49,13 @@ export async function fulfillOrder(orderPublicId: string, _prevState: ActionStat
   }
 
   revalidatePath(`/orders/${orderPublicId}`);
+  // FulfillDialog is also reused directly from the Pick & Pack page (same
+  // "Pack & Ship" action, not a second write path) — revalidate the
+  // queues it changes the shape of: the order drops off Pick & Pack once
+  // fully fulfilled, and the new fulfillment appears on Shipments/Delivery.
+  revalidatePath('/fulfillment/pick-pack');
+  revalidatePath('/fulfillment/shipments');
+  revalidatePath('/fulfillment/delivery');
   return { error: null, success: true };
 }
 
@@ -67,6 +74,7 @@ export async function refundOrder(orderPublicId: string, _prevState: ActionState
   }
 
   revalidatePath(`/orders/${orderPublicId}`);
+  revalidatePath('/fulfillment/refunds');
   return { error: null, success: true };
 }
 

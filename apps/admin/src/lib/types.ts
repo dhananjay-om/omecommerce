@@ -651,6 +651,34 @@ export interface ReturnList {
   returns: ReturnListItem[];
 }
 
+/** Pick & Pack (Fulfillment feature area) — the subset of a pick ticket's
+ *  lines that still need picking, each annotated with its real bin
+ *  location if one's been set (never fabricated — "Unassigned" otherwise). */
+export interface PickListLine {
+  sku: string;
+  name: string;
+  qtyNeeded: number;
+  binLocation: string | null;
+}
+
+export interface PickListOrder {
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  createdAt: string;
+  warehouseCode: string;
+  /** Full lines, unfiltered — passed straight into the existing FulfillDialog. */
+  lines: OrderLine[];
+  pickLines: PickListLine[];
+}
+
+export interface PickList {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: PickListOrder[];
+}
+
 export interface OrderReturnLine {
   sku: string;
   qty: number;

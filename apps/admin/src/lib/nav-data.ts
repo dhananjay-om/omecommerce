@@ -215,9 +215,8 @@ export const NAV: NavGroup[] = [
     icon: PackageCheck,
     items: [
       {
-        key: 'pick-pack', label: 'Pick & Pack', href: '/fulfillment/pick-pack', icon: PackageCheck, status: 'comingSoon',
-        description: 'The warehouse picking and packing queue.',
-        planned: ['A pick list by bin location for orders ready to fulfill', 'A pack station view with package type/weight capture'],
+        key: 'pick-pack', label: 'Pick & Pack', href: '/fulfillment/pick-pack', icon: PackageCheck, status: 'live',
+        description: 'A real pick list, oldest orders first, with editable bin locations and one-click Pack & Ship.',
       },
       {
         key: 'shipments', label: 'Shipments', href: '/fulfillment/shipments', icon: Send, status: 'live',

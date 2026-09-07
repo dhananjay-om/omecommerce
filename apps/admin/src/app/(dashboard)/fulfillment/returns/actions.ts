@@ -38,5 +38,8 @@ export async function refundReturn(returnPublicId: string, _prevState: ActionSta
   }
 
   revalidatePath('/fulfillment/returns');
+  // Reusing RefundOrder means a real new PaymentTransaction row exists now
+  // — the Refunds ledger (Phase 3) needs to reflect it too.
+  revalidatePath('/fulfillment/refunds');
   return { error: null, success: true };
 }

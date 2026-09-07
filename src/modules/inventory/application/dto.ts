@@ -85,6 +85,13 @@ export interface SetStockQuantityCommand {
   note?: string;
 }
 
+export interface SetBinLocationCommand {
+  sku: string;
+  warehouseCode: string;
+  /** null clears a previously-set location. */
+  binLocation: string | null;
+}
+
 export interface BulkStockRow {
   sku: string;
   quantity: number;

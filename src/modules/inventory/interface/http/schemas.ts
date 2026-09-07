@@ -17,6 +17,17 @@ export const updateWarehouseSchema = z.object({
 
 const ADJUST_REASONS = ['PURCHASE', 'RETURN', 'ADJUSTMENT', 'TRANSFER', 'CORRECTION'] as const;
 
+export const setBinLocationSchema = z.object({
+  sku: z.string().min(1),
+  warehouseCode: z.string().min(1),
+  // A blank string means "clear it" — normalized to a real `null` at the
+  // route call site (not here — z.preprocess's output type doesn't infer
+  // cleanly through this project's `parse<T>()` helper), genuinely
+  // different from the "blank means leave unchanged" contract this
+  // session's other optional-string fields use (a token field, say).
+  binLocation: z.string().trim().max(128),
+});
+
 export const adjustStockSchema = z.object({
   variantId: z.string().uuid(),
   warehouseCode: z.string().min(1),

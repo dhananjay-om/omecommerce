@@ -12,6 +12,7 @@ import { ListWarehouses } from './application/list-warehouses.usecase.js';
 import { ListWarehouseStock } from './application/list-warehouse-stock.usecase.js';
 import { ListVariantStock } from './application/list-variant-stock.usecase.js';
 import { AdjustStock } from './application/adjust-stock.usecase.js';
+import { SetBinLocation } from './application/set-bin-location.usecase.js';
 import { GetStock } from './application/get-stock.usecase.js';
 import { ReserveStock } from './application/reserve-stock.usecase.js';
 import { CommitReservation } from './application/commit-reservation.usecase.js';
@@ -21,6 +22,7 @@ import {
   createWarehouseSchema,
   updateWarehouseSchema,
   adjustStockSchema,
+  setBinLocationSchema,
   getStockQuerySchema,
   reserveStockSchema,
   bulkSetStockSchema,
@@ -44,6 +46,7 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
   const listWarehouseStock = new ListWarehouseStock(warehouses, ledger);
   const listVariantStock = new ListVariantStock(variants, ledger);
   const adjustStock = new AdjustStock(variants, warehouses, ledger, outbox);
+  const setBinLocation = new SetBinLocation(variants, warehouses, ledger);
   const getStock = new GetStock(variants, warehouses, ledger);
   const reserveStock = new ReserveStock(variants, warehouses, ledger);
   const commitReservation = new CommitReservation(ledger);
@@ -107,6 +110,16 @@ export function createInventoryModule(db: Db, authorize: (permission: string) =>
         note: body.note,
       });
       res.status(201).json({ data: view });
+    }),
+  );
+
+  admin.post(
+    '/inventory/bin-location',
+    authorize('inventory:adjust'),
+    asyncHandler(async (req, res) => {
+      const body = parse(setBinLocationSchema, req.body);
+      await setBinLocation.execute({ ...body, binLocation: body.binLocation || null });
+      res.status(204).send();
     }),
   );
 

@@ -280,6 +280,44 @@ export interface ReturnListDto {
   returns: ReturnListItemDto[];
 }
 
+export interface ListPickListQuery {
+  page?: number;
+  pageSize?: number;
+}
+
+/** The subset of a pick-list order's lines that still need picking (qty -
+ *  fulfilledQty > 0), each annotated with its real bin location if one's
+ *  been set (see StockLedger.setBinLocation) — never a fabricated
+ *  location. */
+export interface PickListLineDto {
+  sku: string;
+  name: string;
+  qtyNeeded: number;
+  binLocation: string | null;
+}
+
+export interface PickListOrderDto {
+  orderPublicId: string;
+  orderNumber: string;
+  email: string;
+  createdAt: string;
+  /** The warehouse this order would actually be picked/fulfilled from
+   *  (same resolution FulfillOrder itself uses) — round-tripped back by
+   *  the admin UI when saving a bin-location edit. */
+  warehouseCode: string;
+  /** Full lines, unfiltered — reused as-is by the existing FulfillDialog,
+   *  no new component needed to actually pack once picking is done. */
+  lines: OrderLineViewDto[];
+  pickLines: PickListLineDto[];
+}
+
+export interface PickListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  orders: PickListOrderDto[];
+}
+
 export interface OrderNoteDto {
   id: string;
   type: string;

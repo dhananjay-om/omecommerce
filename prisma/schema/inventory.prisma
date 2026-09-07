@@ -49,6 +49,13 @@ model StockItem {
   reserved     Int      @default(0) @map("reserved")
   reorderPoint Int?     @map("reorder_point")
   reorderQty   Int?     @map("reorder_qty")
+  /// Pick & Pack (Fulfillment feature area) — a free-text warehouse
+  /// location (e.g. "A3-12", "Bin 44") an admin can optionally set per
+  /// (variant, warehouse). Nullable/optional throughout: a real pick list
+  /// still works for stock with no location set, it just can't sort or
+  /// group by one — never fabricated, only ever what an admin actually
+  /// entered.
+  binLocation  String?  @map("bin_location")
   version      Int      @default(0)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
