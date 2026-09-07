@@ -20,6 +20,16 @@ import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-write
  * from under those would silently leak a stock hold or leave a payment
  * gateway charge with no order to reconcile against. Cancel or close it
  * first (both already exist), then delete.
+ *
+ * One deliberate exception to that status gate: an order created by
+ * OrderRepository.createImported() (Shopify/Magento migration — see its
+ * own doc comment) never touches stock or a payment gateway at all — no
+ * StockLedger call, no PaymentTransaction row, no Cart — so the exact risk
+ * the gate exists to prevent (a leaked stock hold / an unreconciled
+ * charge) simply doesn't apply to it, regardless of its recorded status.
+ * Detected the same way the order's own Timeline already shows this —
+ * an 'ORDER_IMPORTED' OrderStatusHistory row — rather than a new column,
+ * since this is the one place that needs to know, not a filterable field.
  */
 export class DeleteOrder {
   constructor(
@@ -32,9 +42,13 @@ export class DeleteOrder {
     if (!order) throw new NotFoundError('Order', orderPublicId);
 
     if (order.status !== 'CANCELLED' && order.status !== 'CLOSED') {
-      throw new InvalidOrderStateError(
-        `order ${orderPublicId} is ${order.status} — cancel or close it first, then delete`,
-      );
+      const history = await this.orders.listHistory(order.id);
+      const wasImported = history.some((h) => h.eventType === 'ORDER_IMPORTED');
+      if (!wasImported) {
+        throw new InvalidOrderStateError(
+          `order ${orderPublicId} is ${order.status} — cancel or close it first, then delete`,
+        );
+      }
     }
 
     await this.orders.hardDelete(order.id);
