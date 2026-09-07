@@ -224,9 +224,8 @@ export const NAV: NavGroup[] = [
         description: 'Every shipment across every order, in one list, with carrier/status/date filters and an edit-tracking action.',
       },
       {
-        key: 'delivery', label: 'Delivery', href: '/fulfillment/delivery', icon: Map, status: 'comingSoon',
-        description: 'Delivery status and SLA tracking across shipments.',
-        planned: ['Delivered/in-transit/delayed breakdown with SLA-breach flags'],
+        key: 'delivery', label: 'Delivery', href: '/fulfillment/delivery', icon: Map, status: 'live',
+        description: 'Delivered/in-transit/delayed breakdown with real SLA-breach flags across shipments.',
       },
       {
         key: 'returns', label: 'Returns', href: '/fulfillment/returns', icon: Undo2, status: 'comingSoon',

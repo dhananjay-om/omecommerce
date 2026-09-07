@@ -34,6 +34,9 @@ export async function updateShipmentTracking(fulfillmentPublicId: string, _prevS
     throw err;
   }
 
+  // This same action is also reused by the Delivery page's EditTrackingDialog
+  // (both views operate on the same Fulfillment resource) — revalidate both.
   revalidatePath('/fulfillment/shipments');
+  revalidatePath('/fulfillment/delivery');
   return { error: null, success: true };
 }

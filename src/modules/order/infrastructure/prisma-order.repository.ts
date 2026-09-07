@@ -21,6 +21,7 @@ import type {
   ListFulfillmentsFilter,
   ListFulfillmentsResult,
   UpdateFulfillmentTrackingInput,
+  DeliveryBreakdown,
 } from '../domain/repositories.js';
 import { fromMinorUnits, toMinorUnits } from '../../../shared/domain/decimal.js';
 import { OutboxWriter } from '../../../shared/infrastructure/outbox/outbox-writer.js';
@@ -444,11 +445,30 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   async listFulfillments(filter: ListFulfillmentsFilter): Promise<ListFulfillmentsResult> {
+    // Shared by the WHERE filter and the SELECTed is_delayed column below,
+    // so the two definitions can never drift apart. COALESCE(...,false):
+    // `estimated_delivery_at < now()` is SQL NULL (neither true nor false)
+    // when there's no ETA at all — without this, `delayed=false` would
+    // WRONGLY exclude a no-ETA fulfillment too (NOT NULL is still NULL,
+    // which a WHERE clause treats as "no match"), when "no ETA" genuinely
+    // means "not delayed" (nothing to be late against).
+    const isDelayedExpr = Prisma.sql`COALESCE(f.status NOT IN ('DELIVERED', 'CANCELLED') AND st.estimated_delivery_at < now(), false)`;
+
     const conditions: Prisma.Sql[] = [];
     if (filter.status) conditions.push(Prisma.sql`f.status = ${filter.status}::"ShipmentStatus"`);
     if (filter.carrier) conditions.push(Prisma.sql`f.carrier ILIKE ${`%${filter.carrier}%`}`);
     if (filter.dateFrom) conditions.push(Prisma.sql`f.created_at >= ${filter.dateFrom}`);
     if (filter.dateTo) conditions.push(Prisma.sql`f.created_at <= ${filter.dateTo}`);
+    // `undefined` means no filter; `true`/`false` must each produce a REAL
+    // opposite condition (a bare `if (filter.delayed)` would silently treat
+    // `false` the same as "no filter" and return everything — the exact
+    // shape of bug this codebase already caught once on a different
+    // boolean filter, see listFulfillmentsQuerySchema's own doc comment).
+    if (filter.delayed === true) {
+      conditions.push(Prisma.sql`${isDelayedExpr} = true`);
+    } else if (filter.delayed === false) {
+      conditions.push(Prisma.sql`${isDelayedExpr} = false`);
+    }
     const where = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
 
     const fromJoin = Prisma.sql`
@@ -473,11 +493,13 @@ export class PrismaOrderRepository implements OrderRepository {
           current_status: string | null;
           shipped_at: Date | null;
           created_at: Date;
+          is_delayed: boolean;
         }>
       >(Prisma.sql`
         SELECT f.public_id, o.public_id AS order_public_id, o.order_number, o.email, f.status, f.carrier,
                f.tracking_number, st.carrier_tracking_url, st.estimated_delivery_at, st.current_status,
-               f.shipped_at, f.created_at
+               f.shipped_at, f.created_at,
+               ${isDelayedExpr} AS is_delayed
         ${fromJoin}
         ORDER BY f.created_at DESC
         LIMIT ${filter.pageSize} OFFSET ${(filter.page - 1) * filter.pageSize}`),
@@ -500,7 +522,32 @@ export class PrismaOrderRepository implements OrderRepository {
         currentStatus: row.current_status,
         shippedAt: row.shipped_at,
         createdAt: row.created_at,
+        isDelayed: row.is_delayed,
       })),
+    };
+  }
+
+  async getDeliveryBreakdown(): Promise<DeliveryBreakdown> {
+    const rows = await this.db.$queryRaw<
+      Array<{ pending: bigint; packed: bigint; shipped: bigint; delivered: bigint; cancelled: bigint; delayed: bigint }>
+    >(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE f.status = 'PENDING') AS pending,
+        COUNT(*) FILTER (WHERE f.status = 'PACKED') AS packed,
+        COUNT(*) FILTER (WHERE f.status = 'SHIPPED') AS shipped,
+        COUNT(*) FILTER (WHERE f.status = 'DELIVERED') AS delivered,
+        COUNT(*) FILTER (WHERE f.status = 'CANCELLED') AS cancelled,
+        COUNT(*) FILTER (WHERE f.status NOT IN ('DELIVERED', 'CANCELLED') AND st.estimated_delivery_at < now()) AS delayed
+      FROM fulfillment f
+      LEFT JOIN shipment_tracking st ON st.fulfillment_id = f.id`);
+    const r = rows[0]!;
+    return {
+      pending: Number(r.pending),
+      packed: Number(r.packed),
+      shipped: Number(r.shipped),
+      delivered: Number(r.delivered),
+      cancelled: Number(r.cancelled),
+      delayed: Number(r.delayed),
     };
   }
 

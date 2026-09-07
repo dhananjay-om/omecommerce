@@ -204,6 +204,12 @@ export const listFulfillmentsQuerySchema = z.object({
   carrier: z.string().min(1).optional(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'expected a date, e.g. "2026-07-01"').optional(),
+  // Deliberately NOT z.coerce.boolean() — that coerces the STRING "false"
+  // to `true` (a non-empty string is always truthy in JS), a real bug
+  // this codebase already caught once on a different filter (see
+  // ListAllProductReviews' own isApproved fix). An explicit enum, parsed
+  // to a real boolean at the route call site, avoids it here from the start.
+  delayed: z.enum(['true', 'false']).optional(),
 });
 
 /** Every field optional — same "blank means leave unchanged" contract as

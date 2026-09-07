@@ -311,6 +311,7 @@ export interface ListFulfillmentsQuery {
   carrier?: string;
   dateFrom?: string;
   dateTo?: string;
+  delayed?: boolean;
 }
 
 export interface FulfillmentListItemDto {
@@ -326,6 +327,7 @@ export interface FulfillmentListItemDto {
   currentStatus: string | null;
   shippedAt: string | null;
   createdAt: string;
+  isDelayed: boolean;
 }
 
 export interface FulfillmentListDto {
@@ -333,6 +335,15 @@ export interface FulfillmentListDto {
   page: number;
   pageSize: number;
   fulfillments: FulfillmentListItemDto[];
+}
+
+export interface DeliveryBreakdownDto {
+  pending: number;
+  packed: number;
+  shipped: number;
+  delivered: number;
+  cancelled: number;
+  delayed: number;
 }
 
 /** Every field optional — see UpdateFulfillmentTrackingInput's own doc

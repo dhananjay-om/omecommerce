@@ -494,6 +494,12 @@ export interface FulfillmentListItem {
   currentStatus: string | null;
   shippedAt: Date | null;
   createdAt: Date;
+  /** Delivery feature area — true when this fulfillment is not yet
+   *  DELIVERED/CANCELLED and its estimatedDeliveryAt has already passed.
+   *  Computed in the same query (a plain date comparison, no new column)
+   *  rather than as a separate read, so Shipments and Delivery share one
+   *  data provider. */
+  isDelayed: boolean;
 }
 
 export interface ListFulfillmentsFilter {
@@ -503,6 +509,8 @@ export interface ListFulfillmentsFilter {
   carrier?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  /** Delivery's own filter — fulfillments currently in breach of their ETA. */
+  delayed?: boolean;
 }
 
 export interface ListFulfillmentsResult {
@@ -510,6 +518,19 @@ export interface ListFulfillmentsResult {
   page: number;
   pageSize: number;
   fulfillments: FulfillmentListItem[];
+}
+
+/** Delivery's summary stat row — a plain count breakdown, `delayed` is a
+ *  subset overlay of the non-terminal statuses (not mutually exclusive
+ *  with pending/packed/shipped), same "delayed" definition as
+ *  FulfillmentListItem.isDelayed. */
+export interface DeliveryBreakdown {
+  pending: number;
+  packed: number;
+  shipped: number;
+  delivered: number;
+  cancelled: number;
+  delayed: number;
 }
 
 /** Every field optional — only what's provided gets overwritten (same
@@ -791,6 +812,9 @@ export interface OrderRepository {
   /** Fulfillment feature area — cross-order shipments list, the one
    *  genuinely missing piece over data FulfillOrder already writes. */
   listFulfillments(filter: ListFulfillmentsFilter): Promise<ListFulfillmentsResult>;
+  /** Delivery feature area — the summary stat row above the (same)
+   *  fulfillments list. */
+  getDeliveryBreakdown(): Promise<DeliveryBreakdown>;
   /** Resolves a fulfillment by its own publicId to the orderId/
    *  orderPublicId it belongs to — needed by UpdateFulfillmentTracking to
    *  scope the update and to write the order's own history row. */

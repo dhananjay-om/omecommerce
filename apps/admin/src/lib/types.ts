@@ -584,6 +584,16 @@ export interface FulfillmentListItem {
   currentStatus: string | null;
   shippedAt: string | null;
   createdAt: string;
+  isDelayed: boolean;
+}
+
+export interface DeliveryBreakdown {
+  pending: number;
+  packed: number;
+  shipped: number;
+  delivered: number;
+  cancelled: number;
+  delayed: number;
 }
 
 export interface FulfillmentList {

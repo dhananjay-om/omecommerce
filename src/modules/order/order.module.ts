@@ -44,6 +44,7 @@ import { GetOrder } from './application/get-order.usecase.js';
 import { ListOrders } from './application/list-orders.usecase.js';
 import { ListFulfillments } from './application/list-fulfillments.usecase.js';
 import { UpdateShipmentTracking } from './application/update-fulfillment-tracking.usecase.js';
+import { GetDeliveryBreakdown } from './application/get-delivery-breakdown.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
@@ -326,6 +327,7 @@ export function createOrderModule(
   const listOrders = new ListOrders(orders);
   const listFulfillments = new ListFulfillments(orders);
   const updateShipmentTracking = new UpdateShipmentTracking(orders);
+  const getDeliveryBreakdown = new GetDeliveryBreakdown(orders);
   const listShippingMethods = new ListShippingMethods(shippingMethods);
   // walletLedger is already constructed above (shared with EnrichCartView).
   // Own instance of the customer-context lookup — CreditWallet is reused
@@ -567,8 +569,15 @@ export function createOrderModule(
     '/fulfillments',
     authorize('orders:view'),
     asyncHandler(async (req, res) => {
-      const query = parse(listFulfillmentsQuerySchema, req.query);
-      res.json({ data: await listFulfillments.execute(query) });
+      const { delayed, ...rest } = parse(listFulfillmentsQuerySchema, req.query);
+      res.json({ data: await listFulfillments.execute({ ...rest, delayed: delayed === undefined ? undefined : delayed === 'true' }) });
+    }),
+  );
+  admin.get(
+    '/fulfillments/delivery-breakdown',
+    authorize('orders:view'),
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await getDeliveryBreakdown.execute() });
     }),
   );
   admin.patch(

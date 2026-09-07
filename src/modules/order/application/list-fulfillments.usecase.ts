@@ -21,6 +21,7 @@ export class ListFulfillments {
       carrier: query.carrier,
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
       dateTo: query.dateTo ? endOfDayIfDateOnly(query.dateTo) : undefined,
+      delayed: query.delayed,
     });
     return {
       total: result.total,
@@ -39,6 +40,7 @@ export class ListFulfillments {
         currentStatus: f.currentStatus,
         shippedAt: f.shippedAt ? f.shippedAt.toISOString() : null,
         createdAt: f.createdAt.toISOString(),
+        isDelayed: f.isDelayed,
       })),
     };
   }
