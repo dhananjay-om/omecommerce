@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, ImageIcon, MoreHorizontal, Sparkles } from 'lucide-react';
 import type { ProductListItem, BulkJobStatus } from '@/lib/types';
-import { bulkUpdateProductStatus, submitBulkGenerateDescriptions, getBulkGenerateDescriptionsJobStatus, type BulkGenerateDescriptionsResult } from './actions';
+import {
+  bulkUpdateProductStatus,
+  bulkDeleteProducts,
+  submitBulkGenerateDescriptions,
+  getBulkGenerateDescriptionsJobStatus,
+  type BulkGenerateDescriptionsResult,
+} from './actions';
 import { DeleteProductDialog } from './delete-product-dialog';
 import { Badge } from '@/components/ui/badge';
 import { DotBadge } from '@/components/dot-badge';
@@ -55,6 +61,7 @@ export function ProductsTable({
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [deleteBulkError, setDeleteBulkError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProductListItem | null>(null);
 
   const [genJobStatus, setGenJobStatus] = useState<BulkJobStatus<BulkGenerateDescriptionsResult> | null>(null);
@@ -121,6 +128,22 @@ export function ProductsTable({
     });
   }
 
+  /** Deletes what it can and reports the rest — DeleteProduct rejects a
+   *  product that still has stock (adjust to zero first), and a selection
+   *  built for Activate/Deactivate/Generate Descriptions may well include
+   *  some, so this doesn't assume every selected product is deletable. */
+  function applyBulkDelete() {
+    setDeleteBulkError(null);
+    startTransition(async () => {
+      const result = await bulkDeleteProducts(Array.from(selected));
+      setSelected(new Set());
+      if (result.errors.length > 0) {
+        setDeleteBulkError(`Deleted ${result.deletedCount}, ${result.errors.length} skipped: ${result.errors.join('; ')}`);
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <div>
       {/* Matches the mock's `.bulkbar` (accent-wash background, accent text)
@@ -144,8 +167,12 @@ export function ProductsTable({
               <Sparkles className="size-3" />
               {genSubmitting ? `Generating… ${typeof genJobStatus?.progress === 'number' ? genJobStatus.progress : 0}%` : 'Generate Missing Descriptions'}
             </Button>
+            <Button type="button" variant="destructive" size="sm" disabled={isPending} onClick={applyBulkDelete}>
+              {isPending ? 'Deleting…' : 'Delete'}
+            </Button>
             {error ? <span className="font-normal text-destructive">{error}</span> : null}
           </div>
+          {deleteBulkError ? <p className="text-xs text-destructive">{deleteBulkError}</p> : null}
           {genError ? <p className="text-xs text-destructive">{genError}</p> : null}
           {genJobStatus?.status === 'completed' && genJobStatus.result ? (
             <p className="text-xs text-muted-foreground">

@@ -211,6 +211,35 @@ export async function deleteProduct(_prevState: ActionState, formData: FormData)
   return { error: null, success: true };
 }
 
+export interface BulkDeleteResult {
+  deletedCount: number;
+  errors: string[];
+}
+
+/** Same deletes-what-it-can-reports-the-rest shape as orders' own
+ *  bulkDeleteOrders (Promise.allSettled, not Promise.all) — DeleteProduct
+ *  rejects a product that still has stock (adjust to zero first), and the
+ *  same checkbox selection here is shared with Activate/Deactivate/Generate
+ *  Descriptions, none of which have that restriction, so the checkboxes
+ *  themselves aren't gated the way Orders' delete-only checkboxes are —
+ *  ineligible items are reported back per-item instead. */
+export async function bulkDeleteProducts(publicIds: string[]): Promise<BulkDeleteResult> {
+  const results = await Promise.allSettled(publicIds.map((id) => apiDelete(`/admin/v1/products/${id}`)));
+  const errors: string[] = [];
+  let deletedCount = 0;
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      deletedCount++;
+    } else {
+      const message = r.reason instanceof ApiError ? r.reason.message : 'Unknown error';
+      errors.push(`Product ${publicIds[i]}: ${message}`);
+    }
+  });
+
+  revalidatePath('/products');
+  return { deletedCount, errors };
+}
+
 export interface BulkProductRowInput {
   sku: string;
   type?: string;

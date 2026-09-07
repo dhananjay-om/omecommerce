@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
-# Bulk delete: Customers (new) + Orders (fixed UX).
+# Bulk delete: Customers (added), Orders (UX fix), Products (added).
 #
-#   - Customers list had no bulk-select/delete at all — only a per-row
-#     "..." menu. Added the same checkbox-select + bulk action bar the
-#     Orders list already has, and a new bulkDeleteCustomers action
-#     (deletes what's selected in parallel, same Promise.allSettled
-#     shape as bulkDeleteOrders). DeleteCustomer has no eligibility gate
-#     (it's a soft-delete/deactivate, never blocked), so every selected
-#     customer succeeds.
-#   - Orders' bulk delete already existed and DID work — but only for
-#     CANCELLED/CLOSED orders (DeleteOrder's own real business-rule
-#     guard, same one the row-level "Delete Order" menu item already
-#     respects). Selecting a typical active order and clicking bulk
-#     Delete silently reported "0 deleted, N skipped" for every one,
-#     which looked broken. Fixed by disabling the checkbox (with a
-#     tooltip explaining why) for any order that isn't eligible, and
-#     "Select all" now only selects the eligible ones — so bulk delete
-#     only ever offers what it can actually delete, same rule enforced
-#     before the click instead of after.
+#   - Customers: had no bulk-select/delete at all. Added the same
+#     checkbox-select + bulk action bar Orders already has, plus a new
+#     bulkDeleteCustomers action. DeleteCustomer has no eligibility gate
+#     (soft-delete/deactivate, never blocked), so every selection succeeds.
+#   - Orders: bulk delete already worked at the API level, but
+#     DeleteOrder only ever allows CANCELLED/CLOSED orders (a real,
+#     pre-existing business rule — you shouldn't be able to permanently
+#     delete an active/paid order). The bulk checkboxes didn't apply
+#     that rule, so selecting a normal order and clicking Delete
+#     silently reported "0 deleted, N skipped" for every one, which
+#     looked broken. Fixed: ineligible checkboxes are now disabled (with
+#     a tooltip), "Select all" only selects eligible rows, and — since a
+#     page of all-active orders would otherwise show nothing but
+#     mysteriously-disabled checkboxes — an explicit note now explains
+#     why when that happens.
+#   - Products: had no bulk delete at all (only bulk Activate/Deactivate
+#     and Generate Missing Descriptions). Added a Delete button to that
+#     same bulk bar + a new bulkDeleteProducts action. DeleteProduct
+#     rejects a product that still has stock (adjust to zero first) —
+#     unlike Orders, the checkboxes here are shared with the other bulk
+#     actions that have no such restriction, so they aren't gated the
+#     same way; an ineligible product is reported back per-item instead
+#     ("Deleted X, N skipped: ...", same shape as Orders/Customers).
 #
 # Admin-only change. No backend/schema change, no new permission.
 #
@@ -37,6 +43,8 @@ if [ $? -ne 0 ]; then
 fi
 
 echo
-echo "==> Done. Customers now has the same bulk-select + Delete bar as"
-echo "    Orders. On Orders, only cancelled/closed orders can be selected"
-echo "    for bulk delete — cancel an order first if you need to delete it."
+echo "==> Done. Customers and Products now both have bulk-select + Delete."
+echo "    On Orders, only cancelled/closed orders can be selected for bulk"
+echo "    delete — cancel an order first if you need to delete it. On"
+echo "    Products, a product with stock is reported as skipped rather"
+echo "    than blocking selection — adjust its stock to zero first."

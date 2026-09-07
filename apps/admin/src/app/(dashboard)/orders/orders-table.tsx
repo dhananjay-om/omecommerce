@@ -93,6 +93,16 @@ export function OrdersTable({
 
   return (
     <div>
+      {/* Only cancelled/closed orders are deletable (a real business rule,
+          not a bug) — surfaced up front, not just as a per-checkbox
+          tooltip, since a page of all-active orders would otherwise show
+          nothing but silently-disabled checkboxes with no explanation. */}
+      {orders.length > 0 && eligibleOrders.length === 0 ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          None of the orders on this page can be bulk-deleted — only cancelled or closed orders are deletable. Cancel an order first if you need to remove it.
+        </p>
+      ) : null}
+
       {/* Only "Delete" so far — Export/Fulfill-in-bulk aren't real backend
           capabilities yet, so they're not offered here rather than faked. */}
       {selected.size > 0 ? (
