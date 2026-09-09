@@ -269,19 +269,16 @@ export const NAV: NavGroup[] = [
     icon: Workflow,
     items: [
       {
-        key: 'workflows', label: 'Workflows', href: '/automation/workflows', icon: Workflow, status: 'comingSoon',
-        description: 'Automated WHEN/IF/THEN rules that run without manual intervention.',
-        planned: ['A visual workflow builder (auto-reorder on low stock, high-value order approval, delayed-shipment escalation, and similar)'],
+        key: 'workflows', label: 'Workflows', href: '/automation/workflows', icon: Workflow, status: 'live',
+        description: 'Automated WHEN/IF/THEN rules — real order/stock/customer triggers, up to 10 conditions and actions each.',
       },
       {
-        key: 'rules', label: 'Rules', href: '/automation/rules', icon: ListChecks, status: 'comingSoon',
-        description: 'Standalone conditional rules outside the workflow builder.',
-        planned: ['Simple condition → action rules for cases that don\'t need a full workflow'],
+        key: 'rules', label: 'Rules', href: '/automation/rules', icon: ListChecks, status: 'live',
+        description: 'A fast single-condition/single-action quick-create over the same rules as Workflows.',
       },
       {
         key: 'jobs', label: 'Scheduled Jobs', href: '/automation/jobs', icon: Clock, status: 'live',
-        description: 'Recurring background jobs and their run history.',
-        planned: ['Visibility into this store\'s existing background jobs (reservation sweeps, analytics refresh, alert evaluation) with run history and health'],
+        description: 'This store\'s existing background jobs, and their real run history.',
       },
     ],
   },

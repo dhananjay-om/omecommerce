@@ -184,7 +184,11 @@ function createEnvEmailSender(): EmailSender {
  * exact same adapter, and a settings change made in the admin UI is picked
  * up by all of them on the very next email — no restart.
  */
-function createEmailSender(db: Db): EmailSender {
+/** Exported so the automation module's SendEmailAction can send through the
+ *  exact same adapter as every other email in this app (a settings change
+ *  in the admin UI reaches it too, no restart) — same "shared composition
+ *  helper" precedent as createOrderEmailDeps below. */
+export function createEmailSender(db: Db): EmailSender {
   return new DynamicEmailSender(db, createEnvEmailSender());
 }
 

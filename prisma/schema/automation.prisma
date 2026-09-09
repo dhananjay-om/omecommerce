@@ -24,3 +24,60 @@ model JobRunLog {
   @@index([jobName, startedAt])
   @@map("job_run_log")
 }
+
+/// The Rules/Workflows engine (Automation nav group, Phase 2). One model
+/// powers BOTH admin surfaces — "Rules" is a fast single-condition/
+/// single-action quick-create view over this same table, "Workflows" is
+/// the full multi-condition/multi-action builder — a rule created via the
+/// quick form is just a minimal workflow, not a fabricated distinction
+/// (see the plan's own "Decisions" section).
+model AutomationRule {
+  id          BigInt   @id @default(autoincrement())
+  publicId    String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  name        String
+  description String?
+  /// 'ORDER_PLACED' | 'ORDER_PAID' | 'ORDER_CANCELLED' | 'ORDER_REFUNDED' |
+  /// 'ORDER_SHIPPED' | 'ORDER_CLOSED' | 'STOCK_CHANGED' | 'CUSTOMER_REGISTERED'
+  /// — plain string, fixed vocabulary in app code (same precedent as every
+  /// other ruleCode/metricCode-shaped field this session has added).
+  /// Immutable after create (same as Alerts' own metricCode) — change the
+  /// trigger by creating a new rule, not editing this one in place.
+  triggerType String   @map("trigger_type")
+  /// Array<{field, comparator, value}>, ANDed — see ConditionSpec.
+  conditions  Json     @default("[]") @db.JsonB
+  /// Array<{type, config}> — see ActionSpec.
+  actions     Json     @default("[]") @db.JsonB
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy   BigInt?  @map("created_by")
+  updatedBy   BigInt?  @map("updated_by")
+
+  runs AutomationRuleRun[]
+
+  @@index([triggerType, isActive])
+  @@map("automation_rule")
+}
+
+/// One row per rule evaluated against a real event — including a
+/// non-matching evaluation, so "why didn't this fire" is answerable from
+/// real data, not a guess.
+model AutomationRuleRun {
+  id             BigInt   @id @default(autoincrement())
+  ruleId         BigInt   @map("rule_id")
+  triggeredAt    DateTime @default(now()) @map("triggered_at") @db.Timestamptz(6)
+  matched        Boolean
+  /// 'Order' | 'StockItem' | 'Customer' — null only if the entity that
+  /// triggered this couldn't be resolved (deleted between event and
+  /// evaluation, a real, rare race — not swallowed, this row still exists).
+  entityType       String? @map("entity_type")
+  entityPublicId   String? @map("entity_public_id")
+  /// Array<{type, ok, error?}> — one entry per action actually attempted
+  /// (empty when matched=false, since no action runs then).
+  actionResults  Json     @default("[]") @map("action_results") @db.JsonB
+
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, triggeredAt])
+  @@map("automation_rule_run")
+}

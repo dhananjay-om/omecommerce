@@ -1517,3 +1517,52 @@ export interface RegisteredJob {
   schedule: string;
   lastRun: JobRun | null;
 }
+
+/** Automation > Rules / Workflows — one engine, two framings (see the
+ *  plan's own "Decisions" — Rules is a quick single-condition/single-
+ *  action view over this same table, Workflows the full builder). */
+export type AutomationTriggerType =
+  | 'ORDER_PLACED'
+  | 'ORDER_PAID'
+  | 'ORDER_CANCELLED'
+  | 'ORDER_REFUNDED'
+  | 'ORDER_SHIPPED'
+  | 'ORDER_CLOSED'
+  | 'STOCK_CHANGED'
+  | 'CUSTOMER_REGISTERED';
+
+export type ConditionComparator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains';
+
+export interface ConditionSpec {
+  field: string;
+  comparator: ConditionComparator;
+  value: string;
+}
+
+export type AutomationActionType = 'EMAIL' | 'WEBHOOK' | 'ORDER_NOTE';
+
+export interface ActionSpec {
+  type: AutomationActionType;
+  config: Record<string, string>;
+}
+
+export interface AutomationRule {
+  publicId: string;
+  name: string;
+  description: string | null;
+  triggerType: AutomationTriggerType;
+  conditions: ConditionSpec[];
+  actions: ActionSpec[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AutomationRuleRun {
+  id: string;
+  triggeredAt: string;
+  matched: boolean;
+  entityType: string | null;
+  entityPublicId: string | null;
+  actionResults: Array<{ type: string; ok: boolean; error?: string }>;
+}
