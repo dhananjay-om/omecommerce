@@ -4,6 +4,8 @@ import { ReleaseExpiredReservations } from '../modules/inventory/application/rel
 import { PrismaStockLedger } from '../modules/inventory/infrastructure/prisma-stock-ledger.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
 import { logger } from '../shared/infrastructure/logger.js';
+import { createJobRunLogRepository } from '../modules/automation/automation.module.js';
+import { recordJobRun } from '../modules/automation/infrastructure/job-run-recorder.js';
 
 export const RESERVATION_SWEEP_JOB_NAME = 'sweep-expired-reservations';
 const SWEEP_INTERVAL_MS = 60_000; // every minute
@@ -37,11 +39,14 @@ export async function scheduleReservationSweep(): Promise<void> {
  */
 export function createReservationSweepHandler(): (job: Job) => Promise<void> {
   const releaseExpired = new ReleaseExpiredReservations(new PrismaStockLedger(prisma));
+  const jobRunLogs = createJobRunLogRepository(prisma);
   return async (job: Job) => {
     if (job.name !== RESERVATION_SWEEP_JOB_NAME) return;
-    const result = await releaseExpired.execute();
-    if (result.releasedCount > 0) {
-      logger.info({ releasedCount: result.releasedCount }, 'reservation sweep released expired reservations');
-    }
+    await recordJobRun(jobRunLogs, RESERVATION_SWEEP_JOB_NAME, async () => {
+      const result = await releaseExpired.execute();
+      if (result.releasedCount > 0) {
+        logger.info({ releasedCount: result.releasedCount }, 'reservation sweep released expired reservations');
+      }
+    });
   };
 }

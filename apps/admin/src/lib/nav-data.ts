@@ -279,7 +279,7 @@ export const NAV: NavGroup[] = [
         planned: ['Simple condition → action rules for cases that don\'t need a full workflow'],
       },
       {
-        key: 'jobs', label: 'Scheduled Jobs', href: '/automation/jobs', icon: Clock, status: 'comingSoon',
+        key: 'jobs', label: 'Scheduled Jobs', href: '/automation/jobs', icon: Clock, status: 'live',
         description: 'Recurring background jobs and their run history.',
         planned: ['Visibility into this store\'s existing background jobs (reservation sweeps, analytics refresh, alert evaluation) with run history and health'],
       },

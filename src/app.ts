@@ -28,6 +28,7 @@ import { createCompanyModule } from './modules/company/company.module.js';
 import { createAnalyticsModule } from './modules/analytics/analytics.module.js';
 import { createAiModule } from './modules/ai/ai.module.js';
 import { createMigrationModule } from './modules/migration/migration.module.js';
+import { createAutomationModule } from './modules/automation/automation.module.js';
 import { createPincodeModule } from './modules/pincode/pincode.module.js';
 
 /**
@@ -139,6 +140,9 @@ export function createApp(): Express {
 
   const migration = createMigrationModule(prisma, auth.authorize);
   app.use('/admin/v1', migration.admin);
+
+  const automation = createAutomationModule(prisma, auth.authorize);
+  app.use('/admin/v1', automation.admin);
 
   app.use(notFound);
   app.use(errorHandler);

@@ -5,6 +5,8 @@ import { PrismaWalletLedger } from '../modules/wallet/infrastructure/prisma-wall
 import { PrismaGiftCardLedger } from '../modules/giftcard/infrastructure/prisma-giftcard-ledger.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
 import { logger } from '../shared/infrastructure/logger.js';
+import { createJobRunLogRepository } from '../modules/automation/automation.module.js';
+import { recordJobRun } from '../modules/automation/infrastructure/job-run-recorder.js';
 
 export const STORED_VALUE_HOLD_SWEEP_JOB_NAME = 'sweep-expired-stored-value-holds';
 const SWEEP_INTERVAL_MS = 60_000; // every minute — same cadence as reservation-sweep.worker.ts
@@ -22,11 +24,14 @@ export async function scheduleStoredValueHoldSweep(): Promise<void> {
 /** Returns a per-job-name handler, combined into the shared `maintenance` queue Worker in workers/index.ts — see reservation-sweep.worker.ts's identical doc comment for why this isn't its own Worker. */
 export function createStoredValueHoldSweepHandler(): (job: Job) => Promise<void> {
   const releaseExpired = new ReleaseExpiredStoredValueHolds(new PrismaWalletLedger(prisma), new PrismaGiftCardLedger(prisma));
+  const jobRunLogs = createJobRunLogRepository(prisma);
   return async (job: Job) => {
     if (job.name !== STORED_VALUE_HOLD_SWEEP_JOB_NAME) return;
-    const result = await releaseExpired.execute();
-    if (result.releasedCount > 0) {
-      logger.info({ releasedCount: result.releasedCount }, 'stored-value hold sweep released expired holds');
-    }
+    await recordJobRun(jobRunLogs, STORED_VALUE_HOLD_SWEEP_JOB_NAME, async () => {
+      const result = await releaseExpired.execute();
+      if (result.releasedCount > 0) {
+        logger.info({ releasedCount: result.releasedCount }, 'stored-value hold sweep released expired holds');
+      }
+    });
   };
 }

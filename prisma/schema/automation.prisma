@@ -1,0 +1,26 @@
+/// Automation feature area (admin nav "Automation" group). This file starts
+/// with just the Scheduled Jobs' own run-history table — AutomationRule/
+/// AutomationRuleRun (the Rules/Workflows engine) land in their own later
+/// migration, same "one phase, one migration" convention as the earlier
+/// Fulfillment feature area.
+///
+/// BullMQ itself retains ZERO job history — both `domain-events` and
+/// `maintenance` queues are configured `removeOnComplete: true,
+/// removeOnFail: true` (see queues.ts) — so "run history and health" for
+/// the Scheduled Jobs admin page needs a real table, not a read of BullMQ
+/// internals.
+model JobRunLog {
+  id           BigInt    @id @default(autoincrement())
+  /// Matches one of the 4 known job-name constants (RESERVATION_SWEEP_JOB_NAME
+  /// etc.) — plain string, not an enum, same "fixed vocabulary in app code"
+  /// precedent as everywhere else this session has made that call.
+  jobName      String    @map("job_name")
+  startedAt    DateTime  @map("started_at") @db.Timestamptz(6)
+  finishedAt   DateTime? @map("finished_at") @db.Timestamptz(6)
+  /// 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+  status       String
+  errorMessage String?   @map("error_message")
+
+  @@index([jobName, startedAt])
+  @@map("job_run_log")
+}

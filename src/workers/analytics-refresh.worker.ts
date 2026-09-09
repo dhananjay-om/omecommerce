@@ -4,6 +4,8 @@ import { createAnalyticsRefreshDeps } from '../modules/analytics/analytics.modul
 import { yesterdayDateKey } from '../modules/analytics/domain/date-key.js';
 import { prisma } from '../shared/infrastructure/prisma/client.js';
 import { logger } from '../shared/infrastructure/logger.js';
+import { createJobRunLogRepository } from '../modules/automation/automation.module.js';
+import { recordJobRun } from '../modules/automation/infrastructure/job-run-recorder.js';
 
 export const ANALYTICS_REFRESH_JOB_NAME = 'analytics-nightly-refresh';
 // 02:15 UTC — after midnight so "yesterday" is a fully closed day everywhere,
@@ -31,22 +33,32 @@ export async function scheduleAnalyticsRefresh(): Promise<void> {
  *  read numbers that are already correct for the day, not stale ones. */
 export function createAnalyticsRefreshHandler(): (job: Job) => Promise<void> {
   const { runNightlyRefresh, evaluateAlertRules } = createAnalyticsRefreshDeps(prisma);
+  const jobRunLogs = createJobRunLogRepository(prisma);
 
   return async (job: Job) => {
     if (job.name !== ANALYTICS_REFRESH_JOB_NAME) return;
     const now = new Date();
     const dateKey = yesterdayDateKey(now);
-    try {
-      await runNightlyRefresh.execute(dateKey);
-      logger.info({ dateKey }, 'analytics nightly refresh completed');
-    } catch (err) {
-      logger.error({ err, dateKey }, 'analytics nightly refresh failed');
-      return; // don't evaluate alerts against a refresh that may not have completed
-    }
-    try {
-      await evaluateAlertRules.execute(now);
-    } catch (err) {
-      logger.error({ err, dateKey }, 'analytics alert evaluation failed');
-    }
+    // Wrapped in recordJobRun (Scheduled Jobs' own run-history table) —
+    // both steps below still keep their own logger.error + the original
+    // "don't evaluate alerts against a refresh that may not have
+    // completed" short-circuit unchanged; each now also re-throws so a
+    // real failure here shows up as FAILED in that history, not just in
+    // the logs.
+    await recordJobRun(jobRunLogs, ANALYTICS_REFRESH_JOB_NAME, async () => {
+      try {
+        await runNightlyRefresh.execute(dateKey);
+        logger.info({ dateKey }, 'analytics nightly refresh completed');
+      } catch (err) {
+        logger.error({ err, dateKey }, 'analytics nightly refresh failed');
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+      try {
+        await evaluateAlertRules.execute(now);
+      } catch (err) {
+        logger.error({ err, dateKey }, 'analytics alert evaluation failed');
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    });
   };
 }

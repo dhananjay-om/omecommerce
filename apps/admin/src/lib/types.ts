@@ -1498,3 +1498,22 @@ export interface MigrationRun {
   completedAt: string | null;
   createdAt: string;
 }
+
+/** Automation > Scheduled Jobs — visibility into this store's existing
+ *  background jobs. Real run history, not inferred: BullMQ itself
+ *  retains none (both queues clear completed/failed jobs immediately). */
+export interface JobRun {
+  id: string;
+  startedAt: string;
+  finishedAt: string | null;
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  errorMessage: string | null;
+  durationMs: number | null;
+}
+
+export interface RegisteredJob {
+  jobName: string;
+  description: string;
+  schedule: string;
+  lastRun: JobRun | null;
+}

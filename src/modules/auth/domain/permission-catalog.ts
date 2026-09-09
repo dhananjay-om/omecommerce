@@ -49,4 +49,6 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { code: 'ai:view', description: 'View AI-generated insights' },
   { code: 'ai:manage', description: 'Configure AI provider settings (API keys)' },
   { code: 'migration:manage', description: 'Connect source stores and run catalog/customer/order data migrations' },
+  { code: 'automation:view', description: 'View scheduled job run history and automation rules' },
+  { code: 'automation:manage', description: 'Create, edit, and delete automation rules and workflows' },
 ];

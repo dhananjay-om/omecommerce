@@ -46,6 +46,7 @@ const NEUTRAL_WARNING = new Set([
   'REQUESTED',
   'APPROVED',
   'RECEIVED',
+  'RUNNING',
 ]);
 
 /** Maps the many status-like enum strings across products/orders/customers to a consistent badge color. */
