@@ -54,6 +54,8 @@ import { ListPickList } from './application/list-pick-list.usecase.js';
 import { FulfillOrder } from './application/fulfill-order.usecase.js';
 import { RefundOrder } from './application/refund-order.usecase.js';
 import { CancelOrder } from './application/cancel-order.usecase.js';
+import { CancelCustomerOrder } from './application/cancel-customer-order.usecase.js';
+import { CreateCustomerReturn } from './application/create-customer-return.usecase.js';
 import {
   CreateTaxClass,
   ListTaxClasses,
@@ -366,7 +368,9 @@ export function createOrderModule(
     companyCredit,
   );
   const cancelOrder = new CancelOrder(orders, refundOrder, outbox);
+  const cancelCustomerOrder = new CancelCustomerOrder(orders, customers, cancelOrder);
   const createReturn = new CreateReturn(orders);
+  const createCustomerReturn = new CreateCustomerReturn(orders, customers, createReturn);
   const updateReturnStatus = new UpdateReturnStatus(orders);
   const refundReturn = new RefundReturn(orders, refundOrder);
   const listReturns = new ListReturns(orders);
@@ -1018,6 +1022,26 @@ export function createOrderModule(
     asyncHandler(async (req, res) => {
       res.json({
         data: await reorder.execute(req.customer!.customerPublicId, req.params.publicId!),
+      });
+    }),
+  );
+  store.post(
+    '/me/orders/:publicId/cancel',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      const body = parse(cancelOrderSchema, req.body);
+      res.json({
+        data: await cancelCustomerOrder.execute(req.customer!.customerPublicId, req.params.publicId!, body),
+      });
+    }),
+  );
+  store.post(
+    '/me/orders/:publicId/returns',
+    requireCustomer,
+    asyncHandler(async (req, res) => {
+      const body = parse(createReturnSchema, req.body);
+      res.status(201).json({
+        data: await createCustomerReturn.execute(req.customer!.customerPublicId, req.params.publicId!, body),
       });
     }),
   );

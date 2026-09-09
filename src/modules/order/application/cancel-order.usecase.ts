@@ -9,6 +9,11 @@ import type { CancelOrderCommand, OrderViewDto } from './dto.js';
  * Cancel = full refund (with restock) of every line + mark the order CANCELLED.
  * Only allowed while nothing has shipped yet (plan/08 §4) — once any line is
  * fulfilled, use the return/RMA flow for the fulfilled portion instead.
+ *
+ * Originally admin-only; a logged-in customer can now also cancel their own
+ * order (via CancelCustomerOrder, ownership-checked, reusing this exact
+ * usecase — no second cancellation path), so `actorType` says who really
+ * did it on the order's own timeline.
  */
 export class CancelOrder {
   constructor(
@@ -46,7 +51,7 @@ export class CancelOrder {
       fromValue: order.status,
       toValue: 'CANCELLED',
       message: cmd.reason ? `Order cancelled: ${cmd.reason}` : 'Order cancelled',
-      actorType: 'ADMIN',
+      actorType: cmd.actorType ?? 'ADMIN',
     });
     return { ...result, status: 'CANCELLED' };
   }

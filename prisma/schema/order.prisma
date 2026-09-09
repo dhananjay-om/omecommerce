@@ -460,6 +460,14 @@ model OrderReturn {
   orderId   BigInt       @map("order_id")
   reason    String
   status    ReturnStatus @default(REQUESTED)
+  /// Where the eventual refund should go — 'ORIGINAL_PAYMENT_METHOD' | 'WALLET'
+  /// (same fixed vocabulary as RefundOrderCommand.refundTo, plain string not
+  /// a DB enum for the same reason that one isn't). Captured at request time
+  /// (the customer's own choice, on a self-service return) so RefundReturn
+  /// can honor it later without asking again; null on an older/admin-created
+  /// return with no preference recorded — RefundReturn falls back to
+  /// ORIGINAL_PAYMENT_METHOD in that case, same as before this column existed.
+  refundTo  String?      @map("refund_to")
   createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

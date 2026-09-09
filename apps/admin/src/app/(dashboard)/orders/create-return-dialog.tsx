@@ -11,12 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 
 const initialState: ActionState = { error: null, success: false };
 
-/** Records a return that already happened — admin-only (confirmed
- *  decision, no customer self-service in this pass). Same eligible-lines
- *  shape as RefundDialog (qty - refundedQty > 0 — an already-fully-
- *  refunded line has nothing left to return), but restock is captured
- *  per line here, not once for the whole request, since OrderReturnLine
- *  itself stores it per line. */
+/** Records a return that already happened over phone/email/support — the
+ *  same underlying CreateReturn usecase a customer's own self-service
+ *  return request now also creates (CreateCustomerReturn). Same
+ *  eligible-lines shape as RefundDialog (qty - refundedQty > 0 — an
+ *  already-fully-refunded line has nothing left to return), but restock
+ *  is captured per line here, not once for the whole request, since
+ *  OrderReturnLine itself stores it per line. Refund destination is
+ *  optional — leave it unset and RefundReturn falls back to the original
+ *  payment method once this return is actually refunded. */
 export function CreateReturnDialog({ orderPublicId, lines }: { orderPublicId: string; lines: OrderLine[] }) {
   const [open, setOpen] = useState(false);
   const action = createReturn.bind(null, orderPublicId);
@@ -42,6 +45,13 @@ export function CreateReturnDialog({ orderPublicId, lines }: { orderPublicId: st
           <div className="space-y-2">
             <Label htmlFor="return-reason">Reason</Label>
             <Textarea id="return-reason" name="reason" rows={2} placeholder="Why is this being returned?" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="return-refund-to">Refund to (once refunded)</Label>
+            <select id="return-refund-to" name="refundTo" defaultValue="ORIGINAL_PAYMENT_METHOD" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none">
+              <option value="ORIGINAL_PAYMENT_METHOD">Original payment method</option>
+              <option value="WALLET">Store credit (wallet)</option>
+            </select>
           </div>
           {returnableLines.map((line) => {
             const remaining = line.qty - line.refundedQty;

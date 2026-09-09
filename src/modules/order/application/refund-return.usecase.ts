@@ -28,12 +28,17 @@ export class RefundReturn {
 
     const restockLines = ret.lines.filter((l) => l.restock).map((l) => ({ sku: l.sku, qty: l.qty }));
     const keepLines = ret.lines.filter((l) => !l.restock).map((l) => ({ sku: l.sku, qty: l.qty }));
+    // The customer's own choice, captured at request time (or an admin's,
+    // if set when logging the return) — null on an older return with no
+    // preference recorded, in which case RefundOrder's own default
+    // (ORIGINAL_PAYMENT_METHOD) applies, exactly as before this existed.
+    const refundTo = (ret.refundTo as 'ORIGINAL_PAYMENT_METHOD' | 'WALLET' | null) ?? undefined;
 
     if (restockLines.length > 0) {
-      await this.refundOrder.execute({ orderPublicId: ret.orderPublicId, lines: restockLines, restock: true });
+      await this.refundOrder.execute({ orderPublicId: ret.orderPublicId, lines: restockLines, restock: true, refundTo });
     }
     if (keepLines.length > 0) {
-      await this.refundOrder.execute({ orderPublicId: ret.orderPublicId, lines: keepLines, restock: false });
+      await this.refundOrder.execute({ orderPublicId: ret.orderPublicId, lines: keepLines, restock: false, refundTo });
     }
 
     await this.orders.setReturnStatus(ret.id, 'REFUNDED');

@@ -85,7 +85,7 @@ export const fulfillOrderSchema = z.object({
   shippingNotes: z.string().max(2000).optional(),
 });
 
-const refundToSchema = z.enum(['ORIGINAL_PAYMENT_METHOD', 'WALLET']);
+export const refundToSchema = z.enum(['ORIGINAL_PAYMENT_METHOD', 'WALLET']);
 
 export const refundOrderSchema = z.object({
   lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive() })).min(1),
@@ -100,6 +100,11 @@ export const createReturnSchema = z.object({
   // the zod schema, defaulted in the usecase" shape as refundOrderSchema's
   // own restock field.
   lines: z.array(z.object({ sku: z.string().min(1), qty: z.number().int().positive(), restock: z.boolean().optional() })).min(1),
+  // Where the eventual refund should go, captured up front (see
+  // OrderReturn.refundTo's own schema doc comment) — optional so an admin
+  // logging a return without asking the customer yet still works exactly
+  // as before this field existed.
+  refundTo: refundToSchema.optional(),
 });
 
 export const updateReturnStatusSchema = z.object({

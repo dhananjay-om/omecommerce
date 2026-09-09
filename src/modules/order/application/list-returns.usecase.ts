@@ -32,6 +32,7 @@ export class ListReturns {
         status: r.status,
         lineCount: r.lineCount,
         createdAt: r.createdAt.toISOString(),
+        refundTo: r.refundTo,
       })),
     };
   }

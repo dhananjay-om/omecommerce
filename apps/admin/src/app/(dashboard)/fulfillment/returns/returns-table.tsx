@@ -6,6 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { statusBadgeVariant } from '@/lib/status-badge';
 import { ReturnRowActions } from './return-row-actions';
 
+/** 'ORIGINAL_PAYMENT_METHOD' | 'WALLET' | null — see ReturnListItem.refundTo's own doc comment. */
+function refundToLabel(refundTo: string | null): string {
+  if (refundTo === 'WALLET') return 'Wallet';
+  if (refundTo === 'ORIGINAL_PAYMENT_METHOD') return 'Original payment';
+  return '—';
+}
+
 export function ReturnsTable({ returns }: { returns: ReturnListItem[] }) {
   return (
     <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
@@ -15,6 +22,7 @@ export function ReturnsTable({ returns }: { returns: ReturnListItem[] }) {
             <TableHead>Order</TableHead>
             <TableHead>Reason</TableHead>
             <TableHead>Lines</TableHead>
+            <TableHead>Refund to</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Requested</TableHead>
             <TableHead className="w-56" />
@@ -23,7 +31,7 @@ export function ReturnsTable({ returns }: { returns: ReturnListItem[] }) {
         <TableBody>
           {returns.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 No returns found.
               </TableCell>
             </TableRow>
@@ -40,6 +48,7 @@ export function ReturnsTable({ returns }: { returns: ReturnListItem[] }) {
                   {r.reason}
                 </TableCell>
                 <TableCell>{r.lineCount}</TableCell>
+                <TableCell className="text-muted-foreground">{refundToLabel(r.refundTo)}</TableCell>
                 <TableCell>
                   <DotBadge variant={statusBadgeVariant(r.status)}>{r.status}</DotBadge>
                 </TableCell>

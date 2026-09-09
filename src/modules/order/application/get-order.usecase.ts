@@ -113,6 +113,7 @@ export function toOrderDto(order: OrderView): OrderViewDto {
         const orderLine = order.lines.find((ol) => ol.id === l.orderLineId);
         return { sku: orderLine?.sku ?? l.orderLineId.toString(), qty: l.qty, restock: l.restock };
       }),
+      refundTo: r.refundTo,
     })),
     notes: order.notes.map((n) => ({ id: n.id.toString(), type: n.type, body: n.body, createdAt: n.createdAt.toISOString() })),
     invoices: order.invoices.map((inv) => toInvoiceDto(order, inv)),

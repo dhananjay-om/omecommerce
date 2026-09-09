@@ -95,6 +95,7 @@ export async function createReturn(orderPublicId: string, _prevState: ActionStat
     }
   });
   const reason = formData.get('reason');
+  const refundTo = formData.get('refundTo');
   if (lines.length === 0) {
     return { error: 'Enter a quantity to return for at least one line.', success: false };
   }
@@ -103,7 +104,11 @@ export async function createReturn(orderPublicId: string, _prevState: ActionStat
   }
 
   try {
-    await apiPost<{ publicId: string }>(`/admin/v1/orders/${orderPublicId}/returns`, { reason: reason.trim(), lines });
+    await apiPost<{ publicId: string }>(`/admin/v1/orders/${orderPublicId}/returns`, {
+      reason: reason.trim(),
+      lines,
+      refundTo: refundTo === 'WALLET' || refundTo === 'ORIGINAL_PAYMENT_METHOD' ? refundTo : undefined,
+    });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message, success: false };
     throw err;

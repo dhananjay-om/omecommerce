@@ -642,6 +642,11 @@ export interface ReturnListItem {
   status: string;
   lineCount: number;
   createdAt: string;
+  /** 'ORIGINAL_PAYMENT_METHOD' | 'WALLET' | null — the customer's own
+   *  choice if this return was self-service, an admin's choice if they set
+   *  one, or null if nobody has (RefundReturn falls back to
+   *  ORIGINAL_PAYMENT_METHOD in that case). */
+  refundTo: string | null;
 }
 
 export interface ReturnList {
@@ -691,6 +696,7 @@ export interface OrderReturn {
   status: string;
   createdAt: string;
   lines: OrderReturnLine[];
+  refundTo: string | null;
 }
 
 export interface OrderNote {

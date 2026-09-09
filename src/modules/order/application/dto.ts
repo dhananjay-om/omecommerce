@@ -238,15 +238,21 @@ export interface OrderReturnDto {
   status: string;
   createdAt: string;
   lines: OrderReturnLineDto[];
+  refundTo: string | null;
 }
 
-/** Admin-recorded only (confirmed decision — no customer self-service in
- *  this pass). Same "addressed by sku, not orderLineId" contract as
- *  FulfillOrderCommand/RefundOrderCommand. */
+/** Originally admin-recorded only; a logged-in customer can now also
+ *  submit one (via CreateCustomerReturn, ownership-checked, same
+ *  underlying usecase — see its own doc comment) so `actorType` says who
+ *  really did it on the order's timeline. Same "addressed by sku, not
+ *  orderLineId" contract as FulfillOrderCommand/RefundOrderCommand. */
 export interface CreateReturnCommand {
   orderPublicId: string;
   reason: string;
   lines: Array<{ sku: string; qty: number; restock?: boolean }>;
+  /** See OrderReturn.refundTo's own schema doc comment. */
+  refundTo?: 'ORIGINAL_PAYMENT_METHOD' | 'WALLET';
+  actorType?: 'ADMIN' | 'CUSTOMER';
 }
 
 export interface UpdateReturnStatusCommand {
@@ -271,6 +277,7 @@ export interface ReturnListItemDto {
   status: string;
   lineCount: number;
   createdAt: string;
+  refundTo: string | null;
 }
 
 export interface ReturnListDto {
@@ -525,6 +532,9 @@ export interface CancelOrderCommand {
   orderPublicId: string;
   reason?: string;
   refundTo?: 'ORIGINAL_PAYMENT_METHOD' | 'WALLET';
+  /** Defaults to 'ADMIN' inside CancelOrder — CancelCustomerOrder passes
+   *  'CUSTOMER' so the order's own timeline says who really cancelled it. */
+  actorType?: 'ADMIN' | 'CUSTOMER';
 }
 
 export interface ShippingMethodViewDto {

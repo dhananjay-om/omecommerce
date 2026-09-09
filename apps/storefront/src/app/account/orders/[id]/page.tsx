@@ -6,6 +6,8 @@ import { ApiError } from '@/lib/api-client';
 import { formatPrice } from '@/lib/format-price';
 import type { OrderAddress } from '@/types/order';
 import { ReorderButton } from '@/components/account/reorder-button';
+import { CancelOrderDialog } from '@/components/account/cancel-order-dialog';
+import { RequestReturnDialog } from '@/components/account/request-return-dialog';
 
 export const metadata: Metadata = { title: 'Order Details' };
 
@@ -60,6 +62,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const billing = order.addresses.find((a) => a.type === 'BILLING');
   const shipping = order.addresses.find((a) => a.type === 'SHIPPING');
 
+  // Same real guards the backend itself enforces (CancelOrder/CreateReturn)
+  // — shown here just to decide whether these buttons are worth offering
+  // at all; the backend re-checks regardless, this only avoids a pointless
+  // click. Cancel: nothing has shipped yet, and it isn't already
+  // cancelled/completed/closed (fulfillmentStatus alone doesn't change on
+  // cancel, so status has to be checked too). Return: at least one line
+  // has actually shipped to return.
+  const cancellable = order.fulfillmentStatus === 'UNFULFILLED' && !['CANCELLED', 'COMPLETED', 'CLOSED'].includes(order.status);
+  const returnable = order.fulfillmentStatus === 'FULFILLED' || order.fulfillmentStatus === 'PARTIALLY_FULFILLED';
+
   return (
     <div>
       <Link href="/account/orders" className="text-sm text-muted-foreground hover:underline">
@@ -81,6 +93,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </a>
           ) : null}
           <ReorderButton orderPublicId={order.publicId} />
+          {returnable ? <RequestReturnDialog orderPublicId={order.publicId} lines={order.lines} /> : null}
+          {cancellable ? <CancelOrderDialog orderPublicId={order.publicId} /> : null}
         </div>
       </div>
 
@@ -158,6 +172,27 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <span>{formatPrice(order.grandTotal, order.currency)}</span>
         </div>
       </div>
+
+      {order.returns.length > 0 ? (
+        <div className="mt-8">
+          <h3 className="mb-2 text-sm font-semibold">Return Requests</h3>
+          <ul className="flex flex-col gap-2">
+            {order.returns.map((ret) => (
+              <li key={ret.publicId} className="rounded-lg border p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{ret.status.charAt(0) + ret.status.slice(1).toLowerCase().replace('_', ' ')}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(ret.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p className="mt-1 text-muted-foreground">{ret.reason}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {ret.lines.length} item{ret.lines.length === 1 ? '' : 's'}
+                  {ret.refundTo ? ` · Refund to ${ret.refundTo === 'WALLET' ? 'wallet' : 'original payment method'}` : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {order.notes.length > 0 ? (
         <div className="mt-8">

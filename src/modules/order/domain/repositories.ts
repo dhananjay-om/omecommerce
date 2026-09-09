@@ -628,6 +628,7 @@ export interface OrderReturnView {
   status: string;
   createdAt: Date;
   lines: OrderReturnLineView[];
+  refundTo: string | null;
 }
 
 /** Returns feature area — admin-recorded only (confirmed decision: no
@@ -640,6 +641,8 @@ export interface CreateReturnInput {
   orderId: bigint;
   reason: string;
   lines: Array<{ orderLineId: bigint; qty: number; restock: boolean }>;
+  /** See OrderReturn.refundTo's own schema doc comment. */
+  refundTo?: string | null;
 }
 
 /** Unlike OrderReturnView (nested inside a full OrderView, no back-
@@ -656,6 +659,7 @@ export interface ReturnDetail {
   status: ReturnStatus;
   createdAt: Date;
   lines: Array<{ orderLineId: bigint; sku: string; qty: number; restock: boolean }>;
+  refundTo: string | null;
 }
 
 export interface ReturnListItem {
@@ -667,6 +671,7 @@ export interface ReturnListItem {
   status: ReturnStatus;
   lineCount: number;
   createdAt: Date;
+  refundTo: string | null;
 }
 
 export interface ListReturnsFilter {

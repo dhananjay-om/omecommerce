@@ -680,6 +680,7 @@ export class PrismaOrderRepository implements OrderRepository {
       data: {
         orderId: input.orderId,
         reason: input.reason,
+        refundTo: input.refundTo ?? null,
         lines: { createMany: { data: input.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty, restock: l.restock })) } },
       },
     });
@@ -701,6 +702,7 @@ export class PrismaOrderRepository implements OrderRepository {
       status: row.status,
       createdAt: row.createdAt,
       lines: row.lines.map((l) => ({ orderLineId: l.orderLineId, sku: l.orderLine.sku, qty: l.qty, restock: l.restock })),
+      refundTo: row.refundTo,
     };
   }
 
@@ -732,9 +734,10 @@ export class PrismaOrderRepository implements OrderRepository {
           status: string;
           line_count: bigint;
           created_at: Date;
+          refund_to: string | null;
         }>
       >(Prisma.sql`
-        SELECT r.public_id, o.public_id AS order_public_id, o.order_number, o.email, r.reason, r.status, r.created_at,
+        SELECT r.public_id, o.public_id AS order_public_id, o.order_number, o.email, r.reason, r.status, r.created_at, r.refund_to,
                (SELECT COUNT(*) FROM order_return_line rl WHERE rl.return_id = r.id) AS line_count
         ${fromJoin}
         ORDER BY r.created_at DESC
@@ -754,6 +757,7 @@ export class PrismaOrderRepository implements OrderRepository {
         status: row.status as ReturnStatus,
         lineCount: Number(row.line_count),
         createdAt: row.created_at,
+        refundTo: row.refund_to,
       })),
     };
   }
@@ -1005,6 +1009,7 @@ function toView(order: OrderDetailRow): OrderView {
       status: r.status,
       createdAt: r.createdAt,
       lines: r.lines.map((l) => ({ orderLineId: l.orderLineId, qty: l.qty, restock: l.restock })),
+      refundTo: r.refundTo,
     })),
     notes: order.notes.map((n) => ({ id: n.id, type: n.type, body: n.body, createdAt: n.createdAt })),
     invoices: order.invoices.map(toInvoiceView),

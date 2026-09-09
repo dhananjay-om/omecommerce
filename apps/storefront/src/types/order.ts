@@ -98,6 +98,24 @@ export interface OrderInvoice {
   createdAt: string;
 }
 
+export interface OrderReturnLine {
+  sku: string;
+  qty: number;
+  restock: boolean;
+}
+
+export interface OrderReturn {
+  publicId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  lines: OrderReturnLine[];
+  /** 'ORIGINAL_PAYMENT_METHOD' | 'WALLET' | null — the destination chosen
+   *  when this return was requested (null on an older return with no
+   *  preference recorded). */
+  refundTo: string | null;
+}
+
 export interface OrderView {
   publicId: string;
   orderNumber: string;
@@ -119,6 +137,7 @@ export interface OrderView {
   taxLines: OrderTaxLine[];
   payments: OrderPayment[];
   fulfillments: OrderFulfillment[];
+  returns: OrderReturn[];
   notes: OrderNote[];
   invoices: OrderInvoice[];
 }
