@@ -24,9 +24,9 @@ export function FeaturedCategories({ categories, heading }: { categories: Catego
           <p className="mt-2 text-sm text-slate">Everything you need, right where you want it.</p>
         </div>
 
-        <div className="flex flex-nowrap justify-center gap-4 overflow-x-auto pb-2 sm:gap-6 lg:gap-10">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-8 sm:gap-x-6 lg:gap-x-10">
           {categories.map((category) => (
-            <Link key={category.publicId} href={`/collections/${category.slug}`} className="group flex shrink-0 flex-col items-center gap-3">
+            <Link key={category.publicId} href={`/collections/${category.slug}`} className="group flex flex-col items-center gap-3">
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full shadow-md ring-2 ring-transparent transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl group-hover:ring-champagne group-hover:ring-offset-2 sm:h-28 sm:w-28 lg:h-36 lg:w-36">
                 {/* eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URL when real, curated stock photo otherwise */}
                 <img
