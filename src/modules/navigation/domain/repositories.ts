@@ -8,6 +8,10 @@ export interface MegaMenuColumn {
   links: MegaMenuLink[];
 }
 
+/** 'left' | 'right' | 'top' | 'bottom' — fixed vocabulary in app code
+ *  (same "no DB enum" precedent as AutomationRule.triggerType). */
+export type MegaMenuPromoImagePosition = 'left' | 'right' | 'top' | 'bottom';
+
 export interface MegaMenuItemRecord {
   publicId: string;
   label: string;
@@ -18,6 +22,14 @@ export interface MegaMenuItemRecord {
   promoImageMediaKey: string | null;
   promoHref: string | null;
   promoCaption: string | null;
+  /** Layout controls, every one nullable except position — null means
+   *  "use the component's own built-in default," see navigation.prisma's
+   *  own doc comment. */
+  panelWidth: number | null;
+  columnGap: number | null;
+  promoImageWidth: number | null;
+  promoImageHeight: number | null;
+  promoImagePosition: MegaMenuPromoImagePosition;
   updatedAt: Date;
 }
 
@@ -30,6 +42,11 @@ export interface CreateMegaMenuItemInput {
   promoImageMediaKey?: string | null;
   promoHref?: string | null;
   promoCaption?: string | null;
+  panelWidth?: number | null;
+  columnGap?: number | null;
+  promoImageWidth?: number | null;
+  promoImageHeight?: number | null;
+  promoImagePosition?: MegaMenuPromoImagePosition;
 }
 
 export interface UpdateMegaMenuItemInput {
@@ -41,6 +58,11 @@ export interface UpdateMegaMenuItemInput {
   promoImageMediaKey?: string | null;
   promoHref?: string | null;
   promoCaption?: string | null;
+  panelWidth?: number | null;
+  columnGap?: number | null;
+  promoImageWidth?: number | null;
+  promoImageHeight?: number | null;
+  promoImagePosition?: MegaMenuPromoImagePosition;
 }
 
 export interface MegaMenuItemRepository {

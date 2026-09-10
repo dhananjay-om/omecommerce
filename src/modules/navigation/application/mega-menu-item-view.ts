@@ -16,6 +16,11 @@ export async function toMegaMenuItemView(item: MegaMenuItemRecord): Promise<Mega
     promoImageUrl: item.promoImageMediaKey ? await presignGetUrl(item.promoImageMediaKey) : null,
     promoHref: item.promoHref,
     promoCaption: item.promoCaption,
+    panelWidth: item.panelWidth,
+    columnGap: item.columnGap,
+    promoImageWidth: item.promoImageWidth,
+    promoImageHeight: item.promoImageHeight,
+    promoImagePosition: item.promoImagePosition,
     updatedAt: item.updatedAt.toISOString(),
   };
 }

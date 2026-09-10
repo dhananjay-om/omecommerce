@@ -1,5 +1,12 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { MegaMenuItemRepository, MegaMenuItemRecord, MegaMenuColumn, CreateMegaMenuItemInput, UpdateMegaMenuItemInput } from '../domain/repositories.js';
+import type {
+  MegaMenuItemRepository,
+  MegaMenuItemRecord,
+  MegaMenuColumn,
+  MegaMenuPromoImagePosition,
+  CreateMegaMenuItemInput,
+  UpdateMegaMenuItemInput,
+} from '../domain/repositories.js';
 
 const MEGA_MENU_ITEM_SELECT = {
   publicId: true,
@@ -11,6 +18,11 @@ const MEGA_MENU_ITEM_SELECT = {
   promoImageMediaKey: true,
   promoHref: true,
   promoCaption: true,
+  panelWidth: true,
+  columnGap: true,
+  promoImageWidth: true,
+  promoImageHeight: true,
+  promoImagePosition: true,
   updatedAt: true,
 } as const;
 
@@ -24,11 +36,20 @@ type Row = {
   promoImageMediaKey: string | null;
   promoHref: string | null;
   promoCaption: string | null;
+  panelWidth: number | null;
+  columnGap: number | null;
+  promoImageWidth: number | null;
+  promoImageHeight: number | null;
+  promoImagePosition: string;
   updatedAt: Date;
 };
 
 function toRecord(row: Row): MegaMenuItemRecord {
-  return { ...row, columns: (row.columns ?? []) as MegaMenuColumn[] };
+  return {
+    ...row,
+    columns: (row.columns ?? []) as MegaMenuColumn[],
+    promoImagePosition: row.promoImagePosition as MegaMenuPromoImagePosition,
+  };
 }
 
 export class PrismaMegaMenuItemRepository implements MegaMenuItemRepository {
@@ -45,6 +66,11 @@ export class PrismaMegaMenuItemRepository implements MegaMenuItemRepository {
         promoImageMediaKey: input.promoImageMediaKey,
         promoHref: input.promoHref,
         promoCaption: input.promoCaption,
+        panelWidth: input.panelWidth,
+        columnGap: input.columnGap,
+        promoImageWidth: input.promoImageWidth,
+        promoImageHeight: input.promoImageHeight,
+        promoImagePosition: input.promoImagePosition,
       },
       select: MEGA_MENU_ITEM_SELECT,
     });
@@ -82,6 +108,11 @@ export class PrismaMegaMenuItemRepository implements MegaMenuItemRepository {
         promoImageMediaKey: input.promoImageMediaKey,
         promoHref: input.promoHref,
         promoCaption: input.promoCaption,
+        panelWidth: input.panelWidth,
+        columnGap: input.columnGap,
+        promoImageWidth: input.promoImageWidth,
+        promoImageHeight: input.promoImageHeight,
+        promoImagePosition: input.promoImagePosition,
       },
       select: MEGA_MENU_ITEM_SELECT,
     });

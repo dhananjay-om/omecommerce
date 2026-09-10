@@ -8,6 +8,8 @@ export interface MegaMenuColumn {
   links: MegaMenuLink[];
 }
 
+export type MegaMenuPromoImagePosition = 'left' | 'right' | 'top' | 'bottom';
+
 export interface MegaMenuItem {
   publicId: string;
   label: string;
@@ -19,5 +21,11 @@ export interface MegaMenuItem {
   promoImageUrl: string | null;
   promoHref: string | null;
   promoCaption: string | null;
+  /** Layout controls — null means "use the component's own default." */
+  panelWidth: number | null;
+  columnGap: number | null;
+  promoImageWidth: number | null;
+  promoImageHeight: number | null;
+  promoImagePosition: MegaMenuPromoImagePosition;
   updatedAt: string;
 }

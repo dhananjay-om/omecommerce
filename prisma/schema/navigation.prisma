@@ -41,6 +41,22 @@ model MegaMenuItem {
   promoHref          String? @map("promo_href")
   promoCaption       String? @map("promo_caption")
 
+  /// Layout controls — every one nullable/defaulted so an item created
+  /// before this existed (or one where the admin never touches these
+  /// fields) renders with the exact same look this panel already had:
+  /// null panelWidth/columnGap/promoImageWidth/promoImageHeight means
+  /// "use the component's own built-in default," not "zero." Plain px
+  /// integers (not %, not a unit string) — simplest real unit for a
+  /// dropdown that anchors to the top-level link, not the viewport.
+  panelWidth        Int?   @map("panel_width")
+  columnGap         Int?   @map("column_gap")
+  promoImageWidth   Int?   @map("promo_image_width")
+  promoImageHeight  Int?   @map("promo_image_height")
+  /// 'left' | 'right' | 'top' | 'bottom' — fixed vocabulary in app code
+  /// (same "no DB enum" precedent as AutomationRule.triggerType), where
+  /// the promo image sits relative to the columns inside the dropdown.
+  promoImagePosition String @default("right") @map("promo_image_position")
+
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy BigInt?   @map("created_by")

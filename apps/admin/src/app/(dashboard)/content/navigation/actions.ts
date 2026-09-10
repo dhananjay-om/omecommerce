@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiPost, apiPut, apiDelete, ApiError } from '@/lib/api-client';
-import type { MegaMenuItem, MegaMenuColumn } from '@/lib/types';
+import type { MegaMenuItem, MegaMenuColumn, MegaMenuPromoImagePosition } from '@/lib/types';
 
 export interface MegaMenuItemPayload {
   label: string;
@@ -13,6 +13,11 @@ export interface MegaMenuItemPayload {
   promoImageMediaKey?: string | null;
   promoHref?: string | null;
   promoCaption?: string | null;
+  panelWidth?: number | null;
+  columnGap?: number | null;
+  promoImageWidth?: number | null;
+  promoImageHeight?: number | null;
+  promoImagePosition?: MegaMenuPromoImagePosition;
 }
 
 export interface ActionResult {

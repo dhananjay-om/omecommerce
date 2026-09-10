@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createMegaMenuItem, updateMegaMenuItem } from './actions';
 import { MegaMenuImageUploadField } from './mega-menu-image-upload-field';
-import type { MegaMenuItem, MegaMenuColumn, Category } from '@/lib/types';
+import type { MegaMenuItem, MegaMenuColumn, MegaMenuPromoImagePosition, Category } from '@/lib/types';
 import { StickyFormActions } from '@/components/sticky-form-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -71,6 +71,14 @@ export function MegaMenuItemForm({ item, categories }: { item?: MegaMenuItem; ca
   const [promoImageUrl, setPromoImageUrl] = useState(item?.promoImageUrl ?? null);
   const [promoHref, setPromoHref] = useState(item?.promoHref ?? '');
   const [promoCaption, setPromoCaption] = useState(item?.promoCaption ?? '');
+  // Layout controls — kept as strings ('' == "use the default") rather
+  // than number|null directly, since a controlled number <input> can't
+  // represent "empty" any other way without fighting the DOM.
+  const [panelWidth, setPanelWidth] = useState(item?.panelWidth != null ? String(item.panelWidth) : '');
+  const [columnGap, setColumnGap] = useState(item?.columnGap != null ? String(item.columnGap) : '');
+  const [promoImageWidth, setPromoImageWidth] = useState(item?.promoImageWidth != null ? String(item.promoImageWidth) : '');
+  const [promoImageHeight, setPromoImageHeight] = useState(item?.promoImageHeight != null ? String(item.promoImageHeight) : '');
+  const [promoImagePosition, setPromoImagePosition] = useState<MegaMenuPromoImagePosition>(item?.promoImagePosition ?? 'right');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,6 +127,11 @@ export function MegaMenuItemForm({ item, categories }: { item?: MegaMenuItem; ca
       promoImageMediaKey: promoImageMediaKey || null,
       promoHref: promoHref.trim() || null,
       promoCaption: promoCaption.trim() || null,
+      panelWidth: panelWidth.trim() ? Number(panelWidth) : null,
+      columnGap: columnGap.trim() ? Number(columnGap) : null,
+      promoImageWidth: promoImageWidth.trim() ? Number(promoImageWidth) : null,
+      promoImageHeight: promoImageHeight.trim() ? Number(promoImageHeight) : null,
+      promoImagePosition,
     };
     const result = isEdit ? await updateMegaMenuItem(item!.publicId, payload) : await createMegaMenuItem(payload);
     setPending(false);
@@ -206,6 +219,22 @@ export function MegaMenuItemForm({ item, categories }: { item?: MegaMenuItem; ca
         </div>
       </SectionCard>
 
+      <SectionCard
+        title="Dropdown Layout"
+        description="Optional — leave blank to use the panel's normal size and spacing. Only matters when this item has columns and/or a promo image."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="menu-panel-width">Panel width (px)</Label>
+            <Input id="menu-panel-width" type="number" min={1} value={panelWidth} onChange={(e) => setPanelWidth(e.target.value)} placeholder="Default (448)" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="menu-column-gap">Spacing between columns (px)</Label>
+            <Input id="menu-column-gap" type="number" min={0} value={columnGap} onChange={(e) => setColumnGap(e.target.value)} placeholder="Default (24)" />
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="Promo Panel" description="Optional — an image shown alongside the columns above.">
         <MegaMenuImageUploadField
           imageUrl={promoImageUrl}
@@ -222,6 +251,30 @@ export function MegaMenuItemForm({ item, categories }: { item?: MegaMenuItem; ca
           <div className="space-y-2">
             <Label htmlFor="menu-promo-caption">Caption</Label>
             <Input id="menu-promo-caption" value={promoCaption} onChange={(e) => setPromoCaption(e.target.value)} placeholder="Up to 30% off" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="menu-promo-position">Image position</Label>
+            <select
+              id="menu-promo-position"
+              className={nativeSelectClass + ' w-full'}
+              value={promoImagePosition}
+              onChange={(e) => setPromoImagePosition(e.target.value as MegaMenuPromoImagePosition)}
+            >
+              <option value="right">Right of columns</option>
+              <option value="left">Left of columns</option>
+              <option value="top">Above columns</option>
+              <option value="bottom">Below columns</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="menu-promo-width">Image width (px)</Label>
+              <Input id="menu-promo-width" type="number" min={1} value={promoImageWidth} onChange={(e) => setPromoImageWidth(e.target.value)} placeholder="Default" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="menu-promo-height">Image height (px)</Label>
+              <Input id="menu-promo-height" type="number" min={1} value={promoImageHeight} onChange={(e) => setPromoImageHeight(e.target.value)} placeholder="Default" />
+            </div>
           </div>
         </div>
       </SectionCard>

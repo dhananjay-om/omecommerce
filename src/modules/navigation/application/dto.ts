@@ -1,4 +1,4 @@
-import type { MegaMenuColumn } from '../domain/repositories.js';
+import type { MegaMenuColumn, MegaMenuPromoImagePosition } from '../domain/repositories.js';
 
 export interface CreateMegaMenuItemCommand {
   label: string;
@@ -9,6 +9,11 @@ export interface CreateMegaMenuItemCommand {
   promoImageMediaKey?: string | null;
   promoHref?: string | null;
   promoCaption?: string | null;
+  panelWidth?: number | null;
+  columnGap?: number | null;
+  promoImageWidth?: number | null;
+  promoImageHeight?: number | null;
+  promoImagePosition?: MegaMenuPromoImagePosition;
 }
 
 export interface UpdateMegaMenuItemCommand {
@@ -21,6 +26,11 @@ export interface UpdateMegaMenuItemCommand {
   promoImageMediaKey?: string | null;
   promoHref?: string | null;
   promoCaption?: string | null;
+  panelWidth?: number | null;
+  columnGap?: number | null;
+  promoImageWidth?: number | null;
+  promoImageHeight?: number | null;
+  promoImagePosition?: MegaMenuPromoImagePosition;
 }
 
 export interface MegaMenuItemView {
@@ -37,6 +47,13 @@ export interface MegaMenuItemView {
   promoImageUrl: string | null;
   promoHref: string | null;
   promoCaption: string | null;
+  /** Layout controls — see navigation.prisma's own doc comment: null
+   *  means "use the component's own default," not zero. */
+  panelWidth: number | null;
+  columnGap: number | null;
+  promoImageWidth: number | null;
+  promoImageHeight: number | null;
+  promoImagePosition: MegaMenuPromoImagePosition;
   updatedAt: string;
 }
 
