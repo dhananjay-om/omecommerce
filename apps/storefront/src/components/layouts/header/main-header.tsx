@@ -61,8 +61,12 @@ export function MainHeader({
 
         <Link href="/" className="flex-1 text-center lg:flex-none lg:text-left">
           {website.logoUrl ? (
+            // max-h (not a forced h-*) — renders at the logo's own natural
+            // size up to the cap, instead of always shrinking it down to a
+            // fixed height regardless of how it was uploaded. Matches
+            // footer.tsx's own logo cap (h-12) rather than being smaller.
             // eslint-disable-next-line @next/next/no-img-element -- presigned MinIO/S3 URLs are per-request and dynamic
-            <img src={website.logoUrl} alt={website.name} className="inline-block h-10 w-auto max-w-[200px] object-contain" />
+            <img src={website.logoUrl} alt={website.name} className="inline-block max-h-12 w-auto max-w-[220px] object-contain" />
           ) : (
             <span className="font-display text-2xl font-semibold tracking-[0.06em] text-jet">
               OME<span className="text-champagne">Shop</span>
