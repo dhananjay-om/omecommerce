@@ -1,0 +1,49 @@
+// =============================================================================
+// audit.prisma — a real, generic audit trail, deliberately scoped to the
+// security-sensitive System area (admin users, roles/permissions) this
+// pass builds, not a blanket automatic before/after-diff middleware
+// across every write path in the app. That would be a much larger,
+// riskier retrofit onto dozens of existing modules in one pass; this is
+// the concrete starting point, with an obvious extension point
+// (AuditLogRepository.record()) for wiring in more modules later — same
+// incremental-adoption shape as JobRunLog wrapping 4 job handlers one at
+// a time rather than instrumenting every job at once.
+// =============================================================================
+
+model AuditLog {
+  id       BigInt @id @default(autoincrement())
+  publicId String @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+
+  /// The admin who did this — nullable for a system-initiated action (none
+  /// exist yet, but the column allows one without a migration later).
+  /// actorEmail is a snapshot, not a live join to AdminUser, so a log
+  /// entry stays readable even after that admin user is later deleted.
+  actorId    BigInt? @map("actor_id")
+  actorEmail String? @map("actor_email")
+
+  /// Fixed vocabulary in app code (e.g. "ADMIN_USER_CREATED",
+  /// "ROLE_PERMISSIONS_UPDATED") — same "no DB enum" precedent as
+  /// AutomationRule.triggerType.
+  action String
+
+  entityType String @map("entity_type")
+  /// A string, not a typed FK — varies by entityType (an AdminUser's
+  /// publicId, a Role's code, ...).
+  entityId   String @map("entity_id")
+
+  /// One human-readable line, e.g. "Deactivated admin user jane@x.com" —
+  /// always populated, so this reads clearly with zero interpretation
+  /// even without opening `metadata`.
+  summary String
+
+  /// Optional extra structured detail (e.g. the full permission list a
+  /// role change resulted in) — never required to understand what
+  /// happened, `summary` alone always does that.
+  metadata Json? @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_log")
+}

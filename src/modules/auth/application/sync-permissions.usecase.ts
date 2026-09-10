@@ -1,5 +1,7 @@
 import type { PermissionRepository } from '../domain/repositories.js';
 import type { SyncPermissionsResult } from '../domain/repositories.js';
+import type { AuditLogRepository } from '../../audit/domain/repositories.js';
+import type { AuditActor } from './audit-actor.js';
 
 /**
  * Closes the gap a growing PERMISSIONS catalog otherwise leaves open: seeding
@@ -16,9 +18,21 @@ import type { SyncPermissionsResult } from '../domain/repositories.js';
  * see the newly granted access.
  */
 export class SyncPermissions {
-  constructor(private readonly permissions: PermissionRepository) {}
+  constructor(
+    private readonly permissions: PermissionRepository,
+    private readonly auditLogs?: AuditLogRepository,
+  ) {}
 
-  async execute(): Promise<SyncPermissionsResult> {
-    return this.permissions.syncSuperAdminGrants();
+  async execute(actor?: AuditActor): Promise<SyncPermissionsResult> {
+    const result = await this.permissions.syncSuperAdminGrants();
+    await this.auditLogs?.record({
+      actorId: actor?.id ?? null,
+      actorEmail: actor?.email ?? null,
+      action: 'PERMISSIONS_SYNCED',
+      entityType: 'System',
+      entityId: 'permissions',
+      summary: `Synced permissions — ${result.grantsAdded} new grant(s) added to Super Admin (${result.permissionsRegistered} total registered)`,
+    });
+    return result;
   }
 }

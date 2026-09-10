@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { env } from '../../config/env.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
@@ -7,6 +7,8 @@ import { PrismaPermissionRepository } from './infrastructure/prisma-permission.r
 import { PrismaRoleRepository } from './infrastructure/prisma-role.repository.js';
 import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher.js';
 import { JwtTokenService } from './infrastructure/jwt-token.service.js';
+import { createAuditLogRepository } from '../audit/audit.module.js';
+import type { AuditActor } from './application/audit-actor.js';
 import { Login } from './application/login.usecase.js';
 import { CreateAdminUser } from './application/create-admin-user.usecase.js';
 import { GetCurrentAdmin } from './application/get-current-admin.usecase.js';
@@ -44,19 +46,28 @@ export function createAuthModule(db: Db): AuthModule {
   const roles = new PrismaRoleRepository(db);
   const hasher = new ScryptPasswordHasher();
   const tokens = new JwtTokenService(env.JWT_SECRET);
+  const auditLogs = createAuditLogRepository(db);
+
+  // Resolved once per mutation route — every System > Users/Roles write
+  // records who did it (see audit.prisma's own header comment on why
+  // this pass scopes the audit trail to exactly these mutations).
+  async function resolveActor(req: Request): Promise<AuditActor> {
+    const user = await adminUsers.findByPublicId(req.adminUser!.adminUserPublicId);
+    return { id: user?.id ?? null, email: user?.email ?? null };
+  }
 
   const login = new Login(adminUsers, hasher, tokens);
-  const createAdminUser = new CreateAdminUser(adminUsers, hasher);
+  const createAdminUser = new CreateAdminUser(adminUsers, hasher, auditLogs);
   const getCurrentAdmin = new GetCurrentAdmin(adminUsers);
-  const syncPermissions = new SyncPermissions(permissions);
+  const syncPermissions = new SyncPermissions(permissions, auditLogs);
   const listAdminUsers = new ListAdminUsers(adminUsers);
-  const setAdminUserActive = new SetAdminUserActive(adminUsers);
-  const updateAdminUserRoles = new UpdateAdminUserRoles(adminUsers);
-  const resetAdminUserPassword = new ResetAdminUserPassword(adminUsers, hasher);
+  const setAdminUserActive = new SetAdminUserActive(adminUsers, auditLogs);
+  const updateAdminUserRoles = new UpdateAdminUserRoles(adminUsers, auditLogs);
+  const resetAdminUserPassword = new ResetAdminUserPassword(adminUsers, hasher, auditLogs);
   const listRoles = new ListRoles(roles);
-  const createRole = new CreateRole(roles);
-  const updateRolePermissions = new UpdateRolePermissions(roles);
-  const deleteRole = new DeleteRole(roles);
+  const createRole = new CreateRole(roles, auditLogs);
+  const updateRolePermissions = new UpdateRolePermissions(roles, auditLogs);
+  const deleteRole = new DeleteRole(roles, auditLogs);
   const listPermissions = new ListPermissions(permissions);
 
   const publicRouter = Router();
@@ -91,7 +102,7 @@ export function createAuthModule(db: Db): AuthModule {
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
       const body = parse(createAdminUserSchema, req.body);
-      res.status(201).json({ data: await createAdminUser.execute(body) });
+      res.status(201).json({ data: await createAdminUser.execute(body, await resolveActor(req)) });
     }),
   );
   admin.patch(
@@ -99,11 +110,14 @@ export function createAuthModule(db: Db): AuthModule {
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
       const body = parse(setAdminUserActiveSchema, req.body);
-      await setAdminUserActive.execute({
-        actorPublicId: req.adminUser!.adminUserPublicId,
-        targetPublicId: req.params.publicId!,
-        isActive: body.isActive,
-      });
+      await setAdminUserActive.execute(
+        {
+          actorPublicId: req.adminUser!.adminUserPublicId,
+          targetPublicId: req.params.publicId!,
+          isActive: body.isActive,
+        },
+        await resolveActor(req),
+      );
       res.status(204).send();
     }),
   );
@@ -112,7 +126,7 @@ export function createAuthModule(db: Db): AuthModule {
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
       const body = parse(updateAdminUserRolesSchema, req.body);
-      await updateAdminUserRoles.execute({ publicId: req.params.publicId!, roleCodes: body.roleCodes ?? [] });
+      await updateAdminUserRoles.execute({ publicId: req.params.publicId!, roleCodes: body.roleCodes ?? [] }, await resolveActor(req));
       res.status(204).send();
     }),
   );
@@ -121,7 +135,7 @@ export function createAuthModule(db: Db): AuthModule {
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
       const body = parse(resetAdminUserPasswordSchema, req.body);
-      await resetAdminUserPassword.execute({ publicId: req.params.publicId!, newPassword: body.newPassword });
+      await resetAdminUserPassword.execute({ publicId: req.params.publicId!, newPassword: body.newPassword }, await resolveActor(req));
       res.status(204).send();
     }),
   );
@@ -139,7 +153,7 @@ export function createAuthModule(db: Db): AuthModule {
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
       const body = parse(createRoleSchema, req.body);
-      await createRole.execute(body);
+      await createRole.execute(body, await resolveActor(req));
       res.status(201).json({ data: { code: body.code } });
     }),
   );
@@ -148,7 +162,7 @@ export function createAuthModule(db: Db): AuthModule {
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
       const body = parse(updateRolePermissionsSchema, req.body);
-      await updateRolePermissions.execute({ code: req.params.code!, permissionCodes: body.permissionCodes ?? [] });
+      await updateRolePermissions.execute({ code: req.params.code!, permissionCodes: body.permissionCodes ?? [] }, await resolveActor(req));
       res.status(204).send();
     }),
   );
@@ -156,7 +170,7 @@ export function createAuthModule(db: Db): AuthModule {
     '/auth/roles/:code',
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
-      await deleteRole.execute(req.params.code!);
+      await deleteRole.execute(req.params.code!, await resolveActor(req));
       res.status(204).send();
     }),
   );
@@ -172,7 +186,7 @@ export function createAuthModule(db: Db): AuthModule {
     '/auth/sync-permissions',
     authorize('admin:manage'),
     asyncHandler(async (req, res) => {
-      res.json({ data: await syncPermissions.execute() });
+      res.json({ data: await syncPermissions.execute(await resolveActor(req)) });
     }),
   );
 

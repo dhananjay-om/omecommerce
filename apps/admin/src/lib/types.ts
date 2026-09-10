@@ -1636,3 +1636,14 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
+
+export interface AuditLog {
+  publicId: string;
+  actorEmail: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  summary: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}

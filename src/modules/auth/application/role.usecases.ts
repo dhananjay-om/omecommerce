@@ -1,4 +1,6 @@
 import type { RoleRepository, RoleListItem, PermissionRepository, PermissionSummary } from '../domain/repositories.js';
+import type { AuditLogRepository } from '../../audit/domain/repositories.js';
+import type { AuditActor } from './audit-actor.js';
 import { SUPER_ADMIN_ROLE_CODE } from '../domain/permission-catalog.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
 
@@ -19,13 +21,24 @@ export interface CreateRoleCommand {
 }
 
 export class CreateRole {
-  constructor(private readonly roles: RoleRepository) {}
+  constructor(
+    private readonly roles: RoleRepository,
+    private readonly auditLogs?: AuditLogRepository,
+  ) {}
 
-  async execute(cmd: CreateRoleCommand): Promise<void> {
+  async execute(cmd: CreateRoleCommand, actor?: AuditActor): Promise<void> {
     if (await this.roles.findByCode(cmd.code)) {
       throw new ConflictError(`role already exists: ${cmd.code}`);
     }
     await this.roles.create(cmd.code, cmd.name);
+    await this.auditLogs?.record({
+      actorId: actor?.id ?? null,
+      actorEmail: actor?.email ?? null,
+      action: 'ROLE_CREATED',
+      entityType: 'Role',
+      entityId: cmd.code,
+      summary: `Created role "${cmd.name}" (${cmd.code})`,
+    });
   }
 }
 
@@ -35,12 +48,24 @@ export interface UpdateRolePermissionsCommand {
 }
 
 export class UpdateRolePermissions {
-  constructor(private readonly roles: RoleRepository) {}
+  constructor(
+    private readonly roles: RoleRepository,
+    private readonly auditLogs?: AuditLogRepository,
+  ) {}
 
-  async execute(cmd: UpdateRolePermissionsCommand): Promise<void> {
+  async execute(cmd: UpdateRolePermissionsCommand, actor?: AuditActor): Promise<void> {
     const role = await this.roles.findByCode(cmd.code);
     if (!role) throw new NotFoundError('role', cmd.code);
     await this.roles.updatePermissions(cmd.code, cmd.permissionCodes);
+    await this.auditLogs?.record({
+      actorId: actor?.id ?? null,
+      actorEmail: actor?.email ?? null,
+      action: 'ROLE_PERMISSIONS_UPDATED',
+      entityType: 'Role',
+      entityId: cmd.code,
+      summary: `Set permissions for "${role.name}" — now ${cmd.permissionCodes.length} granted`,
+      metadata: { permissionCodes: cmd.permissionCodes },
+    });
   }
 }
 
@@ -50,9 +75,12 @@ export class UpdateRolePermissions {
  *  blocked too, rather than silently stripping it from them via the
  *  schema's own CASCADE. */
 export class DeleteRole {
-  constructor(private readonly roles: RoleRepository) {}
+  constructor(
+    private readonly roles: RoleRepository,
+    private readonly auditLogs?: AuditLogRepository,
+  ) {}
 
-  async execute(code: string): Promise<void> {
+  async execute(code: string, actor?: AuditActor): Promise<void> {
     const role = await this.roles.findByCode(code);
     if (!role) throw new NotFoundError('role', code);
     if (code === SUPER_ADMIN_ROLE_CODE) {
@@ -62,6 +90,14 @@ export class DeleteRole {
       throw new ConflictError(`Cannot delete "${role.name}" — it is still assigned to ${role.userCount} admin user(s). Reassign them first.`);
     }
     await this.roles.delete(code);
+    await this.auditLogs?.record({
+      actorId: actor?.id ?? null,
+      actorEmail: actor?.email ?? null,
+      action: 'ROLE_DELETED',
+      entityType: 'Role',
+      entityId: code,
+      summary: `Deleted role "${role.name}" (${code})`,
+    });
   }
 }
 

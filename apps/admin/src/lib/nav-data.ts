@@ -307,9 +307,8 @@ export const NAV: NavGroup[] = [
         description: 'A persistent notification log — real Alert fires and any Automation rule with a "Notify admins" action.',
       },
       {
-        key: 'audit-logs', label: 'Audit Logs', href: '/system/audit-logs', icon: ScrollText, status: 'comingSoon',
-        description: 'Who changed what, and when.',
-        planned: ['A searchable audit trail of admin actions with before/after values'],
+        key: 'audit-logs', label: 'Audit Logs', href: '/system/audit-logs', icon: ScrollText, status: 'live',
+        description: 'Who changed what, and when — admin users and roles/permissions today.',
       },
       { key: 'settings', label: 'Settings', href: '/stores/general', icon: Settings, status: 'live', description: 'Store configuration — see the Stores section below.' },
     ],
