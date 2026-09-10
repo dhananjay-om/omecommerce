@@ -69,7 +69,7 @@ export function MegaMenuImageUploadField({
             disabled={uploading}
             label={uploading ? 'Uploading…' : previewUrl ? 'Change Image' : 'Choose Image'}
           />
-          <p className="text-xs text-muted-foreground">Shown in the dropdown panel next to this item's columns.</p>
+          <p className="text-xs text-muted-foreground">Shown in the dropdown panel next to this item&apos;s columns.</p>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>

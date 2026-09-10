@@ -289,14 +289,12 @@ export const NAV: NavGroup[] = [
     icon: ShieldCheck,
     items: [
       {
-        key: 'users-admin', label: 'Users', href: '/system/users', icon: Users, status: 'comingSoon',
+        key: 'users-admin', label: 'Users', href: '/system/users', icon: Users, status: 'live',
         description: 'Admin team members and their access.',
-        planned: ['Invite/list/deactivate admin users', 'The underlying admin-user and role data already exists — this is a UI gap, not a data gap'],
       },
       {
-        key: 'roles', label: 'Roles & Permissions', href: '/system/roles', icon: ShieldCheck, status: 'comingSoon',
+        key: 'roles', label: 'Roles & Permissions', href: '/system/roles', icon: ShieldCheck, status: 'live',
         description: 'Roles and their permission grants.',
-        planned: ['A role × permission matrix editor', 'Until then, use Stores > Admin Permissions to sync the Super Admin role'],
       },
       { key: 'tax', label: 'Tax', href: '/stores/tax-classes', icon: Percent, status: 'live', description: 'Tax classes and rates.' },
       {

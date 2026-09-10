@@ -1,0 +1,74 @@
+import type { RoleRepository, RoleListItem, PermissionRepository, PermissionSummary } from '../domain/repositories.js';
+import { SUPER_ADMIN_ROLE_CODE } from '../domain/permission-catalog.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
+
+export type RoleView = RoleListItem;
+
+/** System > Roles & Permissions. */
+export class ListRoles {
+  constructor(private readonly roles: RoleRepository) {}
+
+  async execute(): Promise<RoleView[]> {
+    return this.roles.list();
+  }
+}
+
+export interface CreateRoleCommand {
+  code: string;
+  name: string;
+}
+
+export class CreateRole {
+  constructor(private readonly roles: RoleRepository) {}
+
+  async execute(cmd: CreateRoleCommand): Promise<void> {
+    if (await this.roles.findByCode(cmd.code)) {
+      throw new ConflictError(`role already exists: ${cmd.code}`);
+    }
+    await this.roles.create(cmd.code, cmd.name);
+  }
+}
+
+export interface UpdateRolePermissionsCommand {
+  code: string;
+  permissionCodes: string[];
+}
+
+export class UpdateRolePermissions {
+  constructor(private readonly roles: RoleRepository) {}
+
+  async execute(cmd: UpdateRolePermissionsCommand): Promise<void> {
+    const role = await this.roles.findByCode(cmd.code);
+    if (!role) throw new NotFoundError('role', cmd.code);
+    await this.roles.updatePermissions(cmd.code, cmd.permissionCodes);
+  }
+}
+
+/** Guarded: the super-admin role can never be deleted (every permission
+ *  sync targets it by code — deleting it would break Sync Permissions
+ *  outright), and any role still assigned to at least one admin user is
+ *  blocked too, rather than silently stripping it from them via the
+ *  schema's own CASCADE. */
+export class DeleteRole {
+  constructor(private readonly roles: RoleRepository) {}
+
+  async execute(code: string): Promise<void> {
+    const role = await this.roles.findByCode(code);
+    if (!role) throw new NotFoundError('role', code);
+    if (code === SUPER_ADMIN_ROLE_CODE) {
+      throw new ValidationError('The Super Admin role cannot be deleted.');
+    }
+    if (role.userCount > 0) {
+      throw new ConflictError(`Cannot delete "${role.name}" — it is still assigned to ${role.userCount} admin user(s). Reassign them first.`);
+    }
+    await this.roles.delete(code);
+  }
+}
+
+export class ListPermissions {
+  constructor(private readonly permissions: PermissionRepository) {}
+
+  async execute(): Promise<PermissionSummary[]> {
+    return this.permissions.listAll();
+  }
+}

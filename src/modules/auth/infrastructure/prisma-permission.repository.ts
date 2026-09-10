@@ -1,5 +1,5 @@
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
-import type { PermissionRepository, SyncPermissionsResult } from '../domain/repositories.js';
+import type { PermissionRepository, PermissionSummary, SyncPermissionsResult } from '../domain/repositories.js';
 import { ALL_PERMISSIONS, SUPER_ADMIN_ROLE_CODE } from '../domain/permission-catalog.js';
 
 export class PrismaPermissionRepository implements PermissionRepository {
@@ -23,5 +23,9 @@ export class PrismaPermissionRepository implements PermissionRepository {
       skipDuplicates: true,
     });
     return { permissionsRegistered: ALL_PERMISSIONS.length, grantsAdded };
+  }
+
+  async listAll(): Promise<PermissionSummary[]> {
+    return this.db.permission.findMany({ select: { code: true, description: true }, orderBy: { code: 'asc' } });
   }
 }

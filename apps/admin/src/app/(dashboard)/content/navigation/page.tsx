@@ -22,7 +22,7 @@ export default async function MegaMenuPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mega Menu</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            The storefront header's nav — top-level links, each with optional dropdown columns and a promo image.
+            The storefront header&apos;s nav — top-level links, each with optional dropdown columns and a promo image.
             {items.length === 0 ? ' No items yet — the header currently falls back to the category tree.' : ''}
           </p>
         </div>

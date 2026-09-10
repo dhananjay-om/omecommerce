@@ -40,6 +40,7 @@ export class Login {
 
     const permissions = await this.adminUsers.findPermissions(user.id);
     const token = this.tokens.sign({ adminUserPublicId: user.publicId, permissions });
+    await this.adminUsers.recordLogin(user.id);
     return { token, adminUserPublicId: user.publicId, permissions };
   }
 }

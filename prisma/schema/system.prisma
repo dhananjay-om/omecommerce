@@ -89,6 +89,9 @@ model AdminUser {
   email        String    @unique @db.Citext
   passwordHash String    @map("password_hash")
   isActive     Boolean   @default(true) @map("is_active")
+  /// Set on every successful login (Login.execute()) — null for a user who
+  /// has never logged in yet (e.g. one just created and not yet used).
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(6)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy    BigInt?   @map("created_by")

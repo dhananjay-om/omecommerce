@@ -1600,3 +1600,29 @@ export interface MegaMenuItem {
   promoImagePosition: MegaMenuPromoImagePosition;
   updatedAt: string;
 }
+
+export interface AdminUserRoleSummary {
+  code: string;
+  name: string;
+}
+
+export interface AdminUser {
+  publicId: string;
+  email: string;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  roles: AdminUserRoleSummary[];
+}
+
+export interface Role {
+  code: string;
+  name: string;
+  permissionCodes: string[];
+  userCount: number;
+}
+
+export interface Permission {
+  code: string;
+  description: string;
+}

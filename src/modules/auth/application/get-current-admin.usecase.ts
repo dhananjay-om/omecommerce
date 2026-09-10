@@ -2,6 +2,7 @@ import type { AdminUserRepository } from '../domain/repositories.js';
 import { NotFoundError } from '../../../shared/domain/errors.js';
 
 export interface CurrentAdminView {
+  publicId: string;
   email: string;
   permissions: string[];
 }
@@ -16,6 +17,6 @@ export class GetCurrentAdmin {
   async execute(adminUserPublicId: string, permissions: string[]): Promise<CurrentAdminView> {
     const user = await this.adminUsers.findByPublicId(adminUserPublicId);
     if (!user) throw new NotFoundError('admin user', adminUserPublicId);
-    return { email: user.email, permissions };
+    return { publicId: user.publicId, email: user.email, permissions };
   }
 }
