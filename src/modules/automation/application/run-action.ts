@@ -83,13 +83,29 @@ async function runOrderNoteAction(action: ActionSpec, entity: ResolvedEntity, ad
  *  templating shape as the EMAIL action's own subject/body. `actionHref`
  *  links to the entity's real admin page when one exists (Order,
  *  Customer) — StockItem has no individually-addressable admin page, so
- *  it's omitted rather than pointing somewhere wrong. */
+ *  it's omitted rather than pointing somewhere wrong. Left blank, the
+ *  default message pulls in the entity's own real fields (an order's
+ *  amount/status) rather than a bare "A rule matched" — useful on its
+ *  own for the common case (e.g. a plain "notify on order placed" rule)
+ *  without requiring the admin to write a custom message. */
 async function runNotifyAdminsAction(action: ActionSpec, entity: ResolvedEntity, notifyAdmins: NotifyAdmins): Promise<ActionResult> {
   const title = action.config.title?.trim() || `Automation: ${entity.label}`;
-  const message = action.config.message?.trim() || `A rule matched for ${entity.label}.`;
+  const message = action.config.message?.trim() || defaultNotifyMessage(entity);
   const actionHref = entity.type === 'Order' ? `/orders/${entity.publicId}` : entity.type === 'Customer' ? `/customers/${entity.publicId}` : null;
   await notifyAdmins.execute({ category: 'AUTOMATION', title, message, actionHref });
   return { type: 'NOTIFY_ADMINS', ok: true };
+}
+
+function defaultNotifyMessage(entity: ResolvedEntity): string {
+  if (entity.type === 'Order') {
+    const total = typeof entity.fields.grandTotal === 'number' ? entity.fields.grandTotal.toFixed(2) : null;
+    const currency = typeof entity.fields.currency === 'string' ? entity.fields.currency : '';
+    const status = typeof entity.fields.status === 'string' ? entity.fields.status : null;
+    const amount = total ? ` — ${currency} ${total}` : '';
+    const statusPart = status ? ` (${status})` : '';
+    return `${entity.label}${amount}${statusPart}`;
+  }
+  return `A rule matched for ${entity.label}.`;
 }
 
 function escapeHtml(s: string): string {
