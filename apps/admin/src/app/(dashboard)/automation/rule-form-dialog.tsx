@@ -257,6 +257,13 @@ export function RuleFormDialog({
                   </div>
                 ) : null}
                 {a.type === 'ORDER_NOTE' ? <Textarea rows={2} placeholder="Note text (optional — a default is used if left blank)" value={a.config.note ?? ''} onChange={(e) => updateActionConfig(i, 'note', e.target.value)} /> : null}
+                {a.type === 'NOTIFY_ADMINS' ? (
+                  <>
+                    <Input placeholder="Title (optional — a default is used if left blank)" value={a.config.title ?? ''} onChange={(e) => updateActionConfig(i, 'title', e.target.value)} />
+                    <Textarea rows={2} placeholder="Message (optional — a default is used if left blank)" value={a.config.message ?? ''} onChange={(e) => updateActionConfig(i, 'message', e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Shows up in every admin&apos;s notification bell — see the topbar or System &gt; Notifications.</p>
+                  </>
+                ) : null}
               </div>
             ))}
           </div>

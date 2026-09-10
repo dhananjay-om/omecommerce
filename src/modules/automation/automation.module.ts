@@ -15,6 +15,7 @@ import { PrismaOrderRepository } from '../order/infrastructure/prisma-order.repo
 import { PrismaAdminUserLookup } from '../order/infrastructure/prisma-lookups.js';
 import { AddOrderNote } from '../order/application/add-order-note.usecase.js';
 import { createEmailSender } from '../order/order.module.js';
+import { createNotifyAdminsDeps } from '../notification/notification.module.js';
 
 export interface AutomationRouters {
   admin: Router;
@@ -40,7 +41,8 @@ export function createAutomationRuleEvaluationDeps(db: Db): { evaluateAutomation
   const adminUsers = new PrismaAdminUserLookup(db);
   const addOrderNote = new AddOrderNote(orders, adminUsers);
   const emailSender = createEmailSender(db);
-  const evaluateAutomationRules = new EvaluateAutomationRules(rules, runs, orders, { emailSender, addOrderNote });
+  const { notifyAdmins } = createNotifyAdminsDeps(db);
+  const evaluateAutomationRules = new EvaluateAutomationRules(rules, runs, orders, { emailSender, addOrderNote, notifyAdmins });
   return { evaluateAutomationRules };
 }
 

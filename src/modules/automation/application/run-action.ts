@@ -2,11 +2,13 @@ import type { ActionSpec, ActionResult } from '../domain/repositories.js';
 import type { ResolvedEntity } from './resolved-entity.js';
 import type { EmailSender } from '../../order/domain/ports.js';
 import type { AddOrderNote } from '../../order/application/add-order-note.usecase.js';
+import type { NotifyAdmins } from '../../notification/application/notify-admins.usecase.js';
 import { postWebhook } from './post-webhook.js';
 
 export interface RunActionDeps {
   emailSender: EmailSender;
   addOrderNote: AddOrderNote;
+  notifyAdmins: NotifyAdmins;
 }
 
 /** Executes one ActionSpec against a resolved entity — three real
@@ -27,6 +29,8 @@ export async function runAction(action: ActionSpec, entity: ResolvedEntity, deps
         return await runWebhookAction(action, entity);
       case 'ORDER_NOTE':
         return await runOrderNoteAction(action, entity, deps.addOrderNote);
+      case 'NOTIFY_ADMINS':
+        return await runNotifyAdminsAction(action, entity, deps.notifyAdmins);
       default:
         return { type: action.type, ok: false, error: `unknown action type: ${action.type}` };
     }
@@ -72,6 +76,20 @@ async function runOrderNoteAction(action: ActionSpec, entity: ResolvedEntity, ad
   // in when the automation fires (it wasn't them).
   await addOrderNote.execute({ orderPublicId: entity.publicId, type: 'INTERNAL', body });
   return { type: 'ORDER_NOTE', ok: true };
+}
+
+/** Broadcasts a real admin-topbar bell notification to every active
+ *  admin — the config's title/message are the same simple text-with-no-
+ *  templating shape as the EMAIL action's own subject/body. `actionHref`
+ *  links to the entity's real admin page when one exists (Order,
+ *  Customer) — StockItem has no individually-addressable admin page, so
+ *  it's omitted rather than pointing somewhere wrong. */
+async function runNotifyAdminsAction(action: ActionSpec, entity: ResolvedEntity, notifyAdmins: NotifyAdmins): Promise<ActionResult> {
+  const title = action.config.title?.trim() || `Automation: ${entity.label}`;
+  const message = action.config.message?.trim() || `A rule matched for ${entity.label}.`;
+  const actionHref = entity.type === 'Order' ? `/orders/${entity.publicId}` : entity.type === 'Customer' ? `/customers/${entity.publicId}` : null;
+  await notifyAdmins.execute({ category: 'AUTOMATION', title, message, actionHref });
+  return { type: 'NOTIFY_ADMINS', ok: true };
 }
 
 function escapeHtml(s: string): string {

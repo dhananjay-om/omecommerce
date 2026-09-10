@@ -1539,7 +1539,7 @@ export interface ConditionSpec {
   value: string;
 }
 
-export type AutomationActionType = 'EMAIL' | 'WEBHOOK' | 'ORDER_NOTE';
+export type AutomationActionType = 'EMAIL' | 'WEBHOOK' | 'ORDER_NOTE' | 'NOTIFY_ADMINS';
 
 export interface ActionSpec {
   type: AutomationActionType;
@@ -1625,4 +1625,14 @@ export interface Role {
 export interface Permission {
   code: string;
   description: string;
+}
+
+export interface Notification {
+  publicId: string;
+  category: 'ALERT' | 'AUTOMATION';
+  title: string;
+  message: string;
+  actionHref: string | null;
+  isRead: boolean;
+  createdAt: string;
 }

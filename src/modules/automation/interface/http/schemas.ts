@@ -22,7 +22,7 @@ const conditionSchema = z.object({
 });
 
 const actionSchema = z.object({
-  type: z.enum(['EMAIL', 'WEBHOOK', 'ORDER_NOTE']),
+  type: z.enum(['EMAIL', 'WEBHOOK', 'ORDER_NOTE', 'NOTIFY_ADMINS']),
   config: z.record(z.string(), z.string().max(4000)).default({}),
 });
 

@@ -7,6 +7,7 @@ import { PrismaAlertRuleRepository } from './infrastructure/prisma-alert-rule.re
 import { RefreshWebsiteDay } from './application/refresh-website-day.usecase.js';
 import { RunNightlyRefresh } from './application/run-nightly-refresh.usecase.js';
 import { EvaluateAlertRules } from './application/evaluate-alert-rules.usecase.js';
+import { createNotifyAdminsDeps } from '../notification/notification.module.js';
 import {
   GetSalesTrend,
   GetOrderStatusBreakdown,
@@ -50,9 +51,10 @@ export function createAnalyticsRefreshDeps(db: Db): { runNightlyRefresh: RunNigh
   const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
   const alertRules = new PrismaAlertRuleRepository(db);
   const refreshWebsiteDay = new RefreshWebsiteDay(analytics);
+  const { notifyAdmins } = createNotifyAdminsDeps(db);
   return {
     runNightlyRefresh: new RunNightlyRefresh(analytics, refreshWebsiteDay),
-    evaluateAlertRules: new EvaluateAlertRules(alertRules, analyticsQuery),
+    evaluateAlertRules: new EvaluateAlertRules(alertRules, analyticsQuery, notifyAdmins),
   };
 }
 

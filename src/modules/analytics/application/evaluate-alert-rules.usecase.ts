@@ -1,5 +1,6 @@
 import type { AlertRuleRepository } from '../domain/alert-rule.repository.js';
 import type { AnalyticsQueryRepository } from '../domain/queries.js';
+import type { NotifyAdmins } from '../../notification/application/notify-admins.usecase.js';
 import { dateKeyOf, yesterdayDateKey } from '../domain/date-key.js';
 import { logger } from '../../../shared/infrastructure/logger.js';
 
@@ -24,11 +25,17 @@ function compare(value: number, comparator: string, threshold: number): boolean 
  *  day are up to date, not before. Fires (writes an AlertHistory row) when
  *  the comparator condition holds. `notifiedAt` is deliberately left unset —
  *  actual email delivery is an explicit open question (plan/19 §16), not a
- *  silently-skipped step; the fired condition itself is always recorded. */
+ *  silently-skipped step; the fired condition itself is always recorded.
+ *  Also broadcasts a real in-app bell notification to every active admin
+ *  on every fire, via `notifyAdmins` (optional — omitted in contexts,
+ *  like tests, that don't need it) — genuine out-of-box value, no admin
+ *  setup required, since these 6 metric thresholds already run nightly
+ *  regardless. */
 export class EvaluateAlertRules {
   constructor(
     private readonly rules: AlertRuleRepository,
     private readonly analytics: AnalyticsQueryRepository,
+    private readonly notifyAdmins?: NotifyAdmins,
   ) {}
 
   async execute(now: Date): Promise<void> {
@@ -78,6 +85,14 @@ export class EvaluateAlertRules {
         if (compare(metricValue, rule.comparator, threshold)) {
           const message = `${rule.metricCode} ${rule.comparator} ${rule.thresholdValue} — actual ${metricValue}`;
           await this.rules.recordFired(rule.id, metricValue.toString(), rule.thresholdValue, message);
+          if (this.notifyAdmins) {
+            await this.notifyAdmins.execute({
+              category: 'ALERT',
+              title: `Alert: ${rule.metricCode}`,
+              message,
+              actionHref: '/reports/alerts',
+            });
+          }
         }
       } catch (err) {
         // One rule's evaluation failing (e.g. a transient DB error) must

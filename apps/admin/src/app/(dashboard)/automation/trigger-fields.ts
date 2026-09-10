@@ -69,4 +69,5 @@ export const ACTION_TYPES: Array<{ value: AutomationActionType; label: string; r
   { value: 'EMAIL', label: 'Send an email' },
   { value: 'WEBHOOK', label: 'Call a webhook' },
   { value: 'ORDER_NOTE', label: 'Add an internal order note', requiresOrder: true },
+  { value: 'NOTIFY_ADMINS', label: 'Notify admins (in-app)' },
 ];

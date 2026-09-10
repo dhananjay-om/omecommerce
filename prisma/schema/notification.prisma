@@ -1,0 +1,35 @@
+// =============================================================================
+// notification.prisma — the admin topbar bell's persistent backing store.
+//
+// Every row already has a concrete `recipientId` — there is no
+// `recipientId IS NULL` "broadcast" row. A notification meant for every
+// admin (e.g. an Alert firing) is fanned out at WRITE time: one row per
+// active admin user, inserted together. This keeps "is this read" a
+// plain per-row boolean with no second join table to track per-viewer
+// read state against one shared row — reasonable at this app's admin-
+// team scale (a single store's admin team, not a multi-tenant SaaS with
+// thousands of recipients per notification).
+//
+// No real-time push (no WebSocket/SSE exists anywhere in this codebase to
+// build on) — the bell polls GET /admin/v1/notifications/unread-count
+// client-side every ~30s. See NotifyAdmins' own doc comment for the two
+// real trigger sources that write here.
+// =============================================================================
+
+model Notification {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  recipientId BigInt    @map("recipient_id")
+  /// 'ALERT' | 'AUTOMATION' — fixed vocabulary in app code, same "no DB
+  /// enum, string column" precedent as AutomationRule.triggerType.
+  category    String
+  title       String
+  message     String
+  actionHref  String?   @map("action_href")
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([recipientId, isRead, createdAt])
+  @@map("notification")
+}

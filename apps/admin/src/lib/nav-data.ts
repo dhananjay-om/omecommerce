@@ -303,9 +303,8 @@ export const NAV: NavGroup[] = [
         planned: ['A connect/manage marketplace for payment gateways, couriers, ERPs, and marketing tools'],
       },
       {
-        key: 'notifications', label: 'Notifications', href: '/system/notifications', icon: Bell, status: 'comingSoon',
-        description: 'A persistent notification center.',
-        planned: ['A durable, filterable notification log — today\'s toasts are ephemeral, in-session only'],
+        key: 'notifications', label: 'Notifications', href: '/system/notifications', icon: Bell, status: 'live',
+        description: 'A persistent notification log — real Alert fires and any Automation rule with a "Notify admins" action.',
       },
       {
         key: 'audit-logs', label: 'Audit Logs', href: '/system/audit-logs', icon: ScrollText, status: 'comingSoon',

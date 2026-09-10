@@ -23,11 +23,13 @@ export interface ConditionSpec {
   value: string;
 }
 
-export type ActionType = 'EMAIL' | 'WEBHOOK' | 'ORDER_NOTE';
+export type ActionType = 'EMAIL' | 'WEBHOOK' | 'ORDER_NOTE' | 'NOTIFY_ADMINS';
 
 export interface ActionSpec {
   type: ActionType;
-  /** EMAIL: {recipient, subject, body}. WEBHOOK: {url}. ORDER_NOTE: {note?}. */
+  /** EMAIL: {recipient, subject, body}. WEBHOOK: {url}. ORDER_NOTE: {note?}.
+   *  NOTIFY_ADMINS: {title?, message?} — broadcasts a real admin-topbar
+   *  bell notification to every active admin. */
   config: Record<string, string>;
 }
 
