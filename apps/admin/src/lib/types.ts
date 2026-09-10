@@ -1296,6 +1296,95 @@ export interface InventoryTrendRow {
   lowStockCount: number;
 }
 
+// --- Marketing Analytics (mirrors src/modules/analytics/domain/queries.ts) ---
+
+export interface CouponPerformanceRow {
+  couponId: string;
+  code: string;
+  currency: string;
+  redemptionCount: number;
+  discountAmount: string;
+}
+
+export interface CouponRedemptionDailyRow {
+  dateKey: number;
+  currency: string;
+  redemptionCount: number;
+  discountAmount: string;
+}
+
+export interface ReferralFunnelSummary {
+  signedUpCount: number;
+  qualifiedCount: number;
+  rewardedCount: number;
+}
+
+export interface TopReferrerRow {
+  customerId: string;
+  email: string | null;
+  name: string | null;
+  referralCount: number;
+  qualifiedCount: number;
+  rewardedCount: number;
+}
+
+// --- Financial Analytics ---
+
+export interface TaxBreakdownRow {
+  taxType: string | null;
+  currency: string;
+  amount: string;
+}
+
+export interface StoredValueLiabilityRow {
+  currency: string;
+  giftCardOutstanding: string;
+  walletOutstanding: string;
+}
+
+export interface CreditAccountSummaryRow {
+  currency: string;
+  accountCount: number;
+  totalOutstanding: string;
+  totalCreditLimit: string;
+}
+
+// --- Report Builder ---
+
+export type ReportMetricCategory = 'Sales' | 'Orders' | 'Products' | 'Customers' | 'Inventory' | 'Marketing' | 'Financial';
+
+export interface ReportColumnDef {
+  key: string;
+  label: string;
+}
+
+export interface ReportMetricDefinition {
+  code: string;
+  label: string;
+  description: string;
+  category: ReportMetricCategory;
+  hasLimit: boolean;
+  columns: ReportColumnDef[];
+}
+
+export interface ReportResult {
+  metricCode: string;
+  metricLabel: string;
+  columns: ReportColumnDef[];
+  rows: Array<Record<string, unknown>>;
+}
+
+export interface SavedReportView {
+  publicId: string;
+  name: string;
+  metricCode: string;
+  metricLabel: string;
+  rangePreset: 'last_7_days' | 'last_30_days' | 'this_month' | 'custom';
+  customFromDateKey: number | null;
+  customToDateKey: number | null;
+  createdAt: string;
+}
+
 /** Fixed vocabulary — mirrors src/modules/analytics/application/alert-rule.usecases.ts's
  *  ALERT_METRIC_CODES/ALERT_COMPARATORS exactly. */
 export type AlertMetricCode = 'REVENUE_DROP' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'PAYMENT_FAILURE_RATE' | 'RETURN_RATE' | 'ORDER_STUCK';
