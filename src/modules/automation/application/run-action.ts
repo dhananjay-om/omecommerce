@@ -2,8 +2,7 @@ import type { ActionSpec, ActionResult } from '../domain/repositories.js';
 import type { ResolvedEntity } from './resolved-entity.js';
 import type { EmailSender } from '../../order/domain/ports.js';
 import type { AddOrderNote } from '../../order/application/add-order-note.usecase.js';
-
-const WEBHOOK_TIMEOUT_MS = 5000;
+import { postWebhook } from './post-webhook.js';
 
 export interface RunActionDeps {
   emailSender: EmailSender;
@@ -59,16 +58,8 @@ async function runWebhookAction(action: ActionSpec, entity: ResolvedEntity): Pro
     fields: entity.fields,
     firedAt: new Date().toISOString(),
   };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    return { type: 'WEBHOOK', ok: false, error: `webhook responded ${res.status}` };
-  }
-  return { type: 'WEBHOOK', ok: true };
+  const result = await postWebhook(url, payload);
+  return { type: 'WEBHOOK', ok: result.ok, error: result.error };
 }
 
 async function runOrderNoteAction(action: ActionSpec, entity: ResolvedEntity, addOrderNote: AddOrderNote): Promise<ActionResult> {

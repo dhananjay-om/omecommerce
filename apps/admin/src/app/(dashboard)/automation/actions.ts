@@ -81,3 +81,22 @@ export async function deleteAutomationRule(publicId: string): Promise<{ error: s
 export async function fetchAutomationRuleRuns(publicId: string): Promise<AutomationRuleRun[]> {
   return apiGet<AutomationRuleRun[]>(`/admin/v1/automation/rules/${publicId}/runs?limit=10`);
 }
+
+export interface WebhookTestResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
+
+/** Fires a real request at the URL right now, through the exact same
+ *  send path a live rule match uses — not a separate check that could
+ *  drift from it — so a passing test really means the real thing would
+ *  work too. Works on a URL that hasn't been saved yet (no rule needed). */
+export async function testWebhook(url: string): Promise<WebhookTestResult> {
+  try {
+    return await apiPost<WebhookTestResult>('/admin/v1/automation/test-webhook', { url });
+  } catch (err) {
+    if (err instanceof ApiError) return { ok: false, error: err.message };
+    throw err;
+  }
+}

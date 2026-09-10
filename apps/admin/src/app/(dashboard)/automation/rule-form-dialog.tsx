@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AutomationRule, AutomationTriggerType, AutomationActionType } from '@/lib/types';
-import { createAutomationRule, updateAutomationRule, type RuleConditionInput, type RuleActionInput } from './actions';
+import { createAutomationRule, updateAutomationRule, testWebhook, type RuleConditionInput, type RuleActionInput, type WebhookTestResult } from './actions';
 import { TRIGGER_TYPES, fieldsForTrigger, isOrderTrigger, COMPARATORS_FOR_KIND, ACTION_TYPES, type FieldDef } from './trigger-fields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,7 @@ export function RuleFormDialog({
   const [actions, setActions] = useState<RuleActionInput[]>(rule?.actions ?? [emptyAction('EMAIL')]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [webhookTest, setWebhookTest] = useState<Record<number, { pending: boolean; result?: WebhookTestResult }>>({});
 
   const fields = fieldsForTrigger(triggerType);
   const availableActionTypes = ACTION_TYPES.filter((a) => !a.requiresOrder || isOrderTrigger(triggerType));
@@ -92,6 +93,20 @@ export function RuleFormDialog({
   }
   function removeAction(i: number) {
     setActions((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  /** Fires right now, through the exact same send path a real rule match
+   *  uses (TestWebhook -> the shared postWebhook()) — works before the
+   *  rule is ever saved, since this doesn't need a real entity or a
+   *  saved rule row, just the URL currently typed in. */
+  async function sendTestWebhook(i: number, url: string) {
+    if (!url.trim()) {
+      setWebhookTest((prev) => ({ ...prev, [i]: { pending: false, result: { ok: false, error: 'Enter a URL first.' } } }));
+      return;
+    }
+    setWebhookTest((prev) => ({ ...prev, [i]: { pending: true } }));
+    const result = await testWebhook(url.trim());
+    setWebhookTest((prev) => ({ ...prev, [i]: { pending: false, result } }));
   }
 
   async function submit() {
@@ -224,7 +239,23 @@ export function RuleFormDialog({
                     <Textarea rows={2} placeholder="Body" value={a.config.body ?? ''} onChange={(e) => updateActionConfig(i, 'body', e.target.value)} />
                   </>
                 ) : null}
-                {a.type === 'WEBHOOK' ? <Input placeholder="https://…" value={a.config.url ?? ''} onChange={(e) => updateActionConfig(i, 'url', e.target.value)} /> : null}
+                {a.type === 'WEBHOOK' ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Input className="flex-1" placeholder="https://…" value={a.config.url ?? ''} onChange={(e) => updateActionConfig(i, 'url', e.target.value)} />
+                      <Button type="button" variant="outline" size="sm" disabled={webhookTest[i]?.pending} onClick={() => sendTestWebhook(i, a.config.url ?? '')}>
+                        {webhookTest[i]?.pending ? 'Sending…' : 'Send Test'}
+                      </Button>
+                    </div>
+                    {webhookTest[i]?.result ? (
+                      <p className={`text-xs ${webhookTest[i]!.result!.ok ? 'text-success' : 'text-destructive'}`}>
+                        {webhookTest[i]!.result!.ok
+                          ? `✓ Reached it — responded ${webhookTest[i]!.result!.status}. A sample payload was sent, not a real event.`
+                          : `✗ ${webhookTest[i]!.result!.error}`}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {a.type === 'ORDER_NOTE' ? <Textarea rows={2} placeholder="Note text (optional — a default is used if left blank)" value={a.config.note ?? ''} onChange={(e) => updateActionConfig(i, 'note', e.target.value)} /> : null}
               </div>
             ))}

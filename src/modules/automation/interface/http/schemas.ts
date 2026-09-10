@@ -46,3 +46,7 @@ export const updateAutomationRuleSchema = z.object({
 export const listAutomationRuleRunsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().optional(),
 });
+
+export const testWebhookSchema = z.object({
+  url: z.string().trim().url().max(2048),
+});

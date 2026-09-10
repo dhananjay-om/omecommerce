@@ -9,7 +9,8 @@ import { ListJobRuns } from './application/list-job-runs.usecase.js';
 import { CreateAutomationRule, UpdateAutomationRule, DeleteAutomationRule, ListAutomationRules } from './application/manage-automation-rule.usecases.js';
 import { ListAutomationRuleRuns } from './application/list-automation-rule-runs.usecase.js';
 import { EvaluateAutomationRules } from './application/evaluate-automation-rules.usecase.js';
-import { listJobRunsQuerySchema, createAutomationRuleSchema, updateAutomationRuleSchema, listAutomationRuleRunsQuerySchema } from './interface/http/schemas.js';
+import { TestWebhook } from './application/test-webhook.usecase.js';
+import { listJobRunsQuerySchema, createAutomationRuleSchema, updateAutomationRuleSchema, listAutomationRuleRunsQuerySchema, testWebhookSchema } from './interface/http/schemas.js';
 import { PrismaOrderRepository } from '../order/infrastructure/prisma-order.repository.js';
 import { PrismaAdminUserLookup } from '../order/infrastructure/prisma-lookups.js';
 import { AddOrderNote } from '../order/application/add-order-note.usecase.js';
@@ -55,6 +56,7 @@ export function createAutomationModule(db: Db, authorize: (permission: string) =
   const deleteRule = new DeleteAutomationRule(rules);
   const listRules = new ListAutomationRules(rules);
   const listRuns = new ListAutomationRuleRuns(rules, runs);
+  const testWebhook = new TestWebhook();
 
   const admin = Router();
 
@@ -111,6 +113,14 @@ export function createAutomationModule(db: Db, authorize: (permission: string) =
     asyncHandler(async (req, res) => {
       const query = parse(listAutomationRuleRunsQuerySchema, req.query);
       res.json({ data: await listRuns.execute(req.params.publicId!, query.limit) });
+    }),
+  );
+  admin.post(
+    '/automation/test-webhook',
+    authorize('automation:manage'),
+    asyncHandler(async (req, res) => {
+      const body = parse(testWebhookSchema, req.body);
+      res.json({ data: await testWebhook.execute(body.url) });
     }),
   );
 
