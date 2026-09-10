@@ -33,3 +33,22 @@ export const updateAlertRuleSchema = z.object({
   recipientEmails: z.array(z.string().email()).min(1).max(20).optional(),
   isActive: z.boolean().optional(),
 });
+
+export const reportRunQuerySchema = analyticsTopNQuerySchema.extend({
+  metricCode: z.string().min(1).max(64),
+});
+
+const RANGE_PRESETS = ['last_7_days', 'last_30_days', 'this_month', 'custom'] as const;
+
+export const createSavedReportSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    metricCode: z.string().min(1).max(64),
+    rangePreset: z.enum(RANGE_PRESETS),
+    customFromDateKey: z.number().int().optional(),
+    customToDateKey: z.number().int().optional(),
+  })
+  .refine((v) => v.rangePreset !== 'custom' || (v.customFromDateKey !== undefined && v.customToDateKey !== undefined), {
+    message: 'customFromDateKey and customToDateKey are required when rangePreset is "custom"',
+    path: ['customFromDateKey'],
+  });

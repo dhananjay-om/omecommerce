@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { Db } from '../../../shared/infrastructure/prisma/client.js';
+import { dateKeyToRange } from '../domain/date-key.js';
 import type {
   AnalyticsQueryRepository,
   DateRange,
@@ -16,6 +17,13 @@ import type {
   CustomerActivityRow,
   TopCustomerRow,
   InventoryTrendRow,
+  CouponPerformanceRow,
+  CouponRedemptionDailyRow,
+  ReferralFunnelSummary,
+  TopReferrerRow,
+  TaxBreakdownRow,
+  StoredValueLiabilityRow,
+  CreditAccountSummaryRow,
 } from '../domain/queries.js';
 
 /**
@@ -26,6 +34,13 @@ import type {
  * is lost — a true multi-currency merchant dashboard is a straightforward
  * later addition (group by currency instead of summing it away) once that's
  * an actual deployment need, not a schema change.
+ *
+ * That simplification predates this store having 2 real currencies (INR +
+ * USD, since the Multi-Store feature) — the Marketing/Financial methods
+ * added below deliberately do NOT sum across currency: a liability or tax
+ * total summed across currencies today would be a genuinely wrong number,
+ * not just an MVP simplification (same reasoning as the Refunds ledger's
+ * own "never summed across currencies" precedent elsewhere in this app).
  */
 export class PrismaAnalyticsQueryRepository implements AnalyticsQueryRepository {
   constructor(private readonly db: Db) {}
@@ -331,6 +346,154 @@ export class PrismaAnalyticsQueryRepository implements AnalyticsQueryRepository 
       actualCount: r.actualCount,
       diffCount: r.diffCount,
       diffAmount: r.diffAmount?.toString() ?? null,
+    }));
+  }
+
+  // --- Marketing Analytics ------------------------------------------
+
+  async getCouponPerformance(range: DateRange, limit: number): Promise<CouponPerformanceRow[]> {
+    const { start } = dateKeyToRange(range.fromDateKey);
+    const { end } = dateKeyToRange(range.toDateKey);
+    const rows = await this.db.$queryRaw<Array<{ coupon_id: bigint; code: string; currency: string; redemption_count: bigint; discount_amount: string }>>(
+      Prisma.sql`
+      SELECT cr.coupon_id, c.code, cr.currency,
+        COUNT(*) AS redemption_count, SUM(cr.discount_amount) AS discount_amount
+      FROM coupon_redemption cr
+      JOIN coupon c ON c.id = cr.coupon_id
+      WHERE cr.created_at >= ${start} AND cr.created_at < ${end}
+      GROUP BY cr.coupon_id, c.code, cr.currency
+      ORDER BY discount_amount DESC
+      LIMIT ${limit}
+    `,
+    );
+    return rows.map((r) => ({
+      couponId: r.coupon_id,
+      code: r.code,
+      currency: r.currency,
+      redemptionCount: Number(r.redemption_count),
+      discountAmount: r.discount_amount,
+    }));
+  }
+
+  async getCouponRedemptionTrend(range: DateRange): Promise<CouponRedemptionDailyRow[]> {
+    const { start } = dateKeyToRange(range.fromDateKey);
+    const { end } = dateKeyToRange(range.toDateKey);
+    const rows = await this.db.$queryRaw<Array<{ date_key: number; currency: string; redemption_count: bigint; discount_amount: string }>>(Prisma.sql`
+      SELECT (TO_CHAR(cr.created_at, 'YYYYMMDD'))::int AS date_key, cr.currency,
+        COUNT(*) AS redemption_count, SUM(cr.discount_amount) AS discount_amount
+      FROM coupon_redemption cr
+      WHERE cr.created_at >= ${start} AND cr.created_at < ${end}
+      GROUP BY date_key, cr.currency
+      ORDER BY date_key ASC
+    `);
+    return rows.map((r) => ({
+      dateKey: r.date_key,
+      currency: r.currency,
+      redemptionCount: Number(r.redemption_count),
+      discountAmount: r.discount_amount,
+    }));
+  }
+
+  async getReferralFunnel(range: DateRange): Promise<ReferralFunnelSummary> {
+    const { start } = dateKeyToRange(range.fromDateKey);
+    const { end } = dateKeyToRange(range.toDateKey);
+    const rows = await this.db.$queryRaw<Array<{ signed_up: bigint; qualified: bigint; rewarded: bigint }>>(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE created_at >= ${start} AND created_at < ${end}) AS signed_up,
+        COUNT(*) FILTER (WHERE qualified_at >= ${start} AND qualified_at < ${end}) AS qualified,
+        COUNT(*) FILTER (WHERE rewarded_at >= ${start} AND rewarded_at < ${end}) AS rewarded
+      FROM referral
+    `);
+    const r = rows[0];
+    return { signedUpCount: Number(r?.signed_up ?? 0n), qualifiedCount: Number(r?.qualified ?? 0n), rewardedCount: Number(r?.rewarded ?? 0n) };
+  }
+
+  async getTopReferrers(range: DateRange, limit: number): Promise<TopReferrerRow[]> {
+    const { start } = dateKeyToRange(range.fromDateKey);
+    const { end } = dateKeyToRange(range.toDateKey);
+    const rows = await this.db.$queryRaw<
+      Array<{
+        customer_id: bigint;
+        email: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        referral_count: bigint;
+        qualified_count: bigint;
+        rewarded_count: bigint;
+      }>
+    >(Prisma.sql`
+      SELECT r.referrer_customer_id AS customer_id, c.email, c.first_name, c.last_name,
+        COUNT(*) AS referral_count,
+        COUNT(*) FILTER (WHERE r.qualified_at IS NOT NULL) AS qualified_count,
+        COUNT(*) FILTER (WHERE r.rewarded_at IS NOT NULL) AS rewarded_count
+      FROM referral r
+      LEFT JOIN customer c ON c.id = r.referrer_customer_id
+      WHERE r.created_at >= ${start} AND r.created_at < ${end}
+      GROUP BY r.referrer_customer_id, c.email, c.first_name, c.last_name
+      ORDER BY referral_count DESC
+      LIMIT ${limit}
+    `);
+    return rows.map((r) => ({
+      customerId: r.customer_id,
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(' ') || null,
+      referralCount: Number(r.referral_count),
+      qualifiedCount: Number(r.qualified_count),
+      rewardedCount: Number(r.rewarded_count),
+    }));
+  }
+
+  // --- Financial Analytics --------------------------------------------
+
+  async getTaxBreakdown(range: DateRange): Promise<TaxBreakdownRow[]> {
+    const { start } = dateKeyToRange(range.fromDateKey);
+    const { end } = dateKeyToRange(range.toDateKey);
+    const websiteFilter = range.websiteId !== undefined ? Prisma.sql`AND o.website_id = ${range.websiteId}` : Prisma.empty;
+    const rows = await this.db.$queryRaw<Array<{ tax_type: string | null; currency: string; amount: string }>>(Prisma.sql`
+      SELECT otl.tax_type, o.currency, SUM(otl.amount) AS amount
+      FROM order_tax_line otl
+      JOIN "order" o ON o.id = otl.order_id
+      WHERE o.placed_at >= ${start} AND o.placed_at < ${end}
+        ${websiteFilter}
+      GROUP BY otl.tax_type, o.currency
+      ORDER BY amount DESC
+    `);
+    return rows.map((r) => ({ taxType: r.tax_type, currency: r.currency, amount: r.amount }));
+  }
+
+  async getStoredValueLiability(): Promise<StoredValueLiabilityRow[]> {
+    const [giftCards, wallets] = await Promise.all([
+      this.db.$queryRaw<Array<{ currency: string; total: string }>>(Prisma.sql`
+        SELECT currency, SUM(balance) AS total FROM gift_card WHERE status = 'ACTIVE' GROUP BY currency
+      `),
+      this.db.$queryRaw<Array<{ currency: string; total: string }>>(Prisma.sql`
+        SELECT currency, SUM(balance) AS total FROM wallet GROUP BY currency
+      `),
+    ]);
+    const byCurrency = new Map<string, StoredValueLiabilityRow>();
+    for (const g of giftCards) byCurrency.set(g.currency, { currency: g.currency, giftCardOutstanding: g.total, walletOutstanding: '0' });
+    for (const w of wallets) {
+      const existing = byCurrency.get(w.currency);
+      if (existing) existing.walletOutstanding = w.total;
+      else byCurrency.set(w.currency, { currency: w.currency, giftCardOutstanding: '0', walletOutstanding: w.total });
+    }
+    return [...byCurrency.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+  }
+
+  async getCreditAccountSummary(): Promise<CreditAccountSummaryRow[]> {
+    const rows = await this.db.$queryRaw<Array<{ currency: string; account_count: bigint; total_outstanding: string; total_credit_limit: string }>>(
+      Prisma.sql`
+      SELECT currency, COUNT(*) AS account_count, SUM(outstanding) AS total_outstanding, SUM(credit_limit) AS total_credit_limit
+      FROM company_credit_account
+      GROUP BY currency
+      ORDER BY currency ASC
+    `,
+    );
+    return rows.map((r) => ({
+      currency: r.currency,
+      accountCount: Number(r.account_count),
+      totalOutstanding: r.total_outstanding,
+      totalCreditLimit: r.total_credit_limit,
     }));
   }
 }

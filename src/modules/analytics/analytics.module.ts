@@ -4,6 +4,8 @@ import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaAnalyticsRepository } from './infrastructure/prisma-analytics.repository.js';
 import { PrismaAnalyticsQueryRepository } from './infrastructure/prisma-analytics-query.repository.js';
 import { PrismaAlertRuleRepository } from './infrastructure/prisma-alert-rule.repository.js';
+import { PrismaSavedReportRepository } from './infrastructure/prisma-saved-report.repository.js';
+import { PrismaAdminUserLookup } from '../order/infrastructure/prisma-lookups.js';
 import { RefreshWebsiteDay } from './application/refresh-website-day.usecase.js';
 import { RunNightlyRefresh } from './application/run-nightly-refresh.usecase.js';
 import { EvaluateAlertRules } from './application/evaluate-alert-rules.usecase.js';
@@ -22,14 +24,26 @@ import {
   GetCustomerActivityTrend,
   GetTopCustomers,
   GetInventoryTrend,
+  GetCouponPerformance,
+  GetCouponRedemptionTrend,
+  GetReferralFunnel,
+  GetTopReferrers,
+  GetTaxBreakdown,
+  GetStoredValueLiability,
+  GetCreditAccountSummary,
 } from './application/query-analytics.usecases.js';
 import { CreateAlertRule, UpdateAlertRule, ListAlertRules, GetAlertRuleByPublicId, DeleteAlertRule, ListAlertHistory } from './application/alert-rule.usecases.js';
+import { RunAdHocReport, reportToCsv } from './application/report-builder.usecase.js';
+import { CreateSavedReport, ListSavedReports, DeleteSavedReport } from './application/saved-report.usecases.js';
+import { REPORT_METRICS } from './domain/report-metrics.js';
 import {
   analyticsDateRangeQuerySchema,
   analyticsTopNQuerySchema,
   lowStockQuerySchema,
   createAlertRuleSchema,
   updateAlertRuleSchema,
+  reportRunQuerySchema,
+  createSavedReportSchema,
 } from './interface/http/schemas.js';
 
 export interface AnalyticsRouters {
@@ -64,6 +78,7 @@ export function createAnalyticsRefreshDeps(db: Db): { runNightlyRefresh: RunNigh
 export function createAnalyticsModule(db: Db, authorize: (permission: string) => RequestHandler): AnalyticsRouters {
   const analyticsQuery = new PrismaAnalyticsQueryRepository(db);
   const alertRules = new PrismaAlertRuleRepository(db);
+  const savedReports = new PrismaSavedReportRepository(db);
 
   const getSalesTrend = new GetSalesTrend(analyticsQuery);
   const getOrderStatusBreakdown = new GetOrderStatusBreakdown(analyticsQuery);
@@ -78,6 +93,13 @@ export function createAnalyticsModule(db: Db, authorize: (permission: string) =>
   const getCustomerActivityTrend = new GetCustomerActivityTrend(analyticsQuery);
   const getTopCustomers = new GetTopCustomers(analyticsQuery);
   const getInventoryTrend = new GetInventoryTrend(analyticsQuery);
+  const getCouponPerformance = new GetCouponPerformance(analyticsQuery);
+  const getCouponRedemptionTrend = new GetCouponRedemptionTrend(analyticsQuery);
+  const getReferralFunnel = new GetReferralFunnel(analyticsQuery);
+  const getTopReferrers = new GetTopReferrers(analyticsQuery);
+  const getTaxBreakdown = new GetTaxBreakdown(analyticsQuery);
+  const getStoredValueLiability = new GetStoredValueLiability(analyticsQuery);
+  const getCreditAccountSummary = new GetCreditAccountSummary(analyticsQuery);
 
   const createAlertRule = new CreateAlertRule(alertRules);
   const updateAlertRule = new UpdateAlertRule(alertRules);
@@ -86,9 +108,16 @@ export function createAnalyticsModule(db: Db, authorize: (permission: string) =>
   const deleteAlertRule = new DeleteAlertRule(alertRules);
   const listAlertHistory = new ListAlertHistory(alertRules);
 
+  const runAdHocReport = new RunAdHocReport(analyticsQuery);
+  const createSavedReport = new CreateSavedReport(savedReports);
+  const listSavedReports = new ListSavedReports(savedReports);
+  const deleteSavedReport = new DeleteSavedReport(savedReports);
+  const adminUserLookup = new PrismaAdminUserLookup(db);
+
   const admin = Router();
   const view = authorize('analytics:view');
   const manageAlerts = authorize('alerts:manage');
+  const exportReports = authorize('reports:export');
 
   admin.get(
     '/analytics/sales',
@@ -228,6 +257,116 @@ export function createAnalyticsModule(db: Db, authorize: (permission: string) =>
     manageAlerts,
     asyncHandler(async (req, res) => {
       await deleteAlertRule.execute(req.params.publicId!);
+      res.status(204).send();
+    }),
+  );
+
+  // --- Marketing Analytics ---------------------------------------------
+  admin.get(
+    '/analytics/marketing/coupons',
+    view,
+    asyncHandler(async (req, res) => {
+      const query = parse(analyticsTopNQuerySchema, req.query);
+      res.json({ data: await getCouponPerformance.execute(query, query.limit ?? 10) });
+    }),
+  );
+  admin.get(
+    '/analytics/marketing/coupon-trend',
+    view,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getCouponRedemptionTrend.execute(parse(analyticsDateRangeQuerySchema, req.query)) });
+    }),
+  );
+  admin.get(
+    '/analytics/marketing/referral-funnel',
+    view,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getReferralFunnel.execute(parse(analyticsDateRangeQuerySchema, req.query)) });
+    }),
+  );
+  admin.get(
+    '/analytics/marketing/top-referrers',
+    view,
+    asyncHandler(async (req, res) => {
+      const query = parse(analyticsTopNQuerySchema, req.query);
+      res.json({ data: await getTopReferrers.execute(query, query.limit ?? 10) });
+    }),
+  );
+
+  // --- Financial Analytics ---------------------------------------------
+  admin.get(
+    '/analytics/financial/tax-breakdown',
+    view,
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getTaxBreakdown.execute(parse(analyticsDateRangeQuerySchema, req.query)) });
+    }),
+  );
+  admin.get(
+    '/analytics/financial/stored-value-liability',
+    view,
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await getStoredValueLiability.execute() });
+    }),
+  );
+  admin.get(
+    '/analytics/financial/credit-accounts',
+    view,
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await getCreditAccountSummary.execute() });
+    }),
+  );
+
+  // --- Report Builder ----------------------------------------------------
+  admin.get(
+    '/analytics/report-metrics',
+    view,
+    asyncHandler(async (_req, res) => {
+      res.json({ data: REPORT_METRICS });
+    }),
+  );
+  admin.get(
+    '/analytics/reports/run',
+    view,
+    asyncHandler(async (req, res) => {
+      const query = parse(reportRunQuerySchema, req.query);
+      res.json({ data: await runAdHocReport.execute(query.metricCode, query, query.limit ?? 20) });
+    }),
+  );
+  // Separate permission from `view` — reports:export existed in the
+  // catalog, unused by any feature, until this route.
+  admin.get(
+    '/analytics/reports/export',
+    exportReports,
+    asyncHandler(async (req, res) => {
+      const query = parse(reportRunQuerySchema, req.query);
+      const result = await runAdHocReport.execute(query.metricCode, query, query.limit ?? 1000);
+      const csv = reportToCsv(result);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.metricCode.toLowerCase()}.csv"`);
+      res.send(csv);
+    }),
+  );
+  admin.get(
+    '/analytics/saved-reports',
+    view,
+    asyncHandler(async (_req, res) => {
+      res.json({ data: await listSavedReports.execute() });
+    }),
+  );
+  admin.post(
+    '/analytics/saved-reports',
+    view,
+    asyncHandler(async (req, res) => {
+      const body = parse(createSavedReportSchema, req.body);
+      const actor = await adminUserLookup.findByPublicId(req.adminUser!.adminUserPublicId);
+      res.status(201).json({ data: await createSavedReport.execute({ ...body, createdBy: actor?.id ?? null }) });
+    }),
+  );
+  admin.delete(
+    '/analytics/saved-reports/:publicId',
+    view,
+    asyncHandler(async (req, res) => {
+      await deleteSavedReport.execute(req.params.publicId!);
       res.status(204).send();
     }),
   );

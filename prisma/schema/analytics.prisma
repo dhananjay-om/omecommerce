@@ -339,3 +339,32 @@ model ReconciliationLog {
   @@index([dateKey, tableName])
   @@map("reconciliation_log")
 }
+
+/// Report Builder's "saved report" — a re-runnable metric+date-range
+/// configuration, not a stored result snapshot (re-running always reads
+/// live data through the same RunAdHocReport path an ad hoc run does).
+/// No real "scheduled" recurring generation/delivery yet — this is
+/// scoped to "save the configuration, one-click re-run it," a smaller,
+/// real feature deliberately kept separate from that bigger one (see
+/// report-metrics.ts's own header comment on what's trimmed here).
+model SavedReport {
+  id         BigInt   @id @default(autoincrement())
+  publicId   String   @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  name       String
+  /// A ReportMetrics.code (report-metrics.ts) — plain string, not a DB
+  /// enum, same "fixed vocabulary in app code" precedent as every other
+  /// code column in this schema.
+  metricCode String   @map("metric_code")
+  /// 'last_7_days' | 'last_30_days' | 'this_month' | 'custom' — a
+  /// relative preset re-resolves to "now" on every re-run (so a saved
+  /// "Last 30 Days" report always means the CURRENT last 30 days, not
+  /// the 30 days as of when it was saved); 'custom' pins the two
+  /// dateKeys below instead.
+  rangePreset       String   @map("range_preset")
+  customFromDateKey Int?     @map("custom_from_date_key")
+  customToDateKey   Int?     @map("custom_to_date_key")
+  createdBy         BigInt?  @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("saved_report")
+}

@@ -2,7 +2,10 @@ import type { AnalyticsQueryRepository, DateRange } from '../domain/queries.js';
 import { parseDateKey } from '../domain/date-key.js';
 import type { AnalyticsDateRangeQuery } from './dto.js';
 
-function toRange(q: AnalyticsDateRangeQuery): DateRange {
+/** Exported for reuse by RunAdHocReport (report-builder.usecase.ts) —
+ *  the Report Builder dispatches to these same methods and needs the
+ *  identical dateFrom/dateTo → DateRange conversion, not a second copy. */
+export function toRange(q: AnalyticsDateRangeQuery): DateRange {
   return {
     fromDateKey: parseDateKey(q.dateFrom),
     toDateKey: parseDateKey(q.dateTo),
@@ -103,5 +106,58 @@ export class GetInventoryTrend {
   constructor(private readonly analytics: AnalyticsQueryRepository) {}
   execute(q: AnalyticsDateRangeQuery) {
     return this.analytics.getInventoryTrend(toRange(q));
+  }
+}
+
+// --- Marketing Analytics ---
+
+export class GetCouponPerformance {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery, limit: number) {
+    return this.analytics.getCouponPerformance(toRange(q), limit);
+  }
+}
+
+export class GetCouponRedemptionTrend {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery) {
+    return this.analytics.getCouponRedemptionTrend(toRange(q));
+  }
+}
+
+export class GetReferralFunnel {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery) {
+    return this.analytics.getReferralFunnel(toRange(q));
+  }
+}
+
+export class GetTopReferrers {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery, limit: number) {
+    return this.analytics.getTopReferrers(toRange(q), limit);
+  }
+}
+
+// --- Financial Analytics ---
+
+export class GetTaxBreakdown {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute(q: AnalyticsDateRangeQuery) {
+    return this.analytics.getTaxBreakdown(toRange(q));
+  }
+}
+
+export class GetStoredValueLiability {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute() {
+    return this.analytics.getStoredValueLiability();
+  }
+}
+
+export class GetCreditAccountSummary {
+  constructor(private readonly analytics: AnalyticsQueryRepository) {}
+  execute() {
+    return this.analytics.getCreditAccountSummary();
   }
 }
