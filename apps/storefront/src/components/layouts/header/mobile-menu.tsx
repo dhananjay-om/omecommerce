@@ -5,6 +5,7 @@ import { Bars3Icon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { CategoryNode } from '@/lib/category-tree';
+import type { MegaMenuItem } from '@/types/mega-menu';
 
 const staticLinks = [
   { href: '/products', label: 'Products' },
@@ -33,7 +34,28 @@ function CategoryLinks({ nodes, depth = 0 }: { nodes: CategoryNode[]; depth?: nu
   );
 }
 
-export function MobileMenu({ tree }: { tree: CategoryNode[] }) {
+/** Same admin-managed-items-take-over-when-present, else fall back to the
+ *  category tree, logic as desktop's `MegaMenu` — see its own doc comment. */
+function MegaMenuLinks({ items }: { items: MegaMenuItem[] }) {
+  return (
+    <>
+      {items.map((item) => (
+        <div key={item.publicId}>
+          <Link href={item.href} className="block rounded-lg px-2 py-2 text-sm text-charcoal transition-colors hover:bg-sand hover:text-champagne">
+            {item.label}
+          </Link>
+          {item.columns.flatMap((col) => col.links).map((link) => (
+            <Link key={link.href} href={link.href} className="block rounded-lg px-2 py-2 pl-6 text-sm text-charcoal transition-colors hover:bg-sand hover:text-champagne">
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
+export function MobileMenu({ tree, items }: { tree: CategoryNode[]; items: MegaMenuItem[] }) {
   return (
     <Sheet>
       <SheetTrigger
@@ -51,7 +73,7 @@ export function MobileMenu({ tree }: { tree: CategoryNode[] }) {
           <Link href="/" className="block rounded-lg px-2 py-2 text-sm font-semibold text-jet transition-colors hover:bg-sand hover:text-champagne">
             Home
           </Link>
-          <CategoryLinks nodes={tree} />
+          {items.length > 0 ? <MegaMenuLinks items={items} /> : <CategoryLinks nodes={tree} />}
           <div className="my-2 h-px bg-ghost" />
           {staticLinks.map((link) => (
             <Link

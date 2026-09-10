@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ShoppingBagIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -13,13 +13,19 @@ import { FreeShippingBar } from '@/components/cart/free-shipping-bar';
 
 export function MiniCart() {
   const { cart, itemCount, hydrated, hydrate, removeLine } = useCartStore();
+  // Controlled (unlike most Sheets in this app) specifically so "View
+  // Cart" can close the drawer itself — left uncontrolled, Base UI's own
+  // Dialog state has no way to know a same-tab client-side navigation to
+  // /cart should also count as "closed", so the drawer stayed open over
+  // the cart page underneath it.
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!hydrated) void hydrate();
   }, [hydrated, hydrate]);
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         render={
           <Button variant="ghost" size="icon" aria-label="Open cart" className="relative">
@@ -84,7 +90,7 @@ export function MiniCart() {
           </div>
         ) : null}
         <SheetFooter className="px-5 pb-5">
-          <Button variant="cta" render={<Link href="/cart" />} nativeButton={false}>
+          <Button variant="cta" render={<Link href="/cart" />} nativeButton={false} onClick={() => setOpen(false)}>
             View Cart
           </Button>
         </SheetFooter>

@@ -54,6 +54,7 @@ import {
   Image,
   LayoutGrid,
   Building2,
+  Menu,
 } from 'lucide-react';
 
 /**
@@ -325,6 +326,7 @@ export const NAV: NavGroup[] = [
       { key: 'content-blocks', label: 'Blocks', href: '/content/blocks', icon: LayoutTemplate, status: 'live', description: 'Reusable CMS content blocks.' },
       { key: 'content-banners', label: 'Banners', href: '/content/banners', icon: Image, status: 'live', description: 'Storefront marketing banners.' },
       { key: 'content-widgets', label: 'Widgets', href: '/content/widgets', icon: LayoutGrid, status: 'live', description: 'Placeable homepage content widgets.' },
+      { key: 'content-navigation', label: 'Mega Menu', href: '/content/navigation', icon: Menu, status: 'live', description: 'The storefront header nav — top-level links, dropdown columns, and promo images.' },
     ],
   },
   {

@@ -1,0 +1,51 @@
+// =============================================================================
+// navigation.prisma — the storefront header's mega menu, admin-managed.
+//
+// Before this, the header's mega menu was 100% auto-generated from the
+// Category tree (Category.includeInMenu was the only lever, one level of
+// child categories, no images, no manual columns) — see MegaMenuItem's own
+// consuming component (apps/storefront/.../mega-menu.tsx) for that
+// unchanged fallback path when no rows exist here yet. This table is a
+// real, separate entity an admin curates directly: top-level items, each
+// optionally with a multi-column mega-panel (a flexible JSON shape, same
+// "structured JSON for flexible link data" precedent as
+// AutomationRule.conditions/actions) and an optional real promo image
+// (its own real column, not JSON — same "a real entity, image + order +
+// enable/disable" precedent as banner.prisma's own header comment, which
+// this whole file otherwise mirrors).
+// =============================================================================
+
+model MegaMenuItem {
+  id       BigInt @id @default(autoincrement())
+  publicId String @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+
+  label String
+  /// A path/URL — free text (e.g. "/collections/electronics" or any custom
+  /// URL), not a live FK to Category — the admin form offers a real
+  /// category picker as a convenience to fill this in correctly, but the
+  /// stored value is just a plain href, same as every link inside `columns`.
+  href String
+
+  position Int     @default(0)
+  isActive Boolean @default(true) @map("is_active")
+
+  /// Array<{ heading: string, links: Array<{ label: string, href: string }> }>
+  /// — the mega-panel's columns. An item with an empty array renders as a
+  /// plain top-level link with no dropdown, same as a normal nav link.
+  columns Json @default("[]") @db.JsonB
+
+  /// Optional promo image shown alongside the columns in the dropdown
+  /// panel — same imageMediaKey-only-stored/presigned-fresh-on-read
+  /// pattern as Banner.imageMediaKey/Category.imageMediaKey.
+  promoImageMediaKey String? @map("promo_image_media_key")
+  promoHref          String? @map("promo_href")
+  promoCaption       String? @map("promo_caption")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy BigInt?   @map("created_by")
+  updatedBy BigInt?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("mega_menu_item")
+}

@@ -19,6 +19,7 @@ import { createCustomerModule } from './modules/customer/customer.module.js';
 import { createWishlistModule } from './modules/wishlist/wishlist.module.js';
 import { createCmsModule } from './modules/cms/cms.module.js';
 import { createBannerModule } from './modules/banner/banner.module.js';
+import { createNavigationModule } from './modules/navigation/navigation.module.js';
 import { createWidgetModule } from './modules/widget/widget.module.js';
 import { createWalletModule } from './modules/wallet/wallet.module.js';
 import { createGiftCardModule } from './modules/giftcard/giftcard.module.js';
@@ -107,6 +108,10 @@ export function createApp(): Express {
   const banner = createBannerModule(prisma, auth.authorize);
   app.use('/admin/v1', banner.admin);
   app.use('/store/v1', banner.store);
+
+  const navigation = createNavigationModule(prisma, auth.authorize);
+  app.use('/admin/v1', navigation.admin);
+  app.use('/store/v1', navigation.store);
 
   const widget = createWidgetModule(prisma, auth.authorize);
   app.use('/admin/v1', widget.admin);

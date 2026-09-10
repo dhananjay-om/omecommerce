@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { buildCategoryTree } from '@/lib/category-tree';
 import type { Category } from '@/types/category';
 import type { Website } from '@/types/website';
+import type { MegaMenuItem } from '@/types/mega-menu';
 import { MegaMenu } from './mega-menu';
 import { SearchBar } from './search-bar';
 import { UserMenu } from './user-menu';
@@ -24,7 +25,15 @@ import { WishlistIcon } from './wishlist-icon';
  * in) stays functional in the icon cluster — the one deliberate
  * difference from the theme, which has no real accounts to gate on.
  */
-export function MainHeader({ categories, website }: { categories: Category[]; website: Website }) {
+export function MainHeader({
+  categories,
+  website,
+  megaMenuItems,
+}: {
+  categories: Category[];
+  website: Website;
+  megaMenuItems: MegaMenuItem[];
+}) {
   // Nav-only visibility filter — excluding a category here also drops its
   // whole subtree, since buildCategoryTree groups children by parentId and a
   // hidden parent's children simply won't match anything in the filtered
@@ -48,7 +57,7 @@ export function MainHeader({ categories, website }: { categories: Category[]; we
   return (
     <div className={`border-b bg-background transition-shadow duration-300 ${scrolled ? 'shadow-sm' : ''}`}>
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <MobileMenu tree={tree} />
+        <MobileMenu tree={tree} items={megaMenuItems} />
 
         <Link href="/" className="flex-1 text-center lg:flex-none lg:text-left">
           {website.logoUrl ? (
@@ -61,7 +70,7 @@ export function MainHeader({ categories, website }: { categories: Category[]; we
           )}
         </Link>
 
-        <MegaMenu tree={tree} />
+        <MegaMenu tree={tree} items={megaMenuItems} />
 
         <div className="flex shrink-0 items-center gap-1">
           <Button
