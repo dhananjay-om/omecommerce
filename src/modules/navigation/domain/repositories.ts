@@ -77,3 +77,25 @@ export interface MegaMenuItemRepository {
   update(publicId: string, input: UpdateMegaMenuItemInput): Promise<MegaMenuItemRecord>;
   softDelete(publicId: string): Promise<void>;
 }
+
+export interface TopBarLink {
+  label: string;
+  href: string;
+}
+
+export interface TopBarRecord {
+  isEnabled: boolean;
+  showStoreSwitcher: boolean;
+  phone: string | null;
+  message: string | null;
+  links: TopBarLink[];
+}
+
+/** Per-website storefront top bar settings (see TopBarSetting in navigation.prisma). */
+export interface TopBarRepository {
+  /** null when the website code doesn't exist. `record` is null when the website has no saved row (defaults apply). */
+  findByWebsiteCode(websiteCode: string, opts?: { updatedBy?: bigint }): Promise<{ websiteId: bigint; record: TopBarRecord | null } | null>;
+  upsert(websiteId: bigint, record: TopBarRecord, updatedBy: bigint | null): Promise<void>;
+  /** Back to the built-in defaults — deletes the website's row. */
+  reset(websiteId: bigint): Promise<void>;
+}

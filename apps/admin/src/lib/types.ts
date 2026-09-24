@@ -1755,3 +1755,19 @@ export interface NewsletterSubscriberList {
   subscribers: NewsletterSubscriber[];
   counts: { total: number; subscribed: number; unsubscribed: number };
 }
+
+export interface TopBarLink {
+  label: string;
+  href: string;
+}
+
+export interface TopBarSettings {
+  websiteCode: string;
+  isEnabled: boolean;
+  showStoreSwitcher: boolean;
+  phone: string | null;
+  message: string | null;
+  links: TopBarLink[];
+  /** false = nothing saved yet, the built-in defaults are showing. */
+  isCustomized: boolean;
+}

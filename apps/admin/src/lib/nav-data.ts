@@ -48,6 +48,7 @@ import {
   Receipt,
   Banknote,
   Mail,
+  PanelTop,
   Landmark,
   RefreshCw,
   LayoutTemplate,
@@ -321,6 +322,7 @@ export const NAV: NavGroup[] = [
       { key: 'content-banners', label: 'Banners', href: '/content/banners', icon: Image, status: 'live', description: 'Storefront marketing banners.' },
       { key: 'content-widgets', label: 'Widgets', href: '/content/widgets', icon: LayoutGrid, status: 'live', description: 'Placeable homepage content widgets.' },
       { key: 'content-navigation', label: 'Mega Menu', href: '/content/navigation', icon: Menu, status: 'live', description: 'The storefront header nav — top-level links, dropdown columns, and promo images.' },
+      { key: 'content-top-bar', label: 'Top Bar', href: '/content/top-bar', icon: PanelTop, status: 'live', description: 'The strip above the storefront header — phone number, promo message, and the Track Order / Help links.' },
     ],
   },
   {

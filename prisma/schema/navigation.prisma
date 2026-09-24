@@ -65,3 +65,34 @@ model MegaMenuItem {
 
   @@map("mega_menu_item")
 }
+
+// =============================================================================
+// Storefront top bar (the thin dark strip above the header): phone number,
+// promo/shipping message, and the small links on the right (Track Order, Help…).
+// One row per website — the India and US stores can show different numbers and
+// messages. A website with NO row here shows the built-in defaults (see
+// top-bar.usecases.ts), i.e. exactly what the storefront showed before this
+// existed. The FK to website is added in raw SQL (scope-FK convention).
+// =============================================================================
+
+model TopBarSetting {
+  id       BigInt @id @default(autoincrement())
+  websiteId BigInt @unique @map("website_id")
+
+  /// Master switch — false hides the whole strip.
+  isEnabled         Boolean @default(true) @map("is_enabled")
+  /// The "Shipping to <store>" switcher on the left.
+  showStoreSwitcher Boolean @default(true) @map("show_store_switcher")
+  /// Shown with a phone icon and linked as tel: — blank hides it.
+  phone             String?
+  /// e.g. "Free shipping on orders over $50" — blank hides it.
+  message           String?
+  /// Array<{ label: string, href: string }> — the links on the right, in order.
+  links             Json    @default("[]") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy BigInt?  @map("updated_by")
+
+  @@map("top_bar_setting")
+}

@@ -3,8 +3,10 @@ import type { Db } from '../../shared/infrastructure/prisma/client.js';
 import { parse, asyncHandler } from '../../shared/interface/http/validate.js';
 import { PrismaMegaMenuItemRepository } from './infrastructure/prisma-mega-menu-item.repository.js';
 import { CreateMegaMenuItem, UpdateMegaMenuItem, ListMegaMenuItems, GetMegaMenuItemByPublicId, DeleteMegaMenuItem, ListActiveMegaMenuItems } from './application/mega-menu.usecases.js';
+import { PrismaTopBarRepository } from './infrastructure/prisma-top-bar.repository.js';
+import { GetTopBar, SaveTopBar, ResetTopBar } from './application/top-bar.usecases.js';
 import { RequestMegaMenuImageUpload } from './application/request-mega-menu-image-upload.usecase.js';
-import { createMegaMenuItemSchema, updateMegaMenuItemSchema, requestMegaMenuImageUploadSchema } from './interface/http/schemas.js';
+import { createMegaMenuItemSchema, updateMegaMenuItemSchema, requestMegaMenuImageUploadSchema, saveTopBarSchema, topBarQuerySchema } from './interface/http/schemas.js';
 
 export interface NavigationRouters {
   admin: Router;
@@ -23,6 +25,10 @@ export function createNavigationModule(db: Db, authorize: (permission: string) =
   const deleteItem = new DeleteMegaMenuItem(items);
   const listActiveItems = new ListActiveMegaMenuItems(items);
   const requestImageUpload = new RequestMegaMenuImageUpload();
+  const topBars = new PrismaTopBarRepository(db);
+  const getTopBar = new GetTopBar(topBars);
+  const saveTopBar = new SaveTopBar(topBars);
+  const resetTopBar = new ResetTopBar(topBars);
 
   const admin = Router();
   admin.get(
@@ -72,11 +78,41 @@ export function createNavigationModule(db: Db, authorize: (permission: string) =
     }),
   );
 
+  // Top bar (Content > Top Bar) — the thin strip above the header, per website.
+  admin.get(
+    '/navigation/top-bar/:websiteCode',
+    authorize('navigation:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getTopBar.execute(req.params.websiteCode!) });
+    }),
+  );
+  admin.put(
+    '/navigation/top-bar/:websiteCode',
+    authorize('navigation:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await saveTopBar.execute(req.params.websiteCode!, parse(saveTopBarSchema, req.body), null) });
+    }),
+  );
+  admin.delete(
+    '/navigation/top-bar/:websiteCode',
+    authorize('navigation:manage'),
+    asyncHandler(async (req, res) => {
+      res.json({ data: await resetTopBar.execute(req.params.websiteCode!) });
+    }),
+  );
+
   const store = Router();
   store.get(
     '/navigation/mega-menu',
     asyncHandler(async (_req, res) => {
       res.json({ data: await listActiveItems.execute() });
+    }),
+  );
+
+  store.get(
+    '/navigation/top-bar',
+    asyncHandler(async (req, res) => {
+      res.json({ data: await getTopBar.execute(parse(topBarQuerySchema, req.query).websiteCode) });
     }),
   );
 

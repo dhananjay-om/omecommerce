@@ -60,3 +60,24 @@ export const requestMegaMenuImageUploadSchema = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(128),
 });
+
+// A link is rendered as an <a href>, so only safe destinations are allowed —
+// a "javascript:" (or any other) scheme would be an XSS hole on every page.
+const SAFE_HREF = /^(\/(?!\/)[^\s]*|https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+)$/i;
+
+export const saveTopBarSchema = z.object({
+  isEnabled: z.boolean(),
+  showStoreSwitcher: z.boolean(),
+  phone: z.string().trim().max(40).nullish(),
+  message: z.string().trim().max(200).nullish(),
+  links: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1, 'label is required').max(40),
+        href: z.string().trim().max(500).regex(SAFE_HREF, 'must start with "/" (a page on your store), https://, mailto: or tel:'),
+      }),
+    )
+    .max(6),
+});
+
+export const topBarQuerySchema = z.object({ websiteCode: z.string().trim().min(1).max(64) });
