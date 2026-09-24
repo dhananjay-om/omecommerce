@@ -157,6 +157,22 @@ export class PrismaProductMediaLookup implements ProductMediaLookup {
       LIMIT 1`;
     return rows[0]?.storage_key ?? null;
   }
+
+  async primaryImageKeysByPublicId(publicIds: string[]): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (publicIds.length === 0) return result;
+    // DISTINCT ON keeps one row per product: the designated THUMBNAIL first, else the lowest position.
+    const rows = await this.db.$queryRaw<Array<{ public_id: string; storage_key: string }>>`
+      SELECT DISTINCT ON (p.id) p.public_id::text AS public_id, ma.storage_key
+      FROM product p
+      JOIN product_media pm ON pm.product_id = p.id
+      JOIN media_asset ma ON ma.id = pm.asset_id
+      WHERE p.public_id = ANY(${publicIds}::uuid[])
+        AND pm.role IN ('GALLERY', 'THUMBNAIL')
+      ORDER BY p.id, (pm.role = 'THUMBNAIL') DESC, pm.position ASC`;
+    for (const r of rows) result.set(r.public_id, r.storage_key);
+    return result;
+  }
 }
 
 /** Only a real CSS hex color counts — `AttributeOption.swatch` is documented as

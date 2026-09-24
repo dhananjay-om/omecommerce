@@ -68,7 +68,7 @@ export function createSearchModule(
     reviewStats,
     index,
   );
-  const searchProducts = new SearchProducts(index, mediaUrlResolver);
+  const searchProducts = new SearchProducts(index, mediaUrlResolver, productMedia);
   const reindexAll = new ReindexAll(products, index, indexProduct);
 
   /**

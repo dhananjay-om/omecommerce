@@ -90,4 +90,7 @@ export interface ReviewStatsLookup {
 
 export interface ProductMediaLookup {
   primaryImageKey(productId: bigint): Promise<string | null>;
+  /** The same "main image" rule as primaryImageKey, read LIVE for a page of products at once,
+   *  keyed by product public id. Products with no image are simply absent from the map. */
+  primaryImageKeysByPublicId(publicIds: string[]): Promise<Map<string, string>>;
 }

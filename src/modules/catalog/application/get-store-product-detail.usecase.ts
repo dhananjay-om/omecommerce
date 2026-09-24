@@ -89,8 +89,11 @@ export class GetStoreProductDetail {
       }),
     );
 
+    // The admin's "main image" (role THUMBNAIL) leads the gallery, so the product page opens
+    // on the same picture the collection/home cards show; everything else keeps its position order.
+    const orderedMedia = [...mediaRows].sort((a, b) => Number(b.role === 'THUMBNAIL') - Number(a.role === 'THUMBNAIL') || a.position - b.position);
     const media: ProductMediaView[] = await Promise.all(
-      mediaRows.map(async (m) => ({
+      orderedMedia.map(async (m) => ({
         productMediaId: m.id.toString(),
         url: await this.storage.presignGetUrl(m.assetStorageKey),
         role: m.role,

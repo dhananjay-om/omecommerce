@@ -1,4 +1,6 @@
 import type { SearchIndex, SearchQuery, MediaUrlResolver } from '../domain/ports.js';
+import type { ProductMediaLookup } from '../domain/repositories.js';
+import { logger } from '../../../shared/infrastructure/logger.js';
 import { ValidationError } from '../../../shared/domain/errors.js';
 
 export interface SearchProductsQuery {
@@ -39,6 +41,7 @@ export class SearchProducts {
   constructor(
     private readonly index: SearchIndex,
     private readonly mediaUrls: MediaUrlResolver,
+    private readonly productMedia: ProductMediaLookup,
   ) {}
 
   async execute(query: SearchProductsQuery): Promise<SearchProductsResult> {
@@ -59,13 +62,25 @@ export class SearchProducts {
     };
     const result = await this.index.search(searchQuery);
 
+    // The card image is read LIVE from the database, not trusted from the index: the
+    // index copy only changes when a background job re-indexes the product, so a change
+    // of main image (or an added/removed photo) could show the old picture on the home
+    // page and listings for as long as that refresh was late or had failed. Falls back
+    // to the indexed key only if the live lookup itself errors.
+    let liveImageKeys: Map<string, string> | null = null;
+    try {
+      liveImageKeys = await this.productMedia.primaryImageKeysByPublicId(result.hits.map((h) => h.productId));
+    } catch (err) {
+      logger.warn({ err }, 'live product image lookup failed; using indexed image keys');
+    }
+
     // Presigned GET URLs expire in 15 minutes, so they're resolved fresh here
     // rather than stored in the index (see ProductMediaLookup's doc comment).
     const hits = await Promise.all(
-      result.hits.map(async ({ imageKey, ...hit }) => ({
-        ...hit,
-        imageUrl: imageKey ? await this.mediaUrls.presignGetUrl(imageKey) : null,
-      })),
+      result.hits.map(async ({ imageKey, ...hit }) => {
+        const key = liveImageKeys ? (liveImageKeys.get(hit.productId) ?? null) : imageKey;
+        return { ...hit, imageUrl: key ? await this.mediaUrls.presignGetUrl(key) : null };
+      }),
     );
 
     return { ...result, hits };
