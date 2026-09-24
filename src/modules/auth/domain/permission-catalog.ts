@@ -51,5 +51,6 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { code: 'migration:manage', description: 'Connect source stores and run catalog/customer/order data migrations' },
   { code: 'automation:view', description: 'View scheduled job run history and automation rules' },
   { code: 'automation:manage', description: 'Create, edit, and delete automation rules and workflows' },
+  { code: 'newsletter:manage', description: 'View, export, and manage newsletter subscribers' },
   { code: 'navigation:manage', description: 'Manage the storefront header mega menu' },
 ];

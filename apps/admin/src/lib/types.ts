@@ -1737,3 +1737,21 @@ export interface AuditLog {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
+
+export interface NewsletterSubscriber {
+  publicId: string;
+  email: string;
+  status: 'SUBSCRIBED' | 'UNSUBSCRIBED';
+  source: string;
+  websiteCode: string | null;
+  subscribedAt: string;
+  unsubscribedAt: string | null;
+}
+
+export interface NewsletterSubscriberList {
+  total: number;
+  page: number;
+  pageSize: number;
+  subscribers: NewsletterSubscriber[];
+  counts: { total: number; subscribed: number; unsubscribed: number };
+}

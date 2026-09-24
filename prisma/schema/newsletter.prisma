@@ -1,0 +1,36 @@
+// =============================================================================
+// newsletter.prisma — Email newsletter subscribers (storefront sign-up forms).
+//
+// Deliberately NOT tied to Customer: most subscribers are guests who never
+// create an account, and a registered customer's marketing-consent is a
+// different concern. Email is stored lowercased and is the natural key.
+// Unsubscribing keeps the row (status UNSUBSCRIBED) so a later re-subscribe is
+// a status flip, and so an opt-out is never silently forgotten. Every row has
+// its own random `unsubscribeToken` — the one-click unsubscribe link in
+// emails/footers carries it, so no login or email guessing is involved.
+// =============================================================================
+
+enum NewsletterStatus {
+  SUBSCRIBED
+  UNSUBSCRIBED
+}
+
+model NewsletterSubscriber {
+  id               BigInt           @id @default(autoincrement())
+  publicId         String           @unique @default(dbgenerated("uuidv7()")) @map("public_id") @db.Uuid
+  /// Lowercased + trimmed before every write/lookup.
+  email            String           @unique
+  status           NewsletterStatus @default(SUBSCRIBED)
+  /// Where they signed up: 'home' | 'footer' | 'admin' | ... (free text, app-defined vocabulary).
+  source           String           @default("home")
+  /// Which storefront website they signed up on (informational).
+  websiteCode      String?          @map("website_code")
+  unsubscribeToken String           @unique @map("unsubscribe_token")
+  subscribedAt     DateTime         @default(now()) @map("subscribed_at") @db.Timestamptz(6)
+  unsubscribedAt   DateTime?        @map("unsubscribed_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, subscribedAt])
+  @@map("newsletter_subscriber")
+}

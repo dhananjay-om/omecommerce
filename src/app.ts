@@ -33,6 +33,7 @@ import { createAiModule } from './modules/ai/ai.module.js';
 import { createMigrationModule } from './modules/migration/migration.module.js';
 import { createAutomationModule } from './modules/automation/automation.module.js';
 import { createPincodeModule } from './modules/pincode/pincode.module.js';
+import { createNewsletterModule } from './modules/newsletter/newsletter.module.js';
 
 /**
  * Builds the Express app WITHOUT starting the server, so tests can import it directly.
@@ -87,6 +88,9 @@ export function createApp(): Express {
   const pincode = createPincodeModule(prisma, auth.authorize);
   app.use('/admin/v1', pincode.admin);
   app.use('/store/v1', pincode.store);
+  const newsletter = createNewsletterModule(prisma, auth.authorize);
+  app.use('/admin/v1', newsletter.admin);
+  app.use('/store/v1', newsletter.store);
 
   // plan/15 Phase 11 — Order needs customer.authenticateCustomer to gate its
   // new /me/orders/:id, /invoice, /tracking, /reorder routes (same

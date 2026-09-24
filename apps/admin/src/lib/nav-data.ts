@@ -183,6 +183,7 @@ export const NAV: NavGroup[] = [
       { key: 'discounts', label: 'Discounts', href: '/coupons', icon: Tag, status: 'live', description: 'Coupon codes and their performance.' },
       { key: 'gift-cards', label: 'Gift Cards', href: '/gift-cards', icon: Gift, status: 'live', description: 'Issued gift cards, balances, and redemption history.' },
       { key: 'loyalty', label: 'Loyalty & Referrals', href: '/loyalty', icon: Award, status: 'live', description: 'Loyalty program tiers, points, and the referral program.' },
+      { key: 'newsletter', label: 'Newsletter', href: '/newsletter', icon: Mail, status: 'live', description: 'Newsletter subscribers from the storefront sign-up forms — search, export, and manage.' },
     ],
   },
   {

@@ -5,6 +5,8 @@ import { TruckIcon, ArrowUturnLeftIcon, LockClosedIcon, SparklesIcon } from '@he
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { Website } from '@/types/website';
+import { useNewsletterSubscribe } from '@/components/newsletter/use-newsletter-subscribe';
+import { Honeypot } from '@/components/newsletter/honeypot';
 
 const trustStrip = [
   { icon: TruckIcon, title: 'Free Shipping', sub: 'On orders above $50' },
@@ -38,6 +40,7 @@ const socialLinks = ['Facebook', 'Instagram', 'X', 'YouTube'];
 const paymentMethods = ['Visa', 'Mastercard', 'Amex', 'PayPal', 'UPI'];
 
 export function Footer({ website }: { website: Website }) {
+  const newsletter = useNewsletterSubscribe('footer');
   return (
     <footer className="mt-16 bg-foreground text-background">
       {/* Trust strip */}
@@ -100,20 +103,29 @@ export function Footer({ website }: { website: Website }) {
         <div>
           <h3 className="text-xs font-semibold tracking-widest text-background/70 uppercase">Newsletter</h3>
           <p className="mt-4 text-sm text-background/50">Get updates on new arrivals and offers.</p>
-          <form className="mt-3 flex gap-0 overflow-hidden rounded-full border border-background/20" onSubmit={(e) => e.preventDefault()}>
+          <form className="relative mt-3 flex gap-0 overflow-hidden rounded-full border border-background/20" onSubmit={newsletter.onSubmit}>
             <Input
               type="email"
+              name="email"
+              aria-label="Email address"
               placeholder="Email address"
               required
+              disabled={newsletter.loading}
               className="rounded-none border-0 bg-transparent px-4 text-background placeholder:text-background/40 focus-visible:ring-0"
             />
             {/* Champagne override: the default cta button is jet, which would
                 vanish against this footer's jet background — see the storefront
                 restyle plan's Header/Footer phase notes. */}
             <Button type="submit" variant="cta" size="default" className="shrink-0 rounded-none bg-champagne px-5 hover:bg-champagne/90">
-              Join
+              {newsletter.loading ? '…' : 'Join'}
             </Button>
+            <Honeypot />
           </form>
+          {newsletter.state.kind === 'success' ? (
+            <p role="status" className="mt-2 text-xs text-champagne">You&apos;re subscribed — thanks!</p>
+          ) : newsletter.state.kind === 'error' ? (
+            <p role="status" className="mt-2 text-xs text-rose">{newsletter.state.message}</p>
+          ) : null}
         </div>
       </div>
 
