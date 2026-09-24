@@ -27,6 +27,7 @@ export async function createAttribute(_prevState: ActionState, formData: FormDat
   const isSearchable = formData.get('isSearchable') === 'on';
   const isComparable = formData.get('isComparable') === 'on';
   const isVariantForming = formData.get('isVariantForming') === 'on';
+  const isVisiblePdp = formData.get('isVisiblePdp') === 'on';
 
   let options: Array<{ value: string; label: string }> = [];
   const optionsRaw = String(formData.get('options') ?? '');
@@ -53,6 +54,7 @@ export async function createAttribute(_prevState: ActionState, formData: FormDat
       isSearchable,
       isComparable,
       isVariantForming,
+      isVisiblePdp,
       options: options.length ? options : undefined,
     });
   } catch (err) {
@@ -93,6 +95,7 @@ export async function updateAttribute(_prevState: ActionState, formData: FormDat
       isSearchable: formData.get('isSearchable') === 'on',
       isComparable: formData.get('isComparable') === 'on',
       isVariantForming: formData.get('isVariantForming') === 'on',
+      isVisiblePdp: formData.get('isVisiblePdp') === 'on',
     });
     if (options.length > 0) {
       await apiPut(`/admin/v1/attributes/${code}/options`, { options });

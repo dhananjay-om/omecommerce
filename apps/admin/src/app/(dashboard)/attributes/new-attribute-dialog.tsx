@@ -131,6 +131,10 @@ export function NewAttributeDialog() {
               <Label htmlFor="attr-searchable">Searchable</Label>
             </div>
             <div className="flex items-center gap-2">
+              <input id="attr-visible-pdp" name="isVisiblePdp" type="checkbox" className="size-4" defaultChecked />
+              <Label htmlFor="attr-visible-pdp">Show on product page (Specifications)</Label>
+            </div>
+            <div className="flex items-center gap-2">
               <input id="attr-comparable" name="isComparable" type="checkbox" className="size-4" />
               <Label htmlFor="attr-comparable">Comparable</Label>
             </div>

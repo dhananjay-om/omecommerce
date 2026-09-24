@@ -6,6 +6,7 @@ import type { Category } from '@/types/category';
 import { SITE_URL } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { getProductReviews } from '@/services/reviews.service';
+import { getCmsBlockOrUndefined } from '@/services/content.service';
 import { ProductGallery } from '@/components/pdp/product-gallery';
 import { ProductPurchasePanel } from '@/components/pdp/product-purchase-panel';
 import { ProductTabs } from '@/components/pdp/product-tabs';
@@ -45,7 +46,11 @@ export async function ProductDetailView({
   const priceNumber = product.price ? Number(product.price) : null;
   const shortDescription = stringAttr(product.attributes, 'short_description');
   const description = stringAttr(product.attributes, 'description');
-  const reviews = await getProductReviews(product.publicId);
+  // The Shipping & Returns tab's text is an admin-managed CMS block; missing/unpublished → the tab's built-in fallback.
+  const [reviews, shippingReturns] = await Promise.all([
+    getProductReviews(product.publicId),
+    getCmsBlockOrUndefined('pdp_shipping_returns').catch(() => undefined),
+  ]);
 
   const productJsonLd = {
     '@context': 'https://schema.org',
@@ -149,7 +154,7 @@ export async function ProductDetailView({
               confusing since Reviews can run long. It's now its own full-width
               section below the grid instead, see the bottom of this component. */}
           <div className="mt-6">
-            <ProductTabs sku={product.sku} description={description} attributes={product.attributes} />
+            <ProductTabs sku={product.sku} description={description} specifications={product.specifications ?? []} shippingReturnsHtml={shippingReturns?.body ?? null} />
           </div>
 
           <div className="mt-4 space-y-3">

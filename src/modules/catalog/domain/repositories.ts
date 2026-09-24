@@ -628,6 +628,19 @@ export interface VariantStockLookup {
   availableQty(variantId: bigint, storeId: bigint): Promise<number | null>;
 }
 
+/** One row of the storefront product page's "Specifications" table. */
+export interface ProductSpecification {
+  code: string;
+  label: string;
+  /** Display-ready: a dropdown attribute's option LABEL (not its internal id), "Yes"/"No" for booleans, etc. */
+  value: string;
+}
+
+/** Storefront "Specifications" — the product's attribute values shaped for display. */
+export interface ProductSpecificationLookup {
+  forStoreView(productId: bigint, attributeSetId: bigint, chain: { websiteId: bigint; storeId: bigint; storeViewId: bigint }): Promise<ProductSpecification[]>;
+}
+
 /** Persistence port for the storefront brand entity (plan/14 Phase 0b) — same shape/discipline as CategoryRepository, minus the tree (brands are flat). */
 export interface BrandRepository {
   create(input: CreateBrandInput): Promise<BrandInfo>;

@@ -128,6 +128,8 @@ export interface StoreProductDetailView extends ProductForStoreView {
   /** The first-by-position variant's MRP — same "representative default" caveat as `price` above. */
   mrp: string | null;
   inStock: boolean;
+  /** The "Specifications" table: attributes marked visible on the product page, with real labels and display-ready values. */
+  specifications: Array<{ code: string; label: string; value: string }>;
   media: ProductMediaView[];
   variants: StoreProductVariantView[];
   categoryIds: string[];

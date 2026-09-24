@@ -44,6 +44,8 @@ export interface ProductDetail {
   /** When true, `price` (and every variant's price) already includes GST — the final price. */
   pricesIncludeTax: boolean;
   attributes: Record<string, unknown>;
+  /** The Specifications table — attributes marked visible on the product page, real labels, display-ready values. */
+  specifications: Array<{ code: string; label: string; value: string }>;
   price: string | null;
   /** The first-by-position variant's MRP — same "representative default" caveat as `price`. */
   mrp: string | null;

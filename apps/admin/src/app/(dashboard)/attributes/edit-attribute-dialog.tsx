@@ -88,6 +88,16 @@ export function EditAttributeDialog({ attribute }: { attribute: Attribute }) {
             </div>
             <div className="flex items-center gap-2">
               <input
+                id={`edit-visible-pdp-${attribute.code}`}
+                name="isVisiblePdp"
+                type="checkbox"
+                className="size-4"
+                defaultChecked={attribute.isVisiblePdp}
+              />
+              <Label htmlFor={`edit-visible-pdp-${attribute.code}`}>Show on product page (Specifications)</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
                 id={`edit-searchable-${attribute.code}`}
                 name="isSearchable"
                 type="checkbox"

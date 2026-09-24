@@ -2,18 +2,9 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-function formatLabel(code: string): string {
-  return code.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/** Codes that are either shown elsewhere on the PDP (description, short description) or exist
- * purely for SEO metadata (<head> tags, never visible page content) — never listed as a spec. */
-const NON_SPEC_CODES = new Set(['description', 'short_description', 'url_key', 'meta_title', 'meta_keywords', 'meta_description']);
-
-/** Static store policy copy, matching the reference theme's Shipping/Returns
- *  tabs — this store has no per-product or admin-configurable shipping/
- *  returns content system, so these are genuinely static, same posture as
- *  the trust badges and footer's own policy copy elsewhere on the site. */
+/** Fallback copy for the Shipping & Returns tab — shown only when the admin
+ *  hasn't created (or has unpublished) the `pdp_shipping_returns` block in
+ *  Content > Blocks, which is what normally supplies this tab's content. */
 const SHIPPING_RETURNS_ITEMS = [
   'Free standard delivery on orders above $50',
   'Express delivery (1–2 days) available at checkout',
@@ -28,16 +19,16 @@ const SHIPPING_RETURNS_ITEMS = [
 export function ProductTabs({
   sku,
   description,
-  attributes,
+  specifications,
+  shippingReturnsHtml,
 }: {
   sku: string;
   description: string | null;
-  attributes: Record<string, unknown>;
+  /** Real attribute labels + display-ready values, already filtered to those marked visible on the product page. */
+  specifications: Array<{ code: string; label: string; value: string }>;
+  /** Admin-managed (Content > Blocks > `pdp_shipping_returns`); null → the built-in fallback list. */
+  shippingReturnsHtml: string | null;
 }) {
-  const specEntries = Object.entries(attributes).filter(
-    ([code, value]) => !NON_SPEC_CODES.has(code) && value !== null && value !== undefined && value !== '',
-  );
-
   return (
     <Tabs defaultValue="description">
       <TabsList>
@@ -49,28 +40,35 @@ export function ProductTabs({
         {description ? <p className="whitespace-pre-line">{description}</p> : <p>No description available for SKU {sku} yet.</p>}
       </TabsContent>
       <TabsContent value="specifications" className="pt-4">
-        {specEntries.length === 0 ? (
+        {specifications.length === 0 ? (
           <p className="text-slate">No additional specifications for this product.</p>
         ) : (
           <dl className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
-            {specEntries.map(([code, value]) => (
-              <div key={code} className="flex justify-between border-b border-ghost py-1.5 text-sm">
-                <dt className="text-slate">{formatLabel(code)}</dt>
-                <dd className="font-medium text-jet">{String(value)}</dd>
+            {specifications.map((spec) => (
+              <div key={spec.code} className="flex justify-between gap-4 border-b border-ghost py-1.5 text-sm">
+                <dt className="text-slate">{spec.label}</dt>
+                <dd className="text-right font-medium text-jet">{spec.value}</dd>
               </div>
             ))}
           </dl>
         )}
       </TabsContent>
       <TabsContent value="shipping" className="pt-4">
-        <ul className="flex flex-col gap-2.5">
-          {SHIPPING_RETURNS_ITEMS.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-sm text-charcoal">
-              <span className="mt-0.5 shrink-0 text-champagne">·</span>
-              {item}
-            </li>
-          ))}
-        </ul>
+        {shippingReturnsHtml ? (
+          <div
+            className="text-sm text-charcoal [&_a]:text-champagne [&_a]:underline [&_h2]:mt-3 [&_h2]:mb-1 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:font-semibold [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5"
+            dangerouslySetInnerHTML={{ __html: shippingReturnsHtml }}
+          />
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {SHIPPING_RETURNS_ITEMS.map((item) => (
+              <li key={item} className="flex items-start gap-2 text-sm text-charcoal">
+                <span className="mt-0.5 shrink-0 text-champagne">·</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
       </TabsContent>
     </Tabs>
   );

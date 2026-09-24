@@ -19,11 +19,15 @@ import type {
   ProductListResult,
   UpdateProductInput,
   VariantStockLookup,
+  ProductSpecification,
+  ProductSpecificationLookup,
   AttributeOptionInfo,
   UpsertAttributeOptionInput,
 } from '../domain/repositories.js';
 import { Prisma } from '@prisma/client';
 import { ConflictError } from '../../../shared/domain/errors.js';
+import { fromRow } from '../domain/attribute-value.js';
+import type { PrismaProductAttributeStore } from './product-attribute.store.js';
 import type { Product as PrismaProductRow } from '@prisma/client';
 
 function toDomainProps(row: PrismaProductRow) {
@@ -387,6 +391,76 @@ export class PrismaVariantStockLookup implements VariantStockLookup {
       SELECT available FROM stock_item WHERE variant_id = ${variantId} AND warehouse_id = ${warehouseId}`;
     return Math.max(0, Number(rows[0]?.available ?? 0));
   }
+}
+
+/** Never listed as a specification: shown elsewhere on the page, or SEO-only metadata. */
+const NON_SPEC_CODES = new Set(['description', 'short_description', 'url_key', 'meta_title', 'meta_keywords', 'meta_description']);
+/** Long-form or non-tabular values don't belong in a spec table. */
+const NON_SPEC_TYPES = new Set(['RICHTEXT', 'TEXTAREA', 'JSON', 'IMAGE', 'FILE']);
+
+/**
+ * Builds the PDP "Specifications" rows: every attribute value this product has for the
+ * store view, for attributes marked visible on the product page (Attribute.isVisiblePdp),
+ * with the attribute's real LABEL and a display-ready value — a dropdown/multi-select
+ * attribute shows its option label, not the internal option id it is stored as. Ordered
+ * the way the product's attribute set lays them out (group order, then attribute order).
+ */
+export class PrismaProductSpecificationLookup implements ProductSpecificationLookup {
+  constructor(
+    private readonly db: Db,
+    private readonly attrStore: PrismaProductAttributeStore,
+  ) {}
+
+  async forStoreView(
+    productId: bigint,
+    attributeSetId: bigint,
+    chain: { websiteId: bigint; storeId: bigint; storeViewId: bigint },
+  ): Promise<ProductSpecification[]> {
+    const resolved = await this.attrStore.resolveForStoreView(productId, chain);
+    if (resolved.length === 0) return [];
+
+    const [attrs, layout] = await Promise.all([
+      this.db.attribute.findMany({
+        where: { id: { in: resolved.map((r) => r.attributeId) }, isVisiblePdp: true },
+        select: { id: true, code: true, label: true, dataType: true, options: { where: { deletedAt: null }, select: { id: true, label: true } } },
+      }),
+      this.db.attributeSetAttribute.findMany({
+        where: { attributeSetId },
+        select: { attributeId: true, sortOrder: true, group: { select: { sortOrder: true } } },
+      }),
+    ]);
+    const attrById = new Map(attrs.map((a) => [a.id.toString(), a]));
+    const orderById = new Map(layout.map((l) => [l.attributeId.toString(), [l.group.sortOrder, l.sortOrder] as const]));
+
+    const rows: Array<{ spec: ProductSpecification; order: readonly [number, number] }> = [];
+    for (const r of resolved) {
+      const attr = attrById.get(r.attributeId.toString());
+      if (!attr || NON_SPEC_CODES.has(attr.code.toLowerCase()) || NON_SPEC_TYPES.has(attr.dataType)) continue;
+      const value = formatSpecValue(attr, fromRow(attr.dataType, r.columns));
+      if (value === null) continue;
+      rows.push({ spec: { code: attr.code, label: attr.label, value }, order: orderById.get(attr.id.toString()) ?? [Number.MAX_SAFE_INTEGER, 0] });
+    }
+    rows.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.spec.label.localeCompare(b.spec.label));
+    return rows.map((r) => r.spec);
+  }
+}
+
+function formatSpecValue(attr: { dataType: string; options: Array<{ id: bigint; label: string }> }, raw: unknown): string | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const optionLabel = (id: unknown) => attr.options.find((o) => o.id.toString() === String(id))?.label;
+  if (attr.dataType === 'SELECT') return optionLabel(raw) ?? null; // a stale/deleted option → omit rather than show an id
+  if (attr.dataType === 'MULTISELECT') {
+    const labels = (Array.isArray(raw) ? raw : []).map(optionLabel).filter((l): l is string => !!l);
+    return labels.length > 0 ? labels.join(', ') : null;
+  }
+  if (attr.dataType === 'BOOLEAN') return raw ? 'Yes' : 'No';
+  if (attr.dataType === 'DATE' || attr.dataType === 'DATETIME') {
+    const d = raw instanceof Date ? raw : new Date(String(raw));
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+  if (attr.dataType === 'DECIMAL') return String(raw).includes('.') ? String(raw).replace(/\.?0+$/, '') : String(raw);
+  if (attr.dataType.startsWith('REF_')) return null; // an internal reference id means nothing to a shopper
+  return String(raw);
 }
 
 const ATTRIBUTE_SELECT = {

@@ -14,6 +14,7 @@ import {
   PrismaAttributeSetRepository,
   PrismaProductVariantRepository,
   PrismaVariantStockLookup,
+  PrismaProductSpecificationLookup,
 } from './infrastructure/prisma-product.repository.js';
 import { PrismaCategoryRepository, PrismaProductCategoryRepository } from './infrastructure/prisma-category.repository.js';
 import { PrismaBrandRepository } from './infrastructure/prisma-brand.repository.js';
@@ -156,6 +157,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
     variantStock,
     storeContext,
     getProductForStoreView,
+    new PrismaProductSpecificationLookup(db, attrStore),
   );
   const getStoreProductDetailBySlug = new GetStoreProductDetailBySlug(products, getStoreProductDetail);
   const createAttributeSet = new CreateAttributeSet(attributeSets);

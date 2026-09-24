@@ -237,6 +237,7 @@ export const NAV: NavGroup[] = [
         key: 'refunds', label: 'Refunds', href: '/fulfillment/refunds', icon: CreditCard, status: 'live',
         description: 'Every refund issued, in one list, filterable by method/status/date, with a real per-currency total.',
       },
+      { key: 'stores-pincodes', label: 'Delivery Pincodes', href: '/stores/pincodes', icon: MapPin, status: 'live', description: 'The pincodes you deliver to — powers the “Check Delivery” box on product pages.' },
     ],
   },
   {
@@ -343,7 +344,6 @@ export const NAV: NavGroup[] = [
       { key: 'stores-currencies', label: 'Currency Setup', href: '/stores/currencies', icon: Coins, status: 'live', description: 'Supported currencies.' },
       { key: 'stores-tax-classes', label: 'Tax Classes', href: '/stores/tax-classes', icon: Receipt, status: 'live', description: 'Tax classes and rates.' },
       { key: 'stores-shipping', label: 'Shipping Methods', href: '/stores/shipping-methods', icon: Truck, status: 'live', description: 'Available shipping methods and rates.' },
-      { key: 'stores-pincodes', label: 'Pincodes', href: '/stores/pincodes', icon: MapPin, status: 'live', description: 'Delivery-serviceable pincodes shown on the storefront PDP.' },
       { key: 'stores-payment', label: 'Payment Methods', href: '/stores/payment-methods', icon: Banknote, status: 'live', description: 'Available payment methods.' },
       { key: 'stores-email', label: 'Email (SMTP)', href: '/stores/email-settings', icon: Mail, status: 'live', description: 'Outbound email/SMTP configuration.' },
       { key: 'stores-gst', label: 'GST Settings', href: '/stores/gst-settings', icon: Landmark, status: 'live', description: 'GST configuration per website.' },

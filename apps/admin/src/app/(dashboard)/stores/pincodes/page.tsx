@@ -30,11 +30,11 @@ export default async function PincodesPage({
 
   return (
     <div>
-      <PageBreadcrumb items={[{ label: 'Stores', href: '/stores/pincodes' }, { label: 'Pincodes' }]} />
+      <PageBreadcrumb items={[{ label: 'Fulfillment', href: '/stores/pincodes' }, { label: 'Delivery Pincodes' }]} />
 
       <div className="mt-2 flex items-center justify-between">
         <div>
-          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Pincodes</h1>
+          <h1 className="text-[1.32rem] font-extrabold tracking-tight">Delivery Pincodes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Delivery-serviceable pincodes shown on the storefront&apos;s pincode checker — a pincode not listed
             here reads as &quot;not serviceable yet.&quot; {list.total} pincode{list.total === 1 ? '' : 's'}.

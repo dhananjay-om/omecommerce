@@ -5,6 +5,7 @@ import type {
   ProductMediaRepository,
   MediaStorage,
   VariantStockLookup,
+  ProductSpecificationLookup,
 } from '../domain/repositories.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { StoreContextResolver } from '../../../shared/application/scope.js';
@@ -30,6 +31,7 @@ export class GetStoreProductDetail {
     private readonly variantStock: VariantStockLookup,
     private readonly storeContext: StoreContextResolver,
     private readonly getProductForStoreView: GetProductForStoreView,
+    private readonly specificationLookup: ProductSpecificationLookup,
   ) {}
 
   async execute(query: ProductForStoreViewQuery): Promise<StoreProductDetailView> {
@@ -52,6 +54,12 @@ export class GetStoreProductDetail {
       this.productCategories.listCategoryPublicIdsForProduct(productId),
       this.products.findBrandSlug(productId),
     ]);
+
+    const specifications = await this.specificationLookup.forStoreView(productId, product.props.attributeSetId, {
+      websiteId: ctx.websiteId,
+      storeId: ctx.storeId,
+      storeViewId: ctx.storeViewId,
+    });
 
     const variants: StoreProductVariantView[] = await Promise.all(
       variantRows.map(async (v) => {
@@ -113,6 +121,7 @@ export class GetStoreProductDetail {
       price: first?.price ?? null,
       mrp: first?.mrp ?? null,
       inStock: first?.inStock ?? false,
+      specifications,
       media,
       variants,
       categoryIds,
