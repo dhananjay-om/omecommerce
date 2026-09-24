@@ -16,6 +16,7 @@ import {
   PrismaBrandLookup,
   PrismaProductMediaLookup,
   PrismaVariantSwatchLookup,
+  PrismaReviewStatsLookup,
 } from './infrastructure/prisma-lookups.js';
 import { IndexProduct } from './application/index-product.usecase.js';
 import { SearchProducts } from './application/search-products.usecase.js';
@@ -50,6 +51,7 @@ export function createSearchModule(
   const brandLookup = new PrismaBrandLookup(db);
   const productMedia = new PrismaProductMediaLookup(db);
   const variantSwatches = new PrismaVariantSwatchLookup(db);
+  const reviewStats = new PrismaReviewStatsLookup(db);
   const mediaUrlResolver = new S3MediaUrlResolver();
 
   const indexProduct = new IndexProduct(
@@ -63,6 +65,7 @@ export function createSearchModule(
     brandLookup,
     productMedia,
     variantSwatches,
+    reviewStats,
     index,
   );
   const searchProducts = new SearchProducts(index, mediaUrlResolver);

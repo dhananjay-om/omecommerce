@@ -38,15 +38,15 @@ import type { ProductDetail, SearchHit } from '@/types/product';
  * variant-forming option that has a hex swatch, e.g. Color=Red) and the row
  * is omitted entirely when a product has none.
  *
- * Still placeholder-until-real-data (per the user's own explicit call, not
- * this component's usual "don't fabricate" default): `SearchHit` carries no
- * brand or rating at grid scale, so the brand eyebrow and star rating are NOT
- * real — the rating is a deterministic per-product placeholder (stable
- * across renders, not literally `Math.random()`, so it doesn't jump around or
- * cause a hydration mismatch) and the brand eyebrow cycles through this
- * store's own real brand names as a stand-in. Swapping those for real data
- * would need a rating aggregate + brand adding to the search index /
- * `SearchHit`, not just this component.
+ * The star rating is REAL too: `hit.ratingAvg` / `hit.ratingCount` come from
+ * the search index (approved reviews only) and the rating is omitted for a
+ * product with no reviews. Its index entry is refreshed whenever an admin
+ * approves/rejects a review.
+ *
+ * Still a placeholder (per the user's own explicit call): the brand eyebrow —
+ * `SearchHit` carries no brand at grid scale, so it cycles through this
+ * store's own real brand names as a stand-in. A real one would need the
+ * brand adding to the search index / `SearchHit`, not just this component.
  *
  * Image: `resolveProductImage(hit.sku, hit.name, hit.imageUrl)`, not a
  * blind `hit.imageUrl` OR a blind mock — a real image wins whenever one
@@ -75,18 +75,15 @@ function hashString(value: string): number {
 const MAX_SWATCHES = 5;
 
 const PLACEHOLDER_BRANDS = ['Nova Electronics', 'Urban Threads', 'HomeStyle'];
-const PLACEHOLDER_RATINGS = [3.5, 4, 4.5, 5];
 
 function placeholderBrand(productId: string): string {
   return PLACEHOLDER_BRANDS[hashString(productId) % PLACEHOLDER_BRANDS.length]!;
 }
 
-function placeholderRating(productId: string): number {
-  return PLACEHOLDER_RATINGS[hashString(`${productId}-rating`) % PLACEHOLDER_RATINGS.length]!;
-}
-
 export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'bestseller' }) {
   const swatches = hit.swatches ?? [];
+  const ratingAvg = hit.ratingAvg ?? null;
+  const ratingCount = hit.ratingCount ?? 0;
   const percentOff =
     hit.priceDisplay && hit.mrpDisplay ? discountPercent(hit.priceDisplay, hit.mrpDisplay) : null;
   // Falls back to the old id-based URL (itself now a permanent redirect to
@@ -204,13 +201,14 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
                 <span className="text-xs text-slate line-through">{formatPrice(hit.mrpDisplay!, hit.currency)}</span>
               ) : null}
             </span>
-            <span className="flex shrink-0 gap-0.5 pt-0.5 sm:pt-0" aria-hidden>
-              {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} className={`text-[10px] ${i < Math.round(placeholderRating(hit.productId)) ? 'text-champagne' : 'text-silver'}`}>
-                  ★
-                </span>
-              ))}
-            </span>
+            {/* Real rating (approved reviews only) — omitted entirely when the product has none. */}
+            {ratingCount > 0 && ratingAvg !== null ? (
+              <span className="flex shrink-0 items-center gap-1 pt-0.5 text-xs sm:pt-0" title={`${ratingAvg} out of 5 from ${ratingCount} review${ratingCount === 1 ? '' : 's'}`}>
+                <span className="text-champagne" aria-hidden>★</span>
+                <span className="font-medium text-jet">{ratingAvg.toFixed(1)}</span>
+                <span className="text-slate">({ratingCount})</span>
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

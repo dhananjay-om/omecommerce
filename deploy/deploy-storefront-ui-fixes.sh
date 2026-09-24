@@ -15,9 +15,12 @@
 #   - Product cards: real colour swatches (from each product's colour options
 #     that have a hex swatch) instead of 4 fixed dots; none shown if a product
 #     has none
+#   - Product cards: real review rating (average + count of APPROVED reviews)
+#     instead of placeholder stars; nothing shown for a product with no
+#     reviews. Approving/rejecting a review updates the card automatically.
 #
-# The colour swatches need the api rebuilt and a search reindex (they're stored
-# in each product's search document) — this script does both. It will ask for
+# The colour swatches and ratings need the api rebuilt and a search reindex
+# (they're stored in each product's search document) — this script does both. It will ask for
 # an admin email/password for the reindex step.
 #
 # No migration, no new permission.
@@ -44,10 +47,11 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "==> Reindexing search so existing products get their colour swatches"
+echo "==> Reindexing search so existing products get their colour swatches and ratings"
 "$REPO_ROOT/deploy/reindex-search.sh"
 
 echo
 echo "==> Done. Hard-reload the site (Ctrl+Shift+R) and check: logo size,"
 echo "Shop by Category, mega menu closing on click, no sideways scroll,"
-echo "aligned product cards, and colour dots only on products that have colours."
+echo "aligned product cards, colour dots only on products that have colours, and"
+echo "star ratings only on products that have approved reviews."

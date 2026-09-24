@@ -178,7 +178,7 @@ export function createCatalogModule(db: Db, redis: Redis, authorize: (permission
   const listAllProductReviews = new ListAllProductReviews(productReviews, mediaStorage);
   const customerNames = new CustomerNameLookup(db);
   const submitProductReview = new SubmitProductReview(products, productReviews, customerNames, mediaStorage);
-  const moderateProductReview = new ModerateProductReview(products, productReviews);
+  const moderateProductReview = new ModerateProductReview(products, productReviews, outbox);
   const requestReviewImageUpload = new RequestReviewImageUpload(mediaStorage);
   const listAttributeSets = new ListAttributeSets(attributeSets);
   const getAttributeSetDetail = new GetAttributeSetDetail(attributeSets);

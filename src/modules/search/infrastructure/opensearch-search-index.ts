@@ -119,6 +119,8 @@ export class OpenSearchIndex implements SearchIndex {
       imageKey: h._source.imageKey,
       // Documents indexed before swatches existed have none until reindexed.
       swatches: h._source.swatches ?? [],
+      ratingAvg: h._source.ratingAvg ?? null,
+      ratingCount: h._source.ratingCount ?? 0,
     }));
 
     const facets: Record<string, FacetBucket[]> = {};

@@ -43,6 +43,9 @@ export const PRODUCT_INDEX_MAPPING = {
       imageKey: { type: 'keyword' },
       // Returned as-is from _source for the listing card's color dots — never searched/filtered on.
       swatches: { type: 'object', enabled: false },
+      // Returned from _source for the card's star rating (approved reviews only).
+      ratingAvg: { type: 'double' },
+      ratingCount: { type: 'integer' },
       facets: {
         type: 'nested',
         properties: {

@@ -65,6 +65,9 @@ export interface SearchHit {
   imageUrl: string | null;
   /** The product's real colors (variant options with a hex swatch) — empty/absent when it has none. */
   swatches?: Array<{ label: string; hex: string }>;
+  /** Average of the product's APPROVED reviews (one decimal) — null/absent when it has none. */
+  ratingAvg?: number | null;
+  ratingCount?: number;
 }
 
 export interface FacetBucket {

@@ -11,6 +11,7 @@ import type {
   BrandLookup,
   ProductMediaLookup,
   VariantSwatchLookup,
+  ReviewStatsLookup,
 } from '../domain/repositories.js';
 
 export class PrismaProductLookup implements ProductLookup {
@@ -183,5 +184,19 @@ export class PrismaVariantSwatchLookup implements VariantSwatchLookup {
       }
     }
     return [...byId.values()].sort((a, b) => a.sortOrder - b.sortOrder).map(({ label, hex }) => ({ label, hex }));
+  }
+}
+
+export class PrismaReviewStatsLookup implements ReviewStatsLookup {
+  constructor(private readonly db: Db) {}
+
+  async stats(productId: bigint): Promise<{ avg: number | null; count: number }> {
+    const agg = await this.db.productReview.aggregate({
+      where: { productId, isApproved: true },
+      _avg: { rating: true },
+      _count: { _all: true },
+    });
+    const count = agg._count._all;
+    return { avg: count > 0 && agg._avg.rating !== null ? Math.round(agg._avg.rating * 10) / 10 : null, count };
   }
 }

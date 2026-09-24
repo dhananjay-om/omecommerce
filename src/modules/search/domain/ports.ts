@@ -45,6 +45,9 @@ export interface ProductDocument {
   facets: FacetPair[];
   /** Distinct real colors across this product's variants — empty when none have a swatch. */
   swatches: ColorSwatch[];
+  /** Average of this product's APPROVED reviews (1-5, one decimal) — null when it has none. */
+  ratingAvg: number | null;
+  ratingCount: number;
   updatedAt: string;
 }
 
@@ -80,7 +83,7 @@ export interface SearchResult {
   total: number;
   page: number;
   pageSize: number;
-  hits: Array<{ productId: string; sku: string; slug: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null; swatches: ColorSwatch[] }>;
+  hits: Array<{ productId: string; sku: string; slug: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null; swatches: ColorSwatch[]; ratingAvg: number | null; ratingCount: number }>;
   facets: Record<string, FacetBucket[]>;
 }
 

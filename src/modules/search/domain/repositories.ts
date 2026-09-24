@@ -83,6 +83,11 @@ export interface VariantSwatchLookup {
   swatches(productId: bigint): Promise<Array<{ label: string; hex: string }>>;
 }
 
+export interface ReviewStatsLookup {
+  /** Approved reviews only — a pending/rejected review never counts toward a product's public rating. */
+  stats(productId: bigint): Promise<{ avg: number | null; count: number }>;
+}
+
 export interface ProductMediaLookup {
   primaryImageKey(productId: bigint): Promise<string | null>;
 }
