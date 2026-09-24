@@ -42,11 +42,48 @@ export class PrismaCartRepository implements CartRepository {
     // reservation UPDATE — atomically prevents two concurrent checkout calls for
     // the same cart from both proceeding (plan/05 §2.3 cart trust model).
     const rows = await this.db.$executeRaw`
-      UPDATE cart SET status = 'CONVERTED' WHERE id = ${cartId} AND status = 'ACTIVE'`;
+      UPDATE cart SET status = 'CONVERTED', updated_at = now() WHERE id = ${cartId} AND status = 'ACTIVE'`;
     if (rows === 0) {
       const cart = await this.db.cart.findFirst({ where: { id: cartId }, select: { publicId: true } });
       throw new CartNotActiveError(cart?.publicId ?? String(cartId));
     }
+  }
+
+  async reopenAfterFailedCheckout(cartId: bigint, opts?: { onlyIfOlderThanSeconds?: number }): Promise<boolean> {
+    return this.db.$transaction(async (tx) => {
+      const carts = await tx.$queryRaw<Array<{ status: string; idle_seconds: number }>>`
+        SELECT status::text AS status, EXTRACT(EPOCH FROM (now() - updated_at))::float8 AS idle_seconds
+        FROM cart WHERE id = ${cartId} FOR UPDATE`;
+      const cart = carts[0];
+      if (!cart || cart.status !== 'CONVERTED') return false;
+      if (opts?.onlyIfOlderThanSeconds !== undefined && cart.idle_seconds < opts.onlyIfOlderThanSeconds) return false;
+
+      const orders = await tx.$queryRaw<Array<{ id: bigint; order_status: string; financial_status: string }>>`
+        SELECT id, status::text AS order_status, financial_status::text AS financial_status
+        FROM "order" WHERE cart_id = ${cartId} FOR UPDATE`;
+      const order = orders[0];
+      if (order) {
+        const declined = order.order_status === 'CANCELLED' && order.financial_status === 'FAILED';
+        const neverProgressed = order.order_status === 'PENDING' && order.financial_status === 'PENDING';
+        if (!declined && !neverProgressed) return false; // paid / on account / COD in progress — never reopen
+        if (neverProgressed) {
+          await tx.$executeRaw`UPDATE "order" SET status = 'CANCELLED', financial_status = 'FAILED' WHERE id = ${order.id}`;
+          await tx.orderStatusHistory.create({
+            data: {
+              orderId: order.id,
+              eventType: 'CHECKOUT_FAILED',
+              fromValue: 'PENDING',
+              toValue: 'CANCELLED',
+              message: 'Checkout did not complete — order cancelled so the customer can retry with the same cart',
+              actorType: 'SYSTEM',
+            },
+          });
+        }
+        await tx.$executeRaw`UPDATE "order" SET cart_id = NULL WHERE id = ${order.id}`;
+      }
+      await tx.$executeRaw`UPDATE cart SET status = 'ACTIVE', updated_at = now() WHERE id = ${cartId}`;
+      return true;
+    });
   }
 
   async setCouponCode(cartId: bigint, code: string | null): Promise<void> {

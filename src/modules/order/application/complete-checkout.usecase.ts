@@ -4,6 +4,7 @@ import type {
   VariantLookup,
   WarehouseResolver,
   CartTenderView,
+  CartView,
   CompanyMembershipLookup,
   WalletSettingsLookup,
   PaymentMethodRepository,
@@ -31,7 +32,7 @@ import { InsufficientAvailableBalanceError } from '../../wallet/domain/errors.js
 import { InsufficientAvailableGiftCardBalanceError } from '../../giftcard/domain/errors.js';
 import { CreditLimitExceededError } from '../../company/domain/errors.js';
 import { NotFoundError, ValidationError } from '../../../shared/domain/errors.js';
-import { PaymentDeclinedError } from '../domain/errors.js';
+import { PaymentDeclinedError, CartNotActiveError } from '../domain/errors.js';
 import {
   addMinor,
   subtractMinor,
@@ -62,6 +63,9 @@ interface PricedLine {
  * call reverseCharge() on failure, mirroring the other two tenders' shape
  * closely enough to share the same array/loop.
  */
+/** A cart still claimed by a checkout this many seconds ago is treated as stuck from a failed attempt, not as one still running. */
+const STUCK_CART_AFTER_SECONDS = 120;
+
 type TenderHold =
   | { tenderType: 'WALLET'; hold: WalletHoldHandle }
   | { tenderType: 'GIFT_CARD'; hold: GiftCardHoldHandle }
@@ -124,8 +128,38 @@ export class CompleteCheckout {
     const warehouse = await this.warehouses.resolveForStore(ctx.storeId);
     if (!warehouse) throw new NotFoundError('Warehouse', 'no warehouse available for this store');
 
-    // Step 1: claim the cart atomically before any expensive work.
-    await this.carts.claimForCheckout(cart.id);
+    // Step 1: claim the cart atomically before any expensive work. A cart found still
+    // claimed from an earlier attempt that failed (long enough ago that it can't be the
+    // request currently running) is reopened first — this also heals carts stuck that way
+    // by checkouts that failed before failures reopened the cart themselves.
+    try {
+      await this.carts.claimForCheckout(cart.id);
+    } catch (err) {
+      const healed =
+        err instanceof CartNotActiveError &&
+        (await this.carts.reopenAfterFailedCheckout(cart.id, { onlyIfOlderThanSeconds: STUCK_CART_AFTER_SECONDS }));
+      if (!healed) throw err;
+      await this.carts.claimForCheckout(cart.id);
+    }
+
+    // From here we own the claim. If this attempt fails for ANY reason before the order is
+    // paid (out of stock, declined payment, bad coupon, ...), give the cart back so the
+    // shopper can fix the problem and retry with the same cart instead of a dead
+    // "cart is not active" error. (A cart whose order really went through stays converted.)
+    try {
+      return await this.placeClaimedCart(cmd, cart, ctx, warehouse);
+    } catch (err) {
+      await this.carts.reopenAfterFailedCheckout(cart.id).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  private async placeClaimedCart(
+    cmd: CompleteCheckoutCommand,
+    cart: CartView,
+    ctx: StoreViewContext,
+    warehouse: { id: bigint },
+  ): Promise<OrderViewDto> {
 
     // Step 2: resolve live per-unit prices for every line.
     const pricedLines: PricedLine[] = [];

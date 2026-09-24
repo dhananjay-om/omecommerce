@@ -301,6 +301,21 @@ export interface CartRepository {
   upsertLine(cartId: bigint, variantId: bigint, qty: number): Promise<void>;
   /** Guarded ACTIVE -> CONVERTED transition; throws if the cart isn't ACTIVE. */
   claimForCheckout(cartId: bigint): Promise<void>;
+  /**
+   * Puts a cart that a checkout attempt claimed (CONVERTED) back to ACTIVE after that attempt
+   * FAILED, so the shopper can simply retry with the same cart. Returns true if it reopened it.
+   *
+   * Never reopens a cart whose order actually went through: if the linked order is anything
+   * other than a definitive failure (CANCELLED + FAILED) or a never-progressed attempt
+   * (PENDING + PENDING), it is left alone. The failed order is unlinked from the cart
+   * (Order.cartId is unique — a retry would otherwise collide with it) but kept as history;
+   * a never-progressed one is marked CANCELLED/FAILED first.
+   *
+   * `onlyIfOlderThanSeconds` is for healing a cart found stuck at the START of a checkout: it
+   * refuses to touch a cart claimed that recently, so a double-click can't cancel the attempt
+   * that is still running.
+   */
+  reopenAfterFailedCheckout(cartId: bigint, opts?: { onlyIfOlderThanSeconds?: number }): Promise<boolean>;
   /** null clears the applied coupon. Not itself validated here — callers (ApplyCouponToCart)
    *  validate via DiscountCalculator.evaluate() first. */
   setCouponCode(cartId: bigint, code: string | null): Promise<void>;
