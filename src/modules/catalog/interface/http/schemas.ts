@@ -231,6 +231,7 @@ export const createCategorySchema = z.object({
   metaDescription: blankToUndefined(z.string().max(2000).nullish()),
   metaKeywords: blankToUndefined(z.string().max(255).nullish()),
   includeInMenu: z.boolean().optional(),
+  showOnHome: z.boolean().optional(),
 });
 
 export const updateCategorySchema = z.object({
@@ -243,6 +244,7 @@ export const updateCategorySchema = z.object({
   metaDescription: blankToUndefined(z.string().max(2000).nullish()),
   metaKeywords: blankToUndefined(z.string().max(255).nullish()),
   includeInMenu: z.boolean().optional(),
+  showOnHome: z.boolean().optional(),
 });
 
 export const reparentCategorySchema = z.object({

@@ -45,14 +45,17 @@ export default async function HomePage() {
   ]);
 
   const hasMiddleWidget = (type: string) => middleWidgets.some((w) => w.type === type);
-  const rootCategories = categories.filter((c) => c.parentId === null);
+  // "Shop by Category" shows exactly the categories an admin ticked "Show on Home
+  // Page" for (Categories > edit), in their own position order — no implicit
+  // "every root category" rule any more.
+  const homeCategories = categories.filter((c) => c.showOnHome).sort((a, b) => a.position - b.position);
 
   return (
     <div>
       <WidgetZone widgets={topWidgets} section="TOP" />
       <MarqueeStrip />
 
-      {!hasMiddleWidget('CATEGORY_GRID') ? <FeaturedCategories categories={rootCategories} /> : null}
+      {!hasMiddleWidget('CATEGORY_GRID') ? <FeaturedCategories categories={homeCategories} /> : null}
 
       <ProductCarousel
         title="Bestsellers"

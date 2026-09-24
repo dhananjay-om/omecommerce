@@ -20,6 +20,7 @@ export async function toCategoryView(c: CategoryInfo): Promise<CategoryView> {
     metaDescription: c.metaDescription,
     metaKeywords: c.metaKeywords,
     includeInMenu: c.includeInMenu,
+    showOnHome: c.showOnHome,
     createdAt: c.createdAt.toISOString(),
   };
 }

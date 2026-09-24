@@ -412,6 +412,7 @@ export interface CreateCategoryCommand {
   metaDescription?: string | null;
   metaKeywords?: string | null;
   includeInMenu?: boolean;
+  showOnHome?: boolean;
 }
 
 export interface UpdateCategoryCommand {
@@ -425,6 +426,7 @@ export interface UpdateCategoryCommand {
   metaDescription?: string | null;
   metaKeywords?: string | null;
   includeInMenu?: boolean;
+  showOnHome?: boolean;
 }
 
 export interface ReparentCategoryCommand {
@@ -450,6 +452,7 @@ export interface CategoryView {
   metaDescription: string | null;
   metaKeywords: string | null;
   includeInMenu: boolean;
+  showOnHome: boolean;
   createdAt: string;
 }
 

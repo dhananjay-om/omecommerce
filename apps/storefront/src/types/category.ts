@@ -13,6 +13,8 @@ export interface Category {
   metaDescription: string | null;
   metaKeywords: string | null;
   includeInMenu: boolean;
+  /** Admin's explicit "feature this on the home page's Shop by Category" choice. */
+  showOnHome: boolean;
   createdAt: string;
 }
 

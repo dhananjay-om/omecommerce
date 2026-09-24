@@ -83,6 +83,7 @@ function TreeRow({
           </div>
         )}
         <span className="flex-1 truncate font-medium text-foreground">{name}</span>
+        {node.category.showOnHome ? <DotBadge variant="success">On home page</DotBadge> : null}
         <DotBadge variant={node.category.includeInMenu ? 'success' : 'secondary'}>{node.category.includeInMenu ? 'Visible' : 'Hidden'}</DotBadge>
         <DropdownMenu>
           <DropdownMenuTrigger

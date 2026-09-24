@@ -38,6 +38,7 @@ export async function updateCategory(_prevState: ActionState, formData: FormData
   const position = String(formData.get('position') ?? '').trim();
   const sortMode = String(formData.get('sortMode') ?? '').trim();
   const includeInMenu = String(formData.get('includeInMenu') ?? '').trim();
+  const showOnHome = String(formData.get('showOnHome') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim();
   const imageMediaKey = String(formData.get('imageMediaKey') ?? '').trim();
   const metaTitle = String(formData.get('metaTitle') ?? '').trim();
@@ -56,6 +57,7 @@ export async function updateCategory(_prevState: ActionState, formData: FormData
       position: position ? Number(position) : undefined,
       sortMode: sortMode || undefined,
       includeInMenu: includeInMenu ? includeInMenu === 'true' : undefined,
+      showOnHome: showOnHome ? showOnHome === 'true' : undefined,
       description: description || null,
       imageMediaKey: imageMediaKey || null,
       metaTitle: metaTitle || null,

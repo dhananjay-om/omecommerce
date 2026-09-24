@@ -119,7 +119,7 @@ export async function WidgetRenderer({ widget }: { widget: WidgetInstance }) {
       const chosen =
         categoryIds && categoryIds.length > 0
           ? curateByIds(allCategories, categoryIds)
-          : allCategories.filter((c) => c.parentId === null); // default: root categories only, same as before curation existed
+          : allCategories.filter((c) => c.showOnHome).sort((a, b) => a.position - b.position); // default: the categories flagged "Show on Home Page" (an explicit pick — a widget's own curated list still wins)
       const categories = limit ? chosen.slice(0, limit) : chosen;
       return <FeaturedCategories categories={categories} heading={widget.title ?? undefined} />;
     }

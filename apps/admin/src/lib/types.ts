@@ -139,6 +139,7 @@ export interface Category {
   metaDescription: string | null;
   metaKeywords: string | null;
   includeInMenu: boolean;
+  showOnHome: boolean;
   createdAt: string;
 }
 

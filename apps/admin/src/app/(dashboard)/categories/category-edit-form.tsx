@@ -152,6 +152,21 @@ export function CategoryEditForm({ category, categories }: { category: Category;
             </Select>
             <p className="text-xs text-muted-foreground">Hiding a category also hides everything under it in the nav.</p>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="cat-showOnHome">Show on Home Page</Label>
+            <Select key={String(category.showOnHome)} name="showOnHome" defaultValue={category.showOnHome ? 'true' : 'false'}>
+              <SelectTrigger id="cat-showOnHome" className="w-full">
+                <SelectValue>{(value: string) => (value === 'true' ? 'Yes — featured in "Shop by Category"' : 'No — not on the home page')}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Yes — featured in &quot;Shop by Category&quot;</SelectItem>
+                <SelectItem value="false">No — not on the home page</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              The home page&apos;s &quot;Shop by Category&quot; shows exactly the categories set to Yes here, in the order of their Position number (lowest first).
+            </p>
+          </div>
         </div>
       </SectionCard>
 

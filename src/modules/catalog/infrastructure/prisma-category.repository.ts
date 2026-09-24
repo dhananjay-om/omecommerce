@@ -22,6 +22,7 @@ const CATEGORY_SELECT = {
   metaDescription: true,
   metaKeywords: true,
   includeInMenu: true,
+  showOnHome: true,
   createdAt: true,
   parent: { select: { publicId: true } },
 } as const;
@@ -41,6 +42,7 @@ type CategoryRow = {
   metaDescription: string | null;
   metaKeywords: string | null;
   includeInMenu: boolean;
+  showOnHome: boolean;
   createdAt: Date;
   parent: { publicId: string } | null;
 };
@@ -62,6 +64,7 @@ function mapRow(row: CategoryRow): CategoryInfo {
     metaDescription: row.metaDescription,
     metaKeywords: row.metaKeywords,
     includeInMenu: row.includeInMenu,
+    showOnHome: row.showOnHome,
     createdAt: row.createdAt,
   };
 }
@@ -85,6 +88,7 @@ export class PrismaCategoryRepository implements CategoryRepository {
         metaDescription: input.metaDescription,
         metaKeywords: input.metaKeywords,
         includeInMenu: input.includeInMenu,
+        showOnHome: input.showOnHome,
       },
       select: CATEGORY_SELECT,
     });
@@ -141,6 +145,7 @@ export class PrismaCategoryRepository implements CategoryRepository {
         metaDescription: input.metaDescription,
         metaKeywords: input.metaKeywords,
         includeInMenu: input.includeInMenu,
+        showOnHome: input.showOnHome,
       },
       select: CATEGORY_SELECT,
     });

@@ -28,6 +28,7 @@ export class CreateCategory {
       metaDescription: cmd.metaDescription,
       metaKeywords: cmd.metaKeywords,
       includeInMenu: cmd.includeInMenu,
+      showOnHome: cmd.showOnHome,
     });
     return toCategoryView(created);
   }

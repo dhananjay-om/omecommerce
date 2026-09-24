@@ -385,6 +385,7 @@ export interface CategoryInfo {
   metaDescription: string | null;
   metaKeywords: string | null;
   includeInMenu: boolean;
+  showOnHome: boolean;
   createdAt: Date;
 }
 
@@ -402,6 +403,7 @@ export interface CreateCategoryInput {
   metaDescription?: string | null;
   metaKeywords?: string | null;
   includeInMenu?: boolean;
+  showOnHome?: boolean;
 }
 
 export interface UpdateCategoryInput {
@@ -414,6 +416,7 @@ export interface UpdateCategoryInput {
   metaDescription?: string | null;
   metaKeywords?: string | null;
   includeInMenu?: boolean;
+  showOnHome?: boolean;
 }
 
 /**

@@ -376,6 +376,13 @@ model Category {
   /// navigation menu. Defaults true so every pre-existing category keeps
   /// showing up unchanged.
   includeInMenu    Boolean               @default(true) @map("include_in_menu")
+  /// Whether this category is featured in the home page's "Shop by Category"
+  /// section — an explicit, per-category admin choice (any level of the tree,
+  /// not just roots). Defaults false so a NEW category never appears there
+  /// unasked; the migration backfilled true for every root category that
+  /// already existed, so nothing on the live home page changed on deploy.
+  /// Display order follows `position`.
+  showOnHome       Boolean               @default(false) @map("show_on_home")
   createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        BigInt?               @map("created_by")
