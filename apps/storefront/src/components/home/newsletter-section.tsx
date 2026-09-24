@@ -36,12 +36,14 @@ export function NewsletterSection() {
             {loading ? 'Subscribing…' : 'Subscribe'}
           </button>
         </form>
-        <p role="status" aria-live="polite" className={`mt-3 text-xs ${state.kind === 'error' ? 'text-rose' : state.kind === 'success' ? 'text-green-700' : 'text-slate'}`}>
+        <p role="status" aria-live="polite" className={`mt-3 text-xs ${state.kind === 'error' ? 'text-rose' : state.kind === 'success' ? 'text-green-700' : state.kind === 'already' ? 'text-champagne' : 'text-slate'}`}>
           {state.kind === 'success'
             ? "You're subscribed — thanks! Check your inbox for a welcome note."
-            : state.kind === 'error'
-              ? state.message
-              : 'Unsubscribe any time with one click.'}
+            : state.kind === 'already'
+              ? 'This email is already subscribed.'
+              : state.kind === 'error'
+                ? state.message
+                : 'Unsubscribe any time with one click.'}
         </p>
       </div>
     </section>

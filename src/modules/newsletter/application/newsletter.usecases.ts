@@ -44,24 +44,25 @@ export class SubscribeToNewsletter {
     private readonly siteUrl: string | undefined,
   ) {}
 
-  /** Idempotent and non-revealing: subscribing an address that's already on
-   *  the list succeeds the same way, so the public form can't be used to
-   *  probe who is subscribed. A welcome email goes out only when something
-   *  actually changed (new address, or an unsubscribed one coming back), and
-   *  a mail failure never fails the sign-up. */
-  async execute(cmd: { email: string; source?: string; websiteCode?: string }): Promise<void> {
+  /** Idempotent: subscribing an address that's already on the list creates
+   *  nothing and reports `alreadySubscribed` so the form can say so. A welcome
+   *  email goes out only when something actually changed (new address, or an
+   *  unsubscribed one coming back), and a mail failure never fails the
+   *  sign-up. */
+  async execute(cmd: { email: string; source?: string; websiteCode?: string }): Promise<{ alreadySubscribed: boolean }> {
     const { outcome, subscriber } = await this.newsletter.subscribe({
       email: cmd.email,
       source: cmd.source ?? 'home',
       websiteCode: cmd.websiteCode ?? null,
     });
-    if (outcome === 'ALREADY_SUBSCRIBED') return;
+    if (outcome === 'ALREADY_SUBSCRIBED') return { alreadySubscribed: true };
     try {
       const { subject, html } = welcomeEmail(this.siteUrl, subscriber.unsubscribeToken);
       await this.email.send({ to: subscriber.email, subject, html });
     } catch (err) {
       logger.warn({ err }, 'newsletter welcome email failed');
     }
+    return { alreadySubscribed: false };
   }
 }
 

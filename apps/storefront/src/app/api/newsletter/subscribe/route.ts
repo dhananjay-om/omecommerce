@@ -35,8 +35,12 @@ export async function POST(request: Request) {
   if (tooMany(ip)) return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
 
   try {
-    await apiPost('/store/v1/newsletter/subscribe', { email, source, websiteCode: await getSelectedWebsiteCode() });
-    return NextResponse.json({ ok: true });
+    const result = await apiPost<{ alreadySubscribed: boolean }>('/store/v1/newsletter/subscribe', {
+      email,
+      source,
+      websiteCode: await getSelectedWebsiteCode(),
+    });
+    return NextResponse.json({ ok: true, alreadySubscribed: result.alreadySubscribed });
   } catch (err) {
     if (err instanceof ApiError) {
       const message = err.status === 422 ? 'Please enter a valid email address.' : 'Could not subscribe right now. Please try again.';

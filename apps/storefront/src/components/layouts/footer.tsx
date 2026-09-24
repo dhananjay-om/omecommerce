@@ -123,6 +123,8 @@ export function Footer({ website }: { website: Website }) {
           </form>
           {newsletter.state.kind === 'success' ? (
             <p role="status" className="mt-2 text-xs text-champagne">You&apos;re subscribed — thanks!</p>
+          ) : newsletter.state.kind === 'already' ? (
+            <p role="status" className="mt-2 text-xs text-champagne">This email is already subscribed.</p>
           ) : newsletter.state.kind === 'error' ? (
             <p role="status" className="mt-2 text-xs text-rose">{newsletter.state.message}</p>
           ) : null}

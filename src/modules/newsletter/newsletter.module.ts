@@ -45,8 +45,8 @@ export function createNewsletterModule(db: Db, authorize: (permission: string) =
   store.post(
     '/newsletter/subscribe',
     asyncHandler(async (req, res) => {
-      await subscribe.execute(parse(subscribeSchema, req.body));
-      res.status(202).json({ data: { subscribed: true } });
+      const { alreadySubscribed } = await subscribe.execute(parse(subscribeSchema, req.body));
+      res.status(202).json({ data: { subscribed: true, alreadySubscribed } });
     }),
   );
   store.post(
