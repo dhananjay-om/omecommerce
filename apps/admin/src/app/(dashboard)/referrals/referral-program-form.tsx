@@ -21,7 +21,7 @@ const initialState: ActionState = { error: null, success: false };
  * a bad configuration never round-trips to the API to find out.
  */
 function validateReward(
-  side: 'Referrer' | 'Referee',
+  side: 'Referrer' | 'New customer',
   type: ReferralRewardType,
   amount: string,
   points: string,
@@ -61,7 +61,7 @@ export function ReferralProgramForm({
       hasLoyaltyProgram,
     );
     const refereeError = validateReward(
-      'Referee',
+      'New customer',
       refereeType,
       String(data.get('refereeRewardAmount') ?? ''),
       String(data.get('refereeRewardPoints') ?? ''),
@@ -117,8 +117,8 @@ export function ReferralProgramForm({
       </div>
 
       <div className="rounded-lg border p-4">
-        <h4 className="text-sm font-semibold">Referrer reward</h4>
-        <p className="mt-1 text-xs text-muted-foreground">Granted to the person who shared their referral link.</p>
+        <h4 className="text-sm font-semibold">Reward for the referrer</h4>
+        <p className="mt-1 text-xs text-muted-foreground">The existing customer who shares their referral link — they get this when a friend qualifies.</p>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor={`ref-referrer-type-${scope}`}>Reward type</Label>
@@ -160,8 +160,8 @@ export function ReferralProgramForm({
       </div>
 
       <div className="rounded-lg border p-4">
-        <h4 className="text-sm font-semibold">Referee reward</h4>
-        <p className="mt-1 text-xs text-muted-foreground">Granted to the new customer who used the referral link.</p>
+        <h4 className="text-sm font-semibold">Reward for the new customer (referee)</h4>
+        <p className="mt-1 text-xs text-muted-foreground">The friend who signs up using that link — a separate reward, given to them.</p>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor={`ref-referee-type-${scope}`}>Reward type</Label>

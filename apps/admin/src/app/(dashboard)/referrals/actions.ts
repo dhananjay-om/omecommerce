@@ -51,7 +51,10 @@ export async function saveReferralProgram(_prevState: ActionState, formData: For
     if (mode === 'create') {
       const websiteCode = String(formData.get('websiteCode') ?? '').trim();
       if (!websiteCode) return { error: 'Missing website code.', success: false };
-      await apiPost<ReferralProgram>('/admin/v1/referral/programs', { websiteCode, ...body });
+      // The create endpoint takes "omitted" (not null) for every optional field — unlike
+      // update, where null means "clear it" — so drop the empty ones instead of sending null.
+      const createBody = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== null && v !== undefined));
+      await apiPost<ReferralProgram>('/admin/v1/referral/programs', { websiteCode, ...createBody });
     } else {
       const programPublicId = String(formData.get('programPublicId') ?? '').trim();
       const status = String(formData.get('status') ?? '').trim();
@@ -59,7 +62,11 @@ export async function saveReferralProgram(_prevState: ActionState, formData: For
       await apiPatch<ReferralProgram>(`/admin/v1/referral/programs/${programPublicId}`, { ...body, status: status || undefined });
     }
   } catch (err) {
-    if (err instanceof ApiError) return { error: err.message, success: false };
+    if (err instanceof ApiError) {
+      // Say WHICH field is wrong, not just "Validation failed".
+      const details = err.errors?.map((e) => `${e.path}: ${e.message}`).join('; ');
+      return { error: details ? `${err.message} — ${details}` : err.message, success: false };
+    }
     throw err;
   }
 
