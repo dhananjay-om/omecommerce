@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Bars3Icon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -56,8 +57,12 @@ function MegaMenuLinks({ items }: { items: MegaMenuItem[] }) {
 }
 
 export function MobileMenu({ tree, items }: { tree: CategoryNode[]; items: MegaMenuItem[] }) {
+  // Controlled so tapping any link inside can close the drawer itself — left
+  // uncontrolled it stayed open over the page the link navigated to (same
+  // bug the mini-cart's "View Cart" had).
+  const [open, setOpen] = useState(false);
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         render={
           <Button variant="ghost" size="icon" aria-label="Open menu" className="lg:hidden">
@@ -69,7 +74,12 @@ export function MobileMenu({ tree, items }: { tree: CategoryNode[]; items: MegaM
         <SheetHeader>
           <SheetTitle>Menu</SheetTitle>
         </SheetHeader>
-        <nav className="flex flex-col gap-0.5 overflow-y-auto px-2 pb-4">
+        <nav
+          className="flex flex-col gap-0.5 overflow-y-auto px-2 pb-4"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('a')) setOpen(false);
+          }}
+        >
           <Link href="/" className="block rounded-lg px-2 py-2 text-sm font-semibold text-jet transition-colors hover:bg-sand hover:text-champagne">
             Home
           </Link>

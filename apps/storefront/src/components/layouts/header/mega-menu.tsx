@@ -1,8 +1,18 @@
+'use client';
+
+import { useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import type { CategoryNode } from '@/lib/category-tree';
 import type { MegaMenuItem, MegaMenuPromoImagePosition } from '@/types/mega-menu';
 
 const linkClass = 'rounded-full px-3 py-1.5 text-sm font-medium text-charcoal transition-colors hover:bg-sand hover:text-jet';
+
+// Reveal classes are dropped entirely while a panel is `closed` (just
+// clicked a link inside it) — CSS :hover/:focus-within alone can't know a
+// click already "used" the menu, so without this the panel stayed open over
+// the page the click navigated to (cursor still hovering, clicked link still
+// focused).
+const REVEAL_CLASS = 'group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100';
 
 const staticLinks = [
   { href: '/products', label: 'Products' },
@@ -30,7 +40,7 @@ const PROMO_DIRECTION_CLASS: Record<MegaMenuPromoImagePosition, string> = {
  *  Mega Menu > Dropdown Layout / Promo Panel); every one left unset here
  *  reproduces the exact look this panel had before those controls
  *  existed. */
-function MegaMenuPanel({ item }: { item: MegaMenuItem }) {
+function MegaMenuPanel({ item, closed }: { item: MegaMenuItem; closed: boolean }) {
   const isRow = item.promoImagePosition === 'left' || item.promoImagePosition === 'right';
   const promoWidth = item.promoImageWidth ? `${item.promoImageWidth}px` : isRow ? '160px' : '100%';
   const promoHeight = item.promoImageHeight ? `${item.promoImageHeight}px` : isRow ? '100%' : '200px';
@@ -40,7 +50,7 @@ function MegaMenuPanel({ item }: { item: MegaMenuItem }) {
     // element from the tab order entirely, so a keyboard user tabbing to the
     // parent link needs :focus-within on the group to reveal the panel.
     <div
-      className={`invisible absolute top-full left-0 z-40 flex items-start gap-6 rounded-2xl border border-ghost bg-white p-6 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${PROMO_DIRECTION_CLASS[item.promoImagePosition]}`}
+      className={`invisible absolute top-full left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-start gap-6 rounded-2xl border border-ghost bg-white p-6 opacity-0 shadow-xl transition-opacity ${closed ? '' : REVEAL_CLASS} ${PROMO_DIRECTION_CLASS[item.promoImagePosition]}`}
       style={{ minWidth: item.panelWidth ? `${item.panelWidth}px` : '28rem' }}
     >
       {item.columns.length > 0 ? (
@@ -73,10 +83,13 @@ function MegaMenuPanel({ item }: { item: MegaMenuItem }) {
 }
 
 /**
- * Desktop nav with a hover-triggered dropdown per top-level item. Pure
- * CSS (`group`/`group-hover`), no JS state — the primitives copied from
- * admin don't include a NavigationMenu component, and this doesn't need
- * one.
+ * Desktop nav with a hover-triggered dropdown per top-level item. Opening
+ * is pure CSS (`group`/`group-hover`); the only JS state is which item was
+ * just clicked, so its panel can close after navigating (see REVEAL_CLASS).
+ * The dropdown is anchored to the <nav> (centered, clamped to the viewport)
+ * rather than to its own item — anchored to the item, a wide panel on a
+ * right-hand link stuck out past the window edge even while invisible and
+ * gave the whole page a sideways scrollbar.
  *
  * `items` (admin-managed, Content > Mega Menu — see navigation.service.ts)
  * takes over completely once at least one exists: real multi-column
@@ -88,18 +101,30 @@ function MegaMenuPanel({ item }: { item: MegaMenuItem }) {
  * site that hasn't set up the new admin page yet.
  */
 export function MegaMenu({ tree, items }: { tree: CategoryNode[]; items: MegaMenuItem[] }) {
+  const [closedId, setClosedId] = useState<string | null>(null);
+
+  // Click anywhere inside a group (top link or a panel link): close it, and
+  // drop focus from the clicked anchor so :focus-within doesn't re-open it
+  // the moment the cursor leaves.
+  const onGroupClick = (id: string) => (e: MouseEvent<HTMLDivElement>) => {
+    if (!(e.target as HTMLElement).closest('a')) return;
+    (e.target as HTMLElement).closest('a')?.blur();
+    setClosedId(id);
+  };
+  const onGroupLeave = (id: string) => () => setClosedId((cur) => (cur === id ? null : cur));
+
   if (items.length > 0) {
     return (
-      <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex">
+      <nav className="relative hidden flex-1 items-center justify-center gap-1 lg:flex">
         <Link href="/" className={linkClass}>
           Home
         </Link>
         {items.map((item) => (
-          <div key={item.publicId} className="group relative">
+          <div key={item.publicId} className="group" onClick={onGroupClick(item.publicId)} onMouseLeave={onGroupLeave(item.publicId)}>
             <Link href={item.href} className={`flex items-center gap-1 ${linkClass}`}>
               {item.label}
             </Link>
-            {item.columns.length > 0 || item.promoImageUrl ? <MegaMenuPanel item={item} /> : null}
+            {item.columns.length > 0 || item.promoImageUrl ? <MegaMenuPanel item={item} closed={closedId === item.publicId} /> : null}
           </div>
         ))}
       </nav>
@@ -114,12 +139,12 @@ export function MegaMenu({ tree, items }: { tree: CategoryNode[]; items: MegaMen
         Home
       </Link>
       {tree.map((node) => (
-        <div key={node.category.publicId} className="group relative">
+        <div key={node.category.publicId} className="group relative" onClick={onGroupClick(node.category.publicId)} onMouseLeave={onGroupLeave(node.category.publicId)}>
           <Link href={`/collections/${node.category.slug}`} className={`flex items-center gap-1 ${linkClass}`}>
             {node.category.nameDefault ?? node.category.slug}
           </Link>
           {node.children.length > 0 ? (
-            <div className="invisible absolute top-full left-0 z-40 min-w-56 rounded-2xl border border-ghost bg-white p-3 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+            <div className={`invisible absolute top-full left-0 z-40 min-w-56 rounded-2xl border border-ghost bg-white p-3 opacity-0 shadow-xl transition-opacity ${closedId === node.category.publicId ? '' : REVEAL_CLASS}`}>
               {node.children.map((child) => (
                 <Link
                   key={child.category.publicId}
