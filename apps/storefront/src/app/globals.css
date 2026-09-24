@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Banner backdrops are picked in the admin (Content > Banners > Gradient) and arrive as class
+   names stored in the database, so Tailwind can't see them in the source. List every preset the
+   API accepts (src/modules/banner/interface/http/schemas.ts) so their classes are generated. */
+@source inline("from-blue-600 to-indigo-700 from-rose-500 to-pink-600 from-amber-600 to-orange-700 from-emerald-600 to-teal-700 from-indigo-600 to-violet-700 from-rose-600 to-orange-600 from-primary to-blue-700 from-slate-700 to-slate-900");
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

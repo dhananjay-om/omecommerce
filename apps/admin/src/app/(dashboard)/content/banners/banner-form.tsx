@@ -79,6 +79,9 @@ export function BannerForm({ banner }: { banner?: Banner }) {
           <div className="space-y-2">
             <Label htmlFor="banner-title">Title</Label>
             <Input id="banner-title" name="title" defaultValue={banner?.title ?? ''} required />
+            <p className="text-xs text-muted-foreground">
+              Simple formatting works here and in the subtitle: <code>&lt;br&gt;</code> for a new line, <code>&lt;b&gt;</code>, <code>&lt;em&gt;</code>, <code>&lt;u&gt;</code>. Anything else is ignored.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="banner-subtitle">Subtitle</Label>
@@ -92,6 +95,7 @@ export function BannerForm({ banner }: { banner?: Banner }) {
           <div className="space-y-2">
             <Label htmlFor="banner-ctaLabel">Button Text</Label>
             <Input id="banner-ctaLabel" name="ctaLabel" defaultValue={banner?.ctaLabel ?? ''} placeholder="Shop Now" />
+            <p className="text-xs text-muted-foreground">The button label on the card. Leave blank for the default (&quot;Explore →&quot; on Promo cards).</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="banner-ctaHref">Button Link</Label>

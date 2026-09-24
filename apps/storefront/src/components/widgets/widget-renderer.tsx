@@ -102,6 +102,7 @@ export async function WidgetRenderer({ widget }: { widget: WidgetInstance }) {
         title: b.title,
         subtitle: b.subtitle ?? '',
         href: b.ctaHref ?? '/products',
+        ctaLabel: b.ctaLabel ?? undefined,
         imageUrl: b.imageUrl,
         // `||`, not `??` — the admin form submits an empty string (not null)
         // for "None (default rotation)", and an empty string is exactly the
