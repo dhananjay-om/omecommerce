@@ -167,12 +167,18 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
       <div className="mt-3 flex flex-1 flex-col px-0.5">
         <p className="text-[10px] tracking-widest text-slate uppercase">{placeholderBrand(hit.productId)}</p>
         <Link href={href}>
-          <h3 className="mt-0.5 line-clamp-2 text-sm leading-snug font-medium text-jet transition-colors hover:text-champagne">
+          {/* min-h reserves exactly two lines (2 × text-sm leading-snug) even for a
+             one-line title, so price/discount/swatches start at the same height
+             on every card regardless of how long each product name is. */}
+          <h3 className="mt-0.5 line-clamp-2 min-h-[2.42rem] text-sm leading-snug font-medium text-jet transition-colors hover:text-champagne">
             {hit.name}
           </h3>
         </Link>
         <div className="mt-auto pt-1.5">
-          <div className="flex items-center justify-between gap-1.5">
+          {/* On narrow (phone) cards, price + struck-through MRP + stars don't always fit on
+              one line and wrap to two — reserve two lines there (items-start, so every
+              card's price sits at the same top edge) instead of letting one card grow. */}
+          <div className="flex min-h-[2.75rem] items-start justify-between gap-1.5 sm:min-h-0 sm:items-center">
             <span className="flex flex-wrap items-baseline gap-1.5">
               <span className="text-sm font-semibold text-jet">
                 {hit.priceDisplay && hit.currency ? formatPrice(hit.priceDisplay, hit.currency) : 'Price unavailable'}
@@ -181,7 +187,7 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
                 <span className="text-xs text-slate line-through">{formatPrice(hit.mrpDisplay!, hit.currency)}</span>
               ) : null}
             </span>
-            <span className="flex shrink-0 gap-0.5" aria-hidden>
+            <span className="flex shrink-0 gap-0.5 pt-0.5 sm:pt-0" aria-hidden>
               {Array.from({ length: 5 }, (_, i) => (
                 <span key={i} className={`text-[10px] ${i < Math.round(placeholderRating(hit.productId)) ? 'text-champagne' : 'text-silver'}`}>
                   ★

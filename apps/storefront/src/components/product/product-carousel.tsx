@@ -47,6 +47,10 @@ export function ProductCarousel({
           </Link>
         ) : null}
       </div>
+      {/* !h-auto on each slide: Swiper's default slide height:100% of an
+          auto-height wrapper means slides are only as tall as their own
+          content, so the card's pin-price-to-the-bottom (mt-auto) never
+          had equal-height cards to work against. */}
       <Swiper
         modules={[Navigation]}
         navigation
@@ -60,7 +64,7 @@ export function ProductCarousel({
         }}
       >
         {hits.map((hit) => (
-          <SwiperSlide key={hit.productId}>
+          <SwiperSlide key={hit.productId} className="!h-auto">
             <ProductCard hit={hit} badge={badge} />
           </SwiperSlide>
         ))}
