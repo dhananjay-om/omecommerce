@@ -41,6 +41,8 @@ export const PRODUCT_INDEX_MAPPING = {
       mrpDisplay: { type: 'keyword' },
       currency: { type: 'keyword' },
       imageKey: { type: 'keyword' },
+      // Returned as-is from _source for the listing card's color dots — never searched/filtered on.
+      swatches: { type: 'object', enabled: false },
       facets: {
         type: 'nested',
         properties: {

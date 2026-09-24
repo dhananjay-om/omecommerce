@@ -117,6 +117,8 @@ export class OpenSearchIndex implements SearchIndex {
       mrpDisplay: h._source.mrpDisplay,
       currency: h._source.currency,
       imageKey: h._source.imageKey,
+      // Documents indexed before swatches existed have none until reindexed.
+      swatches: h._source.swatches ?? [],
     }));
 
     const facets: Record<string, FacetBucket[]> = {};

@@ -10,6 +10,7 @@ import type {
   CategoryMembershipLookup,
   BrandLookup,
   ProductMediaLookup,
+  VariantSwatchLookup,
 } from '../domain/repositories.js';
 
 export class PrismaProductLookup implements ProductLookup {
@@ -154,5 +155,33 @@ export class PrismaProductMediaLookup implements ProductMediaLookup {
       ORDER BY (pm.role = 'THUMBNAIL') DESC, pm.position ASC
       LIMIT 1`;
     return rows[0]?.storage_key ?? null;
+  }
+}
+
+/** Only a real CSS hex color counts — `AttributeOption.swatch` is documented as
+ *  "hex color or media reference", and a media reference can't be drawn as a
+ *  colored dot. */
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+export class PrismaVariantSwatchLookup implements VariantSwatchLookup {
+  constructor(private readonly db: Db) {}
+
+  async swatches(productId: bigint): Promise<Array<{ label: string; hex: string }>> {
+    const rows = await this.db.variantAxisValue.findMany({
+      where: {
+        variant: { productId, deletedAt: null, status: 'ACTIVE' },
+        option: { swatch: { not: null }, deletedAt: null },
+        attribute: { deletedAt: null },
+      },
+      select: { option: { select: { id: true, label: true, swatch: true, sortOrder: true } } },
+    });
+    const byId = new Map<string, { label: string; hex: string; sortOrder: number }>();
+    for (const r of rows) {
+      const { id, label, swatch, sortOrder } = r.option;
+      if (swatch && HEX_COLOR.test(swatch.trim()) && !byId.has(id.toString())) {
+        byId.set(id.toString(), { label, hex: swatch.trim(), sortOrder });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.sortOrder - b.sortOrder).map(({ label, hex }) => ({ label, hex }));
   }
 }

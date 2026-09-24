@@ -78,6 +78,11 @@ export interface BrandLookup {
  * trigger reindex, same documented limitation as price/stock/category).
  * SearchProducts resolves the key to a fresh URL on every read instead.
  */
+export interface VariantSwatchLookup {
+  /** Distinct hex-swatch options across the product's live variants, in the option's own sort order. */
+  swatches(productId: bigint): Promise<Array<{ label: string; hex: string }>>;
+}
+
 export interface ProductMediaLookup {
   primaryImageKey(productId: bigint): Promise<string | null>;
 }

@@ -63,6 +63,8 @@ export interface SearchHit {
   mrpDisplay: string | null;
   currency: string | null;
   imageUrl: string | null;
+  /** The product's real colors (variant options with a hex swatch) — empty/absent when it has none. */
+  swatches?: Array<{ label: string; hex: string }>;
 }
 
 export interface FacetBucket {

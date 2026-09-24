@@ -14,6 +14,14 @@ export const CATEGORY_FACET_CODE = '__category';
 /** Reserved facet code for brand (plan/14 Phase 0b) — at most one per product (Product.brandId is a single nullable FK, unlike categories). */
 export const BRAND_FACET_CODE = '__brand';
 
+/** One real color a product comes in — from a variant-forming attribute
+ *  option that has a hex `swatch` set (Color=Red -> #C4786A). Shown as the
+ *  listing card's swatches; a product with no such option has none. */
+export interface ColorSwatch {
+  label: string;
+  hex: string;
+}
+
 export interface ProductDocument {
   productId: string;
   storeViewId: string;
@@ -35,6 +43,8 @@ export interface ProductDocument {
   /** Storage key of the lowest-position media asset, not a URL — see ProductMediaLookup's doc comment. */
   imageKey: string | null;
   facets: FacetPair[];
+  /** Distinct real colors across this product's variants — empty when none have a swatch. */
+  swatches: ColorSwatch[];
   updatedAt: string;
 }
 
@@ -70,7 +80,7 @@ export interface SearchResult {
   total: number;
   page: number;
   pageSize: number;
-  hits: Array<{ productId: string; sku: string; slug: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null }>;
+  hits: Array<{ productId: string; sku: string; slug: string; name: string; priceDisplay: string | null; mrpDisplay: string | null; currency: string | null; imageKey: string | null; swatches: ColorSwatch[] }>;
   facets: Record<string, FacetBucket[]>;
 }
 

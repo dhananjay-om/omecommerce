@@ -34,17 +34,19 @@ import type { ProductDetail, SearchHit } from '@/types/product';
  * `useCartStore.addLine` the PDP's own Add to Cart button uses — a real
  * extra round trip, not a shortcut.
  *
- * Placeholder-until-real-data (per the user's own explicit call, not this
- * component's usual "don't fabricate" default): `SearchHit` carries no
- * brand, rating, or color-variant fields at grid scale, so the brand
- * eyebrow/star rating/color swatches below are NOT real — the rating is a
- * deterministic per-product placeholder (stable across renders, not
- * literally `Math.random()`, so it doesn't jump around or cause a
- * hydration mismatch), the brand eyebrow cycles through this store's own
- * real brand names as a stand-in, and the swatches are one fixed static
- * set shown on every card. Swap these for the real thing later: a rating
- * aggregate + brand + variant colors would need adding to the search
- * index / `SearchHit` itself, not just this component.
+ * Color swatches are REAL: `hit.swatches` comes from the search index (each
+ * variant-forming option that has a hex swatch, e.g. Color=Red) and the row
+ * is omitted entirely when a product has none.
+ *
+ * Still placeholder-until-real-data (per the user's own explicit call, not
+ * this component's usual "don't fabricate" default): `SearchHit` carries no
+ * brand or rating at grid scale, so the brand eyebrow and star rating are NOT
+ * real — the rating is a deterministic per-product placeholder (stable
+ * across renders, not literally `Math.random()`, so it doesn't jump around or
+ * cause a hydration mismatch) and the brand eyebrow cycles through this
+ * store's own real brand names as a stand-in. Swapping those for real data
+ * would need a rating aggregate + brand adding to the search index /
+ * `SearchHit`, not just this component.
  *
  * Image: `resolveProductImage(hit.sku, hit.name, hit.imageUrl)`, not a
  * blind `hit.imageUrl` OR a blind mock — a real image wins whenever one
@@ -69,10 +71,11 @@ function hashString(value: string): number {
   return hash;
 }
 
+/** Cap so a product with many colors doesn't overflow the card — the rest collapse into "+N". */
+const MAX_SWATCHES = 5;
+
 const PLACEHOLDER_BRANDS = ['Nova Electronics', 'Urban Threads', 'HomeStyle'];
 const PLACEHOLDER_RATINGS = [3.5, 4, 4.5, 5];
-/** One fixed set, same on every card for now — per the user's own "static for now" call. */
-const STATIC_SWATCHES = ['#111111', '#B8956A', '#C4786A', '#EBEBEA'];
 
 function placeholderBrand(productId: string): string {
   return PLACEHOLDER_BRANDS[hashString(productId) % PLACEHOLDER_BRANDS.length]!;
@@ -83,6 +86,7 @@ function placeholderRating(productId: string): number {
 }
 
 export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'bestseller' }) {
+  const swatches = hit.swatches ?? [];
   const percentOff =
     hit.priceDisplay && hit.mrpDisplay ? discountPercent(hit.priceDisplay, hit.mrpDisplay) : null;
   // Falls back to the old id-based URL (itself now a permanent redirect to
@@ -165,7 +169,20 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
       </div>
 
       <div className="mt-3 flex flex-1 flex-col px-0.5">
-        <p className="text-[10px] tracking-widest text-slate uppercase">{placeholderBrand(hit.productId)}</p>
+        {/* Brand on the left, real color dots on the right (omitted entirely when the
+            product has none). On the brand line — not their own row — so a product
+            with colors is never taller than one without, and prices stay aligned. */}
+        <div className="flex h-4 items-center justify-between gap-2">
+          <p className="truncate text-[10px] tracking-widest text-slate uppercase">{placeholderBrand(hit.productId)}</p>
+          {swatches.length > 0 ? (
+            <span className="flex shrink-0 items-center gap-1">
+              {swatches.slice(0, MAX_SWATCHES).map((sw) => (
+                <span key={sw.hex} title={sw.label} className="size-2.5 rounded-full border border-ghost" style={{ backgroundColor: sw.hex }} />
+              ))}
+              {swatches.length > MAX_SWATCHES ? <span className="text-[10px] text-slate">+{swatches.length - MAX_SWATCHES}</span> : null}
+            </span>
+          ) : null}
+        </div>
         <Link href={href}>
           {/* min-h reserves exactly two lines (2 × text-sm leading-snug) even for a
              one-line title, so price/discount/swatches start at the same height
@@ -194,11 +211,6 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
                 </span>
               ))}
             </span>
-          </div>
-          <div className="mt-2 flex gap-1.5">
-            {STATIC_SWATCHES.map((hex) => (
-              <span key={hex} className="size-3 rounded-full border border-ghost" style={{ backgroundColor: hex }} />
-            ))}
           </div>
         </div>
       </div>
