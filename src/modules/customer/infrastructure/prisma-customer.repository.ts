@@ -45,6 +45,15 @@ export class PrismaCustomerRepository implements CustomerRepository {
     });
   }
 
+  async releaseDeletedEmail(websiteId: bigint, email: string): Promise<void> {
+    // Raw SQL: the client's soft-delete extension hides deleted rows from Prisma reads/updates.
+    // `email` is citext, so the match is case-insensitive like the unique index itself.
+    await this.db.$executeRaw`
+      UPDATE customer
+      SET email = (email::text || '.deleted.' || public_id::text)::citext
+      WHERE website_id = ${websiteId} AND email = ${email}::citext AND deleted_at IS NOT NULL`;
+  }
+
   async softDelete(id: bigint): Promise<void> {
     await this.db.customer.update({
       where: { id },

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import type { CustomerRepository, WebsiteLookup } from '../domain/repositories.js';
 import type { PasswordHasher } from '../../auth/domain/ports.js';
 import { ConflictError, NotFoundError } from '../../../shared/domain/errors.js';
@@ -21,14 +22,26 @@ export class RegisterCustomer {
     if (await this.customers.findByWebsiteAndEmail(website.id, email)) {
       throw new ConflictError(`customer already registered on this website: ${email}`);
     }
+    // A previously deleted account still holds this email in the DB — free it up first.
+    await this.customers.releaseDeletedEmail(website.id, email);
     const passwordHash = await this.hasher.hash(cmd.password);
-    const customer = await this.customers.create({
-      websiteId: website.id,
-      email,
-      passwordHash,
-      firstName: cmd.firstName ?? null,
-      lastName: cmd.lastName ?? null,
-    });
+    let customer;
+    try {
+      customer = await this.customers.create({
+        websiteId: website.id,
+        email,
+        passwordHash,
+        firstName: cmd.firstName ?? null,
+        lastName: cmd.lastName ?? null,
+      });
+    } catch (err) {
+      // Two simultaneous sign-ups with the same address: the loser gets the normal
+      // "already registered" answer instead of an Internal Server Error.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError(`customer already registered on this website: ${email}`);
+      }
+      throw err;
+    }
 
     await this.outbox.write({
       aggregateType: 'Customer',

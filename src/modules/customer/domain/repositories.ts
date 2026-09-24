@@ -50,6 +50,13 @@ export interface CustomerRepository {
    *  checks isActive) and drops out of new B2B/order flows, but every order they ever placed keeps
    *  its own snapshot of name/email, and existing wallet/loyalty/referral rows are kept, not cascaded. */
   softDelete(id: bigint): Promise<void>;
+  /** A soft-deleted customer row still occupies its (website, email) unique slot, so the same
+   *  address could never register again (and crashed with a 500 when it tried). This renames
+   *  any such deleted row's email to a tombstone (`<email>.deleted.<publicId>`), freeing the
+   *  address for a brand-new, empty account. The deleted record — and every order/wallet/loyalty
+   *  row hanging off it — is otherwise untouched, and is deliberately NOT handed to the new
+   *  registrant (registering doesn't prove you own the address). */
+  releaseDeletedEmail(websiteId: bigint, email: string): Promise<void>;
 }
 
 export interface CustomerAddressRecord {
