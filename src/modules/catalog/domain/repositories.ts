@@ -621,6 +621,11 @@ export interface UpdateBrandInput {
 /** Per-variant stock check for the storefront PDP (plan/14 Phase 0c) — catalog's own copy of the same read search/domain/repositories.ts's StockAvailabilityLookup does, per the established per-module lookup pattern, just keyed by variant instead of product (no join needed, the PDP already has the variant id in hand). */
 export interface VariantStockLookup {
   isInStock(variantId: bigint): Promise<boolean>;
+  /** Units available in the warehouse checkout reserves from for this store
+   *  (StoreWarehouse priority, else the first active warehouse) — the number a
+   *  shopper can actually buy. null when no warehouse resolves. Catalog's own
+   *  copy of the order module's warehouse rule, per the per-module lookup pattern. */
+  availableQty(variantId: bigint, storeId: bigint): Promise<number | null>;
 }
 
 /** Persistence port for the storefront brand entity (plan/14 Phase 0b) — same shape/discipline as CategoryRepository, minus the tree (brands are flat). */

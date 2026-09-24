@@ -6,6 +6,7 @@ import { MinusIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/cart-store';
 import { formatPrice } from '@/lib/format-price';
+import { cartErrorMessage, stockLimitMessage } from '@/lib/cart-error';
 import { TaxInclusiveNote } from '@/components/tax-inclusive-note';
 import type { CartLine } from '@/types/cart';
 
@@ -14,13 +15,20 @@ export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLi
   const addLine = useCartStore((s) => s.addLine);
   const removeLine = useCartStore((s) => s.removeLine);
 
+  const overStock = line.availableQty !== null && line.qty > line.availableQty;
+
   async function setQty(qty: number) {
     if (qty < 1) return;
+    // Instant answer — no round trip needed to know this would be refused.
+    if (line.availableQty !== null && qty > line.availableQty && qty > line.qty) {
+      toast.error(stockLimitMessage(line.availableQty));
+      return;
+    }
     setPending(true);
     try {
       await addLine(line.variantId, qty);
-    } catch {
-      toast.error('Could not update quantity. Please try again.');
+    } catch (err) {
+      toast.error(cartErrorMessage(err, 'Could not update quantity. Please try again.'));
     } finally {
       setPending(false);
     }
@@ -79,6 +87,11 @@ export function CartLineRow({ line, currency, pricesIncludeTax }: { line: CartLi
             <TrashIcon className="size-4 text-rose" />
           </Button>
         </div>
+        {overStock ? (
+          <p role="alert" className="text-xs font-medium text-destructive">
+            {line.availableQty === 0 ? 'Out of stock — please remove this item.' : `Only ${line.availableQty} in stock — please reduce the quantity.`}
+          </p>
+        ) : null}
       </div>
 
       <div className="text-right whitespace-nowrap">

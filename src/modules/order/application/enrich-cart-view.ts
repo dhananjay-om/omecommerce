@@ -9,7 +9,7 @@ import type {
   CompanyMembershipLookup,
   WalletSettingsLookup,
 } from '../domain/repositories.js';
-import type { MediaUrlResolver } from '../domain/ports.js';
+import type { MediaUrlResolver, CartStockLookup } from '../domain/ports.js';
 import type { PriceResolver } from '../../pricing/domain/repositories.js';
 import type { DiscountCalculator, DiscountLineInput } from '../../coupon/domain/repositories.js';
 import type { WalletLedger } from '../../wallet/domain/repositories.js';
@@ -49,6 +49,7 @@ interface EnrichableCart {
   publicId: string;
   currency: string;
   websiteId: bigint;
+  storeViewId: bigint;
   customerId: bigint | null;
   customerGroupId: bigint | null;
   status: string;
@@ -83,6 +84,7 @@ export class EnrichCartView {
     private readonly companyCredit: CompanyCreditLedger,
     private readonly companyMemberships: CompanyMembershipLookup,
     private readonly walletSettings: WalletSettingsLookup,
+    private readonly stock: CartStockLookup,
   ) {}
 
   async execute(cart: EnrichableCart): Promise<CartView> {
@@ -92,8 +94,14 @@ export class EnrichCartView {
     const variantRefs = await Promise.all(
       cart.lines.map((line) => this.variants.byId(line.variantId)),
     );
+    const availableByVariant = await this.stock.availableByVariant(
+      cart.lines.map((l) => l.variantId),
+      cart.storeViewId,
+    );
     const lines: CartLineDto[] = await Promise.all(
-      cart.lines.map((line, i) => this.enrichLine(line, cart, variantRefs[i]!)),
+      cart.lines.map((line, i) =>
+        this.enrichLine(line, cart, variantRefs[i]!, availableByVariant.get(line.variantId.toString()) ?? null),
+      ),
     );
 
     // Not frozen at cart creation — see CartView.pricesIncludeTax's doc comment.
@@ -442,6 +450,7 @@ export class EnrichCartView {
     line: CartLineView,
     cart: EnrichableCart,
     variant: VariantRef,
+    availableQty: number | null,
   ): Promise<CartLineDto> {
     const [resolvedPrice, imageKey] = await Promise.all([
       this.priceResolver.resolve({
@@ -470,6 +479,7 @@ export class EnrichCartView {
       mrp: resolvedPrice?.mrp ?? null,
       imageUrl,
       lineTotal,
+      availableQty,
       discountAmount: null, // filled in by execute() once the coupon evaluation is known
     };
   }

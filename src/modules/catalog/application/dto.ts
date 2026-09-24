@@ -107,6 +107,10 @@ export interface StoreProductVariantView {
    *  strikethrough + "X% off" display when mrp > price. */
   mrp: string | null;
   inStock: boolean;
+  /** Units a shopper can buy right now (the store's fulfilling warehouse) — the
+   *  storefront caps its quantity picker with it. null when it couldn't be
+   *  determined, in which case nothing is capped. */
+  availableQty: number | null;
   /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — powers the
    * storefront's variant picker. Empty for a SIMPLE/DIGITAL/VIRTUAL product's single implicit variant. */
   axisValues: VariantAxisValueView[];

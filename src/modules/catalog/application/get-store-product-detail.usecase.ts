@@ -55,7 +55,7 @@ export class GetStoreProductDetail {
 
     const variants: StoreProductVariantView[] = await Promise.all(
       variantRows.map(async (v) => {
-        const [resolvedPrice, inStock] = await Promise.all([
+        const [resolvedPrice, inStockAnywhere, availableQty] = await Promise.all([
           this.priceResolver.resolve({
             variantId: v.id,
             qty: 1,
@@ -65,7 +65,12 @@ export class GetStoreProductDetail {
             asOf: new Date(),
           }),
           this.variantStock.isInStock(v.id),
+          this.variantStock.availableQty(v.id, ctx.storeId),
         ]);
+        // Same warehouse checkout reserves from, so "In Stock" here always means
+        // "you can actually buy it"; falls back to the any-warehouse check only
+        // when no warehouse resolves.
+        const inStock = availableQty !== null ? availableQty > 0 : inStockAnywhere;
         return {
           publicId: v.publicId,
           sku: v.sku,
@@ -74,6 +79,7 @@ export class GetStoreProductDetail {
           price: resolvedPrice?.price ?? null,
           mrp: resolvedPrice?.mrp ?? null,
           inStock,
+          availableQty,
           axisValues: v.axisValues.map((a) => ({
             attributeCode: a.attributeCode,
             attributeLabel: a.attributeLabel,

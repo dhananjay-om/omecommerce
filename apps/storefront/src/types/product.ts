@@ -22,6 +22,8 @@ export interface ProductVariant {
    *  a qty tier. Drives a strikethrough + "X% off" next to `price` when mrp > price. */
   mrp: string | null;
   inStock: boolean;
+  /** Units the shopper can buy right now — null when unknown (nothing is capped then). */
+  availableQty: number | null;
   /** Which axis-attribute option this variant represents (Size=M, Color=Red, ...) — powers the
    * variant picker on the PDP. Empty for a SIMPLE/DIGITAL/VIRTUAL product's single variant. */
   axisValues: VariantAxisValue[];

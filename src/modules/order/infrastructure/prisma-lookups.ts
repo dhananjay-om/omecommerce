@@ -10,6 +10,7 @@ import type {
   WalletSettingsLookup,
 } from '../domain/repositories.js';
 import type { WalletSettings } from '../domain/wallet-rules.js';
+import type { CartStockLookup } from '../domain/ports.js';
 
 export class PrismaVariantLookup implements VariantLookup {
   constructor(private readonly db: Db) {}
@@ -219,5 +220,29 @@ export class PrismaAdminUserLookup implements AdminUserLookup {
 
   async findByPublicId(publicId: string): Promise<{ id: bigint; email: string } | null> {
     return this.db.adminUser.findFirst({ where: { publicId }, select: { id: true, email: true } });
+  }
+}
+
+export class PrismaCartStockLookup implements CartStockLookup {
+  private readonly warehouses: PrismaWarehouseResolver;
+  constructor(private readonly db: Db) {
+    this.warehouses = new PrismaWarehouseResolver(db);
+  }
+
+  async availableByVariant(variantIds: bigint[], storeViewId: bigint): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    if (variantIds.length === 0) return result;
+    const view = await this.db.storeView.findUnique({ where: { id: storeViewId }, select: { storeId: true } });
+    const warehouse = view ? await this.warehouses.resolveForStore(view.storeId) : null;
+    // No warehouse resolvable: nothing to check against here — checkout raises
+    // its own "no warehouse" error, same as before this lookup existed.
+    if (!warehouse) return result;
+    // `available` is a DB-generated column (on_hand - reserved), not on the Prisma model.
+    const rows = await this.db.$queryRaw<Array<{ variant_id: bigint; available: number }>>`
+      SELECT variant_id, available FROM stock_item
+      WHERE warehouse_id = ${warehouse.id} AND variant_id = ANY(${variantIds}::bigint[])`;
+    for (const id of variantIds) result.set(id.toString(), 0);
+    for (const r of rows) result.set(r.variant_id.toString(), Math.max(0, Number(r.available)));
+    return result;
   }
 }

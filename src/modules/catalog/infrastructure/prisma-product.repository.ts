@@ -371,6 +371,22 @@ export class PrismaVariantStockLookup implements VariantStockLookup {
       SELECT EXISTS (SELECT 1 FROM stock_item WHERE variant_id = ${variantId} AND available > 0) AS in_stock`;
     return rows[0]?.in_stock ?? false;
   }
+
+  async availableQty(variantId: bigint, storeId: bigint): Promise<number | null> {
+    const mapped = await this.db.storeWarehouse.findFirst({
+      where: { storeId },
+      orderBy: { priority: 'asc' },
+      select: { warehouseId: true },
+    });
+    const warehouseId =
+      mapped?.warehouseId ??
+      (await this.db.warehouse.findFirst({ where: { isActive: true, deletedAt: null }, orderBy: { id: 'asc' }, select: { id: true } }))?.id;
+    if (warehouseId === undefined) return null;
+    // `available` is a DB-generated column (on_hand - reserved), not on the Prisma model.
+    const rows = await this.db.$queryRaw<Array<{ available: number }>>`
+      SELECT available FROM stock_item WHERE variant_id = ${variantId} AND warehouse_id = ${warehouseId}`;
+    return Math.max(0, Number(rows[0]?.available ?? 0));
+  }
 }
 
 const ATTRIBUTE_SELECT = {

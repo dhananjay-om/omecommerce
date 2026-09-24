@@ -11,6 +11,7 @@ import type { OrderRepository } from './domain/repositories.js';
 import {
   PrismaVariantLookup,
   PrismaWarehouseResolver,
+  PrismaCartStockLookup,
   PrismaCustomerGroupLookup,
   PrismaCartProductMediaLookup,
   PrismaAdminUserLookup,
@@ -268,6 +269,7 @@ export function createOrderModule(
   // companyCredit above — used both for cart tender preview (EnrichCartView)
   // and checkout-time capping (CompleteCheckout) below.
   const walletSettings = new PrismaWalletSettingsLookup(db);
+  const cartStock = new PrismaCartStockLookup(db);
   const enrichCartView = new EnrichCartView(
     variants,
     priceResolver,
@@ -282,6 +284,7 @@ export function createOrderModule(
     companyCredit,
     companyMemberships,
     walletSettings,
+    cartStock,
   );
 
   const createCart = new CreateCart(
@@ -299,7 +302,7 @@ export function createOrderModule(
     companyMemberships,
     enrichCartView,
   );
-  const addCartLine = new AddCartLine(carts, variants, enrichCartView);
+  const addCartLine = new AddCartLine(carts, variants, enrichCartView, cartStock);
   const getCart = new GetCart(carts, enrichCartView);
   const removeCartLine = new RemoveCartLine(carts, variants, enrichCartView);
   const applyCouponToCart = new ApplyCouponToCart(

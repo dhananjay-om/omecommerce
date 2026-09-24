@@ -107,7 +107,13 @@ export function ProductPurchasePanel({
         )}
       </p>
       <p className={`mt-2 text-sm font-medium ${selectedVariant ? (inStock ? 'text-green-700' : 'text-destructive') : 'text-slate'}`}>
-        {selectedVariant ? (inStock ? 'In Stock' : 'Out of Stock') : 'Select options to see availability'}
+        {selectedVariant
+          ? inStock
+            ? selectedVariant.availableQty !== null && selectedVariant.availableQty <= 5
+              ? `Only ${selectedVariant.availableQty} left in stock`
+              : 'In Stock'
+            : 'Out of Stock'
+          : 'Select options to see availability'}
       </p>
 
       {axes.length > 0 ? (

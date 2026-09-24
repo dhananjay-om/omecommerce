@@ -122,3 +122,15 @@ export interface PdfStorage {
 export interface EmailSender {
   send(input: { to: string; subject: string; html: string }): Promise<{ providerRef: string }>;
 }
+
+/**
+ * How many units of each variant a shopper can still buy from the warehouse
+ * checkout would reserve from for this store view — the same warehouse
+ * (StoreWarehouse priority, else first active) CompleteCheckout resolves, so
+ * "available" here and "reserved at checkout" can never disagree. Only used to
+ * cap the cart early; the guarded reservation at checkout stays the real
+ * source of truth against overselling.
+ */
+export interface CartStockLookup {
+  availableByVariant(variantIds: bigint[], storeViewId: bigint): Promise<Map<string, number>>;
+}

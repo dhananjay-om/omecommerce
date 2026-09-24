@@ -10,6 +10,8 @@ export interface CartLine {
   mrp: string | null;
   imageUrl: string | null;
   lineTotal: string | null;
+  /** Units still buyable for this variant — null when unknown. Can be below `qty` if stock dropped after adding. */
+  availableQty: number | null;
   /** This line's share of the applied coupon's discount — null when no coupon is
    *  applied, or when an item-targeted coupon's conditions didn't match this line. */
   discountAmount: string | null;

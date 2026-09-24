@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { cartErrorMessage } from '@/lib/cart-error';
 import { HeartIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import { formatPrice } from '@/lib/format-price';
@@ -108,8 +109,8 @@ export function ProductCard({ hit, badge }: { hit: SearchHit; badge?: 'new' | 'b
       if (!variant) throw new Error('no purchasable variant');
       await addLine(variant.publicId, 1);
       toast.success('Added to cart');
-    } catch {
-      toast.error('Could not add to cart — open the product page instead.');
+    } catch (err) {
+      toast.error(cartErrorMessage(err, 'Could not add to cart — open the product page instead.'));
     } finally {
       setQuickAdding(false);
     }

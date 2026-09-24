@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { cartErrorMessage } from '@/lib/cart-error';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/axios';
@@ -53,8 +54,8 @@ export function WishlistList({ initialItems }: { initialItems: EnrichedWishlistI
     try {
       await addLine(item.variantId, 1);
       toast.success('Added to cart');
-    } catch {
-      toast.error('Could not add to cart. Please try again.');
+    } catch (err) {
+      toast.error(cartErrorMessage(err, 'Could not add to cart. Please try again.'));
     } finally {
       setAddingId(null);
     }

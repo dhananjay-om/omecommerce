@@ -24,6 +24,10 @@ export interface CartLineDto {
   imageUrl: string | null;
   /** `price * qty`, or null when price is null (no price configured for this variant). */
   lineTotal: string | null;
+  /** Units the shopper can still buy for this variant right now — null when it
+   *  couldn't be determined (then the UI simply doesn't cap). Can be lower than
+   *  `qty` if stock dropped after the item was added. */
+  availableQty: number | null;
   /** This line's share of the applied coupon's discount (allocateProportionally),
    *  live-computed same as CartView.discountTotal — null when no coupon is applied,
    *  or 0 for a line an ITEM-target coupon's conditions didn't match. */

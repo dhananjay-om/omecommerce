@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlistStore } from '@/store/wishlist-store';
 import { formatPrice } from '@/lib/format-price';
+import { cartErrorMessage, stockLimitMessage } from '@/lib/cart-error';
 import type { ProductVariant } from '@/types/product';
 
 export function ProductActions({
@@ -26,13 +27,33 @@ export function ProductActions({
   currency: string;
 }) {
   const router = useRouter();
-  const [qty, setQty] = useState(1);
+  const [wantedQty, setQty] = useState(1);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const addLine = useCartStore((s) => s.addLine);
   const isWishlisted = useWishlistStore((s) => s.has(productId));
   const toggleWishlist = useWishlistStore((s) => s.toggle);
 
   const canPurchase = inStock && !!variant;
+  // Units on hand for the selected variant; null = unknown, so nothing is capped.
+  // Derived (not synced through an effect) so switching to a variant with less
+  // stock immediately pulls the quantity down.
+  const maxQty = variant?.availableQty ?? null;
+  const qty = maxQty !== null && maxQty > 0 ? Math.min(wantedQty, maxQty) : wantedQty;
+
+  function increase() {
+    if (maxQty !== null && qty >= maxQty) {
+      setLimitMessage(stockLimitMessage(maxQty));
+      return;
+    }
+    setLimitMessage(null);
+    setQty(qty + 1);
+  }
+
+  function decrease() {
+    setLimitMessage(null);
+    setQty(Math.max(1, qty - 1));
+  }
 
   async function addToCart() {
     if (!variant) return;
@@ -40,8 +61,10 @@ export function ProductActions({
     try {
       await addLine(variant.publicId, qty);
       toast.success('Added to cart');
-    } catch {
-      toast.error('Could not add to cart. Please try again.');
+    } catch (err) {
+      const message = cartErrorMessage(err, 'Could not add to cart. Please try again.');
+      setLimitMessage(message);
+      toast.error(message);
     } finally {
       setPending(false);
     }
@@ -53,8 +76,10 @@ export function ProductActions({
     try {
       await addLine(variant.publicId, qty);
       router.push('/cart');
-    } catch {
-      toast.error('Could not add to cart. Please try again.');
+    } catch (err) {
+      const message = cartErrorMessage(err, 'Could not add to cart. Please try again.');
+      setLimitMessage(message);
+      toast.error(message);
       setPending(false);
     }
   }
@@ -79,15 +104,20 @@ export function ProductActions({
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-jet">Quantity</span>
         <div className="flex items-center gap-1 rounded-xl border border-ghost bg-ivory px-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Decrease quantity">
+          <Button variant="ghost" size="icon-sm" onClick={decrease} aria-label="Decrease quantity">
             <MinusIcon className="size-4" />
           </Button>
           <span className="w-8 text-center text-sm font-semibold text-jet">{qty}</span>
-          <Button variant="ghost" size="icon-sm" onClick={() => setQty((q) => q + 1)} aria-label="Increase quantity">
+          <Button variant="ghost" size="icon-sm" onClick={increase} aria-label="Increase quantity">
             <PlusIcon className="size-4" />
           </Button>
         </div>
       </div>
+      {limitMessage ? (
+        <p role="alert" className="-mt-2 text-sm font-medium text-destructive">
+          {limitMessage}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="cta" size="lg" disabled={!canPurchase || pending} onClick={addToCart} className="flex-1">
